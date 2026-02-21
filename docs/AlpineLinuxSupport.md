@@ -17,7 +17,7 @@ Alpine Linux users can use grate through multiple distribution methods without n
 The official grate Docker image is built on Alpine Linux and is the recommended approach for Alpine users:
 
 ```sh
-docker pull grate-devs/grate:latest
+docker pull erikbra/grate:latest
 ```
 
 The Docker image:
@@ -30,7 +30,7 @@ See the [Getting Grate](/getting-grate/) documentation for Docker usage examples
 
 ### 2. Standalone linux-musl Binaries
 
-Pre-built binaries for linux-musl (Alpine's libc implementation) are available for download from the [releases page](https://github.com/erikbra/grate/releases/latest):
+Pre-built binaries for linux-musl (Alpine's libc implementation) are available for download from the [releases page](https://github.com/grate-devs/grate/releases/latest):
 
 - `grate-linux-musl-x64-self-contained-{version}.zip` - For x86_64/amd64 systems
 - `grate-linux-musl-arm64-self-contained-{version}.zip` - For ARM64 systems
@@ -41,10 +41,10 @@ These self-contained binaries work on Alpine Linux without requiring .NET runtim
 
 ```sh
 # Download the appropriate binary (replace {version} with actual version like 2.0.5)
-wget https://github.com/erikbra/grate/releases/download/{version}/grate-linux-musl-x64-self-contained-{version}.zip
+wget https://github.com/grate-devs/grate/releases/download/{version}/grate-linux-musl-x64-self-contained-{version}.zip
 
 # Or use latest release
-wget https://github.com/erikbra/grate/releases/latest/download/grate-linux-musl-x64-self-contained-{version}.zip
+wget https://github.com/grate-devs/grate/releases/latest/download/grate-linux-musl-x64-self-contained-{version}.zip
 
 # Extract to a directory
 unzip grate-linux-musl-x64-self-contained-{version}.zip -d grate-bin
@@ -63,7 +63,7 @@ For Alpine users who prefer to build from source:
 apk add dotnet-sdk icu-libs
 
 # Clone and build
-git clone https://github.com/erikbra/grate.git
+git clone https://github.com/grate-devs/grate.git
 cd grate
 dotnet build -c Release
 ```
@@ -91,7 +91,7 @@ If there is significant demand for a native Alpine package, community contributi
 - Be maintained in sync with grate releases
 - Potentially be submitted to the Alpine package repository
 
-Please open a discussion on the [GitHub repository](https://github.com/erikbra/grate) if you're interested in contributing this.
+Please open a discussion on the [GitHub repository](https://github.com/grate-devs/grate) if you're interested in contributing this.
 
 ## Summary
 

@@ -70,8 +70,8 @@ BUILD_ARGS=(
     --file ./installers/docker/Dockerfile
     --platform "$PLATFORM"
     --build-arg VERSION="$VERSION"
-    --tag grate-devs/grate:$VERSION
-    --tag grate-devs/grate:latest
+    --tag erikbra/grate:$VERSION
+    --tag erikbra/grate:latest
 )
 
 # Add --load if single platform or explicitly requested
@@ -88,8 +88,8 @@ docker buildx build "${BUILD_ARGS[@]}" .
 echo ""
 echo "Build completed successfully!"
 echo "Image tags:"
-echo "  - grate-devs/grate:$VERSION"
-echo "  - grate-devs/grate:latest"
+echo "  - erikbra/grate:$VERSION"
+echo "  - erikbra/grate:latest"
 echo ""
 echo "To test the image:"
-echo "  docker run --rm --platform $PLATFORM grate-devs/grate:latest --help"
+echo "  docker run --rm --platform $PLATFORM erikbra/grate:latest --help"

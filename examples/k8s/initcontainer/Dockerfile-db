@@ -1,4 +1,4 @@
-FROM gratedevs/grate:latest as base
+FROM erikbra/grate:latest as base
 WORKDIR /app
 COPY sql/ /db
 RUN mkdir /output

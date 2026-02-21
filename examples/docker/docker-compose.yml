@@ -2,7 +2,7 @@ version: "3.7"
 services:
   db-migration:
     #build: .
-    image: gratedevs/grate:latest
+    image: erikbra/grate:latest
     environment:
       # don't configure passwords here for real.  This is just a sample!
       APP_CONNSTRING: "Server=db;Database=grate_test;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True"
