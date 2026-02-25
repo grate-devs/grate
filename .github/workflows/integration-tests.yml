@@ -220,7 +220,7 @@ jobs:
         run: >
           az account show
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
 
       - run: terraform init
 
@@ -610,7 +610,7 @@ jobs:
         run: >
           az account show
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
 
       - run: terraform init
 
