@@ -20,7 +20,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Setup .NET 10 and earlier
       uses: actions/setup-dotnet@v5
       with:
@@ -45,7 +45,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup .NET 10 and earlier
       uses: actions/setup-dotnet@v5
@@ -77,7 +77,7 @@ jobs:
         #category: [ "Basic_tests", "Sqlite"  ]
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Setup .NET 10 and earlier
       uses: actions/setup-dotnet@v5
       with:
