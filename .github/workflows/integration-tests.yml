@@ -35,7 +35,7 @@ jobs:
       with:
         dotnet-version: 10.0.x
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - name: Install GitVersion
@@ -63,7 +63,7 @@ jobs:
           # - linux-arm64
           # - osx-x64
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Setup .NET 10
       uses: actions/setup-dotnet@v5
       with:
@@ -97,7 +97,7 @@ jobs:
         arch: [ "osx-arm64" ]
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Setup .NET 10
       uses: actions/setup-dotnet@v5
       with:
@@ -126,7 +126,7 @@ jobs:
           - linux-x64
           #- osx-x64
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Setup .NET 10 and earlier
       uses: actions/setup-dotnet@v5
       with:
@@ -160,7 +160,7 @@ jobs:
         arch: [ "osx-arm64" ]
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Setup .NET 10 and earlier
       uses: actions/setup-dotnet@v5
       with:
@@ -208,7 +208,7 @@ jobs:
       #encoded_dbs: ${{ steps.show.outputs.encoded_dbs }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Log into Azure
         uses: azure/login@v2
@@ -326,7 +326,7 @@ jobs:
         echo "Database type: ${{ matrix.database.type }}"
         echo "Image: ${{ matrix.database.image }}"
 
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
 
     - uses: actions/download-artifact@v6
       name: Download executables
@@ -437,7 +437,7 @@ jobs:
 
         echo "Connection string: $([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String( "${{ matrix.database.connectionstring }}" )) )"
 
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
 
     - uses: actions/download-artifact@v6
       name: Download executables
@@ -598,7 +598,7 @@ jobs:
         working-directory: ${{ env.tf_actions_working_dir }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Log into Azure
         uses: azure/login@v2

@@ -15,7 +15,7 @@ jobs:
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       
       - name: Download grate
         run: curl -sL https://github.com/grate-devs/grate/releases/download/1.6.1/grate_1.6.1-1_amd64.deb -o /tmp/grate_1.6.1-1_amd64.deb
@@ -40,7 +40,7 @@ jobs:
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Download grate
         run: curl -sL https://github.com/grate-devs/grate/releases/download/1.6.1/grate_1.6.1-1_amd64.deb -o /tmp/grate_1.6.1-1_amd64.deb
