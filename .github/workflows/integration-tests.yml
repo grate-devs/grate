@@ -75,7 +75,7 @@ jobs:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
     - name: Upload self-contained ${{ matrix.arch }}
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: ./publish/${{ matrix.arch }}/self-contained/*
@@ -109,7 +109,7 @@ jobs:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
     - name: Upload self-contained ${{ matrix.arch }}
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: ./publish/${{ matrix.arch }}/self-contained/*
@@ -144,7 +144,7 @@ jobs:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
     - name: Upload Test DLLs ${{ matrix.arch }}
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: integration-tests-${{ matrix.arch }}-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: ./integration-tests/${{ matrix.arch }}/*
@@ -178,7 +178,7 @@ jobs:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
     - name: Upload Test DLLs ${{ matrix.arch }}
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: integration-tests-${{ matrix.arch }}-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: ./integration-tests/${{ matrix.arch }}/*
@@ -378,7 +378,7 @@ jobs:
 
     - name: Upload Unit Test Results
       if: always()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: "docker ${{ matrix.database.name }} XML test results"
         path: |
@@ -501,7 +501,7 @@ jobs:
 
     - name: Upload Unit Test Results
       if: always()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: "${{ matrix.os.arch }} ${{ matrix.database.cleaned_name }} XML test results"
         path: |
@@ -573,7 +573,7 @@ jobs:
           /tmp/smink/smink "${XML_DIR}/*.xml" "${REPORT_DIR}/grate integration tests $(date +'%Y-%m-%d %H.%M.%S %z').html" --title "grate integration tests"
 
       - name: Upload HTML test report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: HTML test report
           path: |
