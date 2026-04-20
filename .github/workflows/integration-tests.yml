@@ -328,13 +328,13 @@ jobs:
 
     - uses: actions/checkout@v6
 
-    - uses: actions/download-artifact@v6
+    - uses: actions/download-artifact@v8
       name: Download executables
       with:
         name: grate-linux-x64-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: executables/linux-x64
 
-    - uses: actions/download-artifact@v6
+    - uses: actions/download-artifact@v8
       name: Download test DLLs
       with:
         name: integration-tests-linux-x64-${{ needs.set-version-number.outputs.nuGetVersion }}
@@ -439,13 +439,13 @@ jobs:
 
     - uses: actions/checkout@v6
 
-    - uses: actions/download-artifact@v6
+    - uses: actions/download-artifact@v8
       name: Download executables
       with:
         name: grate-${{ matrix.os.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: executables/${{ matrix.os.arch }}
 
-    - uses: actions/download-artifact@v6
+    - uses: actions/download-artifact@v8
       name: Download test DLLs
       with:
         name: integration-tests-${{ matrix.os.arch }}-${{ needs.set-version-number.outputs.nuGetVersion }}
@@ -529,7 +529,7 @@ jobs:
 
     steps:
       - name: Download XML test reports
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           path: test-results
 
