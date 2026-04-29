@@ -97,7 +97,7 @@ jobs:
 
     - name: Upload Unit Test Results
       if: always()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v4
       with:
         name: "${{ matrix.category }} XML test results"
         path: |
@@ -157,7 +157,7 @@ jobs:
           /tmp/smink/smink "${XML_DIR}/*.xml" "${REPORT_DIR}/test-report.html" --title "grate unit tests"
 
       - name: Upload HTML test report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: HTML test report
           path: |
