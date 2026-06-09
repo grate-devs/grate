@@ -34,7 +34,7 @@ public async Task Run_migration_agains_target_db()
 }
 ```
 
-for more configuration options, see the [documentation](https://erikbra.github.io/grate/configuration-options/).
+for more configuration options, see the [documentation](https://grate-devs.github.io/grate/configuration-options/).
 
 
 
@@ -56,6 +56,6 @@ or for writing your own database provider. Please feel free to create your own d
 if you need support for a database that is not supported yet.
 
 
-Full documentation can be found at [https://erikbra.github.io/grate/](https://erikbra.github.io/grate/).
+Full documentation can be found at [https://grate-devs.github.io/grate/](https://grate-devs.github.io/grate/).
 
 

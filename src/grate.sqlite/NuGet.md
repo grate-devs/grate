@@ -35,7 +35,7 @@ public async Task Run_migration_agains_target_db()
 ```
 
 
-for more configuration options, see the [documentation](https://erikbra.github.io/grate/configuration-options/).
+for more configuration options, see the [documentation](https://grate-devs.github.io/grate/configuration-options/).
 
 ## grate supports the following DMBS's
 
@@ -54,6 +54,6 @@ This is the core package, which does nothing by itself. It is mostly useful for 
 or for writing your own database provider. Please feel free to create your own database provider, and submit it a pull request,
 if you need support for a database that is not supported yet.
 
-Full documentation can be found at [https://erikbra.github.io/grate/](https://erikbra.github.io/grate/).
+Full documentation can be found at [https://grate-devs.github.io/grate/](https://grate-devs.github.io/grate/).
 
 

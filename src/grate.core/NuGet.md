@@ -45,7 +45,7 @@ public async Task Run_migration_agains_target_db()
 }
 ```
 
-for more configuration options, see the [documentation](https://erikbra.github.io/grate/configuration-options/).
+for more configuration options, see the [documentation](https://grate-devs.github.io/grate/configuration-options/).
 
 
 ## grate supports the following DMBS's
@@ -58,6 +58,6 @@ for more configuration options, see the [documentation](https://erikbra.github.i
 | Sqlite (sqlite) | [![NuGet](https://img.shields.io/nuget/v/grate.sqlite.svg)](https://www.nuget.org/packages/grate.sqlite/) |
 | Oracle (oracle) | [![NuGet](https://img.shields.io/nuget/v/grate.oracle.svg)](https://www.nuget.org/packages/grate.oracle/) |
 
-Full documentation can be found at [https://erikbra.github.io/grate/](https://erikbra.github.io/grate/).
+Full documentation can be found at [https://grate-devs.github.io/grate/](https://grate-devs.github.io/grate/).
 
 

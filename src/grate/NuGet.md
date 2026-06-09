@@ -13,7 +13,7 @@ It will deploy to that database, looking for sql scripts in the current director
 grate --connectionstring="Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Database=grate_test"
 ```
 
-for more configuration options, see the [documentation](https://erikbra.github.io/grate/configuration-options/).
+for more configuration options, see the [documentation](https://grate-devs.github.io/grate/configuration-options/).
 
 
 
@@ -25,6 +25,6 @@ for more configuration options, see the [documentation](https://erikbra.github.i
 * Sqlite
 * Oracle
 
-Full documentation can be found at [https://erikbra.github.io/grate/](https://erikbra.github.io/grate/).
+Full documentation can be found at [https://grate-devs.github.io/grate/](https://grate-devs.github.io/grate/).
 
 
