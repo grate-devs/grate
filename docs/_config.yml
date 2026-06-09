@@ -1,5 +1,9 @@
 remote_theme: pmarsceill/just-the-docs
 
+kramdown:
+  typographic_symbols:
+    ndash: __
+
 # Aux links for the upper right navigation
 aux_links:
   "grate on GitHub":
