@@ -18,8 +18,7 @@ public record SqlServerTestContainerDatabase(
 
     protected override IContainer InitializeTestContainer()
     {
-        return new MsSqlBuilder()
-            .WithImage(DockerImage)
+        return new MsSqlBuilder(DockerImage)
             .WithEnvironment("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)

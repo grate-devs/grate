@@ -7,36 +7,35 @@
     <!--
       .net sdk
     -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-    <PackageVersion Include="Npgsql" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.301" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
     <PackageVersion Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageVersion Include="Dapper" Version="2.1.72" />
-    <PackageVersion Include="MySqlConnector" Version="2.4.0" />
-    <PackageVersion Include="Oracle.ManagedDataAccess.Core" Version="3.21.170" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.1" />
+    <PackageVersion Include="Dapper" Version="2.1.79" />
+    <PackageVersion Include="MySqlConnector" Version="2.6.0" />
+    <PackageVersion Include="Oracle.ManagedDataAccess.Core" Version="23.26.200" />
     <PackageVersion Include="System.Private.Uri" Version="4.3.2" />
     <!--
       Note: the following references are exclusively used in the test projects:
     -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageVersion Include="xunit" Version="2.9.2 " />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.runner.utility" Version="2.9.2" />
-    <PackageVersion Include="FluentAssertions" Version="7.0.0" />
+    <PackageVersion Include="FluentAssertions" Version="8.10.0" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
-    <PackageVersion Include="XunitXml.TestLogger" Version="5.0.0" />
-    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
-    <PackageVersion Include="Testcontainers" Version="4.1.0" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.1.0" />
-    <PackageVersion Include="Testcontainers.MariaDb" Version="4.1.0" />
-    <PackageVersion Include="Testcontainers.Oracle" Version="4.1.0" />
-    <PackageVersion Include="Testcontainers.MsSql" Version="4.1.0" />
-    <PackageVersion Include="Xunit.DependencyInjection" Version="9.7.1" />
+    <PackageVersion Include="XunitXml.TestLogger" Version="8.0.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="Testcontainers" Version="4.12.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.12.0" />
+    <PackageVersion Include="Testcontainers.MariaDb" Version="4.12.0" />
+    <PackageVersion Include="Testcontainers.Oracle" Version="4.12.0" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.12.0" />
     <PackageVersion Include="Xunit.DependencyInjection.Logging" Version="9.0.0" />
-    <PackageVersion Include="MartinCostello.Logging.XUnit" Version="0.5.0" />
+    <PackageVersion Include="MartinCostello.Logging.XUnit" Version="0.7.1" />
   </ItemGroup>
 </Project>

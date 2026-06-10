@@ -23,7 +23,6 @@
 
     <PackageReference Include="MartinCostello.Logging.XUnit" />
     <PackageReference Include="XunitXml.TestLogger" />
-    <PackageReference Include="Xunit.DependencyInjection" />
     <PackageReference Include="Xunit.DependencyInjection.Logging" />
   </ItemGroup>
   

@@ -73,13 +73,12 @@ public record DockerGrateMigrator(
         var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var token = cancellationTokenSource.Token;
         
-        var containerBuilder = new ContainerBuilder()
-            .WithImage(DockerImage)
+        var containerBuilder = new ContainerBuilder(DockerImage)
             .WithEntrypoint(dockerArguments.ToArray())
             .WithEnvironment("DOTNET_BUNDLE_EXTRACT_BASE_DIR", "/home/app")
             // This is dependent on changing the image to only use grate as ENTRYPOINT, and the rest as CMD
             //.WithCommand(dockerArguments.ToArray())
-            .WithCreateParameterModifier(param => param.HostConfig.ReadonlyRootfs = true)
+            .WithCreateParameterModifier(param => param.HostConfig?.ReadonlyRootfs = true)
             .WithTmpfsMount("/tmp")
             .WithNetwork(Network)
             .WithLogger(Logger);

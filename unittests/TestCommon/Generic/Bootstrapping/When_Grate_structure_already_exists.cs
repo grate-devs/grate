@@ -79,7 +79,7 @@ public abstract class When_Grate_structure_already_exists(IGrateTestContext cont
         selectSql = $"SELECT COUNT(*) FROM {grateInternalScriptsRunTable}";
         conn = Context.CreateDbConnection(db);
         var count = await conn.QueryFirstOrDefaultAsync<int>(selectSql);
-        count.Should().BeGreaterOrEqualTo(6);
+        Assert.True(count >= 6);
         
         TryClose(conn);
         

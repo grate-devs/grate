@@ -18,8 +18,7 @@ public record PostgreSqlTestContainerDatabase(
 
     protected override IContainer InitializeTestContainer()
     {
-        return new PostgreSqlBuilder()
-            .WithImage(DockerImage)
+        return new PostgreSqlBuilder(DockerImage)
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)
             .WithNetworkAliases(NetworkAlias)

@@ -7,6 +7,7 @@ using grate.Oracle.Infrastructure;
 using grate.Oracle.Migration;
 using Oracle.ManagedDataAccess.Client;
 using TestCommon.TestInfrastructure;
+using OracleDatabase = grate.Oracle.Migration.OracleDatabase;
 
 namespace Oracle.TestInfrastructure;
 

@@ -18,8 +18,7 @@ public record OracleTestContainerDatabase(
 
     protected override IContainer InitializeTestContainer()
     {
-        return new OracleBuilder()
-            .WithImage(DockerImage)
+        return new OracleBuilder(DockerImage)
             .WithEnvironment("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
             .WithEnvironment("ORACLE_PDB", "FREEPDB1")
             .WithPassword(AdminPassword)

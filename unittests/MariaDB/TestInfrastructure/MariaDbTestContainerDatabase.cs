@@ -19,9 +19,8 @@ public record MariaDbTestContainerDatabase(
 
     protected override IContainer InitializeTestContainer()
     {
-        return new MariaDbBuilder()
+        return new MariaDbBuilder(DockerImage)
             .WithCommand("--max_connections=10000")
-            .WithImage(DockerImage)
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)
             .WithNetworkAliases(NetworkAlias)
