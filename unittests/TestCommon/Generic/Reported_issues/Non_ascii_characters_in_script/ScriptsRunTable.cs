@@ -3,7 +3,6 @@ using FluentAssertions;
 using grate.Configuration;
 using TestCommon.Generic.Running_MigrationScripts;
 using TestCommon.TestInfrastructure;
-using Xunit.Abstractions;
 
 namespace TestCommon.Generic.Reported_issues.Non_ascii_characters_in_script;
 

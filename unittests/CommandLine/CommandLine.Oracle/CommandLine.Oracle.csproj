@@ -6,6 +6,7 @@
 
     <IsPublishable>true</IsPublishable>
     <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
     
   </PropertyGroup>

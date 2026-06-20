@@ -13,19 +13,19 @@ public class SqliteTestDatabase : ITestDatabase, IAsyncLifetime
 {
     private readonly string _root = Dir.CreateTempSubdirectory("grate-sqlite-tests-").ToString();
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         var dbFiles = Directory.GetFiles(_root, "*.db");
         foreach (var dbFile in dbFiles)
         {
             File.Delete(dbFile);
         }
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
     
     public string AdminConnectionString => $"Data Source={Wrap("grate-sqlite.db")}";

@@ -4,7 +4,7 @@ public class TestDatabaseFixture(ITestDatabase testDatabase) : IAsyncLifetime
 {
     public ITestDatabase TestDatabase { get; } = testDatabase;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (TestDatabase is IAsyncLifetime asyncLifetime)
         {
@@ -12,7 +12,7 @@ public class TestDatabaseFixture(ITestDatabase testDatabase) : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (TestDatabase is IAsyncLifetime asyncLifetime)
         {

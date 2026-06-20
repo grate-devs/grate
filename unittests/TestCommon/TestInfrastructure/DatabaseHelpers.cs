@@ -2,7 +2,6 @@
 using System.Transactions;
 using Dapper;
 using Microsoft.Data.Sqlite;
-using Xunit.Abstractions;
 using Xunit.Sdk;
 
 #if NET6_0

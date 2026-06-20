@@ -29,13 +29,13 @@ public record MariaDbTestContainerDatabase(
             .Build();
     }
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await Network.CreateAsync();
         await base.InitializeAsync();
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         await Network.DeleteAsync();
         await Network.DisposeAsync();

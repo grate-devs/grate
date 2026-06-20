@@ -17,7 +17,7 @@ public abstract record GrateTestContext(IGrateMigrator Migrator, ITestDatabase T
 
     public virtual IGrateTestContext External => this with { TestDatabase = TestDatabase.External };
     
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (TestDatabase is IAsyncLifetime asyncLifetime)
         {
@@ -25,7 +25,7 @@ public abstract record GrateTestContext(IGrateMigrator Migrator, ITestDatabase T
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (TestDatabase is IAsyncLifetime asyncLifetime)
         {

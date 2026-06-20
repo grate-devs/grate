@@ -5,7 +5,6 @@ using grate.Configuration;
 using grate.Exceptions;
 using TestCommon.Generic.Running_MigrationScripts;
 using TestCommon.TestInfrastructure;
-using Xunit.Abstractions;
 
 namespace TestCommon.Generic.Reported_issues.Non_ascii_characters_in_script;
 

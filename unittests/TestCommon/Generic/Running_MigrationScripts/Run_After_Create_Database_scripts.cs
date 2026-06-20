@@ -3,7 +3,6 @@ using FluentAssertions;
 using FluentAssertions.Execution;
 using grate.Configuration;
 using TestCommon.TestInfrastructure;
-using Xunit.Abstractions;
 using Xunit.Sdk;
 using static grate.Configuration.KnownFolderKeys;
 

@@ -41,13 +41,13 @@ public abstract record TestContainerDatabase : ITestDatabase, IAsyncLifetime
     public IContainer TestContainer { get; }
     public abstract string AdminConnectionString { get; }
 
-    public virtual async Task InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         await Network.CreateAsync();
         await TestContainer.StartAsync();
     }
-    
-    public virtual async Task DisposeAsync()
+
+    public virtual async ValueTask DisposeAsync()
     {
         //await Network.DeleteAsync();
         await Network.DisposeAsync();

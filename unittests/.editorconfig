@@ -1,0 +1,8 @@
+# Analyzer configuration scoped to the test projects (layers on top of the repo root .editorconfig).
+
+[*.cs]
+# xUnit1051: new xunit.v3 analyzer advising that calls accepting a CancellationToken pass
+# TestContext.Current.CancellationToken for more responsive test cancellation. This is advisory
+# only and was introduced by the xunit v2 -> v3 migration. Suppressed for now to keep the
+# migration focused; passing the ambient token through the ~25 call sites can follow up separately.
+dotnet_diagnostic.xUnit1051.severity = none
