@@ -5,7 +5,8 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>preview</AnalysisLevel>
     <NoWarn>$(NoWarn);CS1591;NU5118;NU5128</NoWarn>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- disable warnings due to https://github.com/advisories/GHSA-2m69-gcr7-jv3q, will enable once fixed -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors> 
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <DebugSymbols>true</DebugSymbols>
