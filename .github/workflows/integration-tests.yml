@@ -70,7 +70,7 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish -f net9.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      run: dotnet publish -f net10.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
@@ -104,7 +104,7 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish -f net9.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      run: dotnet publish -f net10.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
@@ -138,7 +138,7 @@ jobs:
     - name: Build Test DLLs ${{ matrix.arch }}
       run: |
         dotnet restore -r ${{ matrix.arch }} unittests/UnitTests.slnf
-        dotnet publish -f net9.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
+        dotnet publish -f net10.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
 
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
@@ -354,8 +354,10 @@ jobs:
       if: ${{ !cancelled() }}
       shell: pwsh
       run: |
-        dotnet test integration-tests/linux-x64/CommandLine.${{ matrix.database.type }}.dll `
-        --logger:"xunit;Environment=${{ matrix.database.name }} (docker);LogFilePath=/tmp/test-results/docker/CommandLine.${{ matrix.database.name }}.xml"
+        dotnet test --test-modules integration-tests/linux-x64/CommandLine.${{ matrix.database.type }}.dll `
+          --coverage `
+          --coverage-output-format xml `
+          --coverage-output "/tmp/test-results/docker/CommandLine.${{ matrix.database.name }}.xml"
       env:
         LogLevel: Information
         GrateExecutablePath: ${{ github.workspace }}/executables/linux-x64/grate
@@ -369,8 +371,10 @@ jobs:
       if: false
       shell: pwsh
       run: |
-        dotnet test integration-tests/linux-x64/Docker.${{ matrix.database.type }}.dll `
-        --logger:"xunit;Environment=${{ matrix.database.name }} (docker);LogFilePath=/tmp/test-results/docker/Docker.${{ matrix.database.name }}.xml"
+        dotnet test --test-modules integration-tests/linux-x64/Docker.${{ matrix.database.type }}.dll `
+          --coverage `
+          --coverage-output-format xml `
+          --coverage-output "/tmp/test-results/docker/Docker.${{ matrix.database.name }}.xml"
       env:
         LogLevel: Information
         TZ: UTC
@@ -477,8 +481,9 @@ jobs:
         $env:GrateTestConfig__AdminConnectionString="$([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String( "${{ matrix.database.connectionstring }}" )) )";
 
         dotnet test integration-tests/${{ matrix.os.arch }}/${{ matrix.database.type }}.dll `
-        --logger:"xunit;Environment=${{ matrix.os.arch }},${{ matrix.database.name }};LogFilePath=/tmp/test-results/${{ matrix.os.arch }}/${{ matrix.database.cleaned_name }}.xml" -- `
-        -MaxCpuCount 2
+          --coverage `
+          --coverage-output-format xml `
+          --coverage-output "/tmp/test-results/${{ matrix.os.arch }}/${{ matrix.database.cleaned_name }}.xml"
 
       env:
         LogLevel: Critical
@@ -491,9 +496,9 @@ jobs:
         $env:GrateTestConfig__AdminConnectionString="$([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String( "${{ matrix.database.connectionstring }}" )) )";
 
         dotnet test integration-tests/${{ matrix.os.arch }}/CommandLine.${{ matrix.database.type }}.dll `
-        --logger:"xunit;Environment=${{ matrix.os.arch }},${{ matrix.database.name }};LogFilePath=/tmp/test-results/${{ matrix.os.arch }}/CommandLine.${{ matrix.database.cleaned_name }}.xml" -- `
-        -MaxCpuCount 2
-
+          --coverage `
+          --coverage-output-format xml `
+          --coverage-output "/tmp/test-results/${{ matrix.os.arch }}/CommandLine.${{ matrix.database.cleaned_name }}.xml"
       env:
         LogLevel: Information
         GrateExecutablePath: ${{ github.workspace }}/executables/${{ matrix.os.arch }}/${{ matrix.os.executable }}

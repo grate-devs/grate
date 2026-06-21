@@ -11,7 +11,7 @@
   
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit.v3"/>
+    <PackageReference Include="xunit.v3.mtp-v2"/>
     <PackageReference Include="xunit.runner.visualstudio" >
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -22,7 +22,7 @@
     <PackageReference Include="Testcontainers" />
 
     <PackageReference Include="MartinCostello.Logging.XUnit.v3" />
-    <PackageReference Include="XunitXml.TestLogger" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="Xunit.DependencyInjection.Logging" />
   </ItemGroup>
   

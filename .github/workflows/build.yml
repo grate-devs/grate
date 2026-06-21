@@ -385,11 +385,12 @@ jobs:
           9.0.x
           10.0.x
     - name: Test
-      run: >
-        dotnet test 
-        unittests/${{ matrix.category }} 
-        --logger:"xunit;LogFilePath=/tmp/test-results/${{ matrix.category }}.xml" --
-        -MaxCpuCount 2
+      run: |
+        dotnet test \
+        --project unittests/${{ matrix.category }} \
+        --coverage \
+        --coverage-output-format xml \
+        --coverage-output /tmp/test-results/${{ matrix.category }}.xml
       env:
         LogLevel: Warning
         TZ: UTC
