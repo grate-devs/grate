@@ -16,10 +16,10 @@ namespace TestCommon.DependencyInjection;
 public abstract class GrateServiceCollectionTest(IGrateTestContext context)
 {
     protected IGrateTestContext Context { get; } = context;
-    
+
     protected abstract string BigintType { get; }
     protected abstract string VarcharType { get; }
-    
+
     private void ConfigureService(GrateConfigurationBuilder grateConfigurationBuilder)
     {
         var connectionString = Context.ConnectionString(TestConfig.RandomDatabase());
@@ -29,7 +29,7 @@ public abstract class GrateServiceCollectionTest(IGrateTestContext context)
             .WithConnectionString(connectionString)
             .WithAdminConnectionString(adminConnectionString);
     }
-    
+
 
 
     [Fact]
@@ -67,10 +67,10 @@ public abstract class GrateServiceCollectionTest(IGrateTestContext context)
         var tableName = CreateMigrationScript(sqlFolder, syntax);
 
         var scope = serviceProvider.CreateScope();
-        
+
         var provider = scope.ServiceProvider;
         var grateConfiguration = provider.GetRequiredService<GrateConfiguration>();
-        
+
         const int maxTries = 10;
 
         await using (var grateMigrator = provider.GetService<IGrateMigrator>())
@@ -85,16 +85,16 @@ public abstract class GrateServiceCollectionTest(IGrateTestContext context)
                 }
                 catch (DbException)
                 {
-                    await Task.Delay(100);
+                    await Task.Delay(100, TestContext.Current.CancellationToken);
                 }
             } while (numberOfTries++ < maxTries);
         }
 
         string sql =
             $"SELECT script_name FROM {syntax.TableWithSchema("grate", "ScriptsRun")} where script_name like '{tableName}_%'";
-        
+
         int tries = 0;
-        
+
         string[] scripts = [];
         FileInfo[] files = [];
 
@@ -105,9 +105,10 @@ public abstract class GrateServiceCollectionTest(IGrateTestContext context)
                 using var conn = Context.GetDbConnection(grateConfiguration.ConnectionString!);
                 scripts = (await conn.QueryAsync<string>(sql)).ToArray();
                 files = sqlFolder.GetFiles("*.sql", SearchOption.AllDirectories);
-            }catch (DbException)
+            }
+            catch (DbException)
             {
-                await Task.Delay(100);
+                await Task.Delay(100, TestContext.Current.CancellationToken);
             }
         } while (tries++ < maxTries);
 
