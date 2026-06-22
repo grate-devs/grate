@@ -29,19 +29,6 @@ public record MariaDbTestContainerDatabase(
             .Build();
     }
 
-    public override async ValueTask InitializeAsync()
-    {
-        await Network.CreateAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async ValueTask DisposeAsync()
-    {
-        await Network.DeleteAsync();
-        await Network.DisposeAsync();
-        await base.DisposeAsync();
-    }
-
     public override string AdminConnectionString => $"Server={Hostname};Port={Port};Database=mysql;Uid=root;Pwd={AdminPassword}";
     public override string ConnectionString(string database) => $"Server={Hostname};Port={Port};Database={database};Uid=root;Pwd={AdminPassword}";
     public override string UserConnectionString(string database) => $"Server={Hostname};Port={Port};Database={database};Uid={database};Pwd=mooo1213";
