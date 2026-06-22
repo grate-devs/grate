@@ -30,12 +30,12 @@ public record SqlServerTestContainerDatabase(
     }
 
     public override string AdminConnectionString =>
-        $"Data Source={Hostname},{Port};Initial Catalog=master;User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=15";
+        $"Data Source={Hostname},{Port};Initial Catalog=master;User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=5";
 
     public override string ConnectionString(string database) =>
-        $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=15";
+        $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=2";
 
     public override string UserConnectionString(string database) =>
-        $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=zorro;Password=batmanZZ4;Encrypt=false;Pooling=false;Connect Timeout=15";
+        $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=zorro;Password=batmanZZ4;Encrypt=false;Pooling=false;Connect Timeout=2";
 
 }
