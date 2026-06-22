@@ -306,7 +306,7 @@ jobs:
             image: "postgres:12"
           - name: "MariaDB 13" 
             type: MariaDB
-            image: "mariadb:13"
+            image: "mariadb:13.0-rc"
           - name: "MariaDB 12" 
             type: MariaDB
             image: "mariadb:12"
