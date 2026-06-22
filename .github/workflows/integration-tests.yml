@@ -271,6 +271,9 @@ jobs:
       fail-fast: false
       matrix:
         database:
+          - name: "SqlServer 2025"
+            type: SqlServer
+            image: "mcr.microsoft.com/mssql/server:2025-latest"
           - name: "SqlServer 2022"
             type: SqlServer
             image: "mcr.microsoft.com/mssql/server:2022-latest"
@@ -280,6 +283,12 @@ jobs:
           - name: "SqlServer 2017" 
             type: SqlServer
             image: "mcr.microsoft.com/mssql/server:2017-latest"
+          - name: "PostgreSQL 18" 
+            type: PostgreSQL
+            image: "postgres:18"
+          - name: "PostgreSQL 17" 
+            type: PostgreSQL
+            image: "postgres:17"
           - name: "PostgreSQL 16" 
             type: PostgreSQL
             image: "postgres:16"
@@ -295,6 +304,15 @@ jobs:
           - name: "PostgreSQL 12" 
             type: PostgreSQL
             image: "postgres:12"
+          - name: "MariaDB 13" 
+            type: MariaDB
+            image: "mariadb:13"
+          - name: "MariaDB 12" 
+            type: MariaDB
+            image: "mariadb:12"
+          - name: "MariaDB 11" 
+            type: MariaDB
+            image: "mariadb:11"
           - name: "MariaDB 10.4" 
             type: MariaDB
             image: "mariadb:10.4"
