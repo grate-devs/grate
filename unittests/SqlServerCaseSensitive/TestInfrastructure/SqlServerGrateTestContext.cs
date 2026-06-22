@@ -8,28 +8,28 @@ using TestCommon.TestInfrastructure;
 
 namespace SqlServerCaseSensitive.TestInfrastructure;
 
-[CollectionDefinition(nameof(SqlServerGrateTestContext))]
-public class SqlServerTestCollection : ICollectionFixture<SqlServerGrateTestContext>;
+[CollectionDefinition(nameof(SqlServerCaseSensitiveGrateTestContext))]
+public class SqlServerCaseSensitiveTestCollection : ICollectionFixture<SqlServerCaseSensitiveGrateTestContext>;
 
-public record SqlServerGrateTestContext
+public record SqlServerCaseSensitiveGrateTestContext
     : GrateTestContext
 {
-    public SqlServerGrateTestContext(
+    public SqlServerCaseSensitiveGrateTestContext(
         IGrateMigrator migrator,
-        string serverCollation, 
+        string serverCollation,
         ITestDatabase testDatabase) : base(migrator, testDatabase)
     {
         ServerCollation = serverCollation;
     }
-    
+
     // ReSharper disable once UnusedMember.Global
-    public SqlServerGrateTestContext(
-        IGrateMigrator migrator, 
-        ITestDatabase testDatabase): this(migrator, "Danish_Norwegian_CS_AS", testDatabase) // Case Sensitive collation
+    public SqlServerCaseSensitiveGrateTestContext(
+        IGrateMigrator migrator,
+        ITestDatabase testDatabase) : this(migrator, "Danish_Norwegian_CS_AS", testDatabase) // Case Sensitive collation
     {
     }
 
-  
+
     public override IDbConnection GetDbConnection(string connectionString) => new SqlConnection(connectionString);
 
     public override ISyntax Syntax { get; } = new SqlServerSyntax();
@@ -42,13 +42,13 @@ public record SqlServerGrateTestContext
     {
         SelectVersion = "SELECT @@VERSION",
         SleepTwoSeconds = "WAITFOR DELAY '00:00:02'",
-        CreateUser = (db, user, password) => 
+        CreateUser = (db, user, password) =>
 $"""
     USE {db};
     CREATE LOGIN {user} WITH PASSWORD = '{password}';
     CREATE USER {user} FOR LOGIN {user};
 """,
-        GrantAccess = (db, user) => 
+        GrantAccess = (db, user) =>
 $"""
     USE {db};
     ALTER ROLE db_owner ADD MEMBER {user};

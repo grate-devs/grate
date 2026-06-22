@@ -118,51 +118,76 @@ jobs:
         with:
           path: test-results
 
-      - name: Install smink
-        run: |
-          BASEURL="https://github.com/erikbra/smink/releases/download/"
-          VERSION="0.3.0"
-
-          INSTALL_DIR="/tmp/smink"
-          SMINK="${INSTALL_DIR}/smink"
-
-          FILENAME="smink-linux-x64-${VERSION}.zip"
-          FULL_URL="${BASEURL}${VERSION}/${FILENAME}"
-          DOWNLOAD_DIR="/tmp/smink-download"
-
-          DOWNLOAD_FILE="${DOWNLOAD_DIR}/${FILENAME}"
-
-          test -f "${SMINK}" && \
-          echo "smink already installed - not installing" || \
-          echo "Installing smink v ${VERSION}" && \
-          (test -d "${DOWNLOAD_DIR}" || mkdir -p "${DOWNLOAD_DIR}") && \
-          (test -d "${INSTALL_DIR}" || mkdir -p "${INSTALL_DIR}") && \
-          (test -f "${DOWNLOAD_FILE}" || curl -o "${DOWNLOAD_FILE}" -sL "${FULL_URL}") && \
-          unzip -o "${DOWNLOAD_FILE}" -d "${INSTALL_DIR}" 
-
-          chmod u+x "${SMINK}"
+      - name: Setup .NET # Required to execute ReportGenerator
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
 
       - name: Create HTML test report
-        run: |
+        uses: danielpalme/ReportGenerator-GitHub-Action@v5
+        with:
+          reports: 'test-results/**/*.xml'
+          targetdir: 'test-outputs' # REQUIRED # The directory where the generated report should be saved.
+          reporttypes: 'HtmlInline;Cobertura' # The output formats and scope (separated by semicolon) Values: Badges, Clover, Cobertura, OpenCover, CsvSummary, Html, Html_Dark, Html_Light, Html_BlueRed, HtmlChart, HtmlInline, HtmlInline_AzurePipelines, HtmlInline_AzurePipelines_Dark, HtmlInline_AzurePipelines_Light, HtmlSummary, Html_BlueRed_Summary, JsonSummary, Latex, LatexSummary, lcov, MarkdownSummary, MarkdownSummaryGithub, MarkdownDeltaSummary, MHtml, SvgChart, SonarQube, TeamCitySummary, TextSummary, TextDeltaSummary, Xml, XmlSummary
+          sourcedirs: '' # Optional directories which contain the corresponding source code (separated by semicolon). The source directories are used if coverage report contains classes without path information.
+          historydir: '' # Optional directory for storing persistent coverage information. Can be used in future reports to show coverage evolution.
+          workingdir: '' # Optional working directory. If available, the targetdir, sourcedirs and historydir are interpreted relative to the working directory (only if not specified as absolute paths).'
+          plugins: '' # Optional plugin files for custom reports or custom history storage (separated by semicolon).
+          assemblyfilters: '+*' # Optional list of assemblies that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+          classfilters: '+*' # Optional list of classes that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+          filefilters: '+*' # Optional list of files that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+          verbosity: 'Info' # The verbosity level of the log messages. Values: Verbose, Info, Warning, Error, Off
+          title: 'grate unit tests' # Optional title.
+          tag: '${{ github.run_number }}_${{ github.run_id }}' # Optional tag or build version.
+          license: '' # Optional license for PRO version. Get your license here: https://reportgenerator.io/pro
+          customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
+          toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
 
-          XML_DIR='/tmp/xml'
-          REPORT_DIR='/tmp/test-results'
+      # - name: Install smink
+      #   run: |
+      #     BASEURL="https://github.com/erikbra/smink/releases/download/"
+      #     VERSION="0.3.0"
 
-          test -d $XML_DIR  || mkdir $XML_DIR
-          find "test-results" -name '*.xml' -exec cp "{}" $XML_DIR \;
-          echo "Found the following test results files:"
-          ls -1 $XML_DIR
+      #     INSTALL_DIR="/tmp/smink"
+      #     SMINK="${INSTALL_DIR}/smink"
 
-          test -d $REPORT_DIR || mkdir $REPORT_DIR
-          echo "Running smink"
-          /tmp/smink/smink "${XML_DIR}/*.xml" "${REPORT_DIR}/test-report.html" --title "grate unit tests"
+      #     FILENAME="smink-linux-x64-${VERSION}.zip"
+      #     FULL_URL="${BASEURL}${VERSION}/${FILENAME}"
+      #     DOWNLOAD_DIR="/tmp/smink-download"
+
+      #     DOWNLOAD_FILE="${DOWNLOAD_DIR}/${FILENAME}"
+
+      #     test -f "${SMINK}" && \
+      #     echo "smink already installed - not installing" || \
+      #     echo "Installing smink v ${VERSION}" && \
+      #     (test -d "${DOWNLOAD_DIR}" || mkdir -p "${DOWNLOAD_DIR}") && \
+      #     (test -d "${INSTALL_DIR}" || mkdir -p "${INSTALL_DIR}") && \
+      #     (test -f "${DOWNLOAD_FILE}" || curl -o "${DOWNLOAD_FILE}" -sL "${FULL_URL}") && \
+      #     unzip -o "${DOWNLOAD_FILE}" -d "${INSTALL_DIR}" 
+
+      #     chmod u+x "${SMINK}"
+
+      # - name: Create HTML test report
+      #   run: |
+
+      #     XML_DIR='/tmp/xml'
+      #     REPORT_DIR='/tmp/test-results'
+
+      #     test -d $XML_DIR  || mkdir $XML_DIR
+      #     find "test-results" -name '*.xml' -exec cp "{}" $XML_DIR \;
+      #     echo "Found the following test results files:"
+      #     ls -1 $XML_DIR
+
+      #     test -d $REPORT_DIR || mkdir $REPORT_DIR
+      #     echo "Running smink"
+      #     /tmp/smink/smink "${XML_DIR}/*.xml" "${REPORT_DIR}/test-report.html" --title "grate unit tests"
 
       - name: Upload HTML test report
         uses: actions/upload-artifact@v7
         with:
           name: HTML test report
           path: |
-            /tmp/test-results/test-report.html
+            test-outputs/*.html
           retention-days: 1
 
 

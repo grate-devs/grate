@@ -1,10 +1,10 @@
 ﻿using SqlServerCaseSensitive.TestInfrastructure;
-using TestCommon.TestInfrastructure;
 
 namespace SqlServerCaseSensitive.Running_MigrationScripts;
-[Collection(nameof(SqlServerGrateTestContext))]
+
+[Collection(nameof(SqlServerCaseSensitiveGrateTestContext))]
 // ReSharper disable once InconsistentNaming
-public class Failing_Scripts(SqlServerGrateTestContext testContext, ITestOutputHelper testOutput)
+public class Failing_Scripts(SqlServerCaseSensitiveGrateTestContext testContext, ITestOutputHelper testOutput)
     : TestCommon.Generic.Running_MigrationScripts.Failing_Scripts(testContext, testOutput)
 {
     protected override string ExpectedStartOfErrorMessageForInvalidSql =>
@@ -17,7 +17,7 @@ public class Failing_Scripts(SqlServerGrateTestContext testContext, ITestOutputH
         """;
 
     protected override IDictionary<string, object?> ExpectedErrorDetails => new Dictionary<string, object?>
-    { 
+    {
         { "Message", "Incorrect syntax near \u0027TOP\u0027." },
         { "LineNumber", 1 },
         { "Number", 102 },

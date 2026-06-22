@@ -2,8 +2,8 @@
 
 namespace SqlServerCaseSensitive.Bootstrapping;
 
-[Collection(nameof(SqlServerGrateTestContext))]
+[Collection(nameof(SqlServerCaseSensitiveGrateTestContext))]
 // ReSharper disable once InconsistentNaming
 // ReSharper disable once UnusedType.Global
-public class Grate_Internal_Scripts(SqlServerGrateTestContext testContext, ITestOutputHelper testOutput)
+public class Grate_Internal_Scripts(SqlServerCaseSensitiveGrateTestContext testContext, ITestOutputHelper testOutput)
     : TestCommon.Generic.Bootstrapping.Grate_Internal_Scripts(testContext, testOutput);

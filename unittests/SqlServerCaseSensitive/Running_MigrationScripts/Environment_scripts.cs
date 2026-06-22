@@ -1,9 +1,8 @@
 ﻿using SqlServerCaseSensitive.TestInfrastructure;
-using TestCommon.TestInfrastructure;
 
 namespace SqlServerCaseSensitive.Running_MigrationScripts;
 
-[Collection(nameof(SqlServerGrateTestContext))]
+[Collection(nameof(SqlServerCaseSensitiveGrateTestContext))]
 // ReSharper disable once InconsistentNaming
-public class Environment_scripts(SqlServerGrateTestContext testContext, ITestOutputHelper testOutput)
+public class Environment_scripts(SqlServerCaseSensitiveGrateTestContext testContext, ITestOutputHelper testOutput)
     : TestCommon.Generic.Running_MigrationScripts.Environment_scripts(testContext, testOutput);

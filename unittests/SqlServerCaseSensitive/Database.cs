@@ -1,8 +1,6 @@
 ﻿using SqlServerCaseSensitive.TestInfrastructure;
-using TestCommon.TestInfrastructure;
-
 namespace SqlServerCaseSensitive;
 
-[Collection(nameof(SqlServerGrateTestContext))]
-public class Database(SqlServerGrateTestContext testContext, ITestOutputHelper testOutput)
+[Collection(nameof(SqlServerCaseSensitiveGrateTestContext))]
+public class Database(SqlServerCaseSensitiveGrateTestContext testContext, ITestOutputHelper testOutput)
     : TestCommon.Generic.GenericDatabase(testContext, testOutput);

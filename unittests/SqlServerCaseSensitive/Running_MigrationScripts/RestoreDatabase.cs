@@ -6,9 +6,9 @@ using TestCommon.TestInfrastructure;
 
 namespace SqlServerCaseSensitive.Running_MigrationScripts;
 
-[Collection(nameof(SqlServerGrateTestContext))]
+[Collection(nameof(SqlServerCaseSensitiveGrateTestContext))]
 // ReSharper disable once InconsistentNaming
-public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputHelper testOutput)
+public class RestoreDatabase(SqlServerCaseSensitiveGrateTestContext testContext, ITestOutputHelper testOutput)
     : SqlServerScriptsBase(testContext, testOutput)
 {
 
@@ -33,7 +33,7 @@ public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputH
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[KnownFolderKeys.Sprocs]);
-        
+
         var restoreConfig = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
@@ -54,7 +54,7 @@ public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputH
         }
 
         results.First().Should().Be(1);
-        
+
         //await Context.DropDatabase(db);
     }
 }

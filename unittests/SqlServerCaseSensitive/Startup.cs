@@ -1,4 +1,4 @@
-using grate.DependencyInjection;
+﻿using grate.DependencyInjection;
 using grate.sqlserver.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -9,7 +9,7 @@ using TestCommon;
 namespace SqlServerCaseSensitive;
 
 // ReSharper disable once UnusedType.Global
-public class Startup: Startup<SqlServerTestContainerDatabase, SqlServerExternalDatabase, SqlServerGrateTestContext>
+public class Startup : Startup<SqlServerTestContainerDatabase, SqlServerExternalDatabase, SqlServerCaseSensitiveGrateTestContext>
 {
     protected override void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context)
     {
