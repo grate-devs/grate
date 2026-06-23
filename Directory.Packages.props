@@ -29,6 +29,12 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="FluentAssertions" Version="8.10.0" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    
+    <!-- Transitive security pin (EF Core Sqlite → SQLitePCLRaw): patch for GHSA-2m69-gcr7-jv3q (NU1903).
+     Bundle 3.x pulls the patched branch (lib.e_sqlite3 3.50.x, SQLite 3.50.x); 2.1.11 is the last vulnerable 2.1.x.
+    -->
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+    
     <PackageVersion Include="Testcontainers" Version="4.12.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.12.0" />
     <PackageVersion Include="Testcontainers.MariaDb" Version="4.12.0" />
