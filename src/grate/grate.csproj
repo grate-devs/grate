@@ -4,7 +4,6 @@
     <OutputType>Exe</OutputType>
     <DebugType>Embedded</DebugType>
     <Nullable>enable</Nullable>
-    
     <IsPublishable>true</IsPublishable>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <InvariantGlobalization>false</InvariantGlobalization>
@@ -108,7 +107,7 @@
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
-    <NoWarn>IL2105</NoWarn>
+    <NoWarn>IL2105,NU5118</NoWarn>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
