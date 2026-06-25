@@ -64,11 +64,18 @@ jobs:
       if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
       with:
         name: grate-dotnet-tool-${{ needs.set-version-number.outputs.nuGetVersion }}
-        path: /tmp/grate/nupkg/*   
+        path: /tmp/grate/nupkg/*
+          
+    # Get a short-lived NuGet API key
+    - name: NuGet login (OIDC → temp API key)
+    uses: NuGet/login@v1
+    id: login
+    with:
+      user: ${{ secrets.NUGET_USER }}
     
     - name: Push to Nuget.org
       if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: dotnet nuget push /tmp/grate/nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_ORG_KEY }} --skip-duplicate
+      run: dotnet nuget push /tmp/grate/nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}} --skip-duplicate
   
   build-nuget-package:
     needs: set-version-number
@@ -107,10 +114,17 @@ jobs:
       run: dotnet pack ./src/${{ matrix.package }} -c Release --include-symbols -o /tmp/grate/nupkg /p:Version=${{ env.VERSION }}
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
-        
+      
+    # Get a short-lived NuGet API key
+    - name: NuGet login (OIDC → temp API key)
+    uses: NuGet/login@v1
+    id: login
+    with:
+      user: ${{ secrets.NUGET_USER }}
+      
     - name: Push to Nuget.org
       if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: dotnet nuget push /tmp/grate/nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_ORG_KEY }} --skip-duplicate
+      run: dotnet nuget push /tmp/grate/nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}} --skip-duplicate
 
   build-standalone:
     name: Build cli
