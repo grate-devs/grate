@@ -17,7 +17,7 @@
     <PackageVersion Include="System.CommandLine" Version="2.0.9" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.1" />
     <PackageVersion Include="Dapper" Version="2.1.79" />
-    <PackageVersion Include="MySqlConnector" Version="2.6.0" />
+    <PackageVersion Include="MySqlConnector" Version="2.6.1" />
     <PackageVersion Include="Oracle.ManagedDataAccess.Core" Version="23.26.200" />
     <PackageVersion Include="System.Private.Uri" Version="4.3.2" />
     <!--
