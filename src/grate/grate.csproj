@@ -89,8 +89,12 @@
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DebugType>None</DebugType>
-    <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-musl-x64;linux-musl-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <ToolCommandName>grate</ToolCommandName>
+    <!--    Bug #714: Opt out of RID-specific .NET Tool packaging until we only support net10 or later -->
+    <!--    <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-musl-x64;linux-musl-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>-->
+    <ManageAppHostPerConfiguration>false</ManageAppHostPerConfiguration>
+    <CreateRuntimeIdentifierPackageForEachTargetFramework>false</CreateRuntimeIdentifierPackageForEachTargetFramework>
+
   </PropertyGroup>
 
   <ItemGroup>
