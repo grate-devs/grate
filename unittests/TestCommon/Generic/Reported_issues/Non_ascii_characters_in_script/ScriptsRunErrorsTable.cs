@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Exceptions;
 using TestCommon.Generic.Running_MigrationScripts;
@@ -58,8 +57,8 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
            repositoryPaths = (await conn.QueryAsync<string>(selectSql)).ToArray();
        }
 
-       repositoryPaths.Should().HaveCount(1);
-       repositoryPaths.First().Should().Be(repositoryPath);
+       Assert.Single(repositoryPaths);
+       Assert.Equal(repositoryPath, repositoryPaths.First());
         
        //await Context.DropDatabase(db);
     }
@@ -97,8 +96,8 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
             versions = (await conn.QueryAsync<string>(selectSql)).ToArray();
         }
 
-        versions.Should().HaveCount(1);
-        versions.First().Should().Be(version);
+        Assert.Single(versions);
+        Assert.Equal(version, versions.First());
         
         //await Context.DropDatabase(db);
     }
@@ -139,8 +138,8 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
             scriptNames = (await conn.QueryAsync<string>(selectSql)).ToArray();
         }
 
-        scriptNames.Should().HaveCount(1);
-        scriptNames.First().Should().Be(scriptName);
+        Assert.Single(scriptNames);
+        Assert.Equal(scriptName, scriptNames.First());
         
         //await Context.DropDatabase(db);
     }
@@ -186,9 +185,9 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
             scripts = (await conn.QueryAsync<string>(selectSql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        scripts.First().Should().Be(sql);
-        scripts.First().Should().Contain(characters);
+        Assert.Single(scripts);
+        Assert.Equal(sql, scripts.First());
+        Assert.Contains(characters, scripts.First());
         
         //await Context.DropDatabase(db);
     }
@@ -233,8 +232,8 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
             errors = (await conn.QueryAsync<string>(selectSql)).ToArray();
         }
 
-        errors.Should().HaveCount(1);
-        errors.First().Should().Contain(characters);
+        Assert.Single(errors);
+        Assert.Contains(characters, errors.First());
         
         //await Context.DropDatabase(db);
     }
@@ -280,7 +279,7 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
             errors = (await conn.QueryAsync<string>(selectSql)).ToArray();
         }
 
-        errors.Should().HaveCount(1);
+        Assert.Single(errors);
         // This doesn't work well for MariaDb with 🎉 and 👍, they are only '?' in the actual error message from the DB 
         //errors.First().Should().Contain(characters);
         
@@ -332,8 +331,8 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
             user = (await conn.QueryAsync<string>(selectSql)).ToArray();
         }
 
-        user.Should().HaveCount(1);
-        user.First().Should().Contain(enteredBy);
+        Assert.Single(user);
+        Assert.Contains(enteredBy, user.First());
         
         //await Context.DropDatabase(db);
     }

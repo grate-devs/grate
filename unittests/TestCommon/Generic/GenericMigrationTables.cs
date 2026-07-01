@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Exceptions;
 using TestCommon.TestInfrastructure;
@@ -47,7 +46,7 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
         {
             scripts = await conn.QueryAsync<string>(sql);
         }
-        scripts.Should().NotBeNull();
+        Assert.NotNull(scripts);
     }
 
     [Theory]
@@ -82,7 +81,7 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
         {
             scripts = await conn.QueryAsync<string>(sql);
         }
-        scripts.Should().NotBeNull();
+        Assert.NotNull(scripts);
     }
 
     // [Theory]
@@ -166,8 +165,8 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
         var normalCountAfterFirstMigration = await TableCountIn(db, tableName);
         Assert.Multiple(() =>
         {
-            errorCaseCountAfterFirstMigration.Should().Be(1);
-            normalCountAfterFirstMigration.Should().Be(0);
+            Assert.Equal(1, errorCaseCountAfterFirstMigration);
+            Assert.Equal(0, normalCountAfterFirstMigration);
         });
 
         // Run migration again - make sure it does not create the table with different casing too
@@ -181,8 +180,8 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
         var normalCountAfterSecondMigration = await TableCountIn(db, tableName);
         Assert.Multiple(() =>
         {
-            errorCaseCountAfterSecondMigration.Should().Be(1);
-            normalCountAfterSecondMigration.Should().Be(0);
+            Assert.Equal(1, errorCaseCountAfterSecondMigration);
+            Assert.Equal(0, normalCountAfterSecondMigration);
         });
         
         //await Context.DropDatabase(db);
@@ -237,11 +236,11 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
         }
 
         var versions = entries.ToList();
-        versions.Should().HaveCount(1);
+        Assert.Single(versions);
         var version = versions.Single();
-        version.version.Should().Be("a.b.c.d");
+        Assert.Equal("a.b.c.d", version.version);
         // Validate the version is finished after running without errors
-        version.status.Should().Be(MigrationStatus.Finished);
+        Assert.Equal(MigrationStatus.Finished, version.status);
         
         //await Context.DropDatabase(db);
     }

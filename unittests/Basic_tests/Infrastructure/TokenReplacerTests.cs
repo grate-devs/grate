@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
 using NSubstitute;
@@ -15,7 +14,7 @@ public class TokenReplacerTests
     public void EnsureEmptyStringIsLeftEmpty(string? input)
     {
         var tokens = new Dictionary<string, string?>();
-        TokenReplacer.ReplaceTokens(tokens, input).Should().Be(string.Empty);
+        Assert.Equal(string.Empty, TokenReplacer.ReplaceTokens(tokens, input));
     }
 
     [Fact]
@@ -23,7 +22,7 @@ public class TokenReplacerTests
     {
         var tokens = new Dictionary<string, string?>();
         var input = "This has a {{token}} in it.";
-        TokenReplacer.ReplaceTokens(tokens, input).Should().Be(input);
+        Assert.Equal(input, TokenReplacer.ReplaceTokens(tokens, input));
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public class TokenReplacerTests
     {
         var tokens = new Dictionary<string, string?> { ["EnvName"] = "Test" };
         var input = "This is a {{EnvName}}.";
-        TokenReplacer.ReplaceTokens(tokens, input).Should().Be("This is a Test.");
+        Assert.Equal("This is a Test.", TokenReplacer.ReplaceTokens(tokens, input));
     }
 
     [Fact]
@@ -42,22 +41,22 @@ public class TokenReplacerTests
         var provider = new TokenProvider(config, Substitute.For<IDatabase>());
         var tokens = provider.GetTokens();
 
-        tokens["SchemaName"].Should().Be("Test");
+        Assert.Equal("Test", tokens["SchemaName"]);
 
         //RH Only uses the name of a folder, not it's full path.  Make sure we're compat
-        tokens["UpFolderName"].Should().Be("up");
+        Assert.Equal("up", tokens["UpFolderName"]);
 
     }
 
     [Fact]
     public void EnsureUserTokenParserWorks()
     {
-        TokenProvider.ParseUserToken("token=value   ").Should().Be(("token", "value"));
+        Assert.Equal(("token", "value"), TokenProvider.ParseUserToken("token=value   "));
         Assert.Throws<ArgumentOutOfRangeException>(() => TokenProvider.ParseUserToken("token"));
 
         // #641: While we initially wanted to protect migrating users from our change to use multiple `--ut` command line params, there's
-        // legitimate scenarios where we want an `=` in the value.  
-        TokenProvider.ParseUserToken("token1=value=with=equals").Should().Be(("token1", "value=with=equals"));
-        TokenProvider.ParseUserToken("token1=value1;token2=value2").Should().Be(("token1", "value1;token2=value2"));
+        // legitimate scenarios where we want an `=` in the value.
+        Assert.Equal(("token1", "value=with=equals"), TokenProvider.ParseUserToken("token1=value=with=equals"));
+        Assert.Equal(("token1", "value1;token2=value2"), TokenProvider.ParseUserToken("token1=value1;token2=value2"));
     }
 }

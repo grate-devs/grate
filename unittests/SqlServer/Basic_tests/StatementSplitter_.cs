@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Infrastructure;
+﻿using grate.Infrastructure;
 using grate.Migration;
 using grate.SqlServer.Infrastructure;
 
@@ -28,7 +27,7 @@ SELECT 1
 ";
         var batches = _splitter.Split(original);
 
-        batches.Should().HaveCount(2);
+        Assert.Equal(2, batches.Count());
     }
 
 }

@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using Microsoft.Data.SqlClient;
 using SqlServerCaseSensitive.TestInfrastructure;
 
@@ -31,6 +30,6 @@ public class SqlServerDatabase_(InspectableSqlServerDatabase sqlServerDatabase)
 
         var conn = sqlServerDatabase.GetConnection();
         var builder = new SqlConnectionStringBuilder(conn.ConnectionString);
-        builder.Pooling.Should().BeTrue();
+        Assert.True(builder.Pooling);
     }
 }

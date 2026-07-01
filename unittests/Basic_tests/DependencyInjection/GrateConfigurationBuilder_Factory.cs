@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,7 @@ public class GrateConfigurationBuilder_Factory
     {
         var builder = GrateConfigurationBuilder.Create();
         var grateConfiguration = builder.Build();
-        grateConfiguration.NonInteractive.Should().Be(true);
+        Assert.True(grateConfiguration.NonInteractive);
     }
 
     [Theory]
@@ -26,8 +25,8 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithOutputFolder(outputFolder);
         var grateConfiguration = builder.Build();
-        grateConfiguration.OutputPath.Should().NotBeNull();
-        grateConfiguration.OutputPath.FullName.Should().BeEquivalentTo(outputDir.FullName);
+        Assert.NotNull(grateConfiguration.OutputPath);
+        Assert.Equal(outputDir.FullName, grateConfiguration.OutputPath.FullName, ignoreCase: true);
         Directory.Delete(outputFolder, true);
     }
 
@@ -40,8 +39,8 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithSqlFilesDirectory(sqlFolder);
         var grateConfiguration = builder.Build();
-        grateConfiguration.SqlFilesDirectory.Should().NotBeNull();
-        grateConfiguration.SqlFilesDirectory.FullName.Should().BeEquivalentTo(sqlDir.FullName);
+        Assert.NotNull(grateConfiguration.SqlFilesDirectory);
+        Assert.Equal(sqlDir.FullName, grateConfiguration.SqlFilesDirectory.FullName, ignoreCase: true);
         Directory.Delete(sqlFolder, true);
     }
     [Theory]
@@ -52,7 +51,7 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithSchema(schemaName);
         var grateConfiguration = builder.Build();
-        grateConfiguration.SchemaName.Should().Be(schemaName);
+        Assert.Equal(schemaName, grateConfiguration.SchemaName);
     }
 
     [Theory]
@@ -63,7 +62,7 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithConnectionString(connectionString);
         var grateConfiguration = builder.Build();
-        grateConfiguration.ConnectionString.Should().Be(connectionString);
+        Assert.Equal(connectionString, grateConfiguration.ConnectionString);
     }
 
     [Theory]
@@ -74,7 +73,7 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithAdminConnectionString(adminConnectionString);
         var grateConfiguration = builder.Build();
-        grateConfiguration.AdminConnectionString.Should().Be(adminConnectionString);
+        Assert.Equal(adminConnectionString, grateConfiguration.AdminConnectionString);
     }
 
     [Theory]
@@ -85,7 +84,7 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithVersion(version);
         var grateConfiguration = builder.Build();
-        grateConfiguration.Version.Should().Be(version);
+        Assert.Equal(version, grateConfiguration.Version);
     }
     
     [Fact]
@@ -94,7 +93,7 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.DoNotCreateDatabase();
         var grateConfiguration = builder.Build();
-        grateConfiguration.CreateDatabase.Should().Be(false);
+        Assert.False(grateConfiguration.CreateDatabase);
     }
 
     [Fact]
@@ -103,7 +102,7 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithTransaction();
         var grateConfiguration = builder.Build();
-        grateConfiguration.Transaction.Should().Be(true);
+        Assert.True(grateConfiguration.Transaction);
     }
 
     [Theory]
@@ -117,8 +116,8 @@ public class GrateConfigurationBuilder_Factory
         var builder = GrateConfigurationBuilder.Create();
         builder.WithEnvironment(environmentName);
         var grateConfiguration = builder.Build();
-        grateConfiguration.Environment.Should().NotBeNull();
-        grateConfiguration.Environment.Should().BeEquivalentTo(new GrateEnvironment(environmentName));
+        Assert.NotNull(grateConfiguration.Environment);
+        Assert.Equivalent(new GrateEnvironment(environmentName), grateConfiguration.Environment);
     }
     
     [Fact]
@@ -129,10 +128,10 @@ public class GrateConfigurationBuilder_Factory
         var grateConfiguration = builder.Build();
 
         var folders = grateConfiguration.Folders!;
-        folders.Should().HaveCount(Folders.Default.Count);
-        
-        folders[KnownFolderKeys.Up]!.Path.Should().Be("ddl");
-        folders[KnownFolderKeys.Views]!.Path.Should().Be("binoculars");
+        Assert.Equal(Folders.Default.Count, folders.Count);
+
+        Assert.Equal("ddl", folders[KnownFolderKeys.Up]!.Path);
+        Assert.Equal("binoculars", folders[KnownFolderKeys.Views]!.Path);
     }
     
 }

@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Infrastructure;
+﻿using grate.Infrastructure;
 using grate.Migration;
 using grate.PostgreSql.Infrastructure;
 
@@ -36,7 +35,7 @@ CREATE INDEX CONCURRENTLY IX_column2 ON public.table1
 ";
         var batches = _statementSplitter.Split(original);
 
-        batches.Should().HaveCount(4);
+        Assert.Equal(4, batches.Count());
     }
 
     [Fact]
@@ -58,7 +57,7 @@ END
 ";
         var batches = _statementSplitter.Split(original);
 
-        batches.Should().HaveCount(1);
+        Assert.Single(batches);
     }
 
     [Theory]
@@ -82,7 +81,7 @@ END
 {tag};
 ";
         var batches = _statementSplitter.Split(original);
-        batches.Should().HaveCount(1);
+        Assert.Single(batches);
     }
 
     [Fact]
@@ -90,10 +89,10 @@ END
     {
         var original = @"SELECT 1 WHERE whatnot = '; ' ; MOO";
         var batches = _statementSplitter.Split(original).ToList();
-        batches.Should().HaveCount(2);
+        Assert.Equal(2, batches.Count);
 
-        batches.First().Should().Be("SELECT 1 WHERE whatnot = '; ' ");
-        batches.Last().Should().Be(" MOO");
+        Assert.Equal("SELECT 1 WHERE whatnot = '; ' ", batches.First());
+        Assert.Equal(" MOO", batches.Last());
     }
 
     [Fact]
@@ -101,7 +100,7 @@ END
     {
         var original = @"SELECT 1 WHERE whatnot = '; '";
         var batches = _statementSplitter.Split(original);
-        batches.Should().HaveCount(1);
+        Assert.Single(batches);
     }
 
     [Fact]
@@ -123,6 +122,6 @@ END
 ";
         var batches = _statementSplitter.Split(original);
 
-        batches.Should().HaveCount(1);
+        Assert.Single(batches);
     }
 }

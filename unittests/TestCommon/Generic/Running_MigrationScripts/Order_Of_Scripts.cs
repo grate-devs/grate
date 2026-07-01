@@ -1,6 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
-using FluentAssertions.Execution;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
@@ -53,15 +51,12 @@ public abstract class Order_Of_Scripts(IGrateTestContext context, ITestOutputHel
             "1_aftermigration.sql",
         };
 
-        scripts.Should().BeEquivalentTo(expectation);
-        scripts.Should().HaveCount(14);
+        Assert.Equivalent(expectation, scripts);
+        Assert.Equal(14, scripts.Length);
 
-        using (new AssertionScope())
+        for (int i = 0; i < expectation.Length; i++)
         {
-            for (int i = 0; i < expectation.Length; i++)
-            {
-                scripts[i].Should().Be(expectation[i]);
-            }
+            Assert.Equal(expectation[i], scripts[i]);
         }
     }
 

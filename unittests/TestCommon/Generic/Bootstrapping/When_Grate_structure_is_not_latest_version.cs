@@ -1,7 +1,6 @@
 ﻿using System.Data;
 using System.Text.RegularExpressions;
 using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.Generic.Running_MigrationScripts;
@@ -84,7 +83,7 @@ public abstract class When_Grate_structure_is_not_latest_version(IGrateTestConte
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
         var columns = GetColumns(reader).Select(column => column.ToUpper());
         TryClose(conn);
-        columns.Should().NotContain("status".ToUpper());
+        Assert.DoesNotContain("status".ToUpper(), columns);
         
         // Reset the config to use the actual column casings, to make sure that the status column is added even if the
         // already "existing" tables (which we just created above, with varying casings), are updated, even if the
@@ -110,7 +109,7 @@ public abstract class When_Grate_structure_is_not_latest_version(IGrateTestConte
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
         columns = GetColumns(reader).Select(column => column.ToUpper());
         TryClose(conn);
-        columns.Should().Contain("status".ToUpper());
+        Assert.Contains("status".ToUpper(), columns);
         
         //await Context.DropDatabase(db);
     }
@@ -209,7 +208,7 @@ public abstract class When_Grate_structure_is_not_latest_version(IGrateTestConte
         
             var columns = GetColumns(reader);
             TryClose(conn);
-            columns.Should().HaveCountGreaterThan(2);
+            Assert.True(columns.Count > 2);
         }
     }
 

@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.Generic.Running_MigrationScripts;
@@ -29,14 +28,14 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
         await RunMigration(migrator);
 
         var grateScriptsRunTable = await migrator.GetDbMigrator().Database.ExistingTable(config.SchemaName, grateScriptsRunTableName);
-        grateScriptsRunTable.Should().NotBeNull();
-        
+        Assert.NotNull(grateScriptsRunTable);
+
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
-        grateScriptsRunTable!.ToUpper().Should().Be(grateScriptsRunTable.ToUpper());
-        
+        Assert.Equal(grateScriptsRunTable.ToUpper(), grateScriptsRunTable!.ToUpper());
+
         //await Context.DropDatabase(db);
     }
-    
+
     [Fact]
     public async Task ScriptsRunError_Table_Is_Created()
     {
@@ -54,10 +53,10 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
         await RunMigration(migrator);
         
         var scriptsErrorTable = await migrator.GetDbMigrator().Database.ExistingTable(config.SchemaName, grateScriptsErrorTableName);
-        scriptsErrorTable.Should().NotBeNull();
-        
+        Assert.NotNull(scriptsErrorTable);
+
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
-        scriptsErrorTable!.ToUpper().Should().Be(scriptsErrorTable.ToUpper());
+        Assert.Equal(scriptsErrorTable.ToUpper(), scriptsErrorTable!.ToUpper());
         
         //await Context.DropDatabase(db);
     }
@@ -80,10 +79,10 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
         await RunMigration(migrator);
 
         var grateVersionTable = await migrator.GetDbMigrator().Database.ExistingTable(config.SchemaName, grateVersionTableName);
-        grateVersionTable.Should().NotBeNull();
-        
+        Assert.NotNull(grateVersionTable);
+
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
-        grateVersionTable!.ToUpper().Should().Be(grateVersionTable.ToUpper());
+        Assert.Equal(grateVersionTable.ToUpper(), grateVersionTable!.ToUpper());
         
         //await Context.DropDatabase(db);
     }
@@ -118,8 +117,8 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
         // The scripts should have been logged twice, once for the creation of the "meta" tables, with the prefix "bootstrap/"
         // (GrateScriptsRun, GrateScriptsRunErrors and GrateVersion), and once for the creation of the actual table
         // (ScriptsRun, ScriptsRunErrors and Version)
-        scriptNames.Should().Contain(name);
-        scriptNames.Should().Contain($"grate-internal/{name}");
+        Assert.Contains(name, scriptNames);
+        Assert.Contains($"grate-internal/{name}", scriptNames);
         
         //await Context.DropDatabase(db);
     }
@@ -156,10 +155,10 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
         }
 
         // There can be multiple internal migrations, one baseline, and some adjustments. So multiple entries are OK here
-        entries.Should().HaveCountGreaterThanOrEqualTo(1);
+        Assert.NotEmpty(entries);
         var version = entries.First();
-        version.version.Should().Be(ApplicationInfo.Version);
-        version.status.Should().Be(MigrationStatus.Finished);
+        Assert.Equal(ApplicationInfo.Version, version.version);
+        Assert.Equal(MigrationStatus.Finished, version.status);
     }
     
 
@@ -193,9 +192,9 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
 
         // Make sure the Scripts run table is still created even though the custom script was run (and as a side effect, the tokens were initialized)
         var grateScriptsRunTable = await migrator.GetDbMigrator().Database.ExistingTable(config.SchemaName, grateScriptsRunTableName);
-        grateScriptsRunTable.Should().NotBeNull();
+        Assert.NotNull(grateScriptsRunTable);
 
-        grateScriptsRunTable!.ToUpper().Should().Be(grateScriptsRunTable.ToUpper());
+        Assert.Equal(grateScriptsRunTable.ToUpper(), grateScriptsRunTable!.ToUpper());
     }
 
     private async Task RunMigration(IGrateMigrator migrator)

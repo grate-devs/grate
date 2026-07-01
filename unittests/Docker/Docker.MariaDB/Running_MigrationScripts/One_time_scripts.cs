@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Exceptions;
 using MariaDB.TestInfrastructure;
@@ -49,8 +48,8 @@ public class One_time_scripts(MariaDbGrateTestContext testContext, ITestOutputHe
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        scripts.First().Should().Be(Context.Sql.SelectVersion);
+        Assert.Single(scripts);
+        Assert.Equal(Context.Sql.SelectVersion, scripts.First());
         
         //await Context.DropDatabase(db);
     }

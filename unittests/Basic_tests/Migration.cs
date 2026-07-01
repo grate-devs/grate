@@ -1,5 +1,4 @@
 ﻿using Basic_tests.Infrastructure;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
@@ -23,7 +22,7 @@ public class Migration
         var dbMigrator = GetDbMigrator(true, baseline: false);
         var migrator = new GrateMigrator(_loggerFactory, dbMigrator);
         await migrator.Migrate();
-        _logger.LoggedMessages.Should().NotContain(" No sql run, either an empty folder, or all files run against destination previously.");
+        Assert.DoesNotContain(" No sql run, either an empty folder, or all files run against destination previously.", _logger.LoggedMessages);
     }
 
     [Fact]
@@ -32,7 +31,7 @@ public class Migration
         var dbMigrator = GetDbMigrator(false, baseline: false);
         var migrator = new GrateMigrator(_loggerFactory, dbMigrator);
         await migrator.Migrate();
-        _logger.LoggedMessages.Should().Contain(" No sql run, either an empty folder, or all files run against destination previously.");
+        Assert.Contains(" No sql run, either an empty folder, or all files run against destination previously.", _logger.LoggedMessages);
     }
 
     [Fact]
@@ -41,7 +40,7 @@ public class Migration
         var dbMigrator = GetDbMigrator(false, baseline: true);
         var migrator = new GrateMigrator(_loggerFactory, dbMigrator);
         await migrator.Migrate();
-        _logger.LoggedMessages.Should().Contain("Running a baseline run. No scripts will be actually be run, but the scripts will be marked as run.");
+        Assert.Contains("Running a baseline run. No scripts will be actually be run, but the scripts will be marked as run.", _logger.LoggedMessages);
     }
 
     private static DirectoryInfo Wrap(DirectoryInfo root, string? subFolder) =>

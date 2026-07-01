@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using TestCommon.TestInfrastructure;
 using static grate.Configuration.KnownFolderKeys;
@@ -45,8 +44,8 @@ public abstract class Environment_scripts(IGrateTestContext context, ITestOutput
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().BeEmpty();
-        
+        Assert.Empty(scripts);
+
         //await Context.DropDatabase(db);
     }
 
@@ -79,8 +78,8 @@ public abstract class Environment_scripts(IGrateTestContext context, ITestOutput
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().BeEmpty();
-        
+        Assert.Empty(scripts);
+
         //await Context.DropDatabase(db);
     }
 
@@ -115,8 +114,8 @@ public abstract class Environment_scripts(IGrateTestContext context, ITestOutput
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(2);
-        
+        Assert.Equal(2, scripts.Length);
+
         //await Context.DropDatabase(db);
     }
 
@@ -152,8 +151,8 @@ public abstract class Environment_scripts(IGrateTestContext context, ITestOutput
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        
+        Assert.Single(scripts);
+
         //await Context.DropDatabase(db);
     }
 }

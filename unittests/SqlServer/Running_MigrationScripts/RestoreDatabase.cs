@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using SqlServer.TestInfrastructure;
 using TestCommon.TestInfrastructure;
@@ -56,7 +55,7 @@ public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputH
             results = (await conn.QueryAsync<int>(sql)).ToArray();
         }
 
-        results.First().Should().Be(1);
+        Assert.Equal(1, results.First());
         
         //await Context.DropDatabase(db);
     }

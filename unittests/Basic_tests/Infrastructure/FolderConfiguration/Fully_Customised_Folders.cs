@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
@@ -18,10 +17,10 @@ public class Fully_Customised_Folders
 
         Assert.Multiple(() =>
         {
-            items[0].Should().Be(Folders["structure"]);
-            items[1].Should().Be(Folders["randomstuff"]);
-            items[2].Should().Be(Folders["procedures"]);
-            items[3].Should().Be(Folders["security"]);
+            Assert.Equal(Folders["structure"], items[0]);
+            Assert.Equal(Folders["randomstuff"], items[1]);
+            Assert.Equal(Folders["procedures"], items[2]);
+            Assert.Equal(Folders["security"], items[3]);
         });
     }
 
@@ -39,10 +38,10 @@ public class Fully_Customised_Folders
 
         Assert.Multiple(() =>
         {
-            folder.Path?.Should().Be(expectedFolderName);
-            folder.Type.Should().Be(expectedType);
-            folder.ConnectionType.Should().Be(expectedConnectionType);
-            folder.TransactionHandling.Should().Be(transactionHandling);
+            Assert.Equal(expectedFolderName, folder.Path);
+            Assert.Equal(expectedType, folder.Type);
+            Assert.Equal(expectedConnectionType, folder.ConnectionType);
+            Assert.Equal(transactionHandling, folder.TransactionHandling);
         });
     }
 

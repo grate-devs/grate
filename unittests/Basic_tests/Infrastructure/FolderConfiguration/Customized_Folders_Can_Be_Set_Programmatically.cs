@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using FluentAssertions;
 using grate.Configuration;
 
 namespace Basic_tests.Infrastructure.FolderConfiguration;
@@ -20,13 +19,13 @@ public class Customized_Folders_Can_Be_Set_Programmatically
 
         Assert.Multiple(() =>
         {
-            items[0].Should().Be(folders["structure"]);
-            items[1].Should().Be(folders["randomstuff"]);
-            items[2].Should().Be(folders["procedures"]);
-            items[3].Should().Be(folders["security"]);
+            Assert.Equal(folders["structure"], items[0]);
+            Assert.Equal(folders["randomstuff"], items[1]);
+            Assert.Equal(folders["procedures"], items[2]);
+            Assert.Equal(folders["security"], items[3]);
         });
     }
-    
+
     [Fact]
     public void From_Enumerable_of_MigrationsFolder()
     {
@@ -41,13 +40,13 @@ public class Customized_Folders_Can_Be_Set_Programmatically
 
         Assert.Multiple(() =>
         {
-            items[0].Should().Be(folders["structure"]);
-            items[1].Should().Be(folders["randomstuff"]);
-            items[2].Should().Be(folders["procedures"]);
-            items[3].Should().Be(folders["security"]);
+            Assert.Equal(folders["structure"], items[0]);
+            Assert.Equal(folders["randomstuff"], items[1]);
+            Assert.Equal(folders["procedures"], items[2]);
+            Assert.Equal(folders["security"], items[3]);
         });
     }
-    
+
     [Fact]
     public void From_Dictionary_of_MigrationsFolder()
     {
@@ -63,14 +62,14 @@ public class Customized_Folders_Can_Be_Set_Programmatically
 
         Assert.Multiple(() =>
         {
-            items[0].Should().Be(folders["structure"]);
-            items[1].Should().Be(folders["randomstuff"]);
-            items[2].Should().Be(folders["procedures"]);
-            items[3].Should().Be(folders["security"]);
+            Assert.Equal(folders["structure"], items[0]);
+            Assert.Equal(folders["randomstuff"], items[1]);
+            Assert.Equal(folders["procedures"], items[2]);
+            Assert.Equal(folders["security"], items[3]);
         });
     }
-    
-        
+
+
     [Fact]
     public void From_command_line_argument_style_single_string()
     {
@@ -79,14 +78,14 @@ public class Customized_Folders_Can_Be_Set_Programmatically
 
         Assert.Multiple(() =>
         {
-            items[0].Key.Should().Be("nup");
-            items[0].Value!.Path.Should().Be("tables");
-            
-            items[1].Key.Should().Be("sprocs");
-            items[1].Value!.Path.Should().Be("storedprocedures");
-            
-            items[2].Key.Should().Be("views");
-            items[2].Value!.Path.Should().Be("projections");
+            Assert.Equal("nup", items[0].Key);
+            Assert.Equal("tables", items[0].Value!.Path);
+
+            Assert.Equal("sprocs", items[1].Key);
+            Assert.Equal("storedprocedures", items[1].Value!.Path);
+
+            Assert.Equal("views", items[2].Key);
+            Assert.Equal("projections", items[2].Value!.Path);
         });
     }
     
@@ -98,15 +97,15 @@ public class Customized_Folders_Can_Be_Set_Programmatically
 
         Assert.Multiple(() =>
         {
-            items[0].Key.Should().Be("zup");
-            items[0].Value!.Path.Should().Be("tables");
-            
-            items[1].Key.Should().Be("sprocs");
-            items[1].Value!.Path.Should().Be("storedprocedures");
-            items[1].Value!.Type.Should().Be(MigrationType.AnyTime);
-            
-            items[2].Key.Should().Be("views");
-            items[2].Value!.Path.Should().Be("projections");
+            Assert.Equal("zup", items[0].Key);
+            Assert.Equal("tables", items[0].Value!.Path);
+
+            Assert.Equal("sprocs", items[1].Key);
+            Assert.Equal("storedprocedures", items[1].Value!.Path);
+            Assert.Equal(MigrationType.AnyTime, items[1].Value!.Type);
+
+            Assert.Equal("views", items[2].Key);
+            Assert.Equal("projections", items[2].Value!.Path);
         });
     }
     

@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using TestCommon.TestInfrastructure;
 using static grate.Configuration.KnownFolderKeys;
@@ -47,7 +46,7 @@ public abstract class ScriptsRun_Table(IGrateTestContext context, ITestOutputHel
         }
 
         var expectedName = $"sub/folder/long/way/{filename}";
-        scripts.First().Should().Be(expectedName);
+        Assert.Equal(expectedName, scripts.First());
 
         //await Context.DropDatabase(db);
     }
@@ -83,7 +82,7 @@ public abstract class ScriptsRun_Table(IGrateTestContext context, ITestOutputHel
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.First().Should().Be(filename);
+        Assert.Equal(filename, scripts.First());
 
         //await Context.DropDatabase(db);
     }
@@ -130,15 +129,15 @@ public abstract class ScriptsRun_Table(IGrateTestContext context, ITestOutputHel
 
         Assert.Multiple(() =>
         {
-            scripts.Should().HaveCount(2);
+            Assert.Equal(2, scripts.Length);
             var first = scripts.First();
             var second = scripts.Last();
 
-            first.script_name.Should().Be($"dub/folder/long/way/{filename}");
-            first.text_of_script.Should().Be(Context.Sql.SelectVersion);
+            Assert.Equal($"dub/folder/long/way/{filename}", first.script_name);
+            Assert.Equal(Context.Sql.SelectVersion, first.text_of_script);
 
-            second.script_name.Should().Be($"sub/dolder/gong/way/{filename}");
-            second.text_of_script.Should().Be(Context.Syntax.CurrentDatabase);
+            Assert.Equal($"sub/dolder/gong/way/{filename}", second.script_name);
+            Assert.Equal(Context.Syntax.CurrentDatabase, second.text_of_script);
         });
 
         //await Context.DropDatabase(db);
@@ -179,7 +178,7 @@ public abstract class ScriptsRun_Table(IGrateTestContext context, ITestOutputHel
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.First().Should().Be(fileContent);
+        Assert.Equal(fileContent, scripts.First());
 
         //await Context.DropDatabase(db);
     }

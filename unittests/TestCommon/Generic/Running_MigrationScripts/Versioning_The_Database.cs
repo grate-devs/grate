@@ -1,6 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
-using FluentAssertions.Execution;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
@@ -36,16 +34,13 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         {
             await migrator.Migrate();
 
-            using (new AssertionScope())
-            {
-                // Version again
-                var version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
-                version.Should().Be(2);
+            // Version again
+            var version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
+            Assert.Equal(2, version);
 
-                // And again
-                version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
-                version.Should().Be(3);
-            }
+            // And again
+            version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
+            Assert.Equal(3, version);
         }
         
         //await Context.DropDatabase(db);
@@ -73,7 +68,7 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await migrator.Migrate(); // shouldn't touch anything because of --dryrun
         var addedTable = await migrator.GetDbMigrator().Database.VersionTableExists();
-        addedTable.Should().Be(false); // we didn't even add the grate infrastructure
+        Assert.False(addedTable); // we didn't even add the grate infrastructure
         
         //await Context.DropDatabase(db);
     }
@@ -112,9 +107,9 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
             entries = (await conn.QueryAsync<(string version, string status)>(sql)).ToArray();
         }
 
-        entries.Should().HaveCount(2);
+        Assert.Equal(2, entries.Count());
         var version = entries.Single(x => x.version == dbVersion);
-        version.status.Should().Be(MigrationStatus.InProgress);
+        Assert.Equal(MigrationStatus.InProgress, version.status);
         
         //await Context.DropDatabase(db);
     }
@@ -150,12 +145,12 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
             entries = (await conn.QueryAsync<(string version, string status)>(sql)).ToArray();
         }
 
-        entries.Should().HaveCount(1);
+        Assert.Single(entries);
         var version = entries.Single();
-        version.version.Should().Be(dbVersion);
-        version.status.Should().Be(MigrationStatus.Finished);
+        Assert.Equal(dbVersion, version.version);
+        Assert.Equal(MigrationStatus.Finished, version.status);
     }
-    
+
     [Fact]
     [Trait("Category", "Versioning")]
     public async Task Migrating_creates_a_new_version_record_even_in_baseline_mode()
@@ -188,12 +183,12 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
             entries = (await conn.QueryAsync<(string version, string status)>(sql)).ToArray();
         }
 
-        entries.Should().HaveCount(1);
+        Assert.Single(entries);
         var version = entries.Single();
-        version.version.Should().Be(dbVersion);
-        version.status.Should().Be(MigrationStatus.Finished);
+        Assert.Equal(dbVersion, version.version);
+        Assert.Equal(MigrationStatus.Finished, version.status);
     }
-    
+
     [Fact]
     [Trait("Category", "Versioning")]
     public async Task Includes_RepositoryPath_in_version_table()
@@ -228,7 +223,7 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
             loggedRepositoryPath = await conn.QuerySingleOrDefaultAsync<string>(sql);
         }
 
-        loggedRepositoryPath.Should().Be(repositoryPath);
+        Assert.Equal(repositoryPath, loggedRepositoryPath);
         
         //await Context.DropDatabase(db);
     }
@@ -252,8 +247,8 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await migrator.Migrate();
         var currentVersion = await migrator.GetDbMigrator().Database.GetCurrentVersion();
-        currentVersion.Should().NotBe(newVersion);
-        currentVersion.Should().Be(AnsiSqlDatabase.NotVersioning);
+        Assert.NotEqual(newVersion, currentVersion);
+        Assert.Equal(AnsiSqlDatabase.NotVersioning, currentVersion);
         
         await Context.DropDatabase(database);
     }
@@ -298,8 +293,7 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         await newMigrator.Migrate();
 
         var currentVersion = await newMigrator.GetDbMigrator().Database.GetCurrentVersion();
-        currentVersion.Should()
-            .Be(originalVersion, "DB version should not be changed due to no new script detected");
+        Assert.Equal(originalVersion, currentVersion);
 
         //await Context.DropDatabase(db);
     }
@@ -339,7 +333,7 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         await newMigrator.Migrate();
 
         var currentVersion = await newMigrator.GetDbMigrator().Database.GetCurrentVersion();
-        currentVersion.Should().Be(newConfig.Version, "DB version should be changed to the latest version");
+        Assert.Equal(newConfig.Version, currentVersion);
     }
 
 }

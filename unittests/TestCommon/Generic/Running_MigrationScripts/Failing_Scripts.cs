@@ -1,8 +1,6 @@
 ﻿using System.Text.Json;
 using System.Transactions;
 using Dapper;
-using FluentAssertions;
-using FluentAssertions.Execution;
 using grate.Configuration;
 using grate.Exceptions;
 using grate.Migration;
@@ -43,9 +41,9 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         var ex = await Assert.ThrowsAnyAsync<MigrationFailed>(migrator.Migrate);
-        NormalizeLineEndings(ex.Message).TrimEnd().
-            Should().StartWith(
-            $"Migration failed due to the following errors:\n\n{NormalizeLineEndings(ExpectedStartOfErrorMessageForInvalidSql)}".TrimEnd()
+        Assert.StartsWith(
+            $"Migration failed due to the following errors:\n\n{NormalizeLineEndings(ExpectedStartOfErrorMessageForInvalidSql)}".TrimEnd(),
+            NormalizeLineEndings(ex.Message).TrimEnd()
             );
 
         //await Context.DropDatabase(db);
@@ -77,12 +75,9 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
 
         try
         {
-            using (new AssertionScope())
-            {
-                // These _values_ are a bit too specific to assert on
-                // - they vary between versions of the same database. But we can check that the keys are there.
-                ex.MigrationErrors.Keys.Should().Contain(ExpectedErrorDetails.Keys);
-            }
+            // These _values_ are a bit too specific to assert on
+            // - they vary between versions of the same database. But we can check that the keys are there.
+            Assert.All(ExpectedErrorDetails.Keys, key => Assert.Contains(key, ex.MigrationErrors.Keys));
         }
         catch (XunitException)
         {
@@ -116,7 +111,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         var ex = await Assert.ThrowsAnyAsync<MigrationFailed>(migrator.Migrate);
-        ex.IsTransient.Should().BeFalse();
+        Assert.False(ex.IsTransient);
 
         //await Context.DropDatabase(db);
     }
@@ -142,7 +137,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             var ex = await Assert.ThrowsAsync<MigrationFailed>(migrator.Migrate);
-            ex.Should().NotBeNull();
+            Assert.NotNull(ex);
         }
 
         string[] scripts;
@@ -154,7 +149,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
+        Assert.Single(scripts);
 
         //await Context.DropDatabase(db);
     }
@@ -191,7 +186,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
             loggedRepositoryPath = (await conn.QuerySingleOrDefaultAsync<string>(sql));
         }
 
-        loggedRepositoryPath.Should().Be(repositoryPath);
+        Assert.Equal(repositoryPath, loggedRepositoryPath);
 
         //await Context.DropDatabase(db);
     }
@@ -229,8 +224,8 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        scripts.First().Should().Be(fileContent);
+        Assert.Single(scripts);
+        Assert.Equal(fileContent, scripts.First());
 
         //await Context.DropDatabase(db);
     }
@@ -267,7 +262,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
         // it works. I don't know why, but I'm leaving it like this for now.
         //var ex = await Assert.ThrowsAnyAsync<MigrationFailed>(migrator.Migrate);
         var ex = await Assert.ThrowsAnyAsync<Exception>(migrator.Migrate);
-        ex.Should().BeOfType<MigrationFailed>();
+        Assert.IsType<MigrationFailed>(ex);
 
         //await Context.DropDatabase(db);
     }
@@ -304,7 +299,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
         // it works. I don't know why, but I'm leaving it like this for now.
         //var ex = await Assert.ThrowsAnyAsync<MigrationFailed>(migrator.Migrate);
         var ex = await Assert.ThrowsAnyAsync<Exception>(migrator.Migrate);
-        ex.Should().BeOfType<MigrationFailed>();
+        Assert.IsType<MigrationFailed>(ex);
 
         //await Context.DropDatabase(db);
     }
@@ -315,7 +310,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
     {
         var filename = folder.Name + "_jalla1.sql";
         var scripts = await RunMigration(folder, filename);
-        scripts.Should().Contain(filename);
+        Assert.Contains(filename, scripts);
     }
 
     [Theory]
@@ -330,7 +325,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
 
         var filename = folder.Name + "_jalla1.sql";
         var scripts = await RunMigration(folder, filename);
-        scripts.Should().NotContain(filename);
+        Assert.DoesNotContain(filename, scripts);
     }
 
     [Fact]
@@ -353,7 +348,7 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
         await using (migrator = Context.Migrator.WithConfiguration(config))
         {
             var ex = await Assert.ThrowsAsync<MigrationFailed>(migrator.Migrate);
-            ex.Should().NotBeNull();
+            Assert.NotNull(ex);
         }
 
 
@@ -366,8 +361,8 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
             versions = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        versions.Should().HaveCount(1);
-        versions.Single().Should().Be(MigrationStatus.Error);
+        Assert.Single(versions);
+        Assert.Equal(MigrationStatus.Error, versions.Single());
 
         //await Context.DropDatabase(db);
     }

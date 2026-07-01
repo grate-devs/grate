@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using TestCommon.TestInfrastructure;
 using static grate.Configuration.KnownFolderKeys;
@@ -40,8 +39,8 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
 
         using var conn = Context.External.CreateDbConnection(db);
         var scripts = (await conn.QueryAsync<string>(sql)).ToArray();
-        scripts.Should().HaveCount(3);
-        
+        Assert.Equal(3, scripts.Length);
+
         //await Context.DropDatabase(db);
     }
 
@@ -81,8 +80,8 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
             }
         }
 
-        scripts.Should().BeEmpty();
-        
+        Assert.Empty(scripts);
+
         //await Context.DropDatabase(db);
     }
 
@@ -120,7 +119,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(7); // one time script ran once, the two everytime scripts ran every time.
+        Assert.Equal(7, scripts.Length); // one time script ran once, the two everytime scripts ran every time.
         
         //await Context.DropDatabase(db);
     }
@@ -152,7 +151,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
 
         using var conn = Context.External.CreateDbConnection(db);
         var scripts = (await conn.QueryAsync<string>(sql)).ToArray();
-        scripts.Should().HaveCount(1); //marked as run
+        Assert.Single(scripts); //marked as run
 
         // but doesn't exist
         await Assert.ThrowsAsync(Context.DbExceptionType, async () => await conn.QueryAsync<string>("select * from grate"));

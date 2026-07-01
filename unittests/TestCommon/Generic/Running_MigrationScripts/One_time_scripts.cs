@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Exceptions;
 using grate.Migration;
@@ -48,8 +47,8 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        
+        Assert.Single(scripts);
+
         //await Context.DropDatabase(db);
     }
 
@@ -79,7 +78,7 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
         {
             var ex = await Assert.ThrowsAsync<MigrationFailed>(() => migrator.Migrate());
             var inner = ex.InnerException;
-            inner.Should().BeOfType<OneTimeScriptChanged>();
+            Assert.IsType<OneTimeScriptChanged>(inner);
         }
 
         string[] scripts;
@@ -90,8 +89,8 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        scripts.First().Should().Be(Context.Sql.SelectVersion);
+        Assert.Single(scripts);
+        Assert.Equal(Context.Sql.SelectVersion, scripts.First());
         
         //await Context.DropDatabase(db);
     }
@@ -133,8 +132,8 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(2); //script run twice
-        scripts.Last().Should().Be(Context.Syntax.CurrentDatabase); // the script was re-run
+        Assert.Equal(2, scripts.Length); //script run twice
+        Assert.Equal(Context.Syntax.CurrentDatabase, scripts.Last()); // the script was re-run
         
         //await Context.DropDatabase(db);
     }
@@ -180,8 +179,8 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
         var result = (await conn.QueryAsync<string>("select col from grate")).Single();
 
 
-        scripts.Should().HaveCount(2); //script marked as run twice
-        result.Should().Be("1"); // but still the first version of the view
+        Assert.Equal(2, scripts.Count()); //script marked as run twice
+        Assert.Equal("1", result); // but still the first version of the view
         
         //await Context.DropDatabase(db);
     }

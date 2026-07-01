@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Commands;
+﻿using grate.Commands;
 using grate.Configuration;
 using grate.Migration;
 
@@ -16,12 +15,12 @@ public class FoldersCommand_
     {
         var actual = FoldersCommand.Parse(argument);
 
-        actual.Should().NotBeNull();
+        Assert.NotNull(actual);
 
         var expectedArr = expected.ToArray();
         var actualArr = actual.ToArray();
 
-        actualArr.Should().HaveCount(expectedArr.Length);
+        Assert.Equal(expectedArr.Length, actualArr.Length);
 
         Assert.Multiple(() =>
         {
@@ -30,7 +29,7 @@ public class FoldersCommand_
                 var act = actualArr?[i];
                 var exp = expectedArr[i];
 
-                act?.Key.Should().Be(exp.Key);
+                Assert.Equal(exp.Key, act?.Key);
                 AssertEquivalent(exp.Value, act?.Value);
             }
         });
@@ -40,11 +39,11 @@ public class FoldersCommand_
     {
         Assert.Multiple(() =>
         {
-            actual?.Name.Should().Be(expected?.Name);
-            actual?.Path.Should().Be(expected?.Path);
-            actual?.Type.Should().Be(expected?.Type);
-            actual?.ConnectionType.Should().Be(expected?.ConnectionType);
-            actual?.TransactionHandling.Should().Be(expected?.TransactionHandling);
+            Assert.Equal(expected?.Name, actual?.Name);
+            Assert.Equal(expected?.Path, actual?.Path);
+            Assert.Equal(expected?.Type, actual?.Type);
+            Assert.Equal(expected?.ConnectionType, actual?.ConnectionType);
+            Assert.Equal(expected?.TransactionHandling, actual?.TransactionHandling);
         });
     }
 

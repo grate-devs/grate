@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Infrastructure;
+﻿using grate.Infrastructure;
 
 namespace Basic_tests.Infrastructure;
 
@@ -13,7 +12,7 @@ public class GrateEnvironment_
         var env = new GrateEnvironment("TEST");
         var file = FullPath("just_a_normal_file.sql");
 
-        env.ShouldRun(file).Should().BeTrue();
+        Assert.True(env.ShouldRun(file));
     }
 
     [Fact]
@@ -22,7 +21,7 @@ public class GrateEnvironment_
         var env = new GrateEnvironment("BOOYA");
         var file = FullPath("BOOYA.a_file.ENV.sql");
 
-        env.ShouldRun(file).Should().BeTrue();
+        Assert.True(env.ShouldRun(file));
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public class GrateEnvironment_
         var env = new GrateEnvironment("BOOYA");
         var file = FullPath("a_file.BOOYA.ENV.with_middle.sql");
 
-        env.ShouldRun(file).Should().BeTrue();
+        Assert.True(env.ShouldRun(file));
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public class GrateEnvironment_
         var env = new GrateEnvironment("BOOYA");
         var file = FullPath("a_file..ENV.with_middle.BOOYA.sql");
 
-        env.ShouldRun(file).Should().BeTrue();
+        Assert.True(env.ShouldRun(file));
     }
     
     [Fact]
@@ -50,8 +49,8 @@ public class GrateEnvironment_
         
         var file1 = FullPath("a_file.ENV.with.BOOYA.sql");
         var file2 = FullPath("a_file.ENV.with.FOOYA.sql");
-        env.ShouldRun(file1).Should().BeTrue();
-        env.ShouldRun(file2).Should().BeTrue();
+        Assert.True(env.ShouldRun(file1));
+        Assert.True(env.ShouldRun(file2));
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public class GrateEnvironment_
         var env = new GrateEnvironment("FOOFOO");
         var file = FullPath("BOOYA.a_file.ENV.sql");
 
-        env.ShouldRun(file).Should().BeFalse();
+        Assert.False(env.ShouldRun(file));
     }
 
     private static string FullPath(string fileName)

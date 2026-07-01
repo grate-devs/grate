@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using TestCommon.TestInfrastructure;
 using static grate.Configuration.KnownFolderKeys;
@@ -41,7 +40,7 @@ public abstract class TokenScripts(IGrateTestContext context, ITestOutputHelper 
         string sql = $"SELECT dbase FROM grate";
         using var conn = Context.External.CreateDbConnection(db);
         var actual = await conn.QuerySingleAsync<string>(sql);
-        actual.Should().Be(db);
+        Assert.Equal(db, actual);
         
         //await Context.DropDatabase(db);
 
@@ -72,7 +71,7 @@ public abstract class TokenScripts(IGrateTestContext context, ITestOutputHelper 
         string sql = $"SELECT dbase FROM grate";
         using var conn = Context.External.CreateDbConnection(db);
         var actual = await conn.QuerySingleAsync<string>(sql);
-        actual.Should().Be("token1");
+        Assert.Equal("token1", actual);
         
         //await Context.DropDatabase(db);
     }

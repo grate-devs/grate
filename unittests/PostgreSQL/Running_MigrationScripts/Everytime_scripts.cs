@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using PostgreSQL.TestInfrastructure;
 using TestCommon.TestInfrastructure;
@@ -64,7 +63,7 @@ CREATE INDEX CONCURRENTLY IX_column2 ON public.table1
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(2);
+        Assert.Equal(2, scripts.Length);
         
         //await Context.DropDatabase(db);
     }

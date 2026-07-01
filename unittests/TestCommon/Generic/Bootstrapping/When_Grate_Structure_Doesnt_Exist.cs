@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
@@ -45,7 +44,7 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
             schema = await conn.ExecuteScalarAsync<string>(sql);
         }
 
-        schema.Should().Be(schemaName);
+        Assert.Equal(schemaName, schema);
         
         //await Context.DropDatabase(db);
     }
@@ -70,10 +69,10 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
         await RunMigration(migrator);
 
         var scriptsRunTable= await migrator.GetDbMigrator().Database.ExistingTable(schemaName, scriptsRunTableName);
-        scriptsRunTable.Should().NotBeNull();
-        
+        Assert.NotNull(scriptsRunTable);
+
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
-        scriptsRunTable!.ToUpper().Should().Be(scriptsRunTable.ToUpper());
+        Assert.Equal(scriptsRunTable.ToUpper(), scriptsRunTable!.ToUpper());
         
         //await Context.DropDatabase(db);
     }
@@ -98,10 +97,10 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
         await RunMigration(migrator);
         
         var scriptsErrorTable = await migrator.GetDbMigrator().Database.ExistingTable(schemaName, scriptsErrorTableName);
-        scriptsErrorTable.Should().NotBeNull();
-        
+        Assert.NotNull(scriptsErrorTable);
+
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
-        scriptsErrorTable!.ToUpper().Should().Be(scriptsErrorTableName.ToUpper());
+        Assert.Equal(scriptsErrorTableName.ToUpper(), scriptsErrorTable!.ToUpper());
         
         //await Context.DropDatabase(db);
     }
@@ -127,10 +126,10 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
         await RunMigration(migrator);
 
         var versionTable = await migrator.GetDbMigrator().Database.ExistingTable(schemaName, versionTableName);
-        versionTable.Should().NotBeNull();
-        
+        Assert.NotNull(versionTable);
+
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
-        versionTable!.ToUpper().Should().Be(versionTable.ToUpper());
+        Assert.Equal(versionTable.ToUpper(), versionTable!.ToUpper());
         
         //await Context.DropDatabase(db);
     }

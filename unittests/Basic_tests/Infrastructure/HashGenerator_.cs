@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Infrastructure;
+﻿using grate.Infrastructure;
 
 namespace Basic_tests.Infrastructure;
 
@@ -14,6 +13,6 @@ public class HashGenerator_
         string expected_hash = "TMGPZJmBhSO5uYbf/TBqNA==";
 
         var hashGen = new HashGenerator();
-        hashGen.Hash(text_to_hash).Should().Be(expected_hash);
+        Assert.Equal(expected_hash, hashGen.Hash(text_to_hash));
     }
 }

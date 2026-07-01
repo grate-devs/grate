@@ -1,5 +1,4 @@
 ﻿using System.Configuration;
-using FluentAssertions;
 using grate.Commands;
 using grate.Configuration;
 using grate.Exceptions;
@@ -35,7 +34,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + database;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.ConnectionString.Should().Be(database);
+        Assert.Equal(database, cfg?.ConnectionString);
     }
 
     [Theory]
@@ -46,7 +45,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + token;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.AccessToken.Should().Be(token);
+        Assert.Equal(token, cfg?.AccessToken);
     }
 
     [Theory]
@@ -63,7 +62,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + database;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.AdminConnectionString.Should().Be(database);
+        Assert.Equal(database, cfg?.AdminConnectionString);
     }
 
     [Theory]
@@ -76,7 +75,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + folder;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.SqlFilesDirectory.ToString().Should().Be(folder.ToString());
+        Assert.Equal(folder.ToString(), cfg?.SqlFilesDirectory.ToString());
     }
 
     [Theory]
@@ -93,8 +92,8 @@ public class Basic_CommandLineParsing
         CommandLineGrateConfiguration? cfg = null;
         var ex = await Record.ExceptionAsync(async () => cfg = await ParseGrateConfiguration(commandline));
 
-        ex.Should().BeNull();
-        cfg?.OutputPath.ToString().Should().Be(nonExistingDirectory);
+        Assert.Null(ex);
+        Assert.Equal(nonExistingDirectory, cfg?.OutputPath.ToString());
     }
 
     [Theory]
@@ -110,7 +109,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + repositorypath;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.RepositoryPath.Should().Be(repositorypath);
+        Assert.Equal(repositorypath, cfg?.RepositoryPath);
     }
 
     [Theory]
@@ -122,7 +121,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + version;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.Version.Should().Be(version);
+        Assert.Equal(version, cfg?.Version);
     }
 
     [Theory]
@@ -134,7 +133,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + timeout;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.CommandTimeout.Should().Be(timeout);
+        Assert.Equal(timeout, cfg?.CommandTimeout);
     }
 
     [Theory]
@@ -144,7 +143,7 @@ public class Basic_CommandLineParsing
     public async Task DisableTokenReplacement(string commandline, bool expected)
     {
         var cfg = await ParseGrateConfiguration(commandline);
-        cfg?.DisableTokenReplacement.Should().Be(expected);
+        Assert.Equal(expected, cfg?.DisableTokenReplacement);
     }
 
     [Theory]
@@ -156,7 +155,7 @@ public class Basic_CommandLineParsing
         var commandline = argName + timeout;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.AdminCommandTimeout.Should().Be(timeout);
+        Assert.Equal(timeout, cfg?.AdminCommandTimeout);
     }
 
     [Theory]
@@ -168,7 +167,7 @@ public class Basic_CommandLineParsing
         var commandline = argName;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.Transaction.Should().Be(true);
+        Assert.Equal(true, cfg?.Transaction);
     }
 
     [Theory]
@@ -181,7 +180,7 @@ public class Basic_CommandLineParsing
         var commandline = argName;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.Transaction.Should().Be(false);
+        Assert.Equal(false, cfg?.Transaction);
     }
 
 
@@ -232,7 +231,7 @@ public class Basic_CommandLineParsing
         var cfg = await ParseGrateConfiguration(commandline);
 
         var expectedEnvironment = new GrateEnvironment(expected);
-        cfg?.Environment.Should().BeEquivalentTo(expectedEnvironment);
+        Assert.Equivalent(expectedEnvironment, cfg?.Environment);
     }
 
     [Theory]
@@ -245,7 +244,7 @@ public class Basic_CommandLineParsing
         var commandline = argName;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.SchemaName.Should().Be(expected);
+        Assert.Equal(expected, cfg?.SchemaName);
     }
 
     [Theory]
@@ -264,7 +263,7 @@ public class Basic_CommandLineParsing
         var commandline = argName;
         var cfg = await ParseGrateConfiguration(commandline);
 
-        cfg?.Silent.Should().Be(expected);
+        Assert.Equal(expected, cfg?.Silent);
     }
 
     [Theory]
@@ -274,7 +273,7 @@ public class Basic_CommandLineParsing
     public async Task WarnOnOneTimeScriptChanges(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.WarnOnOneTimeScriptChanges.Should().Be(expected);
+        Assert.Equal(expected, cfg?.WarnOnOneTimeScriptChanges);
     }
 
     [Theory]
@@ -283,7 +282,7 @@ public class Basic_CommandLineParsing
     public async Task DoNotStoreScriptsRunText(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.DoNotStoreScriptsRunText.Should().Be(expected);
+        Assert.Equal(expected, cfg?.DoNotStoreScriptsRunText);
     }
 
     [Theory]
@@ -293,7 +292,7 @@ public class Basic_CommandLineParsing
     public async Task RunAllAnyTimeScripts(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.RunAllAnyTimeScripts.Should().Be(expected);
+        Assert.Equal(expected, cfg?.RunAllAnyTimeScripts);
     }
 
     [Theory]
@@ -302,7 +301,7 @@ public class Basic_CommandLineParsing
     public async Task DryRun(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.DryRun.Should().Be(expected);
+        Assert.Equal(expected, cfg?.DryRun);
     }
 
     [Theory]
@@ -312,7 +311,7 @@ public class Basic_CommandLineParsing
     public async Task CreateDatabase(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.CreateDatabase.Should().Be(expected);
+        Assert.Equal(expected, cfg?.CreateDatabase);
     }
 
     [Theory]
@@ -321,7 +320,7 @@ public class Basic_CommandLineParsing
     public async Task WarnAndIgnoreOnOneTimeScriptChanges(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.WarnAndIgnoreOnOneTimeScriptChanges.Should().Be(expected);
+        Assert.Equal(expected, cfg?.WarnAndIgnoreOnOneTimeScriptChanges);
     }
 
     [Theory]
@@ -330,14 +329,14 @@ public class Basic_CommandLineParsing
     public async Task Baseline(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.Baseline.Should().Be(expected);
+        Assert.Equal(expected, cfg?.Baseline);
     }
 
     [Fact]
     public async Task WithoutTransaction_Default()
     {
         var cfg = await ParseGrateConfiguration("");
-        cfg?.Transaction.Should().Be(false);
+        Assert.Equal(false, cfg?.Transaction);
     }
 
 
@@ -350,7 +349,7 @@ public class Basic_CommandLineParsing
     {
         var cfg = await ParseGrateConfiguration(args);
         var t = cfg?.UserTokens.Safe().ToList();
-        t.Should().HaveCount(expectedCount);
+        Assert.Equal(expectedCount, t!.Count);
     }
 
 
@@ -365,7 +364,7 @@ public class Basic_CommandLineParsing
     public async Task TestDatabaseType(string args, DatabaseType expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.DatabaseType.Should().Be(expected);
+        Assert.Equal(expected, cfg?.DatabaseType);
     }
 
 
@@ -377,7 +376,7 @@ public class Basic_CommandLineParsing
     public async Task IgnoreDirectoryNames(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.IgnoreDirectoryNames.Should().Be(expected);
+        Assert.Equal(expected, cfg?.IgnoreDirectoryNames);
     }
 
     [Theory]
@@ -389,7 +388,7 @@ public class Basic_CommandLineParsing
     public async Task UpToDateCheck(string args, bool expected)
     {
         var cfg = await ParseGrateConfiguration(args);
-        cfg?.UpToDateCheck.Should().Be(expected);
+        Assert.Equal(expected, cfg?.UpToDateCheck);
     }
 
     private static Task<CommandLineGrateConfiguration?> ParseGrateConfiguration(string commandline)

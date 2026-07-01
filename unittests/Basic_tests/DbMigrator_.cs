@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
 using Microsoft.Extensions.Logging;
@@ -22,8 +21,8 @@ public class DbMigrator_
         var changedConfig = config with { ConnectionString = "Server=server2" };
         var changedMigrator = migrator with { Configuration = changedConfig };
         
-        migrator.Configuration.ConnectionString.Should().Be("Server=server1");
-        changedMigrator.Configuration.ConnectionString.Should().Be("Server=server2");
+        Assert.Equal("Server=server1", migrator.Configuration.ConnectionString);
+        Assert.Equal("Server=server2", changedMigrator.Configuration.ConnectionString);
     }
     
     [Fact]
@@ -37,8 +36,8 @@ public class DbMigrator_
         changedDatabase.DatabaseName.Returns("server2");
         var changedMigrator = migrator with { Database = changedDatabase };
         
-        migrator.Database.DatabaseName.Should().Be("server1");
-        changedMigrator.Database.DatabaseName.Should().Be("server2");
+        Assert.Equal("server1", migrator.Database.DatabaseName);
+        Assert.Equal("server2", changedMigrator.Database.DatabaseName);
     }
     
 }

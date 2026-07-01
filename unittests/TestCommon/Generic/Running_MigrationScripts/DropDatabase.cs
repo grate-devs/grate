@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using TestCommon.TestInfrastructure;
 using static grate.Configuration.KnownFolderKeys;
@@ -49,6 +48,6 @@ public abstract class DropDatabase(IGrateTestContext context, ITestOutputHelper 
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1); // only one script because the database was dropped after the first migration...
+        Assert.Single(scripts); // only one script because the database was dropped after the first migration...
     }
 }

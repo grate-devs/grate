@@ -1,6 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
-using FluentAssertions.Execution;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
@@ -50,8 +48,8 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        
+        Assert.Single(scripts);
+
         //await Context.DropDatabase(db);
     }
 
@@ -90,14 +88,11 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(2);
+        Assert.Equal(2, scripts.Length);
 
-        using (new AssertionScope())
-        {
-            scripts.First().Should().Be(Context.Sql.SelectVersion);
-            scripts.Last().Should().Be(Context.Syntax.CurrentDatabase);
-        }
-        
+        Assert.Equal(Context.Sql.SelectVersion, scripts.First());
+        Assert.Equal(Context.Syntax.CurrentDatabase, scripts.Last());
+
         //await Context.DropDatabase(db);
     }
 
@@ -131,8 +126,8 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        scripts.Single().Should().Be(null);
+        Assert.Single(scripts);
+        Assert.Null(scripts.Single());
         
         //await Context.DropDatabase(db);
     }
@@ -166,8 +161,8 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        scripts.Single().Should().Be(Context.Sql.SelectVersion);
+        Assert.Single(scripts);
+        Assert.Equal(Context.Sql.SelectVersion, scripts.Single());
         
         //await Context.DropDatabase(db);
     }
@@ -206,8 +201,8 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(2);
-        
+        Assert.Equal(2, scripts.Length);
+
         //await Context.DropDatabase(db);
     }
 }

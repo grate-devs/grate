@@ -1,7 +1,6 @@
 ﻿using System.Data.Common;
 using System.Transactions;
 using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
@@ -29,7 +28,7 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
             res = (string?)await conn.ExecuteScalarAsync(commandText);
         }
 
-        res.Should().StartWith(Context.ExpectedVersionPrefix);
+        Assert.StartsWith(Context.ExpectedVersionPrefix, res);
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
         }
 
         IEnumerable<string> databases = await GetDatabases();
-        databases.Should().Contain(db);
+        Assert.Contains(db, databases);
 
         //await Context.DropDatabase(db);
     }
@@ -77,8 +76,8 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
 
         // The database should have been created by the custom script
         IEnumerable<string> databases = (await GetDatabases()).ToList();
-        databases.Should().Contain(scriptedDatabase);
-        databases.Should().NotContain(confedDatabase);
+        Assert.Contains(scriptedDatabase, databases);
+        Assert.DoesNotContain(confedDatabase, databases);
         
         await Context.DropDatabase(scriptedDatabase);
     }
@@ -89,8 +88,8 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
         var db = TestConfig.RandomDatabase().ToUpper();
 
         IEnumerable<string> databasesBeforeMigration = await GetDatabases();
-        
-        databasesBeforeMigration.Should().NotContain(db);
+
+        Assert.DoesNotContain(db, databasesBeforeMigration);
 
         await using (var migrator = GetMigrator(GetConfiguration(db, false)))
         {
@@ -103,7 +102,7 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
 
         // Ensure that the database was in fact not created 
         IEnumerable<string> databases = await GetDatabases();
-        databases.Should().NotContain(db);
+        Assert.DoesNotContain(db, databases);
     }
 
     [Fact]
@@ -116,14 +115,14 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
 
         // Check that the database has been created
         IEnumerable<string> databasesBeforeMigration = await GetDatabases();
-        databasesBeforeMigration.Should().Contain(db);
+        Assert.Contains(db, databasesBeforeMigration);
 
         var config = GetConfiguration(true, Context.UserConnectionString(db), Context.AdminConnectionString);
         await using (var migrator = GetMigrator(config))
         {
             // There should be no errors running the migration
             Exception? ex = await Record.ExceptionAsync(async () => await migrator.Migrate());
-            ex.Should().BeNull();
+            Assert.Null(ex);
         }
         //await Context.DropDatabase(db);
     }
@@ -140,15 +139,15 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
 
         // Check that the database has been created
         IEnumerable<string> databasesBeforeMigration = await GetDatabases();
-        databasesBeforeMigration.Should().Contain(db);
-        
+        Assert.Contains(db, databasesBeforeMigration);
+
 
         // Change the admin connection string to rubbish and run the migration
         var config = GetConfiguration(true, Context.UserConnectionString(db), adminConnectionString);
         await using (var migrator = GetMigrator(config))
         {
             Exception? ex = await Record.ExceptionAsync(async () => await migrator.Migrate());
-            ex.Should().BeNull();
+            Assert.Null(ex);
         }
         //await Context.DropDatabase(db);
     }

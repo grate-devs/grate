@@ -1,9 +1,6 @@
 ﻿using Dapper;
-using FluentAssertions;
-using FluentAssertions.Execution;
 using grate.Configuration;
 using TestCommon.TestInfrastructure;
-using Xunit.Sdk;
 using static grate.Configuration.KnownFolderKeys;
 
 namespace TestCommon.Generic.Running_MigrationScripts;
@@ -26,7 +23,7 @@ public abstract class Run_After_Create_Database_scripts(IGrateTestContext contex
 
         // Check that the database does not exist
         IEnumerable<string> databasesBeforeMigration = await GetDatabases();
-        databasesBeforeMigration.Should().NotContain(db);
+        Assert.DoesNotContain(db, databasesBeforeMigration);
         
         // Run the migration
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
@@ -49,13 +46,10 @@ public abstract class Run_After_Create_Database_scripts(IGrateTestContext contex
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(2);
-        
-        using (new AssertionScope())
-        {
-            scripts.First().Should().Be("1_runAfterCreateDatabase.sql");
-            scripts.Last().Should().Be("1_sprocs.sql");
-        }
+        Assert.Equal(2, scripts.Length);
+
+        Assert.Equal("1_runAfterCreateDatabase.sql", scripts.First());
+        Assert.Equal("1_sprocs.sql", scripts.Last());
     }
     
     [Fact]
@@ -73,7 +67,7 @@ public abstract class Run_After_Create_Database_scripts(IGrateTestContext contex
 
         // Check that the database has been created
         IEnumerable<string> databasesBeforeMigration = await GetDatabases();
-        databasesBeforeMigration.Should().Contain(db);
+        Assert.Contains(db, databasesBeforeMigration);
         
         // Run the migration
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
@@ -96,11 +90,8 @@ public abstract class Run_After_Create_Database_scripts(IGrateTestContext contex
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        using (new AssertionScope())
-        {
-            scripts.Single().Should().Be("1_sprocs.sql");
-        }
+        Assert.Single(scripts);
+        Assert.Equal("1_sprocs.sql", scripts.Single());
     }
 
     protected virtual Task<IEnumerable<string>> GetDatabases() => Context.GetDatabases(TestOutput);

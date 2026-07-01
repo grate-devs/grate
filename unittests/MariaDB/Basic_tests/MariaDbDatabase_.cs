@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using MariaDB.TestInfrastructure;
 using MySqlConnector;
 
@@ -17,7 +16,7 @@ public class MariaDbDatabase_(InspectableMariaDbDatabase mariaDb)
 
         var conn = mariaDb.GetConnection();
         var builder = new MySqlConnectionStringBuilder(conn.ConnectionString);
-        builder.Pipelining.Should().BeFalse();
+        Assert.False(builder.Pipelining);
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public class MariaDbDatabase_(InspectableMariaDbDatabase mariaDb)
 
         var conn = mariaDb.GetConnection();
         var builder = new MySqlConnectionStringBuilder(conn.ConnectionString);
-        builder.Pipelining.Should().BeTrue();
+        Assert.True(builder.Pipelining);
     }
 
 }

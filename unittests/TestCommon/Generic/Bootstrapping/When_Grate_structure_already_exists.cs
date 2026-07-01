@@ -1,7 +1,6 @@
 ﻿using System.Data;
 using System.Text.RegularExpressions;
 using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
@@ -62,7 +61,7 @@ public abstract class When_Grate_structure_already_exists(IGrateTestContext cont
         
         var columns = GetColumns(reader).Select(column => column.ToUpper());
         TryClose(conn);
-        columns.Should().NotBeEmpty();
+        Assert.NotEmpty(columns);
         
         // Run the migration
         await using (var migrator = Context.Migrator.WithConfiguration(config))

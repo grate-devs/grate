@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Infrastructure;
+﻿using grate.Infrastructure;
 using grate.SqlServer.Infrastructure;
 
 namespace SqlServerCaseSensitive.Basic_tests;
@@ -27,7 +26,7 @@ SELECT 1
 ";
         var batches = _splitter.Split(original);
 
-        batches.Should().HaveCount(2);
+        Assert.Equal(2, batches.Count());
     }
 
 }

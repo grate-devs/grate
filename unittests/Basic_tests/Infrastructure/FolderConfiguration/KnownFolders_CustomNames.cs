@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
@@ -22,20 +21,20 @@ public class KnownFolders_CustomNames
 
         Assert.Multiple(() =>
         {
-            items[0].Should().Be(Folders[BeforeMigration]);
-            items[1].Should().Be(Folders[AlterDatabase]);
-            items[2].Should().Be(Folders[RunAfterCreateDatabase]);
-            items[3].Should().Be(Folders[RunBeforeUp]);
-            items[4].Should().Be(Folders[Up]);
-            items[5].Should().Be(Folders[RunFirstAfterUp]);
-            items[6].Should().Be(Folders[Functions]);
-            items[7].Should().Be(Folders[Views]);
-            items[8].Should().Be(Folders[Sprocs]);
-            items[9].Should().Be(Folders[Triggers]);
-            items[10].Should().Be(Folders[Indexes]);
-            items[11].Should().Be(Folders[RunAfterOtherAnyTimeScripts]);
-            items[12].Should().Be(Folders[Permissions]);
-            items[13].Should().Be(Folders[AfterMigration]);
+            Assert.Equal(Folders[BeforeMigration], items[0]);
+            Assert.Equal(Folders[AlterDatabase], items[1]);
+            Assert.Equal(Folders[RunAfterCreateDatabase], items[2]);
+            Assert.Equal(Folders[RunBeforeUp], items[3]);
+            Assert.Equal(Folders[Up], items[4]);
+            Assert.Equal(Folders[RunFirstAfterUp], items[5]);
+            Assert.Equal(Folders[Functions], items[6]);
+            Assert.Equal(Folders[Views], items[7]);
+            Assert.Equal(Folders[Sprocs], items[8]);
+            Assert.Equal(Folders[Triggers], items[9]);
+            Assert.Equal(Folders[Indexes], items[10]);
+            Assert.Equal(Folders[RunAfterOtherAnyTimeScripts], items[11]);
+            Assert.Equal(Folders[Permissions], items[12]);
+            Assert.Equal(Folders[AfterMigration], items[13]);
         });
     }
 
@@ -53,10 +52,10 @@ public class KnownFolders_CustomNames
 
         Assert.Multiple(() =>
         {
-            folder.Path.Should().Be(name);
-            folder.Type.Should().Be(type);
-            folder.ConnectionType.Should().Be(conn);
-            folder.TransactionHandling.Should().Be(tran);
+            Assert.Equal(name, folder.Path);
+            Assert.Equal(type, folder.Type);
+            Assert.Equal(conn, folder.ConnectionType);
+            Assert.Equal(tran, folder.TransactionHandling);
         });
     }
 

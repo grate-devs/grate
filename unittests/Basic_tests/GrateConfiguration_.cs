@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using grate.DependencyInjection;
 using grate.Infrastructure;
 using grate.Migration;
@@ -33,7 +32,7 @@ public class GrateConfiguration_
         var cfg = serviceProvider.GetRequiredService<GrateConfiguration>();
         var database = serviceProvider.GetService<IDatabase>()!;
         var adminConnectionString = database.GetAdminConnectionString(cfg);
-        adminConnectionString.Should().Be(expectedAdminConnectionString);
+        Assert.Equal(expectedAdminConnectionString, adminConnectionString);
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public class GrateConfiguration_
         db.InitializeConnections(cfg);
         var dropFolder = GrateMigrator.ChangeDropFolder(cfg, db.ServerName, db.DatabaseName);
 
-        dropFolder.Should().NotContain(",");
+        Assert.DoesNotContain(",", dropFolder);
     }
 
 }

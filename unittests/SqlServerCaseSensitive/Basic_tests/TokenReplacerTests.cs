@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
 
@@ -22,7 +21,7 @@ public class TokenReplacerTests(IDatabase database)
         var provider = new TokenProvider(config, database);
         var tokens = provider.GetTokens();
 
-        tokens["DatabaseName"].Should().Be("TestDb");
-        tokens["ServerName"].Should().Be("(LocalDb)\\mssqllocaldb");
+        Assert.Equal("TestDb", tokens["DatabaseName"]);
+        Assert.Equal("(LocalDb)\\mssqllocaldb", tokens["ServerName"]);
     }
 }

@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using PostgreSQL.TestInfrastructure;
 using TestCommon.TestInfrastructure;

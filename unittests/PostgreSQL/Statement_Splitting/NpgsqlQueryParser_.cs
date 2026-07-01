@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Infrastructure.Npgsql;
+﻿using grate.Infrastructure.Npgsql;
 
 namespace PostgreSQL.Infrastructure;
 
@@ -10,7 +9,7 @@ public class NpgsqlQueryParser_
     {
         //var statements = ReflectionNpgsqlQueryParser.Split(sqlStatement);
         var statements = NativeSqlQueryParser.Split(sqlStatement);
-        statements.Should().HaveCount(4);
+        Assert.Equal(4, statements.Count());
     }
 
     private const string sqlStatement = @"

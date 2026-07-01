@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using grate.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,7 +14,7 @@ public class AddGrate
         var builder = GrateConfigurationBuilder.Create();
         var config = builder.Build();
         serviceCollection.AddGrate(config);
-        serviceCollection.Should().ContainSingle(s => s.ServiceType == typeof(GrateConfiguration));
+        Assert.Single(serviceCollection, s => s.ServiceType == typeof(GrateConfiguration));
     }
     
 }

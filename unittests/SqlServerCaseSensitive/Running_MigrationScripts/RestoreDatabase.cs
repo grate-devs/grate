@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using SqlServerCaseSensitive.TestInfrastructure;
 using TestCommon.TestInfrastructure;
@@ -53,7 +52,7 @@ public class RestoreDatabase(SqlServerCaseSensitiveGrateTestContext testContext,
             results = (await conn.QueryAsync<int>(sql)).ToArray();
         }
 
-        results.First().Should().Be(1);
+        Assert.Equal(1, results.First());
 
         //await Context.DropDatabase(db);
     }

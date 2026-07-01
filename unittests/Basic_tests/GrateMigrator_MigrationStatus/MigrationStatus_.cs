@@ -1,5 +1,4 @@
 ﻿using Basic_tests.Infrastructure;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
@@ -24,8 +23,8 @@ public class MigrationStatus_ : IDisposable
         });
         await grateMigrator.Migrate();
 
-        grateMigrator.MigrationResult.Should().NotBeNull();
-        grateMigrator.MigrationResult.ScriptsRun.Should().BeEquivalentTo("script_that_is_run.sql");
+        Assert.NotNull(grateMigrator.MigrationResult);
+        Assert.Equal("script_that_is_run.sql", Assert.Single(grateMigrator.MigrationResult.ScriptsRun));
     }
 
     private static GrateMigrator CreateMigrator(List<(string, string)> scripts)

@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using grate.Configuration;
+﻿using grate.Configuration;
 using grate.Migration;
 using TestCommon.TestInfrastructure;
 
@@ -24,8 +23,8 @@ public class FileSystem_
 
         var files = FileSystem.GetFiles(path, "*.sql").ToList();
 
-        files.First().FullName.Should().Be(Path.Combine(path.ToString(), filename1));
-        files.Last().FullName.Should().Be(Path.Combine(path.ToString(), filename2));
+        Assert.Equal(Path.Combine(path.ToString(), filename1), files.First().FullName);
+        Assert.Equal(Path.Combine(path.ToString(), filename2), files.Last().FullName);
     }
 
     [Fact]
@@ -44,8 +43,8 @@ public class FileSystem_
 
         var files = FileSystem.GetFiles(path, "*.sql").ToList();
 
-        files.First().FullName.Should().Be(Path.Combine(path.ToString(), filename2));
-        files.Last().FullName.Should().Be(Path.Combine(path.ToString(), filename1));
+        Assert.Equal(Path.Combine(path.ToString(), filename2), files.First().FullName);
+        Assert.Equal(Path.Combine(path.ToString(), filename1), files.Last().FullName);
     }
 
     [Fact]
@@ -67,8 +66,8 @@ public class FileSystem_
 
         var files = FileSystem.GetFiles(path, "*.sql").ToList();
 
-        files.First().FullName.Should().Be(Path.Combine(folder1.ToString(), filename2));
-        files.Last().FullName.Should().Be(Path.Combine(folder2.ToString(), filename1));
+        Assert.Equal(Path.Combine(folder1.ToString(), filename2), files.First().FullName);
+        Assert.Equal(Path.Combine(folder2.ToString(), filename1), files.Last().FullName);
     }
 
     [Fact]
@@ -90,8 +89,8 @@ public class FileSystem_
 
         var files = FileSystem.GetFiles(path, "*.sql", true).ToList();
 
-        files.First().FullName.Should().Be(Path.Combine(folder1.ToString(), filename1));
-        files.Last().FullName.Should().Be(Path.Combine(folder2.ToString(), filename2));
+        Assert.Equal(Path.Combine(folder1.ToString(), filename1), files.First().FullName);
+        Assert.Equal(Path.Combine(folder2.ToString(), filename2), files.Last().FullName);
     }
 
     protected static DirectoryInfo Wrap(DirectoryInfo root, string? subFolder) =>

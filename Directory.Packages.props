@@ -27,7 +27,6 @@
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.8.0" />
     <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="FluentAssertions" Version="8.10.0" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
     
     <!-- Transitive security pin (EF Core Sqlite → SQLitePCLRaw): patch for GHSA-2m69-gcr7-jv3q (NU1903).

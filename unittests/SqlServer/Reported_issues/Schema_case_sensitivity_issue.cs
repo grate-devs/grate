@@ -1,5 +1,4 @@
 using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Migration;
 using SqlServer.TestInfrastructure;
@@ -43,7 +42,7 @@ public class Schema_case_sensitivity_issue(SqlServerGrateTestContext context, IT
             schema = await conn.ExecuteScalarAsync<string>(
                 "SELECT s.name FROM sys.schemas s WHERE UPPER(s.name) = UPPER('RoundhousE')");
         }
-        schema.Should().NotBeNull();
+        Assert.NotNull(schema);
 
         // Second migration with "roundhouse" schema (different case)
         // This should NOT fail, as SQL Server is case-insensitive by default
@@ -68,6 +67,6 @@ public class Schema_case_sensitivity_issue(SqlServerGrateTestContext context, IT
             schemaCount = await conn.ExecuteScalarAsync<int>(
                 "SELECT COUNT(*) FROM sys.schemas WHERE UPPER(name) = UPPER('roundhouse')");
         }
-        schemaCount.Should().Be(1);
+        Assert.Equal(1, schemaCount);
     }
 }

@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using TestCommon.Generic.Running_MigrationScripts;
 using TestCommon.TestInfrastructure;
@@ -48,6 +47,6 @@ WHERE script_name = '02_create_scripts_run_table.sql'
             scripts = (await conn.QueryAsync<string>(sql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
+        Assert.Single(scripts);
     }
 }

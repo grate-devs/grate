@@ -1,6 +1,5 @@
 ﻿using System.Data.Common;
 using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using grate.DependencyInjection;
 using grate.Infrastructure;
@@ -112,17 +111,17 @@ public abstract class GrateServiceCollectionTest(IGrateTestContext context)
             }
         } while (tries++ < maxTries);
 
-        scripts.Should().HaveCount(files.Length);
+        Assert.Equal(files.Length, scripts.Length);
     }
 
     protected void ValidateService(IServiceCollection serviceCollection, Type serviceType, ServiceLifetime lifetime, Type? expectedImplementationType = null)
     {
-        serviceCollection.Should().ContainSingle(x => x.ServiceType == serviceType);
+        Assert.Single(serviceCollection, x => x.ServiceType == serviceType);
         var service = serviceCollection.Single(x => x.ServiceType == serviceType);
-        service.Lifetime.Should().Be(lifetime);
+        Assert.Equal(lifetime, service.Lifetime);
         if (expectedImplementationType is not null)
         {
-            service.ImplementationType.Should().Be(expectedImplementationType);
+            Assert.Equal(expectedImplementationType, service.ImplementationType);
         }
     }
 
@@ -134,7 +133,7 @@ public abstract class GrateServiceCollectionTest(IGrateTestContext context)
             .AddGrate();
         var serviceProvider = serviceCollection.BuildServiceProvider();
         Action action = () => serviceProvider.GetService<IGrateMigrator>();
-        action.Should().Throw<InvalidOperationException>("You forgot to configure the database. Please .UseXXX on the grate configuration.");
+        Assert.Throws<InvalidOperationException>(action);
     }
 
     protected virtual string CreateMigrationScript(DirectoryInfo sqlFolder, ISyntax syntax)

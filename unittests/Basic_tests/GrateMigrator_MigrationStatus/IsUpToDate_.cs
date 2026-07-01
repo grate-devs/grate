@@ -1,5 +1,4 @@
 ﻿using Basic_tests.Infrastructure;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
@@ -30,11 +29,11 @@ public class IsUpToDate_ : IDisposable
         var grateMigrator = CreateMigrator(folders, dryRun);
         await grateMigrator.Migrate();
 
-        grateMigrator.MigrationResult.Should().NotBeNull();
-        grateMigrator.MigrationResult.IsUpToDate.Should().BeFalse();
+        Assert.NotNull(grateMigrator.MigrationResult);
+        Assert.False(grateMigrator.MigrationResult.IsUpToDate);
 
-        _logger.LoggedMessages.Should().Contain("Up to date: False");
-        _logger.LoggedMessages.Should().Contain("Changed script: script_that_is_run.sql");
+        Assert.Contains("Up to date: False", _logger.LoggedMessages);
+        Assert.Contains("Changed script: script_that_is_run.sql", _logger.LoggedMessages);
     }
 
     [Theory]
@@ -55,8 +54,8 @@ public class IsUpToDate_ : IDisposable
         var grateMigrator = CreateMigrator(folders, dryRun);
         await grateMigrator.Migrate();
 
-        grateMigrator.MigrationResult.Should().NotBeNull();
-        grateMigrator.MigrationResult.IsUpToDate.Should().BeTrue();
+        Assert.NotNull(grateMigrator.MigrationResult);
+        Assert.True(grateMigrator.MigrationResult.IsUpToDate);
     }
 
     [Theory]
@@ -83,8 +82,8 @@ public class IsUpToDate_ : IDisposable
         var grateMigrator = CreateMigrator(folders, dryRun);
         await grateMigrator.Migrate();
 
-        grateMigrator.MigrationResult.Should().NotBeNull();
-        grateMigrator.MigrationResult.IsUpToDate.Should().BeTrue();
+        Assert.NotNull(grateMigrator.MigrationResult);
+        Assert.True(grateMigrator.MigrationResult.IsUpToDate);
     }
 
     private GrateMigrator CreateMigrator(Dictionary<string, List<(string, string)>> scripts, bool dryRun)

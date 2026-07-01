@@ -1,5 +1,4 @@
 ﻿using Basic_tests.Infrastructure;
-using FluentAssertions;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
@@ -27,13 +26,13 @@ public class GrateMigrator_
 
         var grateMigrator = new GrateMigrator(new MockGrateLoggerFactory(), dbMigrator);
 
-        grateMigrator.Configuration.Should().BeEquivalentTo(config);
+        Assert.Equivalent(config, grateMigrator.Configuration);
 
         var changedConfig = config with { ConnectionString = "Server=server2" };
         var changedMigrator = grateMigrator.WithConfiguration(changedConfig);
 
-        grateMigrator.Configuration.ConnectionString.Should().Be("Server=server1");
-        changedMigrator.Configuration.ConnectionString.Should().Be("Server=server2");
+        Assert.Equal("Server=server1", grateMigrator.Configuration.ConnectionString);
+        Assert.Equal("Server=server2", changedMigrator.Configuration.ConnectionString);
     }
 
     [Fact]
@@ -44,15 +43,15 @@ public class GrateMigrator_
 
         var grateMigrator = new GrateMigrator(new MockGrateLoggerFactory(), dbMigrator);
 
-        grateMigrator.Database.DatabaseName.Should().Be("server1");
+        Assert.Equal("server1", grateMigrator.Database.DatabaseName);
 
         var changedDatabase = Substitute.For<IDatabase>();
         changedDatabase.DatabaseName.Returns("server2");
 
         var changedMigrator = grateMigrator.WithDatabase(changedDatabase) as GrateMigrator;
 
-        grateMigrator.Database.DatabaseName.Should().Be("server1");
-        changedMigrator!.Database.DatabaseName.Should().Be("server2");
+        Assert.Equal("server1", grateMigrator.Database.DatabaseName);
+        Assert.Equal("server2", changedMigrator!.Database.DatabaseName);
     }
     
     [Theory]

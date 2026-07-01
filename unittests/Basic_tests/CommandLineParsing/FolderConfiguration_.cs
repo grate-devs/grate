@@ -1,6 +1,5 @@
 ﻿using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
-using FluentAssertions;
 using grate.Commands;
 using grate.Configuration;
 using grate.Migration;
@@ -32,7 +31,7 @@ public class FolderConfiguration_
         expected[RunAfterCreateDatabase] = expected[RunAfterCreateDatabase]! with { TransactionHandling = TransactionHandling.Autonomous };
 
         var actual = cfg?.Folders;
-        actual![RunAfterCreateDatabase]!.TransactionHandling.Should().Be(TransactionHandling.Autonomous);
+        Assert.Equal(TransactionHandling.Autonomous, actual![RunAfterCreateDatabase]!.TransactionHandling);
         AssertEquivalent(expected.Values, actual.Values);
     }
 
@@ -93,7 +92,7 @@ public class FolderConfiguration_
 
         Assert.Multiple(() =>
         {
-            actualArr.Length.Should().Be(expectedArr.Length);
+            Assert.Equal(expectedArr.Length, actualArr.Length);
             for (var i = 0; i < expectedArr.Length; i++)
             {
                 AssertEquivalent(expectedArr[i], actualArr[i]);
@@ -105,11 +104,11 @@ public class FolderConfiguration_
     {
         Assert.Multiple(() =>
         {
-            actual?.Name.Should().Be(expected?.Name);
-            actual?.Path?.Should().Be(expected?.Path);
-            actual?.Type.Should().Be(expected?.Type);
-            actual?.ConnectionType.Should().Be(expected?.ConnectionType);
-            actual?.TransactionHandling.Should().Be(expected?.TransactionHandling);
+            Assert.Equal(expected?.Name, actual?.Name);
+            Assert.Equal(expected?.Path, actual?.Path);
+            Assert.Equal(expected?.Type, actual?.Type);
+            Assert.Equal(expected?.ConnectionType, actual?.ConnectionType);
+            Assert.Equal(expected?.TransactionHandling, actual?.TransactionHandling);
         });
     }
 

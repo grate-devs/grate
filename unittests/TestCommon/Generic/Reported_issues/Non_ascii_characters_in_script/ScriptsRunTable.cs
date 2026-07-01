@@ -1,5 +1,4 @@
 using Dapper;
-using FluentAssertions;
 using grate.Configuration;
 using TestCommon.Generic.Running_MigrationScripts;
 using TestCommon.TestInfrastructure;
@@ -54,9 +53,9 @@ public abstract class ScriptsRunTable(IGrateTestContext context, ITestOutputHelp
                 scripts = (await conn.QueryAsync<string>(selectSql)).ToArray();
             }
 
-            scripts.Should().HaveCount(1);
-            scripts.First().Should().Be(sql);
-            scripts.First().Should().Contain(characters);
+            Assert.Single(scripts);
+            Assert.Equal(sql, scripts.First());
+            Assert.Contains(characters, scripts.First());
         
         //await Context.DropDatabase(db);
     }
@@ -101,8 +100,8 @@ public abstract class ScriptsRunTable(IGrateTestContext context, ITestOutputHelp
             scripts = (await conn.QueryAsync<string>(selectSql)).ToArray();
         }
 
-        scripts.Should().HaveCount(1);
-        scripts.First().Should().Be(scriptName);
+        Assert.Single(scripts);
+        Assert.Equal(scriptName, scripts.First());
         
         //await Context.DropDatabase(db);
     }
