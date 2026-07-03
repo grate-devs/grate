@@ -24,7 +24,7 @@ jobs:
     name: Set version number
     runs-on: ubuntu-latest
     outputs:
-      nuGetVersion: ${{ steps.gitversion.outputs.SemVer }}
+      nuGetVersion: ${{ steps.gitversion.outputs.majorMinorPatch }}
       semVer: ${{ steps.gitversion.outputs.fullSemVer }}
       is-release: ${{ steps.gitversion.outputs.versionSourceDistance == 0 }}
       #is-release: 'true'
