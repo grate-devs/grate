@@ -24,9 +24,9 @@ jobs:
     name: Set version number
     runs-on: ubuntu-latest
     outputs:
-      nuGetVersion: ${{ steps.gitversion.outputs.nuGetVersionV2 }}
+      nuGetVersion: ${{ steps.gitversion.outputs.majorMinorPatch }}
       semVer: ${{ steps.gitversion.outputs.fullSemVer }}
-      is-release: ${{ steps.gitversion.outputs.CommitsSinceVersionSource == 0 }}
+      is-release: ${{ steps.gitversion.outputs.versionSourceDistance == 0 }}
       #is-release: 'true'
     
     steps:
@@ -45,7 +45,7 @@ jobs:
     - name: Determine Version
       id: gitversion
       uses: gittools/actions/gitversion/execute@v4.6.0
-
+      
   build-standalone:
     name: Build cli
     needs: set-version-number
