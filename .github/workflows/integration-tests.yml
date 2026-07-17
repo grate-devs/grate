@@ -31,7 +31,7 @@ jobs:
     
     steps:
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
     - name: Checkout
@@ -65,7 +65,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
@@ -99,7 +99,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
@@ -128,7 +128,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: Setup .NET 10 and earlier
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
          dotnet-version: |
           8.0.x
@@ -162,7 +162,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: Setup .NET 10 and earlier
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: |
           8.0.x
@@ -359,7 +359,7 @@ jobs:
         path: integration-tests/linux-x64
 
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
@@ -474,7 +474,7 @@ jobs:
         path: integration-tests/${{ matrix.os.arch }}
 
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
@@ -557,7 +557,7 @@ jobs:
           path: test-results
 
       - name: Setup .NET # Required to execute ReportGenerator
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.x
 
