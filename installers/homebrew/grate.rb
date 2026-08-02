@@ -4,11 +4,7 @@ class Grate < Formula
   url "https://github.com/grate-devs/grate/archive/refs/tags/2.1.6.tar.gz"
   sha256 "456d83d3ce605720241fd32b386c2a2f9f1adefaa11af77bfcbcb0bd5e1090b5"
   license "MIT"
-
-  livecheck do
-    url :stable
-    regex(/^v?(\d+(?:\.\d+)+)$/i)
-  end
+  head "https://github.com/grate-devs/grate.git", branch: "main"
 
   depends_on "dotnet" => :build
 
@@ -31,8 +27,8 @@ class Grate < Formula
       -p:IncludeNativeLibrariesForSelfExtract=true
       -p:PublishSingleFile=true
       -p:TargetFrameworks=#{framework}
-      -p:Version=#{version}
     ]
+    args << "-p:Version=#{version}" if build.stable?
 
     system "dotnet", "publish", "src/grate/grate.csproj", *args
     bin.install libexec/"grate"
