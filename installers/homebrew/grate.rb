@@ -7,6 +7,7 @@ class Grate < Formula
   head "https://github.com/grate-devs/grate.git", branch: "main"
 
   depends_on "dotnet" => :build
+  depends_on "brotli"
 
   def install
     ENV["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
