@@ -9,6 +9,12 @@ class Grate < Formula
   depends_on "dotnet" => :build
   depends_on "brotli"
 
+  on_linux do
+    depends_on "icu4c@78"
+    depends_on "libunwind"
+    depends_on "zlib-ng-compat"
+  end
+
   def install
     ENV["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
     ENV["DOTNET_NOLOGO"] = "1"
