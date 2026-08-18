@@ -242,6 +242,42 @@ select ''
             Assert.Equal(["jalla ", ";"], result);
         }
 
+        [Fact]
+        public void slash_in_a_single_quoted_literal_with_an_escaped_quote_is_not_a_separator()
+        {
+            const string sql_to_match = "select 'can''t / here' from dual";
+
+            var result = _splitter.Split(sql_to_match).ToList();
+
+            Assert.Equal([sql_to_match], result);
+        }
+
+        [Theory]
+        [InlineData("q'[/]'", "slash in bracket quoted literal")]
+        [InlineData("q'{ / }'", "slash in brace quoted literal")]
+        [InlineData("q'< / >'", "slash in angle quoted literal")]
+        [InlineData("q'! / !'", "slash in delimiter quoted literal")]
+        public void slash_in_an_oracle_alternative_quoted_literal_is_not_a_separator(
+            string literal,
+            string _)
+        {
+            var sql_to_match = $"select {literal} from dual";
+
+            var result = _splitter.Split(sql_to_match).ToList();
+
+            Assert.Equal([sql_to_match], result);
+        }
+
+        [Fact]
+        public void slash_only_with_crlf_is_not_a_batch()
+        {
+            const string sql_to_match = " \r\n/\r\n";
+
+            var result = _splitter.Split(sql_to_match).ToList();
+
+            Assert.Empty(result);
+        }
+
     }
 
     public class should_not_replace_on
@@ -479,6 +515,92 @@ select ''
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
             Assert.Single(result);
+        }
+    }
+
+    public class sqlplus_compatibility
+    {
+        private readonly OracleStatementSplitter _splitter = new();
+
+        [Fact]
+        public void standalone_slash_executes_a_plsql_buffer()
+        {
+            const string sql = "BEGIN\n    NULL;\nEND;\n/\n";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Equal(["BEGIN\n    NULL;\nEND;\n"], result);
+        }
+
+        [Fact]
+        public void semicolons_inside_a_plsql_buffer_do_not_split_the_buffer()
+        {
+            const string sql = "BEGIN\n    NULL;\n    NULL;\nEND;\n/\n";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Single(result);
+            Assert.Equal(sql[..^2], result[0]);
+        }
+
+        [Fact]
+        public void slash_in_a_division_expression_is_not_a_batch_separator()
+        {
+            const string sql = "SELECT 10 / 2 FROM dual;";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Equal([sql], result);
+        }
+
+        [Fact]
+        public void inline_slash_is_not_a_batch_separator()
+        {
+            const string sql = "SELECT 1 / 2 FROM dual; SELECT 3 FROM dual;";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Equal([sql], result);
+        }
+
+        [Fact]
+        public void blank_lines_do_not_execute_or_split_the_sqlplus_buffer()
+        {
+            const string sql = "SELECT 1 FROM dual;\n\nSELECT 2 FROM dual;";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Equal([sql], result);
+        }
+
+        [Fact]
+        public void standalone_slash_with_trailing_spaces_executes_at_eof()
+        {
+            const string sql = "BEGIN\n    NULL;\nEND;\n/   ";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Equal(["BEGIN\n    NULL;\nEND;\n"], result);
+        }
+
+        [Fact]
+        public void repeated_standalone_slashes_do_not_create_empty_batches()
+        {
+            const string sql = "BEGIN\n    NULL;\nEND;\n/\n/\n";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Single(result);
+        }
+
+        [Fact]
+        public void standalone_slash_works_with_crlf_line_endings()
+        {
+            const string sql = "BEGIN\r\n    NULL;\r\nEND;\r\n/\r\n";
+
+            var result = _splitter.Split(sql).ToList();
+
+            Assert.Equal(["BEGIN\r\n    NULL;\r\nEND;\r\n"], result);
         }
     }
 
