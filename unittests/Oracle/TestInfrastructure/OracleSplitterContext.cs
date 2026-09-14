@@ -20,7 +20,7 @@ BOB2
 
 BOB3 /
 
---`~!@#$%^&*()-_+=,.;:'""[]\/?<> /
+--`~!@#$%^&*()-_+=,.:'""[]\/?<> /
 
 BOB5
    /
@@ -45,7 +45,7 @@ BOB8
 
 BOB9
 
--- `~!@#$%^&*()-_+=,.;:'""[]\/?<>
+-- `~!@#$%^&*()-_+=,.:'""[]\/?<>
 /
 
 BOB10/
@@ -109,12 +109,12 @@ BOB2
 
 -- /
 
-BOB3 ", @"
+BOB3 /
 
---`~!@#$%^&*()-_+=,.;:'""[]\/?<> /
+--`~!@#$%^&*()-_+=,.:'""[]\/?<> /
 
 BOB5
-   ", @"
+", @"
 
 BOB6
 ", @"
@@ -136,7 +136,7 @@ BOB8
 
 BOB9
 
--- `~!@#$%^&*()-_+=,.;:'""[]\/?<>
+-- `~!@#$%^&*()-_+=,.:'""[]\/?<>
 ", @"
 
 BOB10/
@@ -164,8 +164,7 @@ ALTER TABLE Inv.something ADD
 	uhuhhh datetime NULL,
 	slsald varchar(15) NULL,
 	uhasdf varchar(15) NULL,
-    daf_asdfasdf DECIMAL(20,6) NULL;
-", @"
+    daf_asdfasdf DECIMAL(20,6) NULL;", @"
 
 EXEC @ReturnCode = msdb.dbo.sp_add_jobstep @job_id=@jobId, @step_name=N'Daily job', 
 		@step_id=1, 
