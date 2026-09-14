@@ -47,6 +47,7 @@ grate is short for migrate. And it's also pronounced the same way as _great_, so
 * [Environment scripts](EnvironmentScripts.md)
 * [Token replacement](TokenReplacement.md)
 * [Response files](ConfigurationOptions/ResponseFiles.md)
+* [Agent skill](AgentSkill.md)
 
 ## Status
 
