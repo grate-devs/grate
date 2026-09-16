@@ -1,6 +1,11 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using grate.Exceptions;
+#if NETSTANDARD2_0
+using static grate.Compatibility.StringSplitOptionsShim;
+#else
+using static System.StringSplitOptions;
+#endif
 
 namespace grate.Configuration;
 
@@ -36,8 +41,8 @@ internal static class FoldersCommand
     private static IFoldersConfiguration ParseNewCustomFoldersConfiguration(string s)
     {
         // Combine lines into a semicolon-separated string, if there were multiple lines
-        var lines = (s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-        var oneLine = string.Join(';', lines);
+        var lines = (s.Split('\n', RemoveEmptyEntries | TrimEntries));
+        var oneLine = string.Join(";", lines);
         var tokens = oneLine.Split(';', StringSplitOptions.RemoveEmptyEntries);
 
         IEnumerable<(string key, string config)> configs = tokens.Select(token => SplitInTwo(token, '=')).ToArray();

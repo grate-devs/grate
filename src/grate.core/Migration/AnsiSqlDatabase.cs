@@ -7,7 +7,11 @@ using grate.Configuration;
 using grate.Exceptions;
 using grate.Infrastructure;
 using Microsoft.Extensions.Logging;
+#if NETSTANDARD2_0
+using static grate.Compatibility.StringSplitOptionsShim;
+#else
 using static System.StringSplitOptions;
+#endif
 using IsolationLevel = System.Transactions.IsolationLevel;
 
 namespace grate.Migration;
@@ -141,7 +145,11 @@ public abstract record AnsiSqlDatabase : IDatabase
                    new TransactionOptions() { IsolationLevel = IsolationLevel.ReadUncommitted },
                    TransactionScopeAsyncFlowOption.Enabled))
         {
+#if NETSTANDARD2_0
+            using (var connection = GetSqlConnection(connectionString))
+#else
             await using (var connection = GetSqlConnection(connectionString))
+#endif
             {
                 await Open(connection);
                 res = await func(connection);
@@ -155,7 +163,11 @@ public abstract record AnsiSqlDatabase : IDatabase
     protected async Task RunInAutonomousTransaction(string? connectionString, Func<DbConnection, Task> func)
     {
         using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
+#if NETSTANDARD2_0
+        using (var connection = GetSqlConnection(connectionString))
+#else
         await using (var connection = GetSqlConnection(connectionString))
+#endif
         {
             await Open(connection);
             await func(connection);
@@ -652,7 +664,11 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
     {
         Logger.LogTrace("SQL: {Sql}", sql);
 
+#if NETSTANDARD2_0
+        using var cmd = conn.CreateCommand();
+#else
         await using var cmd = conn.CreateCommand();
+#endif
         cmd.CommandText = sql;
         cmd.CommandType = CommandType.Text;
 

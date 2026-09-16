@@ -33,7 +33,10 @@ public class SqliteScriptFailed: ScriptFailed
                 { nameof(SqliteException.Source), ex.Source },
                 { nameof(SqliteException.SqliteErrorCode), ex.SqliteErrorCode },
                 { nameof(SqliteException.SqliteExtendedErrorCode), ex.SqliteExtendedErrorCode },
+#if !NETSTANDARD2_0
+                // IsTransient is not exposed on the netstandard2.0 build of Microsoft.Data.Sqlite.
                 { nameof(SqliteException.IsTransient), ex.IsTransient },
+#endif
                 { nameof(SqliteException.HelpLink), ex.HelpLink },
                 { nameof(SqliteException.HResult), ex.HResult },
                 { nameof(SqliteException.StackTrace), ex.StackTrace }

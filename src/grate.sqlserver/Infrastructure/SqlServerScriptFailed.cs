@@ -39,8 +39,11 @@ public class SqlServerScriptFailed: ScriptFailed
                 { nameof(SqlException.ClientConnectionId), ex.ClientConnectionId },
                 { nameof(SqlException.Class), ex.Class },
                 { nameof(SqlException.ErrorCode), ex.ErrorCode },
+#if !NETSTANDARD2_0
+                // SqlState and IsTransient are not exposed on the netstandard2.0 build of Microsoft.Data.SqlClient.
                 { nameof(SqlException.SqlState), ex.State },
                 { nameof(SqlException.IsTransient), ex.IsTransient },
+#endif
                 { nameof(SqlException.HelpLink), ex.HelpLink },
                 { nameof(SqlException.HResult), ex.HResult },
                 { nameof(SqlException.StackTrace), ex.StackTrace } 

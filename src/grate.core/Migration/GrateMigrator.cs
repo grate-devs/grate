@@ -119,7 +119,7 @@ internal record GrateMigrator : IGrateMigrator
 
         if (!string.IsNullOrEmpty(config.Restore))
         {
-            await RestoreDatabaseFromPath(config.Restore, dbMigrator);
+            await RestoreDatabaseFromPath(config.Restore!, dbMigrator);
         }
 
         // Run these first without a transaction, to make sure the tables are created even on a potential rollback
@@ -420,12 +420,12 @@ internal record GrateMigrator : IGrateMigrator
             string? sql = null;
             try
             {
-                sql = await File.ReadAllTextAsync(file.FullName);
+                sql = await FileCompat.ReadAllTextAsync(file.FullName);
 
                 // Normalize file names to log, so that results won't vary if you run on *nix VS Windows
                 var fileNameToLog = DbMigrator.Configuration.IgnoreDirectoryNames
                     ? file.Name
-                    : string.Join('/', Path.GetRelativePath(path.ToString(), file.FullName).Split(Path.DirectorySeparatorChar));
+                    : string.Join("/", PathCompat.GetRelativePath(path.ToString(), file.FullName).Split(Path.DirectorySeparatorChar));
 
                 bool theSqlRan = await DbMigrator.RunSql(sql, fileNameToLog, folder, versionId, DbMigrator.Configuration.Environment,
                     connectionType, transactionHandling);
@@ -446,7 +446,7 @@ internal record GrateMigrator : IGrateMigrator
             }
             catch (DbException ex)
             {
-                var relativeFileName = Path.GetRelativePath(path.ToString(), file.FullName);
+                var relativeFileName = PathCompat.GetRelativePath(path.ToString(), file.FullName);
                 DbMigrator.Database.ThrowScriptFailed(folder, relativeFileName, sql, ex);
             }
         }
@@ -473,12 +473,12 @@ internal record GrateMigrator : IGrateMigrator
 
         foreach (var file in files)
         {
-            var sql = await File.ReadAllTextAsync(file.FullName);
+            var sql = await FileCompat.ReadAllTextAsync(file.FullName);
 
             // Normalize file names to log, so that results won't vary if you run on *nix VS Windows
             var fileNameToLog = DbMigrator.Configuration.IgnoreDirectoryNames
             ? file.Name
-            : string.Join('/', Path.GetRelativePath(path.ToString(), file.FullName).Split(Path.DirectorySeparatorChar));
+            : string.Join("/", PathCompat.GetRelativePath(path.ToString(), file.FullName).Split(Path.DirectorySeparatorChar));
 
             bool theSqlRan = await DbMigrator.RunSqlWithoutLogging(sql, fileNameToLog, DbMigrator.Configuration.Environment,
                 connectionType, transactionHandling);
@@ -511,7 +511,7 @@ internal record GrateMigrator : IGrateMigrator
 
     private void CopyToChangeDropFolder(DirectoryInfo migrationRoot, FileSystemInfo file, string changeDropFolder)
     {
-        var relativePath = Path.GetRelativePath(migrationRoot.ToString(), file.FullName);
+        var relativePath = PathCompat.GetRelativePath(migrationRoot.ToString(), file.FullName);
 
         string destinationFile = Path.Combine(changeDropFolder, "itemsRan", relativePath);
 

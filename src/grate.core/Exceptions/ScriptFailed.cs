@@ -40,7 +40,7 @@ public abstract class ScriptFailed: MigrationException
         
     public override string ToString() =>
             GetErrorMessage(Folder, File, this.InnerException!) + "\n" 
-         + string.Join('\n', ScriptErrors.Select(item => $" * {item.Key}: {item.Value}"));
+         + string.Join("\n", ScriptErrors.Select(item => $" * {item.Key}: {item.Value}"));
 
     public override IDictionary Data => ScriptErrors.ToDictionary(item => item.Key, item => item.Value);
 
@@ -111,11 +111,11 @@ public abstract class ScriptFailed: MigrationException
     private Dictionary<string, object?> GetGenericErrorDetails() =>
         (InnerException?.Data ?? new Dictionary<string, object?>())
         .Cast<DictionaryEntry>()
-        .ToDictionary(entry => entry.Key.ToString()!, entry => entry.Value);
+        .ToDictionary(entry => entry.Key.ToString()!, entry => (object?)entry.Value);
 
     protected abstract IDictionary<string, object?> GetDbScriptErrors();
 
 
-    public bool IsTransient => DbException?.IsTransient ?? false;
+    public bool IsTransient => DbException?.IsTransientError() ?? false;
 
 }

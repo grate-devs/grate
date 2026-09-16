@@ -3,10 +3,21 @@
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <IsPublishable>false</IsPublishable>
+    <TargetFrameworks>netstandard2.0;$(TargetFrameworks)</TargetFrameworks>
+    <!-- Let PolySharp also emit trimming attributes (e.g. DynamicallyAccessedMembers) for the ns2.0 target. -->
+    <PolySharpIncludeRuntimeSupportedAttributes>true</PolySharpIncludeRuntimeSupportedAttributes>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <!-- Generates compiler-support polyfills (IsExternalInit, Index/Range, etc.) for the ns2.0 target. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="PolySharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
   
   <ItemGroup>

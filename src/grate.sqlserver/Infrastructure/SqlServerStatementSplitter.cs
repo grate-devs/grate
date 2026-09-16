@@ -22,6 +22,16 @@ public partial class SqlServerStatementSplitter : IStatementSplitter
 
     private readonly record struct Token(TokenType Type, int Index, int Length);
 
+#if NETSTANDARD2_0
+    // netstandard2.0 (consumed by .NET Framework 4.8) has no [GeneratedRegex] source generator,
+    // so build the equivalent regexes at runtime instead. Behaviour is identical.
+    private static readonly Regex _tokenPattern =
+        new Regex(@"\bGO\b|'|/\*|\*/|--|$", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static Regex TokenPattern() => _tokenPattern;
+
+    private static readonly Regex _significantTextPattern = new Regex(@"\S", RegexOptions.Compiled);
+    private static Regex SignificantTextPattern() => _significantTextPattern;
+#else
     [GeneratedRegex(
         """
         \bGO\b|'|/\*|\*/|--|$
@@ -31,6 +41,7 @@ public partial class SqlServerStatementSplitter : IStatementSplitter
 
     [GeneratedRegex(@"\S")]
     private static partial Regex SignificantTextPattern();
+#endif
 
     public IEnumerable<string> Split(string statement) =>
         BreakIntoBatches(statement).Where(batch => SignificantTextPattern().IsMatch(batch));
@@ -116,7 +127,11 @@ public partial class SqlServerStatementSplitter : IStatementSplitter
                     break;
 
                 default:
+#if NETSTANDARD2_0
+                    throw new InvalidOperationException($"Unexpected token type: {token.Type}");
+#else
                     throw new UnreachableException($"Unexpected token type: {token.Type}");
+#endif
             }
         }
 

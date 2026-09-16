@@ -1,6 +1,10 @@
 ﻿using grate.Configuration;
 using grate.Migration;
+#if NETSTANDARD2_0
+using static grate.Compatibility.StringSplitOptionsShim;
+#else
 using static System.StringSplitOptions;
+#endif
 
 namespace grate.Infrastructure;
 
