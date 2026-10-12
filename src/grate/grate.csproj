@@ -80,6 +80,7 @@
   </ItemGroup>
   
   <ItemGroup>
+    <ProjectReference Include="..\grate.bigquery\grate.bigquery.csproj" />
     <ProjectReference Include="..\grate.mariadb\grate.mariadb.csproj" />
     <ProjectReference Include="..\grate.oracle\grate.oracle.csproj" />
     <ProjectReference Include="..\grate.postgresql\grate.postgresql.csproj" />
