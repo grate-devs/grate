@@ -28,7 +28,7 @@ grate --connectionstring="Server=(localdb)\MSSQLLocalDB;Integrated Security=true
 | --accesstoken &lt;token&gt; | - | Specify an access token to use when connecting to SQL Server. |
 | -ct<br>--commandtimeout &lt;commandtimeout&gt; | 60 | This is the timeout in seconds when commands are run. This is not for admin commands or restore. |
 | -cta<br>--admincommandtimeout &lt;admincommandtimeout&gt; | 300 | This is the timeout in seconds when administration commands are run (except for restore, which has its own) |
-| --databasetype<br>--dbt<br>--dt <mariadb \| oracle \| postgresql \| sqlite \| sqlserver> | sqlserver | Tells grate what type of database it is running on. |
+| --databasetype<br>--dbt<br>--dt <bigquery \| mariadb \| oracle \| postgresql \| sqlite \| sqlserver> | sqlserver | Tells grate what type of database it is running on. |
 | -t<br>--transaction<br>--trx <transaction> | false | Run the migration in a transaction |
 | --sc<br>--schema<br>--schemaname &lt;schemaname&gt; | grate | The schema to use for the migration tables.  If you're upgrading from RoundhousE you'll probably want this! |
 | --drop | false | **Drop** - This instructs grate to remove the target database. Unlike RoundhousE grate will continue to run the migration scripts after the drop. |

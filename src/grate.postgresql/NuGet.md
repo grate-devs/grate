@@ -45,6 +45,7 @@ for more configuration options, see the [documentation](https://grate-devs.githu
 | MariaDB/MySQL (mariadb) | [![NuGet](https://img.shields.io/nuget/v/grate.mariadb.svg)](https://www.nuget.org/packages/grate.mariadb/) |
 | Sqlite (sqlite) | [![NuGet](https://img.shields.io/nuget/v/grate.sqlite.svg)](https://www.nuget.org/packages/grate.sqlite/) |
 | Oracle (oracle) | [![NuGet](https://img.shields.io/nuget/v/grate.oracle.svg)](https://www.nuget.org/packages/grate.oracle/) |
+| Google BigQuery (bigquery) | [![NuGet](https://img.shields.io/nuget/v/grate.bigquery.svg)](https://www.nuget.org/packages/grate.bigquery/) |
 
 ## grate.core
 [![NuGet](https://img.shields.io/nuget/v/grate.core.svg)](https://www.nuget.org/packages/grate.core/)

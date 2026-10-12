@@ -20,6 +20,7 @@ feature set of all supported databases.
 * MariaDB/MySQL
 * Sqlite
 * Oracle
+* Google BigQuery (see [BigQuery](BigQuery.md))
 
 
 ## Prerequisites

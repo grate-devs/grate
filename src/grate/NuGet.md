@@ -24,6 +24,7 @@ for more configuration options, see the [documentation](https://grate-devs.githu
 * MariaDB/MySQL
 * Sqlite
 * Oracle
+* Google BigQuery
 
 Full documentation can be found at [https://grate-devs.github.io/grate/](https://grate-devs.github.io/grate/).
 
