@@ -1,5 +1,6 @@
 ﻿using System.Data.Common;
 using System.Net;
+using System.Security.Claims;
 using Google;
 using Google.Apis.Bigquery.v2.Data;
 using Google.Cloud.BigQuery.V2;
@@ -30,8 +31,6 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     /// 10 seconds, and DML on grate's tables counts.
     /// </summary>
     private const int MaxAttempts = 5;
-
-    private static readonly string[] RetryableReasons = ["rateLimitExceeded", "backendError"];
 
     private ILogger _logger = logger;
     private BigQueryClient? _client;
@@ -168,22 +167,19 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         try
         {
             // the next id is one above the highest - only one migration runs against a database at a time
-            var rows = await QueryAsync(
+            var rows = await QueryAsync($"SELECT COALESCE(MAX(id), 0) + 1 AS id FROM {VersionTable}");
+            versionId = (long)rows.Single()["id"];
+
+            await QueryAsync(
                 $"""
-                DECLARE new_id INT64 DEFAULT (SELECT COALESCE(MAX(id), 0) + 1 FROM {VersionTable});
-
                 INSERT INTO {VersionTable} (id, repository_path, version, entry_date, modified_date, entered_by, status)
-                VALUES (new_id, @repository_path, @version, @now, @now, @entered_by, @status);
-
-                SELECT new_id AS id;
+                VALUES (@id, CAST(@repository_path AS STRING), @version, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @entered_by, @status)
                 """,
+                new BigQueryParameter("id", BigQueryDbType.Int64, versionId),
                 new BigQueryParameter("repository_path", BigQueryDbType.String, _config?.RepositoryPath),
                 new BigQueryParameter("version", BigQueryDbType.String, newVersion),
-                new BigQueryParameter("now", BigQueryDbType.Timestamp, DateTime.UtcNow),
-                new BigQueryParameter("entered_by", BigQueryDbType.String, Environment.UserName),
+                new BigQueryParameter("entered_by", BigQueryDbType.String, UserName),
                 new BigQueryParameter("status", BigQueryDbType.String, MigrationStatus.InProgress));
-
-            versionId = (long)rows.Single()["id"];
         }
         catch (BigQueryDbException ex)
         {
@@ -236,11 +232,11 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
                 COALESCE(MAX(id), 0) + 1,
                 @version_id,
                 @script_name,
-                @text_of_script,
+                CAST(@text_of_script AS STRING),
                 @text_hash,
                 @one_time_script,
-                @now,
-                @now,
+                CURRENT_TIMESTAMP(),
+                CURRENT_TIMESTAMP(),
                 @entered_by
             FROM {ScriptsRunTable}
             """,
@@ -249,29 +245,27 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             new BigQueryParameter("text_of_script", BigQueryDbType.String, sql),
             new BigQueryParameter("text_hash", BigQueryDbType.String, hash),
             new BigQueryParameter("one_time_script", BigQueryDbType.Bool, runOnce),
-            new BigQueryParameter("now", BigQueryDbType.Timestamp, DateTime.UtcNow),
-            new BigQueryParameter("entered_by", BigQueryDbType.String, Environment.UserName));
+            new BigQueryParameter("entered_by", BigQueryDbType.String, UserName));
     }
 
     public async Task InsertScriptRunError(string scriptName, string? sql, string errorSql, string errorMessage, long versionId)
     {
         await WriteAsync(
             $"""
-            DECLARE script_version STRING DEFAULT (SELECT version FROM {VersionTable} WHERE id = @version_id);
-
             INSERT INTO {ScriptsRunErrorsTable} (id, repository_path, version, script_name, text_of_script, erroneous_part_of_script, error_message, entry_date, modified_date, entered_by)
             SELECT
-                COALESCE(MAX(id), 0) + 1,
-                @repository_path,
-                script_version,
+                next.id,
+                CAST(@repository_path AS STRING),
+                v.version,
                 @script_name,
-                @text_of_script,
+                CAST(@text_of_script AS STRING),
                 @erroneous_part_of_script,
                 @error_message,
-                @now,
-                @now,
+                CURRENT_TIMESTAMP(),
+                CURRENT_TIMESTAMP(),
                 @entered_by
-            FROM {ScriptsRunErrorsTable};
+            FROM (SELECT COALESCE(MAX(id), 0) + 1 AS id FROM {ScriptsRunErrorsTable}) AS next
+            LEFT JOIN (SELECT version FROM {VersionTable} WHERE id = @version_id) AS v ON TRUE
             """,
             new BigQueryParameter("version_id", BigQueryDbType.Int64, versionId),
             new BigQueryParameter("repository_path", BigQueryDbType.String, _config?.RepositoryPath),
@@ -279,8 +273,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             new BigQueryParameter("text_of_script", BigQueryDbType.String, sql),
             new BigQueryParameter("erroneous_part_of_script", BigQueryDbType.String, errorSql),
             new BigQueryParameter("error_message", BigQueryDbType.String, errorMessage),
-            new BigQueryParameter("now", BigQueryDbType.Timestamp, DateTime.UtcNow),
-            new BigQueryParameter("entered_by", BigQueryDbType.String, Environment.UserName));
+            new BigQueryParameter("entered_by", BigQueryDbType.String, UserName));
     }
 
     public async Task<bool> VersionTableExists() => await ExistingTable(_schemaName, _versionTableName) is not null;
@@ -379,6 +372,9 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     /// </summary>
     private bool Bootstrapping => _config?.Environment == GrateEnvironment.InternalBootstrap;
 
+    // as grate's other providers record who ran a migration
+    private static string UserName => ClaimsPrincipal.Current?.Identity?.Name ?? Environment.UserName;
+
     private string Table(string tableName) =>
         $"`{Settings.ProjectId}.{DatasetId}.{Syntax.TableWithSchema(_schemaName, tableName)}`";
 
@@ -451,7 +447,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             {
                 return await Client.ExecuteQueryAsync(sql, parameters, options, resultsOptions);
             }
-            catch (GoogleApiException ex) when (attempt < MaxAttempts && IsRetryable(ex))
+            catch (GoogleApiException ex) when (attempt < MaxAttempts && new BigQueryDbException(ex).IsTransient)
             {
                 var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
                 _logger.LogWarning("BigQuery job failed, and will be tried again: attempt {Attempt}, in {Delay}: {Error}",
@@ -464,9 +460,6 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             }
         }
     }
-
-    private static bool IsRetryable(GoogleApiException exception) =>
-        exception.Error?.Errors?.Any(x => RetryableReasons.Contains(x.Reason)) ?? false;
 
     private sealed class NoConnection : IDisposable
     {
