@@ -331,6 +331,9 @@ jobs:
           - name: "Oracle XE 18" 
             type: Oracle
             image: "gvenzl/oracle-xe:18-faststart"
+          - name: "BigQuery emulator"
+            type: BigQuery
+            image: "ghcr.io/goccy/bigquery-emulator:0.8.1"
 
 
     runs-on: ubuntu-latest
