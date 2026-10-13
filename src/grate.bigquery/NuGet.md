@@ -2,7 +2,7 @@
 
 grate is a SQL scripts migration runner, using plain, old SQL for migrations. No meta-language, no code, no config,
 no EF migrations. It gives you full flexibility, and full control of your migrations, and lets you use
-all the fancy features of you particular database system. You are not constrained to any lowest common
+all the fancy features of your particular database system. You are not constrained to any lowest common
 feature set of all supported databases.
 
 ## grate.bigquery
@@ -14,7 +14,7 @@ programmatically to a BigQuery dataset. For command line usage, please see the
 ## Minimal code example
 The only required argument to pass to grate is a **connection string** to tell it where to find your database.
 For BigQuery, the database is a dataset, and the connection string names the project, the dataset and its location.
-It will deploy to that dataset, looking for sql scripts in the current directory.
+It will deploy to that dataset, looking for sql scripts in the `/db` directory.
 
 ```csharp
 [Fact]
@@ -40,7 +40,7 @@ safe to run again. See the [BigQuery documentation](https://grate-devs.github.io
 
 for more configuration options, see the [documentation](https://grate-devs.github.io/grate/configuration-options/).
 
-## grate supports the following DMBS's
+## grate supports the following DBMSs
 
 | Database  | NuGet package |
 |--|--|
