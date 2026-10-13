@@ -1,6 +1,7 @@
 ﻿using System.CommandLine;
 using System.Reflection;
 using grate.Commands;
+using grate.bigquery.DependencyInjection;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.mariadb.DependencyInjection;
@@ -133,6 +134,7 @@ public static class Program
             DatabaseType.PostgreSQL => services.AddGrateWithPostgreSQL(config),
             DatabaseType.SQLServer => services.AddGrateWithSqlServer(config),
             DatabaseType.SQLite => services.AddGrateWithSqlite(config),
+            DatabaseType.BigQuery => services.AddGrateWithBigQuery(config),
             _ => throw new ArgumentOutOfRangeException(nameof(config), 
                 config.DatabaseType, 
                 "Unknown target database type: " + config.DatabaseType)

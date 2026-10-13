@@ -15,6 +15,7 @@
     <InternalsVisibleTo Include="Oracle" />
     <InternalsVisibleTo Include="PostgreSQL" />
     <InternalsVisibleTo Include="Sqlite" />
+    <InternalsVisibleTo Include="BigQuery" />
     <InternalsVisibleTo Include="SqlServer" />
     <InternalsVisibleTo Include="SqlServerCaseSensitive" />
     
@@ -22,12 +23,14 @@
     <InternalsVisibleTo Include="CommandLine.Oracle" />
     <InternalsVisibleTo Include="CommandLine.PostgreSQL" />
     <InternalsVisibleTo Include="CommandLine.Sqlite" />
+    <InternalsVisibleTo Include="CommandLine.BigQuery" />
     <InternalsVisibleTo Include="CommandLine.SqlServer" />
 
     <InternalsVisibleTo Include="Docker.MariaDB" />
     <InternalsVisibleTo Include="Docker.Oracle" />
     <InternalsVisibleTo Include="Docker.PostgreSQL" />
     <InternalsVisibleTo Include="Docker.Sqlite" />
+    <InternalsVisibleTo Include="Docker.BigQuery" />
     <InternalsVisibleTo Include="Docker.SqlServer" />
 
   </ItemGroup>

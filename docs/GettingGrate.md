@@ -27,7 +27,7 @@ docker network create grate_network && docker run -e SA_PASSWORD=gs8j4AS7h87jHg 
 Run grate migration
 ```sh
 docker run -v ./examples/docker/db:/db  -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network grate-devs/grate
-# run with database type, accept: sqlserver, postgresql, mariadb, sqlite, oracle
+# run with database type, accept: sqlserver, postgresql, mariadb, sqlite, oracle, bigquery
 # docker run -v ./examples/docker/db:/db -e DATABASE_TYPE=sqlserver -e CREATE_DATABASE=true -e ENVIRONMENT=Dev -e TRANSACTION=true -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network grate-devs/grate  
 ```
 

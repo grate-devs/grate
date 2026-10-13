@@ -16,7 +16,7 @@ grate is an automated database deployment (change management) system that allows
 
 **Use your whole DBMS**: You're running a full DBMS, why not use all it's features!  Table-Valued Parameters for efficient processing? Data compression for space savings?  Fancy-pants filtered indexes?  Replication? Fine-grained permission management?  If you've ever had to fight with code-based database scaffolding then you'll appreciate the value of plain old sql scripts.
 
-By the way, we currently support Sql Server (including Azure and localdb), SqLite, Postgres, MariaDb and Oracle!!
+By the way, we currently support Sql Server (including Azure and localdb), SqLite, Postgres, MariaDb, Oracle and Google BigQuery!!
 
 ## How it works
 
