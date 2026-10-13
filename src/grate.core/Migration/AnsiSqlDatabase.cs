@@ -539,8 +539,10 @@ WHERE script_name = @scriptName";
     public async Task InsertScriptRun(string scriptName, string? sql, string hash, bool runOnce, long versionId,
         TransactionHandling transactionHandling)
     {
+        // Keep the cache in sync so later HasRun/GetCurrentHash calls for this script are answered from memory,
+        // instead of querying a table that may hold rows this run has not committed yet.
         var cache = await GetScriptsRunCache();
-        cache.Remove(scriptName);
+        cache[scriptName] = hash;
 
         var insertSql = Parameterize($@"
 INSERT INTO {ScriptsRunTable}
