@@ -94,6 +94,7 @@ jobs:
     strategy:
       matrix:
         package: [
+                "grate.bigquery",
                 "grate.core",
                 "grate.mariadb",
                 "grate.oracle",
