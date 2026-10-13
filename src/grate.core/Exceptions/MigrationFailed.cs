@@ -28,7 +28,7 @@ public class MigrationFailed : AggregateException
             .ToDictionary(entry => entry.Key, entry => entry.Value);
 
     public bool IsTransient => 
-        InnerExceptions.OfType<DbException>().All(ex => ex.IsTransient)
+        InnerExceptions.OfType<DbException>().All(ex => ex.IsTransientError())
         && InnerExceptions.OfType<ScriptFailed>().All(ex => ex.IsTransient)
         ;
 

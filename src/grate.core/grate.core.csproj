@@ -5,8 +5,16 @@
     <RootNamespace>grate</RootNamespace>
     <SourceRevisionId>build$([System.DateTime]::UtcNow.ToString("O"))</SourceRevisionId>
     <IsPublishable>false</IsPublishable>
+    <TargetFrameworks>netstandard2.0;$(TargetFrameworks)</TargetFrameworks>
+    <!-- Let PolySharp also emit trimming attributes (e.g. DynamicallyAccessedMembers) for the ns2.0 target. -->
+    <PolySharpIncludeRuntimeSupportedAttributes>true</PolySharpIncludeRuntimeSupportedAttributes>
   </PropertyGroup>
   
+  <ItemGroup>
+    <!-- Compatibility shims/extensions available everywhere; ns2.0-only members are guarded internally. -->
+    <Using Include="grate.Compatibility" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="grate" />
     <InternalsVisibleTo Include="TestCommon" />
@@ -41,6 +49,14 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting"  />
     <PackageReference Include="Dapper" />
+  </ItemGroup>
+
+  <!-- Generates compiler-support polyfills (IsExternalInit, Index/Range, trimming attributes, etc.) for the ns2.0 target. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="PolySharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

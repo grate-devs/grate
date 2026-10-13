@@ -48,7 +48,7 @@ internal static class Bootstrapping
             using var streamReader = new StreamReader(resourceStream);
             var resourceText = await streamReader.ReadToEndAsync();
             var filePath = Path.Combine(fullFolder, resourceName);
-            await File.WriteAllTextAsync(filePath, resourceText);
+            await FileCompat.WriteAllTextAsync(filePath, resourceText);
         }
     }
     

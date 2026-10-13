@@ -16,7 +16,7 @@ internal static class FileSystem
                 .EnumerateFileSystemInfos(pattern, AllDirectories).ToList()
                 .OrderBy(f =>
                     Combine(
-                        GetRelativePath(folderPath.ToString(), GetDirectoryName(f.FullName)!),
+                        PathCompat.GetRelativePath(folderPath.ToString(), GetDirectoryName(f.FullName)!),
                         GetFileNameWithoutExtension(f.FullName)),
                     CurrentCultureIgnoreCase);
     }

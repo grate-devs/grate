@@ -28,7 +28,7 @@ internal class FoldersConfiguration : Dictionary<string, MigrationsFolder?>, IFo
 
     public static FoldersConfiguration Empty => new();
     
-    public override string ToString() => string.Join(';', Values);
+    public override string ToString() => string.Join(";", Values);
 
     public static IFoldersConfiguration Default(IKnownFolderNames? folderNames = null)
     {

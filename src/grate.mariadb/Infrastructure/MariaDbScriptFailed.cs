@@ -22,6 +22,6 @@ public class MariaDbScriptFailed: ScriptFailed
     protected override IDictionary<string, object?>  GetDbScriptErrors()
         => InnerException!.Data 
             .Cast<DictionaryEntry>()
-            .ToDictionary(entry => entry.Key.ToString()!, entry => entry.Value);
+            .ToDictionary(entry => entry.Key.ToString()!, entry => (object?)entry.Value);
     
 }
