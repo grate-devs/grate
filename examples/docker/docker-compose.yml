@@ -7,7 +7,7 @@ services:
       # don't configure passwords here for real.  This is just a sample!
       APP_CONNSTRING: "Server=db;Database=grate_test;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True"
       VERSION: "1.0.0.0"
-      DATABASE_TYPE: "sqlserver" # sqlite, oracle, postgresql, sqlserver, mariadb
+      DATABASE_TYPE: "sqlserver" # sqlite, oracle, postgresql, sqlserver, mariadb, bigquery
     volumes:
       - ./db:/db
       - ./output:/output
