@@ -11,8 +11,9 @@ public sealed class BigQueryTestDataReader : DbDataReader
 {
     private readonly IReadOnlyList<string> _names;
     private readonly IReadOnlyList<Type> _types;
-    private readonly IEnumerator<BigQueryRow> _rows;
+    private readonly IReadOnlyList<BigQueryRow> _rows;
     private readonly long _affected;
+    private int _index = -1;
     private bool _closed;
 
     public BigQueryTestDataReader(BigQueryResults results)
@@ -20,14 +21,14 @@ public sealed class BigQueryTestDataReader : DbDataReader
         var fields = results.Schema?.Fields ?? [];
         _names = fields.Select(x => x.Name).ToList();
         _types = fields.Select(x => FieldType(x.Type)).ToList();
-        _rows = results.GetEnumerator();
+        _rows = results.ToList(); // read whole, so HasRows can answer before the first Read - test results are small
         _affected = results.NumDmlAffectedRows ?? -1;
     }
 
-    private BigQueryRow Current => _rows.Current;
+    private BigQueryRow Current => _rows[_index];
 
     public override int FieldCount => _names.Count;
-    public override bool HasRows => true;
+    public override bool HasRows => _rows.Count > 0;
     public override bool IsClosed => _closed;
     public override int RecordsAffected => (int)_affected;
     public override int Depth => 0;
@@ -35,13 +36,12 @@ public sealed class BigQueryTestDataReader : DbDataReader
     public override object this[int ordinal] => GetValue(ordinal);
     public override object this[string name] => GetValue(GetOrdinal(name));
 
-    public override bool Read() => _rows.MoveNext();
+    public override bool Read() => ++_index < _rows.Count;
     public override bool NextResult() => false;
 
     public override void Close()
     {
         _closed = true;
-        _rows.Dispose();
     }
 
     public override string GetName(int ordinal) => _names[ordinal];
