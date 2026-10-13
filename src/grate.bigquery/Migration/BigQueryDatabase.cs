@@ -34,6 +34,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
 
     private ILogger _logger = logger;
     private BigQueryClient? _client;
+    private bool _ownsClient;
     private GrateConfiguration? _config;
     private BigQueryConnectionSettings? _settings;
     private string _schemaName = "";
@@ -88,7 +89,11 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         _config = configuration;
 
         // a clone keeps its original's client - grate clones the database for each of its internal migrations
-        _client ??= await BigQueryClientFactory.CreateAsync(_settings);
+        if (_client is null)
+        {
+            _client = await BigQueryClientFactory.CreateAsync(_settings);
+            _ownsClient = true;
+        }
     }
 
     public Task OpenConnection() => Task.CompletedTask;
@@ -346,6 +351,14 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         }
 
         _deferredWrites.Clear();
+
+        // only the database that made the client disposes it - its clones end inside its migration
+        if (_ownsClient)
+        {
+            _client?.Dispose();
+        }
+        _client = null;
+
         GC.SuppressFinalize(this);
     }
 
@@ -353,6 +366,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     {
         // a clone shares the client, but nothing one migration has read or still has to write
         var clone = (BigQueryDatabase)MemberwiseClone();
+        clone._ownsClient = false;
         clone._scriptsRun = null;
         clone._deferredWrites = [];
         return clone;
