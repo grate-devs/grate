@@ -2,7 +2,7 @@
 
 grate is a SQL scripts migration runner, using plain, old SQL for migrations. No meta-language, no code, no config,
 no EF migrations. It gives you full flexibility, and full control of your migrations, and lets you use
-all the fancy features of you particular database system. You are not constrained to any lowest common
+all the fancy features of your particular database system. You are not constrained to any lowest common
 feature set of all supported databases.
 
 ## grate.sqlite
@@ -13,11 +13,11 @@ programmatically to a SQLite database. For command line usage, please see the
 
 ## Minimal code example
 The only required argument to pass to grate is a **connection string** to tell it where to find your database. 
-It will deploy to that database, looking for sql scripts in the current directory.
+It will deploy to that database, looking for sql scripts in the `/db` directory.
 
 ```csharp
 [Fact]
-public async Task Run_migration_agains_target_db()
+public async Task Run_migration_against_target_db()
 {
     var serviceCollection = new ServiceCollection();
     serviceCollection.AddLogging();
@@ -25,7 +25,7 @@ public async Task Run_migration_agains_target_db()
     {
         builder
             .WithSqlFilesDirectory("/db")
-            .WithConnectionString("sqlite connection string here")
+            .WithConnectionString("sqlite connection string here");
     })
     .UseSqlite(); // Important!, you need to specify the database type to use.
     var serviceProvider = serviceCollection.BuildServiceProvider();
@@ -37,7 +37,7 @@ public async Task Run_migration_agains_target_db()
 
 for more configuration options, see the [documentation](https://grate-devs.github.io/grate/configuration-options/).
 
-## grate supports the following DMBS's
+## grate supports the following DBMSs
 
 | Database  | NuGet package |
 |--|--|
