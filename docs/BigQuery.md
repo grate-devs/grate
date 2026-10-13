@@ -48,7 +48,9 @@ dataset at a time.
   script stay done. Write every statement so that it is safe to run again: `CREATE TABLE IF NOT EXISTS`,
   `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `CREATE OR REPLACE VIEW`.
 * **Unqualified table names resolve to the migrated dataset**, as it is the jobs' default dataset. A view body is
-  stored as written, though, so qualify the tables a view reads: `{{DatabaseName}}.my_table`.
+  stored as written, though, so qualify the tables a view reads: `{% raw %}{{DatabaseName}}{% endraw %}.my_table`.
+  Scripts in `dropDatabase`, `createDatabase` and `alterDatabase` are the exception: they can run before the dataset
+  exists, so they have no default dataset, and every table in them needs its dataset.
 * **Rate limits.** A table takes 5 metadata changes (DDL, and DML on grate's tables) per 10 seconds. grate tries a job
   again, with a back-off, when BigQuery answers `rateLimitExceeded` or `backendError`, but prefer one `ALTER TABLE` per
   table per script, listing every new column.
