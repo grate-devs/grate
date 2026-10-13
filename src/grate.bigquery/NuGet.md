@@ -18,7 +18,7 @@ It will deploy to that dataset, looking for sql scripts in the current directory
 
 ```csharp
 [Fact]
-public async Task Run_migration_agains_target_db()
+public async Task Run_migration_against_target_db()
 {
     var serviceCollection = new ServiceCollection();
     serviceCollection.AddLogging();
@@ -26,7 +26,7 @@ public async Task Run_migration_agains_target_db()
     {
         builder
             .WithSqlFilesDirectory("/db")
-            .WithConnectionString("ProjectId=my-project;Dataset=my_dataset;Location=EU")
+            .WithConnectionString("ProjectId=my-project;Dataset=my_dataset;Location=EU");
     })
     .UseBigQuery(); // Important!, you need to specify the database type to use.
     var serviceProvider = serviceCollection.BuildServiceProvider();
