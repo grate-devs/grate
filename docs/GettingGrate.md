@@ -16,7 +16,7 @@ Binaries are available for Windows, Linux (glibc and musl), and macOS across mul
 
 ## Docker
 
-There's a `{{ site.github.repository_nwo }}` docker image published to [dockerhub](https://hub.docker.com/r/{{ site.github.repository_nwo }}) on every release.  See the [examples](https://github.com/grate-devs/grate/tree/main/examples) folder for a demo using this to a migration.
+There's an `erikbra/grate` Docker image published to [Docker Hub](https://hub.docker.com/r/erikbra/grate) on every release. See the [examples](https://github.com/grate-devs/grate/tree/main/examples) folder for a demo using this for a migration.
 
 The Docker image is built on Alpine Linux, making it lightweight and suitable for containerized environments. For more information about Alpine Linux support, see [Alpine Linux Support](AlpineLinuxSupport.md).
 
@@ -26,9 +26,9 @@ docker network create grate_network && docker run -e SA_PASSWORD=gs8j4AS7h87jHg 
 ```
 Run grate migration
 ```sh
-docker run -v ./examples/docker/db:/db  -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network grate-devs/grate
+docker run -v ./examples/docker/db:/db  -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network erikbra/grate
 # run with database type, accept: sqlserver, postgresql, mariadb, sqlite, oracle
-# docker run -v ./examples/docker/db:/db -e DATABASE_TYPE=sqlserver -e CREATE_DATABASE=true -e ENVIRONMENT=Dev -e TRANSACTION=true -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network grate-devs/grate  
+# docker run -v ./examples/docker/db:/db -e DATABASE_TYPE=sqlserver -e CREATE_DATABASE=true -e ENVIRONMENT=Dev -e TRANSACTION=true -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network erikbra/grate
 ```
 
 Cleanup resources
