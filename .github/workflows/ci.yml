@@ -67,13 +67,52 @@ jobs:
   test:
     name: Run tests
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     #needs: build-code
 
     strategy:
       fail-fast: false
       matrix:
-        category: [ "Basic_tests", "SqlServer", "SqlServerCaseSensitive", "PostgreSQL", "MariaDB", "Sqlite", "Oracle"  ]
+        include:
+          - os: ubuntu-latest
+            category: Basic_tests
+            test_filter: ''
+          - os: ubuntu-latest
+            category: SqlServer
+            test_filter: ''
+          - os: ubuntu-latest
+            category: SqlServerCaseSensitive
+            test_filter: ''
+          - os: ubuntu-latest
+            category: PostgreSQL
+            test_filter: ''
+          - os: ubuntu-latest
+            category: MariaDB
+            test_filter: ''
+          - os: ubuntu-latest
+            category: Sqlite
+            test_filter: ''
+          - os: ubuntu-latest
+            category: Oracle
+            test_filter: ''
+          - os: windows-latest
+            category: Basic_tests
+            test_filter: ''
+          - os: windows-latest
+            category: Sqlite
+            test_filter: ''
+          - os: windows-latest
+            category: SqlServer
+            test_filter: FullyQualifiedName~SqlServer.Basic_tests
+          - os: windows-latest
+            category: SqlServerCaseSensitive
+            test_filter: FullyQualifiedName~SqlServerCaseSensitive.Basic_tests
+          - os: windows-latest
+            category: MariaDB
+            test_filter: FullyQualifiedName~MariaDB.Basic_tests
+          - os: windows-latest
+            category: Oracle
+            test_filter: FullyQualifiedName~Oracle.Basic_tests
         #category: [ "Basic_tests", "Sqlite"  ]
 
     steps:
@@ -86,12 +125,23 @@ jobs:
           9.0.x
           10.0.x
     - name: Test
+      shell: pwsh
       run: |
-        dotnet test \
-        --project unittests/${{ matrix.category }} \
-        --coverage \
-        --coverage-output-format xml \
-        --coverage-output /tmp/test-results/${{ matrix.category }}.xml
+        $outDir = Join-Path "${{ runner.temp }}" "test-results"
+        New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+
+        $args = @(
+          "--project", "unittests/${{ matrix.category }}",
+          "--coverage",
+          "--coverage-output-format", "xml",
+          "--coverage-output", "$outDir/${{ matrix.category }}.xml"
+        )
+
+        if ("${{ matrix.test_filter }}") {
+          $args += @("--filter", "${{ matrix.test_filter }}")
+        }
+
+        dotnet test @args
       env:
         LogLevel: Warning
         TZ: UTC
@@ -100,9 +150,9 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: "${{ matrix.category }} XML test results"
+        name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
         path: |
-          /tmp/test-results/${{ matrix.category }}.xml
+          ${{ runner.temp }}/test-results/${{ matrix.category }}.xml
         retention-days: 1
 
 
