@@ -39,7 +39,7 @@ While early versions of grate may not support every last RoundhousE feature, tho
 
 Full documentation is available [on the grate site](https://grate-devs.github.io/grate/).
 
-For coding agents working in projects that use grate, see the [use-grate skill](skills/use-grate/SKILL.md) and its [usage and verification guide](docs/AgentSkill.md).
+For coding agents working in projects that use grate, install the bundled [use-grate skill](skills/use-grate/SKILL.md) with `grate skills install --local` or `--global`. See its [usage and verification guide](docs/AgentSkill.md).
 
 ## Why the name grate?
 

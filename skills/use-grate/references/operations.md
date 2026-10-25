@@ -4,7 +4,7 @@
 
 Record the grate package/binary version, database provider/server version, effective command/wrapper settings, folder connection/transaction overrides, and any explicit SQL transaction control. Use the installed runner's help to construct commands. `--transaction` is false by default in the source inspected here; passing it is not proof that the requested transaction takes effect.
 
-The following describes source inspected at commit `6226b28d22f962ab8ca264575b124a04ea7fadf7`. Recheck the corresponding implementation when using a different release.
+The following describes source inspected at commit `85e413a0979d9a77e014e3a6145624e6158f1a57`. Recheck the corresponding implementation when using a different release.
 
 | Provider implementation | grate advertises DDL transaction support | Implication |
 | --- | --- | --- |
@@ -14,6 +14,8 @@ The following describes source inspected at commit `6226b28d22f962ab8ca264575b12
 | MariaDB / Oracle | No | grate warns and disables the requested transaction. Do not promise migration-wide rollback. |
 
 Do not infer tested provider compatibility from this source table. Measured evidence is in the [SQLite](verification.md) and [PostgreSQL](postgresql-verification.md) verification references.
+
+For runner setup, response files, and adopting an existing RoundhousE history, read [Consumer workflows](consumer-workflows.md). Confirm the SQL root, provider, target and tracking schema from the full invocation before selecting scripts. A successful run against a different database or a new history schema is not an upgrade-path check.
 
 ## Success, commit and failure
 
@@ -28,6 +30,8 @@ On script failure, grate attempts to roll back the active transaction, closes th
 `TransactionHandling:Autonomous` excludes a folder from the surrounding migration transaction; it does not promise one atomic transaction per file. Defaults include autonomous `beforeMigration`, `alterDatabase`, `permissions`, and `afterMigration`; `alterDatabase` also uses the admin connection. After a script failure, remaining files in that folder stop and later default-participating folders are skipped, while later autonomous folders may still execute. Inspect their effects too, and do not assume cleanup completed merely because a folder is configured.
 
 ## Recovery procedure
+
+grate does not provide automatic `down` migrations. Setting an earlier `--version` value does not undo changes or select an earlier set of scripts; it labels the migration run. Recover with a forward repair or an explicitly planned restore, accounting for data and application compatibility.
 
 1. Stop automatic retries. Identify the exact target, runner/configuration, failed filename and provider error. Preserve and redact relevant output.
 2. Compare actual objects and rows with successful history and the failing SQL. Establish which earlier operations committed, which history entries survived, and whether the failed file has partial effects. Check other shared targets before calling a file unpublished.
@@ -47,3 +51,4 @@ Use the project's secret injection and logging controls. Do not echo expanded co
 - [DbMigrator](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/DbMigrator.cs): statement execution, successful history, token/hash checks and failure recording.
 - [AnsiSqlDatabase](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/AnsiSqlDatabase.cs): connections, transaction handling and tracking queries.
 - Provider implementations: [SQLite](https://github.com/grate-devs/grate/blob/main/src/grate.sqlite/Migration/SqLiteDatabase.cs), [PostgreSQL](https://github.com/grate-devs/grate/blob/main/src/grate.postgresql/Migration/PostgreSqlDatabase.cs), [SQL Server](https://github.com/grate-devs/grate/blob/main/src/grate.sqlserver/Migration/SqlServerDatabase.cs), [MariaDB](https://github.com/grate-devs/grate/blob/main/src/grate.mariadb/Migration/MariaDbDatabase.cs), [Oracle](https://github.com/grate-devs/grate/blob/main/src/grate.oracle/Migration/OracleDatabase.cs).
+- Batch parsing: the selected provider's `Infrastructure/*StatementSplitter.cs`; SQL Server uses its own tokenizer, while the other current providers derive from [RegexStatementSplitter](https://github.com/grate-devs/grate/blob/main/src/grate.core/Infrastructure/RegexStatementSplitter.cs). Keep provider-specific executable checks separate from the SQLite example.

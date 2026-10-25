@@ -101,6 +101,19 @@
     <None Include="NuGet.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <!-- Embed the complete skill so every CLI distribution, including single-file installers,
+       can install the matching version without downloading files or locating the source tree. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../skills/use-grate/**/*">
+      <LogicalName>grate.skills.use-grate/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <Target Name="RequireBundledAgentSkill" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('../../skills/use-grate/SKILL.md')"
+           Text="The complete skills/use-grate directory is required when building the grate CLI." />
+  </Target>
+
 
   <PropertyGroup Condition="'$(SelfContained)' == 'true'">
     <PublishSingleFile>true</PublishSingleFile>

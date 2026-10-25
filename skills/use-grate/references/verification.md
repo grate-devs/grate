@@ -1,22 +1,44 @@
 # Verify grate on disposable SQLite databases
 
-Run the bundled harness with Python 3 and a trusted, already available grate CLI.
-It uses only Python's standard library, invokes the real CLI without a shell,
-and inspects real SQLite data and migration history. It never installs or updates
-grate and has no option for supplying an existing database or connection string.
+The bundled verifier is a [file-based C# app](https://learn.microsoft.com/en-us/dotnet/core/sdk/file-based-apps).
+It requires **.NET SDK 10 or newer** and a trusted, already available grate CLI.
+A .NET runtime alone cannot build it. The verifier invokes the real CLI without
+a shell and inspects real SQLite data and migration history using the same pinned
+Microsoft.Data.Sqlite and SQLitePCLRaw packages used by this repository.
+The SDK restores these packages from NuGet on first use unless they are cached;
+it does not install or update grate or the SDK.
 
-From the repository root:
+From the repository root on macOS/Linux:
 
 ```sh
-python3 skills/use-grate/scripts/verify_sqlite.py -- grate
+sh skills/use-grate/scripts/verify_sqlite.sh -- grate
 ```
 
-For an existing framework-dependent build, use an absolute DLL path. The harness
-runs commands from its temporary directory, so relative command paths will not
-resolve against the repository:
+On Windows/PowerShell:
+
+```powershell
+& ./skills/use-grate/scripts/verify_sqlite.ps1 -- grate
+```
+
+Both wrappers forward arguments unchanged. If `dotnet` is absent, only a runtime
+is installed, or the selected SDK is older than 10, they print `SKIP` and exit
+**77**, without running verification. This is a skipped check, not a pass. The
+rest of the skill and self-contained grate distributions remain usable without
+.NET installed. Do not install an SDK automatically or report verification as
+successful after a skip. An incompatible `global.json` can also prevent SDK
+selection; check the consuming project's SDK configuration if an installed SDK
+is not selected.
+
+You can also run the C# app directly when a suitable SDK is available:
 
 ```sh
-python3 skills/use-grate/scripts/verify_sqlite.py \
+dotnet run --file skills/use-grate/scripts/verify_sqlite.cs -- -- grate
+```
+
+For an existing framework-dependent grate build, use an absolute DLL path:
+
+```sh
+sh skills/use-grate/scripts/verify_sqlite.sh \
   --expected-version 2.2.0.0 \
   --report /tmp/grate-verification.md \
   -- dotnet /absolute/path/to/grate.dll
@@ -28,10 +50,14 @@ binary, not an instruction to upgrade. grate's `--version` option labels the
 database migration and is not a command for inspecting the CLI version.
 
 Each CLI invocation has a 60-second timeout, configurable with `--timeout` before
-`--`. The script exits zero only if all checks pass. It prints the temporary
-artifact directory and Markdown report path; databases, copied SQL, CLI output,
-and grate output remain there for inspection. Remove that printed directory when
-finished. Use the report's exact command lines and logs to investigate failures.
+`--`. The verifier exits zero only if all checks pass and exits 1 on verification
+failure. Build/restore failures from `dotnet` also propagate through the wrappers.
+It prints the temporary artifact directory and Markdown report path; databases,
+copied SQL, CLI output, and grate output remain there for inspection. Remove
+that printed directory when finished. The report records commands as JSON
+argument arrays to preserve argument boundaries across platforms, plus log paths.
+CLI commands run from the temporary directory, so use absolute paths for DLLs,
+executables outside PATH, and other path arguments passed to the CLI.
 
 ## What is checked
 
@@ -79,12 +105,12 @@ persisted partial state; it does **not** claim SQLite rollback was verified.
 The `GO` demonstration also establishes that a batch separator does not make
 each batch independently resumable or a file atomic.
 
-## Recorded verification
+## Recorded C# verification
 
-On 2026-09-05, all 11 reported checks passed against an existing local grate
-binary identifying itself as **2.2.0.0**, with .NET runtime **10.0.9**, Python
-**3.14.6**, on macOS **26.6.2 arm64**. Python used SQLite **3.53.4** for independent
-inspection; this is not a claim about the CLI provider's native SQLite version.
+On 2026-10-25, all 11 checks passed through **both wrappers**, using .NET SDK
+**10.0.401**, runtime **10.0.12**, PowerShell **7.6.6**, and an existing grate CLI
+identifying itself as **2.2.0.0**, on macOS arm64. Inspection used
+Microsoft.Data.Sqlite **10.0.10** and SQLitePCLRaw.bundle_e_sqlite3 **3.0.3**.
 
 The tested `grate.dll` SHA-256 was:
 
@@ -92,15 +118,22 @@ The tested `grate.dll` SHA-256 was:
 055b3a877bdedc6ef2506a3041e2f3b1ad81985778b6b37cdb559c2fb0cb2166
 ```
 
-The command was `python3 skills/use-grate/scripts/verify_sqlite.py
---expected-version 2.2.0.0 -- dotnet` followed by the absolute path to the existing
-`src/grate/bin/Release/net10.0/grate.dll`. No installation or build was performed;
-the binary's relationship to the checked-out source was not independently proven.
+Each wrapper received `--expected-version 2.2.0.0 -- dotnet` followed by the
+absolute path to the existing `src/grate/bin/Release/net10.0/grate.dll`. The
+verifier was built, but grate was not rebuilt; the binary's relationship to the
+checked-out source was not independently proven.
 
 As a negative check, the index migration was replaced with `SELECT 1;` in an
-isolated copy of the fixture. The CLI exited successfully, but the harness exited
-1 with `The separate index migration did not create its index`. This confirms
-that a successful process exit cannot substitute for the database assertions.
+isolated copy of the complete skill, outside the repository and in a path with
+spaces. The CLI exited successfully, but the verifier exited 1 with
+`The separate index migration did not create its index.` This also exercised
+asset discovery independently of the repository and working directory.
+
+Both wrappers were tested with simulated missing `dotnet`, a runtime-only
+installation, and an SDK reporting version 9. Each printed `SKIP` and exited 77.
+A fake SDK/runner also verified preservation of arguments containing spaces and
+shell punctuation, and propagation of its nonzero exit code. These wrapper
+checks do not establish execution on Windows: PowerShell was tested on macOS.
 
 These results cover this supplied CLI and disposable SQLite only. They do not
 prove transaction, batch parsing, or recovery behavior for SQL Server,
