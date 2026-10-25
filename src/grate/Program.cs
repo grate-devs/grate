@@ -21,6 +21,14 @@ public static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        // Skill installation is independent of database configuration and migration services.
+        if (args.FirstOrDefault() == "skills")
+        {
+            var skillsRoot = new RootCommand();
+            skillsRoot.Subcommands.Add(new SkillsCommand());
+            return await skillsRoot.Parse(args).InvokeAsync();
+        }
+
         // Temporarily parse the configuration, to get the verbosity level, and potentially set parameters
         // to support the "IsUpToDate" check.
         var cfg = ParseGrateConfiguration(args);
