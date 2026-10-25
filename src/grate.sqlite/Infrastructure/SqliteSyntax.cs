@@ -3,17 +3,8 @@ namespace grate.Sqlite.Infrastructure;
 
 public readonly struct SqliteSyntax : ISyntax
 {
-    public string StatementSeparatorRegex
-    {
-        get
-        {
-            const string strings = @"(?<KEEP1>'[^']*')";
-            const string dashComments = @"(?<KEEP1>--.*$)";
-            const string starComments = @"(?<KEEP1>/\*[\S\s]*?\*/)";
-            const string separator = @"(?<KEEP1>^|\s)(?<BATCHSPLITTER>GO)(?<KEEP2>\s|;|$)";
-            return strings + "|" + dashComments + "|" + starComments + "|" + separator;
-        }
-    }
+    private static readonly IStatementSplitter _statementSplitter = new SqliteStatementSplitter();
+    public IStatementSplitter StatementSplitter => _statementSplitter;
 
     public string CurrentDatabase => "SELECT name FROM pragma_database_list ORDER BY seq DESC LIMIT 1";
     public string ListDatabases => "select name from pragma_database_list";

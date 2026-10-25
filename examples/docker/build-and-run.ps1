@@ -1,4 +1,3 @@
 #!/bin/env pwsh
-
-# App versioning is normally provided by your CI/CD pipelines...
-docker-compose up
+# Output in console and the containers will be removed if the script exits.
+docker compose up --build && docker compose down
