@@ -187,7 +187,7 @@ public sealed class AgentSkillInstaller_ : IDisposable
 
     private string Destination(string agent) => Path.Combine(_root, agent, "skills", "use-grate");
     private static string SourceSkillDirectory([CallerFilePath] string file = "") =>
-        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, "../../../skills/use-grate"));
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, "../../../docs/skills/use-grate"));
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

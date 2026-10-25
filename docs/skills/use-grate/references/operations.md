@@ -1,10 +1,14 @@
+---
+title: Transactions and recovery
+---
+
 # Transactions and recovery
 
 ## Determine what the selected runner will do
 
 Record the grate package/binary version, database provider/server version, effective command/wrapper settings, folder connection/transaction overrides, and any explicit SQL transaction control. Use the installed runner's help to construct commands. `--transaction` is false by default in the source inspected here; passing it is not proof that the requested transaction takes effect.
 
-The following describes source inspected at commit `85e413a0979d9a77e014e3a6145624e6158f1a57`. Recheck the corresponding implementation when using a different release.
+Provider support is release-specific. Recheck the selected release's implementation before relying on these behaviors.
 
 | Provider implementation | grate advertises DDL transaction support | Implication |
 | --- | --- | --- |

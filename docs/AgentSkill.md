@@ -3,11 +3,12 @@ layout: default
 title: Agent skill
 permalink: /agent-skill/
 nav_order: 6
+has_children: true
 ---
 
 # Use grate with a coding agent
 
-The [use-grate skill](https://github.com/grate-devs/grate/tree/main/skills/use-grate) helps coding agents author, review, execute and troubleshoot grate migrations in projects that use grate. It covers script lifecycles, ordering, applied-script immutability, provider-specific transaction behavior and recovery.
+The [use-grate skill](skills/use-grate/SKILL.md) helps coding agents author, review, execute and troubleshoot grate migrations in projects that use grate. It covers script lifecycles, ordering, applied-script immutability, provider-specific transaction behavior and recovery.
 
 Its authoring rule is **one independently tracked DML statement or DDL operation per one-time migration file**. grate can execute SQL batches; this rule makes individual changes easier to track and recover. A procedure definition is one DDL operation even when its body contains multiple statements.
 
@@ -77,7 +78,7 @@ docker run --rm --entrypoint /app/grate \
 
 Container execution writes as the container's user; set `--user` as appropriate
 for your host's permissions. Global installation inside a container affects its
-home, not the host's home. The source directory `skills/use-grate` can also be
+home, not the host's home. The source directory `docs/skills/use-grate` can also be
 copied manually from a reviewed tag/commit when using an older grate CLI.
 
 For example, ask your agent:
@@ -88,10 +89,10 @@ The skill does not upgrade grate or grant permission to deploy to a shared datab
 
 ## Examples and verification
 
-- [SQLite migration files](https://github.com/grate-devs/grate/tree/main/skills/use-grate/assets/sqlite-example/up) separate table creation, index creation and seed inserts.
-- [Authoring reference](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/authoring.md) explains batch separators, parallel-branch naming, environments and tokens.
-- [Transaction and recovery reference](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/operations.md) distinguishes requested transactions from effective rollback and explains preview limitations.
-- [Verification guidance](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/verification.md) explains how to check the project's actual migrations with its pinned runner, provider and test tooling.
+- [SQLite migration files](skills/use-grate/assets/sqlite-example/up/index.md) separate table creation, index creation and seed inserts.
+- [Authoring reference](skills/use-grate/references/authoring.md) explains batch separators, parallel-branch naming, environments and tokens.
+- [Transaction and recovery reference](skills/use-grate/references/operations.md) distinguishes requested transactions from effective rollback and explains preview limitations.
+- [Verification guidance](skills/use-grate/references/verification.md) explains how to check the project's actual migrations with its pinned runner, provider and test tooling.
 
 The skill contains no executable verifier or shell/PowerShell wrappers. It does
 not require an installed SDK when used with self-contained grate. SQLite examples
@@ -100,17 +101,17 @@ establish another provider's transaction behavior.
 
 ## Maintaining the skill
 
-The C# tests in `unittests/Sqlite/AgentSkill/AgentSkillSqliteTests.cs` exercise the
-bundled SQL examples and grate's clean apply/rerun, changed-script refusal,
-forward recovery and partial failure/retry/recovery behavior. They launch the
-CLI built from the same checkout and inspect database contents and history.
-They run automatically in the existing `Sqlite` test matrix in both CI workflows.
+The published skill and its bundled contents share one source directory:
+`docs/skills/use-grate`. Jekyll renders the same Markdown files that the CLI embeds;
+there is no generated copy to keep in sync. Site presentation is configured in
+`docs/_config.yml`; the authoring reference protects token examples with Liquid
+raw tags so they stay literal on GitHub Pages as well as in the installed file.
 
-```sh
-dotnet test --project unittests/Sqlite --filter-class Sqlite.AgentSkill.AgentSkillSqliteTests
-```
+`unittests/Sqlite/AgentSkill/MigrationExamplesTests.cs` executes the exact bundled
+SQLite example SQL and checks its table, index, seed row and rerun behavior. This
+validates the example assets; it does not evaluate how an agent follows the
+instructions. General migration behavior is covered by the existing provider tests.
 
-These are maintainer regression tests, separate from consumer-project validation.
-Historical [SQLite](agent-skill-verification/SQLite.md) and
-[PostgreSQL](agent-skill-verification/PostgreSQL.md) results record earlier
-verification environments and limitations; they are not part of the skill bundle.
+The `Skill installation` CI workflow builds a .NET tool package and a self-contained
+binary, then tests local and global installation on Windows, Linux and macOS.
+The tests compare every installed file against the canonical skill directory.

@@ -28,7 +28,7 @@
     <None Update="xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="../../skills/use-grate/assets/sqlite-example/**/*"
+    <None Include="../../docs/skills/use-grate/assets/sqlite-example/**/*"
           Link="AgentSkill/Fixtures/sqlite-example/%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

@@ -1,3 +1,9 @@
+---
+title: Authoring migrations
+---
+
+{% raw %}
+
 # Authoring migrations
 
 ## Lifecycles and order
@@ -29,7 +35,7 @@ Quote semicolon-separated arguments for the shell, or reuse the project's folder
 
 ## One operation per one-time file
 
-The [runnable SQLite example](../assets/sqlite-example/up) separates table creation, indexes and seeds. For a new feature with a later constraint change, the intended shape is:
+The [runnable SQLite example](../assets/sqlite-example/up/index.md) separates table creation, indexes and seeds. For a new feature with a later constraint change, the intended shape is:
 
 ```text
 up/
@@ -63,16 +69,18 @@ If asked to edit an applied seed from `Initial` to `Updated`, preserve the origi
 
 ## Environments and tokens
 
-See [environment scripts](https://github.com/grate-devs/grate/blob/main/docs/EnvironmentScripts.md) for environment selection. Ordinary files run regardless of environment. A file containing `.ENV.` runs only when a selected environment matches a dot-delimited name component, case-insensitively; without a selected environment it is skipped. For example, `20260905210000_issue821_05_seed.ENV.TEST.sql` selects TEST and must remain separate from shared seed changes. Check the installed CLI's syntax for multiple environments; older documentation and versions differ.
+See [environment scripts](https://grate-devs.github.io/grate/environment-scripts/) for environment selection. Ordinary files run regardless of environment. A file containing `.ENV.` runs only when a selected environment matches a dot-delimited name component, case-insensitively; without a selected environment it is skipped. For example, `20260905210000_issue821_05_seed.ENV.TEST.sql` selects TEST and must remain separate from shared seed changes. Check the installed CLI's syntax for multiple environments; older documentation and versions differ.
 
 One file can target several environments, for example `seed.ENV.TEST.UAT.sql`. Current source also accepts multiple selected environments via comma/semicolon-separated values; the published environment page still describes a single selection. Verify the pinned runner rather than treating that older restriction as current behavior. Keep environment names distinct from other dot-delimited filename components, because matching is not limited to the text after `ENV`.
 
-See [token replacement](https://github.com/grate-devs/grate/blob/main/docs/TokenReplacement.md) for supported tokens and user-token syntax. Tokens use `{{TokenName}}` and are replaced before change detection and execution. Current grate accepts separate `--ut=Key=Value` arguments for user tokens. This is textual substitution, not parameter binding or automatic identifier/value quoting. Use only intended values and provider-correct SQL quoting. Changing a token value can make an unchanged file appear changed, including a Once file. Expanded SQL can appear in history and error output, so do not use secrets as SQL tokens casually.
+See [token replacement](https://grate-devs.github.io/grate/token-replacement/) for supported tokens and user-token syntax. Tokens use `{{TokenName}}` and are replaced before change detection and execution. Current grate accepts separate `--ut=Key=Value` arguments for user tokens. This is textual substitution, not parameter binding or automatic identifier/value quoting. Use only intended values and provider-correct SQL quoting. Changing a token value can make an unchanged file appear changed, including a Once file. Expanded SQL can appear in history and error output, so do not use secrets as SQL tokens casually.
 
 Token names are case-insensitive, but only the selected version's built-in tokens and supplied user tokens are available. An unrecognized `{{TokenName}}` remains in the SQL instead of causing an early configuration error. Check intended expansion in the disposable fixture; an unresolved token inside a quoted SQL value can otherwise be stored as literal data. Do not introduce tokens where ordinary provider SQL would suffice.
 
 ## Upstream sources
 
-Start with [script types](https://github.com/grate-devs/grate/tree/main/docs/ScriptTypes), [folder configuration](https://github.com/grate-devs/grate/blob/main/docs/ConfigurationOptions/FolderConfiguration.md), [environments](https://github.com/grate-devs/grate/blob/main/docs/EnvironmentScripts.md), and [tokens](https://github.com/grate-devs/grate/blob/main/docs/TokenReplacement.md). Select the tag/commit matching the consumer's version.
+Start with [script types](https://grate-devs.github.io/grate/script-types/), [folder configuration](https://grate-devs.github.io/grate/folder-configuration/), [environments](https://grate-devs.github.io/grate/environment-scripts/), and [tokens](https://grate-devs.github.io/grate/token-replacement/). Select the tag/commit matching the consumer's version.
 
 For version-sensitive details, inspect [FoldersConfiguration](https://github.com/grate-devs/grate/blob/main/src/grate.core/Configuration/FoldersConfiguration.cs), [FileSystem](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/FileSystem.cs), [GrateMigrator](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/GrateMigrator.cs), [DbMigrator](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/DbMigrator.cs), and [GrateEnvironment](https://github.com/grate-devs/grate/blob/main/src/grate.core/Infrastructure/GrateEnvironment.cs). For example, current code configures `runAfterCreateDatabase` and `runFirstAfterUp` as AnyTime despite conflicting older documentation.
+
+{% endraw %}

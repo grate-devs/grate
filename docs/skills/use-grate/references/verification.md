@@ -1,3 +1,7 @@
+---
+title: Verify the project's migrations
+---
+
 # Verify the project's migrations
 
 Use the consumer project's pinned grate runner and a disposable database matching
@@ -30,7 +34,7 @@ changing a successfully applied file or retrying blindly is not a recovery plan.
 
 ## Keep the evidence within its scope
 
-The bundled [SQLite SQL example](../assets/sqlite-example/up) demonstrates one
+The bundled [SQLite SQL example](../assets/sqlite-example/up/index.md) demonstrates one
 operation per one-time file. Adapt it to the actual provider; checking that
 example cannot validate a project's own migrations. grate's SQLite provider
 disables requested migration transactions, so SQLite partial-persistence checks

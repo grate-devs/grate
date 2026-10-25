@@ -34,7 +34,7 @@ If context is missing, prepare a clearly marked draft with the missing facts and
 - Respect configured lifecycles and folder order. `up` is one-time by default; `indexes` is anytime, so ordinary one-time `CREATE INDEX` operations belong with ordered one-time changes. Anytime definitions must tolerate re-execution; everytime scripts must be safe on every invocation.
 - Check the combined migration set across parallel branches for duplicate tracked names and dependency order. Reconcile unpublished names before applying; do not renumber deployed history.
 
-The [SQLite table/index/seed example](assets/sqlite-example/up) demonstrates separate operations. Adapt its SQL to the actual provider; do not treat it as a portable schema template. grate has no automatic `down` migration: plan forward repairs and any required data restoration explicitly.
+The [SQLite table/index/seed example](assets/sqlite-example/up/index.md) demonstrates separate operations. Adapt its SQL to the actual provider; do not treat it as a portable schema template. grate has no automatic `down` migration: plan forward repairs and any required data restoration explicitly.
 
 ## Run and recover
 

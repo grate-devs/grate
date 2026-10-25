@@ -8,7 +8,7 @@ WORKDIR /app
 COPY *.props ./
 COPY *.ruleset ./
 COPY src/ ./src/
-COPY skills/use-grate/ ./skills/use-grate/
+COPY docs/skills/use-grate/ ./docs/skills/use-grate/
 RUN dotnet publish --framework "$TARGETFRAMEWORK" --runtime "$RUNTIME" ./src/grate/grate.csproj \
     -c release --self-contained -p:SelfContained=true /p:Version="$VERSION" /p:RuntimeIdentifiers="" \
     -o /publish
