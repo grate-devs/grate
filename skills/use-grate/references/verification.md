@@ -1,155 +1,43 @@
-# Verify grate on disposable SQLite databases
+# Verify the project's migrations
 
-The bundled verifier is a [file-based C# app](https://learn.microsoft.com/en-us/dotnet/core/sdk/file-based-apps).
-It requires **.NET SDK 10 or newer** and a trusted, already available grate CLI.
-A .NET runtime alone cannot build it. The verifier invokes the real CLI without
-a shell and inspects real SQLite data and migration history using the same pinned
-Microsoft.Data.Sqlite and SQLitePCLRaw packages used by this repository.
-The SDK restores these packages from NuGet on first use unless they are cached;
-it does not install or update grate or the SDK.
+Use the consumer project's pinned grate runner and a disposable database matching
+its provider, server version, folder mapping, tokens, environments and transaction
+settings. Reuse its existing verification tooling. The skill adds no test runner
+or SDK requirement of its own.
 
-From the repository root on macOS/Linux:
+## Check the intended change
 
-```sh
-sh skills/use-grate/scripts/verify_sqlite.sh -- grate
-```
+1. Reproduce a representative existing schema and migration history when testing
+   an upgrade. Also check a clean apply when new-database creation is supported.
+2. Run the actual project migrations and assert the expected schema, index and
+   constraint definitions, affected rows, and successful history. Check forbidden
+   effects too: a successful exit alone does not establish correctness.
+3. Run again unchanged. One-time changes must preserve data and successful
+   history; account separately for intentional anytime/everytime effects and
+   version/log records that may change.
+4. When verifying change detection or adopting a runner, edit an applied one-time
+   file only in the disposable fixture. Confirm rejection and inspect the
+   unchanged data/hash/history. Restore the original bytes and check that a new
+   forward migration applies the intended change once.
+5. When relying on transaction or recovery behavior, inject a controlled failure
+   after earlier work. Inspect actual persisted objects/rows, successful history
+   and error history before retrying. Reproduce and test the proposed repair;
+   assert an unchanged rerun after recovery.
 
-On Windows/PowerShell:
+Follow [transactions and recovery](operations.md) for partial effects, autonomous
+folders and preview limits. A failed file can have unrecorded committed work;
+changing a successfully applied file or retrying blindly is not a recovery plan.
 
-```powershell
-& ./skills/use-grate/scripts/verify_sqlite.ps1 -- grate
-```
+## Keep the evidence within its scope
 
-Both wrappers forward arguments unchanged. If `dotnet` is absent, only a runtime
-is installed, or the selected SDK is older than 10, they print `SKIP` and exit
-**77**, without running verification. This is a skipped check, not a pass. The
-rest of the skill and self-contained grate distributions remain usable without
-.NET installed. Do not install an SDK automatically or report verification as
-successful after a skip. An incompatible `global.json` can also prevent SDK
-selection; check the consuming project's SDK configuration if an installed SDK
-is not selected.
+The bundled [SQLite SQL example](../assets/sqlite-example/up) demonstrates one
+operation per one-time file. Adapt it to the actual provider; checking that
+example cannot validate a project's own migrations. grate's SQLite provider
+disables requested migration transactions, so SQLite partial-persistence checks
+cannot establish rollback behavior for SQL Server or PostgreSQL.
 
-You can also run the C# app directly when a suitable SDK is available:
-
-```sh
-dotnet run --file skills/use-grate/scripts/verify_sqlite.cs -- -- grate
-```
-
-For an existing framework-dependent grate build, use an absolute DLL path:
-
-```sh
-sh skills/use-grate/scripts/verify_sqlite.sh \
-  --expected-version 2.2.0.0 \
-  --report /tmp/grate-verification.md \
-  -- dotnet /absolute/path/to/grate.dll
-```
-
-`--expected-version` is optional and compares the exact version in `grate --help`.
-Choose the version approved for the project; `2.2.0.0` above records the tested
-binary, not an instruction to upgrade. grate's `--version` option labels the
-database migration and is not a command for inspecting the CLI version.
-
-Each CLI invocation has a 60-second timeout, configurable with `--timeout` before
-`--`. The verifier exits zero only if all checks pass and exits 1 on verification
-failure. Build/restore failures from `dotnet` also propagate through the wrappers.
-It prints the temporary artifact directory and Markdown report path; databases,
-copied SQL, CLI output, and grate output remain there for inspection. Remove
-that printed directory when finished. The report records commands as JSON
-argument arrays to preserve argument boundaries across platforms, plus log paths.
-CLI commands run from the temporary directory, so use absolute paths for DLLs,
-executables outside PATH, and other path arguments passed to the CLI.
-
-## What is checked
-
-The example has three distinct one-time scripts, all in `up`, in this order:
-
-1. `001_create_widgets.sql` creates the table.
-2. `002_create_widgets_code_index.sql` creates its unique index.
-3. `003_seed_widget.sql` inserts the seed row.
-
-The harness checks the actual table, index, row values, successful script names,
-stored hashes, and one-time flags. A repeat run must preserve application data
-and `grate_ScriptsRun` exactly. This does not assert that version or log records
-never change between invocations.
-
-It then edits an applied seed script. grate must return exit 1, preserve its
-successful history/hash and data, and record the changed-script error in
-`grate_ScriptsRunErrors`. The harness restores the original bytes and adds a new
-forward migration. That migration must apply once and preserve existing history.
-
-Two fresh databases exercise deliberate SQL failure and recovery, one with
-`--transaction=false` and one with `--transaction=true`:
-
-The multi-batch failing file below is an intentional counterexample to the
-authoring rule, created only inside the disposable test. It demonstrates why
-new one-time changes should use separate files; it is not a migration template.
-
-| Observation | Expected result for the tested SQLite provider |
-| --- | --- |
-| A complete file precedes the failure | Its inserted row and successful history persist. |
-| The next file has three `GO`-separated batches; batch two fails | The first batch's row persists, the third batch and later file do not run. |
-| Successful history for that failed file | Absent: history is recorded after the whole file completes. |
-| Error history | Names the file and contains the failed batch. |
-| Retry with the SQL unchanged | Starts the file at batch one and fails on its duplicate primary key. |
-| Repair after inspecting the partial state | Handles the already inserted row, completes remaining work, preserves prior history/errors, and has no repeated effects on the next run. |
-
-The repaired file has no successful history entry in the disposable fixture.
-Editing it is a fixture-specific recovery demonstration, not permission to edit
-a migration that has completed successfully in another environment. For an
-applied one-time script, use the restore-and-forward-change procedure above.
-
-grate's SQLite provider currently reports no DDL transaction support.
-`--transaction=true --silent` emits a warning and continues without
-grate-managed migration transactions. The harness checks that warning and the
-persisted partial state; it does **not** claim SQLite rollback was verified.
-The `GO` demonstration also establishes that a batch separator does not make
-each batch independently resumable or a file atomic.
-
-## Recorded C# verification
-
-On 2026-10-25, all 11 checks passed through **both wrappers**, using .NET SDK
-**10.0.401**, runtime **10.0.12**, PowerShell **7.6.6**, and an existing grate CLI
-identifying itself as **2.2.0.0**, on macOS arm64. Inspection used
-Microsoft.Data.Sqlite **10.0.10** and SQLitePCLRaw.bundle_e_sqlite3 **3.0.3**.
-
-The tested `grate.dll` SHA-256 was:
-
-```text
-055b3a877bdedc6ef2506a3041e2f3b1ad81985778b6b37cdb559c2fb0cb2166
-```
-
-Each wrapper received `--expected-version 2.2.0.0 -- dotnet` followed by the
-absolute path to the existing `src/grate/bin/Release/net10.0/grate.dll`. The
-verifier was built, but grate was not rebuilt; the binary's relationship to the
-checked-out source was not independently proven.
-
-As a negative check, the index migration was replaced with `SELECT 1;` in an
-isolated copy of the complete skill, outside the repository and in a path with
-spaces. The CLI exited successfully, but the verifier exited 1 with
-`The separate index migration did not create its index.` This also exercised
-asset discovery independently of the repository and working directory.
-
-Both wrappers were tested with simulated missing `dotnet`, a runtime-only
-installation, and an SDK reporting version 9. Each printed `SKIP` and exited 77.
-A fake SDK/runner also verified preservation of arguments containing spaces and
-shell punctuation, and propagation of its nonzero exit code. These wrapper
-checks do not establish execution on Windows: PowerShell was tested on macOS.
-
-These results cover this supplied CLI and disposable SQLite only. They do not
-prove transaction, batch parsing, or recovery behavior for SQL Server,
-PostgreSQL, MariaDB, or Oracle. Repeat the relevant failure-and-recovery checks
-on the project's provider and configuration before relying on its behavior.
-
-## Skill behavior evaluation
-
-An independent agent exercise on 2026-09-05 used a synthetic SQL Server request
-with an already-deployed seed and a filename reserved by a parallel branch.
-The resulting draft preserved the deployed seed and produced seven separate
-one-time files: a forward data update, table creation, two indexes, a constraint,
-and two seed inserts. One anytime procedure file kept its SELECT and UPDATE
-together. The new names were unique and sorted after the supplied reservation.
-The agent identified unknown runner/server settings, marked schema assumptions,
-and deferred execution rather than inventing a command. Static inspection
-confirmed those artifacts; SQL Server execution and agent-client installation
-were not tested. This is evidence for that authoring scenario, not a claim of
-compatibility with every agent or SQL Server version.
+Report the runner/provider versions, configuration, commands/checks run, observed
+schema/data/history, requested and effective transaction behavior, and remaining
+assumptions. If the appropriate disposable environment is unavailable, leave a
+verification plan and state what was not tested. Do not install a different grate
+version or additional runtime automatically to manufacture a pass.

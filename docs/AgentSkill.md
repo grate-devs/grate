@@ -13,10 +13,10 @@ Its authoring rule is **one independently tracked DML statement or DDL operation
 
 ## Use the skill
 
-The grate CLI bundles the complete skill: `SKILL.md`, references, example SQL and
-verification scripts. Install that bundled version after installing or updating
+The grate CLI bundles the complete skill: `SKILL.md`, references and example SQL.
+Install that bundled version after installing or updating
 grate. The commands copy files without contacting a database, downloading a
-skill, or running its verifier.
+skill, or executing SQL.
 
 For a project-local .NET tool, run this from the project repository after
 `dotnet tool install` or `dotnet tool restore`:
@@ -52,7 +52,7 @@ on the client; the skill itself has no vendor-specific tool dependency or metada
 Installation is explicit: package managers and `dotnet tool install` do not run
 this command automatically, and normal grate migrations do not install skills.
 Both `--local` and `--global` require no additional .NET installation when using
-a self-contained grate executable. Only the optional C# verifier needs an SDK.
+a self-contained grate executable. The skill adds no runtime or SDK requirement.
 The bundle is included in newly built releases; older installed versions of
 grate do not acquire this command automatically.
 
@@ -91,9 +91,26 @@ The skill does not upgrade grate or grant permission to deploy to a shared datab
 - [SQLite migration files](https://github.com/grate-devs/grate/tree/main/skills/use-grate/assets/sqlite-example/up) separate table creation, index creation and seed inserts.
 - [Authoring reference](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/authoring.md) explains batch separators, parallel-branch naming, environments and tokens.
 - [Transaction and recovery reference](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/operations.md) distinguishes requested transactions from effective rollback and explains preview limitations.
-- [SQLite verification](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/verification.md) provides a local/CI check with the real runner and records the tested version/provider and limitations.
-- [PostgreSQL verification](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/postgresql-verification.md) covers effective transaction rollback.
+- [Verification guidance](https://github.com/grate-devs/grate/blob/main/skills/use-grate/references/verification.md) explains how to check the project's actual migrations with its pinned runner, provider and test tooling.
 
-The optional SQLite verifier is a file-based C# app requiring .NET SDK 10 or newer. Shell and PowerShell wrappers report a skipped check (exit 77) when a suitable SDK is unavailable. The skill itself and self-contained grate distributions do not require .NET to be installed.
+The skill contains no executable verifier or shell/PowerShell wrappers. It does
+not require an installed SDK when used with self-contained grate. SQLite examples
+illustrate file layout; they do not validate a consumer project's migrations or
+establish another provider's transaction behavior.
 
-Verification scope is recorded with the checks. SQL examples are provider-specific; the skill does not claim validation across every database or agent client.
+## Maintaining the skill
+
+The C# tests in `unittests/Sqlite/AgentSkill/AgentSkillSqliteTests.cs` exercise the
+bundled SQL examples and grate's clean apply/rerun, changed-script refusal,
+forward recovery and partial failure/retry/recovery behavior. They launch the
+CLI built from the same checkout and inspect database contents and history.
+They run automatically in the existing `Sqlite` test matrix in both CI workflows.
+
+```sh
+dotnet test --project unittests/Sqlite --filter-class Sqlite.AgentSkill.AgentSkillSqliteTests
+```
+
+These are maintainer regression tests, separate from consumer-project validation.
+Historical [SQLite](agent-skill-verification/SQLite.md) and
+[PostgreSQL](agent-skill-verification/PostgreSQL.md) results record earlier
+verification environments and limitations; they are not part of the skill bundle.

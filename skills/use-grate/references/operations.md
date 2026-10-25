@@ -13,7 +13,7 @@ The following describes source inspected at commit `85e413a0979d9a77e014e3a61456
 | SQLite | No | grate warns and disables the requested transaction. This is grate provider behavior, not a claim that SQLite itself cannot transact DDL. |
 | MariaDB / Oracle | No | grate warns and disables the requested transaction. Do not promise migration-wide rollback. |
 
-Do not infer tested provider compatibility from this source table. Measured evidence is in the [SQLite](verification.md) and [PostgreSQL](postgresql-verification.md) verification references.
+Do not infer tested provider compatibility from this source table. Follow the [verification guidance](verification.md) against the project's own migrations and provider before relying on rollback or recovery behavior.
 
 For runner setup, response files, and adopting an existing RoundhousE history, read [Consumer workflows](consumer-workflows.md). Confirm the SQL root, provider, target and tracking schema from the full invocation before selecting scripts. A successful run against a different database or a new history schema is not an upgrade-path check.
 

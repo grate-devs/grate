@@ -388,6 +388,7 @@ jobs:
           9.0.x
           10.0.x
     - name: Test
+      # The Sqlite lane includes the agent-skill example and CLI behavior checks.
       run: |
         dotnet test \
         --project unittests/${{ matrix.category }} \

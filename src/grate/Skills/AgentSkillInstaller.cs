@@ -123,12 +123,6 @@ internal static class AgentSkillInstaller
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                 File.WriteAllBytes(file, contents);
             }
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(Path.Combine(staging, "scripts", "verify_sqlite.sh"),
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-                    | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-            }
             if (Directory.Exists(destination)) Directory.Move(destination, backup);
             try
             {

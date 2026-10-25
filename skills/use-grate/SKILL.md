@@ -16,8 +16,7 @@ Read the relevant reference when it helps the task; do not load every reference 
 | Set up a runner, inspect `.rsp` files, or migrate from RoundhousE | [Consumer workflows](references/consumer-workflows.md) |
 | Add or review migrations, select folders, order parallel changes, or use environments/tokens | [Authoring migrations](references/authoring.md) |
 | Plan execution, understand transactions, or recover a failure | [Transactions and recovery](references/operations.md) |
-| Run the optional SQLite behavior checks | [Executable SQLite checks](references/verification.md) |
-| Check evidence for effective PostgreSQL rollback | [PostgreSQL verification](references/postgresql-verification.md) |
+| Verify the project's migrations and collect scoped evidence | [Verification guidance](references/verification.md) |
 
 ## Establish the project context
 
@@ -51,6 +50,6 @@ For a failure, inspect actual schema/data, successful history, error history, an
 
 Test a migration change with the real runner on a disposable database matching the intended provider/configuration: exercise clean apply or a representative upgrade path, assert schema/data and history, then verify an unchanged rerun. When making transaction/recovery claims or adopting a runner, also test deliberate failure, inspected recovery, and rejection of an edited applied one-time script. A successful CLI exit alone is insufficient.
 
-The optional SQLite verifier uses shell/PowerShell wrappers and requires .NET SDK 10 or newer. Exit **77** means verification was skipped, not passed. Continue the rest of the task and report the gap without automatically installing an SDK. SQLite checks do not establish rollback or compatibility for other providers; distinguish them from the PostgreSQL evidence and actual project-provider tests.
+Use the [verification guidance](references/verification.md) to plan checks for the actual project migrations. Reuse the project's runner and test tooling; this skill adds no verifier or SDK requirement. The SQLite SQL example illustrates file layout, and cannot establish rollback or compatibility for another provider.
 
 Report changed files and rationale, grate/provider versions, requested/effective transaction modes, checks actually run, observed persistence/history after failure, and untested assumptions. Keep source inspection, executable evidence, and agent behavior evaluation distinct.

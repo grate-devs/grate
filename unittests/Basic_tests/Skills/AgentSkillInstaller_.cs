@@ -29,10 +29,7 @@ public sealed class AgentSkillInstaller_ : IDisposable
             {
                 Assert.Equal(content, File.ReadAllBytes(Path.Combine(destination, relativePath)));
             }
-            if (!OperatingSystem.IsWindows())
-            {
-                Assert.True((File.GetUnixFileMode(Path.Combine(destination, "scripts", "verify_sqlite.sh")) & UnixFileMode.UserExecute) != 0);
-            }
+            Assert.False(Directory.Exists(Path.Combine(destination, "scripts")));
         }
     }
 
@@ -74,7 +71,8 @@ public sealed class AgentSkillInstaller_ : IDisposable
     public void Force_replaces_only_use_grate_and_removes_stale_files()
     {
         AgentSkillInstaller.Install(_root, force: false);
-        var customFile = Path.Combine(Destination(".agents"), "scripts", "obsolete.py");
+        var customFile = Path.Combine(Destination(".agents"), "scripts", "verify_sqlite.cs");
+        Directory.CreateDirectory(Path.GetDirectoryName(customFile)!);
         File.WriteAllText(customFile, "old script");
         var modified = Path.Combine(Destination(".claude"), "SKILL.md");
         File.WriteAllText(modified, "Local edit");
@@ -88,6 +86,7 @@ public sealed class AgentSkillInstaller_ : IDisposable
 
         Assert.Equal(AgentSkillInstaller.ReadBundledFiles()["SKILL.md"], File.ReadAllBytes(modified));
         Assert.False(File.Exists(customFile));
+        Assert.False(Directory.Exists(Path.Combine(Destination(".agents"), "scripts")));
         Assert.Equal("Keep me", File.ReadAllText(neighbor));
     }
 
@@ -169,7 +168,7 @@ public sealed class AgentSkillInstaller_ : IDisposable
         Assert.Equal(0, exitCode);
         Assert.Equal("", error.ToString());
         Assert.True(File.Exists(Path.Combine(Destination(".agents"), "SKILL.md")));
-        Assert.True(File.Exists(Path.Combine(Destination(".claude"), "scripts", "verify_sqlite.cs")));
+        Assert.True(File.Exists(Path.Combine(Destination(".claude"), "assets", "sqlite-example", "up", "001_create_widgets.sql")));
     }
 
     [Fact]
