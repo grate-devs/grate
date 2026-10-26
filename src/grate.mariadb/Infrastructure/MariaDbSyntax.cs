@@ -3,17 +3,8 @@ namespace grate.MariaDb.Infrastructure;
 
 public readonly struct MariaDbSyntax : ISyntax
 {
-    public string StatementSeparatorRegex
-    {
-        get
-        {
-            const string strings = @"(?<KEEP1>'[^']*')";
-            const string dashComments = @"(?<KEEP1>--.*$)";
-            const string starComments = @"(?<KEEP1>/\*[\S\s]*?\*/)";
-            const string separator = @"(?<KEEP1>^|\s)(?<BATCHSPLITTER>GO)(?<KEEP2>\s|;|$)";
-            return strings + "|" + dashComments + "|" + starComments + "|" + separator;
-        }
-    }
+    private static readonly IStatementSplitter _statementSplitter = new MariaDbStatementSplitter();
+    public IStatementSplitter StatementSplitter => _statementSplitter;
 
     public string CurrentDatabase => "SELECT DATABASE()";
     public string ListDatabases => "SHOW DATABASES";

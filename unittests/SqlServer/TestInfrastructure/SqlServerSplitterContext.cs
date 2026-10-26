@@ -100,25 +100,25 @@ INSERT [dbo].[Foo] ([Bar]) VALUES (N'Go speed racer, go speed racer, go speed ra
 
 GO";
 
-        public static readonly string tsql_statement_scrubbed = @"
+        public static readonly string[] tsql_statement_scrubbed = [@"
 BOB1
-" + StatementSplitter.BatchTerminatorReplacementString + @"
+", @"
 
 /* COMMENT */
 BOB2
-" + StatementSplitter.BatchTerminatorReplacementString + @"
+", @"
 
 -- GO
 
-BOB3 " + StatementSplitter.BatchTerminatorReplacementString + @"
+BOB3 ", @"
 
 --`~!@#$%^&*()-_+=,.;:'""[]\/?<> GO
 
 BOB5
-   " + StatementSplitter.BatchTerminatorReplacementString + @"
+   ", @"
 
 BOB6
-" + StatementSplitter.BatchTerminatorReplacementString + @"
+", @"
 
 /* GO */
 
@@ -133,12 +133,12 @@ GO
 BOB8
 
 --
-" + StatementSplitter.BatchTerminatorReplacementString + @"
+", @"
 
 BOB9
 
 -- `~!@#$%^&*()-_+=,.;:'""[]\/?<>
-" + StatementSplitter.BatchTerminatorReplacementString + @"
+", @"
 
 BOB10GO
 
@@ -166,7 +166,7 @@ ALTER TABLE Inv.something ADD
 	slsald varchar(15) NULL,
 	uhasdf varchar(15) NULL,
     daf_asdfasdf DECIMAL(20,6) NULL;
-" + StatementSplitter.BatchTerminatorReplacementString + @"
+", @"
 
 EXEC @ReturnCode = msdb.dbo.sp_add_jobstep @job_id=@jobId, @step_name=N'Daily job', 
 		@step_id=1, 
@@ -183,40 +183,13 @@ dml statements
 GO  
 dml statements '
 
-" + StatementSplitter.BatchTerminatorReplacementString + @"
+", @"
 
 INSERT [dbo].[Foo] ([Bar]) VALUES (N'hello--world.
 Thanks!')
 INSERT [dbo].[Foo] ([Bar]) VALUES (N'Go speed racer, go speed racer, go speed racer go!!!!! ')
 
-" + StatementSplitter.BatchTerminatorReplacementString + @"";
+"];
 
-        public static readonly string plsql_statement =
-            @"
-SQL1;
-;
-SQL2;
-;
-tmpSql := 'DROP SEQUENCE mutatieStockID';
-EXECUTE IMMEDIATE tmpSql; 
-;
-BEGIN
-INSERT into Table (columnname) values ("";"");
-UPDATE Table set columnname="";"";
-END;
-";
-        public static readonly string plsql_statement_scrubbed = @"
-SQL1;
-" + StatementSplitter.BatchTerminatorReplacementString + @"
-SQL2;
-" + StatementSplitter.BatchTerminatorReplacementString + @"
-tmpSql := 'DROP SEQUENCE mutatieStockID';
-EXECUTE IMMEDIATE tmpSql; 
-" + StatementSplitter.BatchTerminatorReplacementString + @"
-BEGIN
-INSERT into Table (columnname) values ("";"");
-UPDATE Table set columnname="";"";
-END;
-";
     }
 }

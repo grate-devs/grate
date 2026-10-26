@@ -245,26 +245,27 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
         var parent = CreateRandomTempDirectory();
         var knownFolders = global::grate.Configuration.Folders.Default;
         var path = MakeSurePathExists(parent, knownFolders[Up]);
-        WriteSql(path, "goodnight.sql", sql);
 
-        // run it with a timeout shorter than the 1 second sleep, should timeout
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
-            .CommandTimeout(1) // shorter than the script runs for
             .Build();
 
-        await using var migrator = Context.Migrator.WithConfiguration(config);
+        // Keep database and migration-history setup outside the timeout under test.
+        await using (var setupMigrator = Context.Migrator.WithConfiguration(config))
+        {
+            await setupMigrator.Migrate();
+        }
 
-        // For some reason, the Assert.ThrowAnyAsync<MigrationFailed> fails, and
-        // says that we get the Sql Exception instead of the MigratorFailed exception,
-        // but when we assert that we get any exception, and _then_ check on the type of the exception,
-        // it works. I don't know why, but I'm leaving it like this for now.
-        //var ex = await Assert.ThrowsAnyAsync<MigrationFailed>(migrator.Migrate);
-        var ex = await Assert.ThrowsAnyAsync<Exception>(migrator.Migrate);
-        Assert.IsType<MigrationFailed>(ex);
+        WriteSql(path, "goodnight.sql", sql);
 
-        //await Context.DropDatabase(db);
+        await using var migrator = Context.Migrator.WithConfiguration(config with
+        {
+            CreateDatabase = false,
+            CommandTimeout = 1 // shorter than the two-second script
+        });
+
+        await AssertScriptTimedOut(migrator, config, db);
     }
 
     [Fact]
@@ -282,26 +283,48 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
         var parent = CreateRandomTempDirectory();
         var knownFolders = global::grate.Configuration.Folders.Default;
         var path = MakeSurePathExists(parent, knownFolders[AlterDatabase]); //so it's run on the admin connection
-        WriteSql(path, "goodnight.sql", sql);
 
-        // run it with a timeout shorter than the 1 second sleep, should timeout
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
-            .AdminCommandTimeout(1) // shorter than the script runs for
             .Build();
 
-        await using var migrator = Context.Migrator.WithConfiguration(config);
+        // Database creation also uses AdminCommandTimeout. Complete setup with the
+        // normal timeout so this test measures the script, not database startup.
+        await using (var setupMigrator = Context.Migrator.WithConfiguration(config))
+        {
+            await setupMigrator.Migrate();
+        }
 
-        // For some reason, the Assert.ThrowAnyAsync<MigrationFailed> fails, and
-        // says that we get the Sql Exception instead of the MigratorFailed exception,
-        // but when we assert that we get any exception, and _then_ check on the type of the exception,
-        // it works. I don't know why, but I'm leaving it like this for now.
-        //var ex = await Assert.ThrowsAnyAsync<MigrationFailed>(migrator.Migrate);
-        var ex = await Assert.ThrowsAnyAsync<Exception>(migrator.Migrate);
-        Assert.IsType<MigrationFailed>(ex);
+        WriteSql(path, "goodnight.sql", sql);
 
-        //await Context.DropDatabase(db);
+        await using var migrator = Context.Migrator.WithConfiguration(config with
+        {
+            CreateDatabase = false,
+            AdminCommandTimeout = 1 // shorter than the two-second script
+        });
+
+        await AssertScriptTimedOut(migrator, config, db);
+    }
+
+    private async Task AssertScriptTimedOut(IGrateMigrator migrator, GrateConfiguration config, string db)
+    {
+        var exception = await Record.ExceptionAsync(migrator.Migrate);
+
+        using var connection = Context.External.GetDbConnection(Context.External.ConnectionString(db));
+        var errorTable = Context.Syntax.TableWithSchema(config.SchemaName, config.ScriptsRunErrorsTableName);
+        var successTable = Context.Syntax.TableWithSchema(config.SchemaName, config.ScriptsRunTableName);
+        var failedScripts = await connection.QueryAsync<string>($"SELECT script_name FROM {errorTable}");
+        var successfulScripts = await connection.QueryAsync<string>($"SELECT script_name FROM {successTable}");
+
+        // If no exception was thrown, distinguish a skipped script from SQL that
+        // completed unexpectedly instead of timing out.
+        TestOutput.WriteLine($"Failed scripts: {string.Join(", ", failedScripts)}");
+        TestOutput.WriteLine($"Successful scripts: {string.Join(", ", successfulScripts)}");
+
+        Assert.IsType<MigrationFailed>(exception);
+        Assert.Equal("goodnight.sql", Assert.Single(failedScripts));
+        Assert.Empty(successfulScripts);
     }
 
     [Theory]
