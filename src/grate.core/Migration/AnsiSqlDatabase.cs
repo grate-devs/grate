@@ -36,7 +36,6 @@ public abstract record AnsiSqlDatabase : IDatabase
     {
         Logger = logger;
         _syntax = syntax;
-        StatementSplitter = new StatementSplitter(syntax);
     }
     
     public string ServerName => Connection.DataSource;
@@ -54,14 +53,12 @@ public abstract record AnsiSqlDatabase : IDatabase
     public abstract bool SupportsSchemas { get; }
 
     public virtual bool SplitBatchStatements => true;
-    private StatementSplitter StatementSplitter { get; }
+    private IStatementSplitter StatementSplitter => _syntax.StatementSplitter;
 
     public virtual IEnumerable<string> GetStatements(string sql)
         => SplitBatchStatements ? this.StatementSplitter.Split(sql) : new[] { sql };
 
     public abstract void ThrowScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception exception);
-
-    public string StatementSeparatorRegex => _syntax.StatementSeparatorRegex;
 
     public string ScriptsRunTable => _syntax.TableWithSchema(SchemaName, ScriptsRunTableName);
     public string ScriptsRunErrorsTable => _syntax.TableWithSchema(SchemaName, ScriptsRunErrorsTableName);
