@@ -31,6 +31,7 @@
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.9.0" />
     <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
     <PackageVersion Include="NSubstitute" Version="6.0.0" />
     <!-- Native SQLite security floor: bundle 3.0.5 selects SQLite 3.53.4,
          including the FTS5 fix for CVE-2026-11822 / CVE-2026-11824 (fixed in 3.53.2). -->

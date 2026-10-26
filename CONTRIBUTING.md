@@ -7,9 +7,12 @@ I'll try to jot down a few notes on how to get started developing grate.
 
 Grate is built with .NET 8/9/10. You can get it [here](https://dotnet.microsoft.com/en-us/download) and start building right away.
 
-The build requires SDK 10.0.403 or a later patch in the 10.0.4xx feature band, as selected by `global.json`.
-When servicing .NET, update the exact SDK inputs in `.github/workflows` and `installers/docker/Dockerfile`
-together with the self-contained runtime versions in `src/grate/grate.csproj` (currently 8.0.33, 9.0.22 and 10.0.14).
+The build requires SDK 10.0.403 or a later stable .NET 10 SDK, as selected by `global.json`.
+CI installs `10.0.x` and Docker uses `10.0-alpine` / `alpine:3` so subsequent builds receive servicing updates.
+Self-contained distributions use the selected SDK's latest runtime patch and reject versions below
+8.0.33 / 9.0.22 / 10.0.14. These are security minimums, not exact runtime pins.
+Pull fresh base images when rebuilding Docker (`docker buildx build --pull ...`), record the resulting
+image digests, and verify the embedded runtime and native SQLite versions before releasing.
 The Docker final stage supplies Alpine and ICU; the .NET runtime is embedded by `dotnet publish` in the build stage.
 MSI and Debian recipes consume those published standalone binaries; framework-dependent tools and libraries use the consumer's runtime.
 
