@@ -8,6 +8,8 @@
       <IsTestProject>true</IsTestProject>
       <IsPublishable>true</IsPublishable>
       <IsPackable>false</IsPackable>
+      <!-- NuGet project identities are case-insensitive: avoid a cycle with the native SQLite package. -->
+      <PackageId>grate.tests.sqlite</PackageId>
             
     </PropertyGroup>
 
