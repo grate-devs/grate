@@ -26,6 +26,11 @@ But don't be fooled, there's power in this simplicity due to a couple of key fac
 - Different folders are treated differently depending on the scripts they contain, eg Sproc's are re-run whenver the definition has changed from that in the target database, while `up` scripts are run once only... See the `Script Types` section below.
 - grate allows you to specify an Environment for each run, and [Environment Specific](EnvironmentScripts.md) scripts will only be run if appropriate.  This allows for the loading of test-data into non-prod environments while keeping production clean, or catering for systems where environments markedly diverge (maybe you have different versions of Sql or something?).
 
+grate records your migration history in `ScriptsRun`, `ScriptsRunErrors`, and
+`Version`. It also maintains three `Grate*` tables to track changes to the migration
+tables themselves. See [Migration tables](MigrationTables.md) for what each table
+contains and where they are stored.
+
 ## Examples
 
 There are samples included in source control in the [`/examples/`](https://github.com/grate-devs/grate/tree/main/examples) directory, have a look and a play in there for some more info.
