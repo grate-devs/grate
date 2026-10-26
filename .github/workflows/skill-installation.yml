@@ -1,0 +1,86 @@
+name: Skill installation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - 'unittests/Basic_tests/**'
+      - 'Directory.*'
+      - 'global.json'
+      - '.github/workflows/skill-installation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - 'unittests/Basic_tests/**'
+      - 'Directory.*'
+      - 'global.json'
+      - '.github/workflows/skill-installation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: docs
+          destination: _site
+      - name: Check published skill and literal SQL tokens
+        run: |
+          test -f _site/skills/use-grate/SKILL.html
+          test -f _site/skills/use-grate/references/authoring.html
+          test -f _site/skills/use-grate/assets/sqlite-example/up/001_create_widgets.sql
+          grep -Fq '{{TokenName}}' _site/skills/use-grate/references/authoring.html
+          grep -Fq 'references/authoring.html' _site/skills/use-grate/SKILL.html
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Build test runner and distributions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $root = Join-Path $env:RUNNER_TEMP 'grate-skill-installation'
+          $version = "0.0.0-ci.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT"
+          $os = if ($IsWindows) { 'win' } elseif ($IsMacOS) { 'osx' } else { 'linux' }
+          $arch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+          dotnet build unittests/Basic_tests -c Release -p:TargetFrameworks=net10.0
+          dotnet pack src/grate/grate.csproj -c Release -p:TargetFrameworks=net10.0 -p:PackAsTool=true -p:SelfContained=false -p:PackageVersion=$version -o "$root/packages"
+          dotnet publish src/grate/grate.csproj -c Release -f net10.0 -r "$os-$arch" --self-contained -p:SelfContained=true -p:TargetFrameworks=net10.0 -o "$root/published"
+          New-Item -ItemType Directory -Force "$root/tool/.config" | Out-Null
+          '{"version":1,"isRoot":true,"tools":{}}' | Set-Content "$root/tool/.config/dotnet-tools.json"
+          "<configuration><packageSources><clear/><add key='local' value='$root/packages'/></packageSources></configuration>" | Set-Content "$root/nuget.config"
+          dotnet tool install grate --version $version --tool-manifest "$root/tool/.config/dotnet-tools.json" --configfile "$root/nuget.config"
+      - name: Test actual local and global installation from each distribution
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $root = Join-Path $env:RUNNER_TEMP 'grate-skill-installation'
+          $tests = (Resolve-Path 'unittests/Basic_tests/bin/Release/net10.0/Basic_tests.dll').Path
+          $binary = Join-Path "$root/published" $(if ($IsWindows) { 'grate.exe' } else { 'grate' })
+          foreach ($kind in @('tool', 'self-contained')) {
+            $env:GRATE_SKILL_TEST_COMMAND = if ($kind -eq 'tool') { ConvertTo-Json -Compress -InputObject @('dotnet', 'tool', 'run', 'grate', '--') } else { ConvertTo-Json -Compress -InputObject @($binary) }
+            $env:GRATE_SKILL_TEST_WORKING_DIRECTORY = "$root/tool"
+            dotnet $tests --filter-class Basic_tests.Skills.PublishedSkillInstallationTests --minimum-expected-tests 2 --report-junit --results-directory "$root/results/$kind"
+          }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: skill-installation-${{ matrix.os }}
+          path: ${{ runner.temp }}/grate-skill-installation/results

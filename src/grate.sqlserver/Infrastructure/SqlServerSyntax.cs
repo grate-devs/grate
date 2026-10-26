@@ -3,17 +3,8 @@ namespace grate.SqlServer.Infrastructure;
 
 public readonly struct SqlServerSyntax : ISyntax
 {
-    public string StatementSeparatorRegex
-    {
-        get
-        {
-            const string strings = @"(?<KEEP1>'[^']*')";
-            const string dashComments = @"(?<KEEP1>--.*$)";
-            const string starComments = @"(?<KEEP1>/\*[\S\s]*?\*/)";
-            const string separator = @"(?<KEEP1>^|\s)(?<BATCHSPLITTER>GO)(?<KEEP2>\s|;|$)";
-            return strings + "|" + dashComments + "|" + starComments + "|" + separator;
-        }
-    }
+    private static readonly IStatementSplitter _statementSplitter = new SqlServerStatementSplitter();
+    public IStatementSplitter StatementSplitter => _statementSplitter;
 
     public string CurrentDatabase => "SELECT DB_NAME()";
     public string ListDatabases => "SELECT name FROM sys.databases";

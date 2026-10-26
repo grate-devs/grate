@@ -8,6 +8,7 @@ WORKDIR /app
 COPY *.props ./
 COPY *.ruleset ./
 COPY src/ ./src/
+COPY docs/skills/use-grate/ ./docs/skills/use-grate/
 RUN dotnet publish --framework "$TARGETFRAMEWORK" --runtime "$RUNTIME" ./src/grate/grate.csproj \
     -c release --self-contained -p:SelfContained=true /p:Version="$VERSION" /p:RuntimeIdentifiers="" \
     -o /publish
@@ -17,18 +18,10 @@ RUN apk add --no-cache icu-libs
 WORKDIR /app
 
 COPY --chmod=0755 --from=build /publish .
+COPY --chmod=0755 installers/docker/entrypoint.sh .
 RUN mkdir /output
 # Add globalization support to the OS so .Net can use cultures
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
-# Add the grate executable
-ENTRYPOINT ./grate \
---sqlfilesdirectory=/db \
---version=${VERSION:-1.0.0} \
---connstring="$APP_CONNSTRING" \
---databasetype=${DATABASE_TYPE:-sqlserver} \
---silent \
---outputPath=/output \
---createdatabase=${CREATE_DATABASE:-true} \
---environment=${ENVIRONMENT:-LOCAL} \
---transaction=${TRANSACTION:-false}
+# Expand environment variables into the response file, then run grate
+ENTRYPOINT ["./entrypoint.sh"]
