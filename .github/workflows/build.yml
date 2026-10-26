@@ -388,6 +388,7 @@ jobs:
           9.0.x
           10.0.x
     - name: Test
+      # The Sqlite lane also executes the SQL examples shipped with the skill.
       run: |
         dotnet test \
         --project unittests/${{ matrix.category }} \

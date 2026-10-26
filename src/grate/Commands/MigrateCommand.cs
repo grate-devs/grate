@@ -48,6 +48,7 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(IgnoreDirectoryNames);
         Options.Add(UpToDateCheck);
         Options.Add(Verbosity);
+        Subcommands.Add(new SkillsCommand());
 
         // Obsolete options - kept so that grate keeps reporting helpful messages, but not bound.
         Options.Add(Database);
