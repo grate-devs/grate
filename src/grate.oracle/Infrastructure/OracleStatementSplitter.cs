@@ -170,13 +170,13 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     break;
 
                 case TokenType.Semicolon:
-                    // We want to include the semicolon in the batch 
+                    // Semicolons belong to PL/SQL blocks, but only delimit ordinary SQL commands.
                     if (blockDepth > 0)
                     {
                         break;
                     }
 
-                    yield return sql[cutIndex..(token.Index + token.Length)];
+                    yield return sql[cutIndex..token.Index];
                     cutIndex = token.Index + token.Length;
                     break;
 

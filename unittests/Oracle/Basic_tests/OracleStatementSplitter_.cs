@@ -260,7 +260,7 @@ select ''
             string sql_to_match = "jalla /;";
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
-            Assert.Equal(["jalla /;"], result);
+            Assert.Equal(["jalla /"], result);
         }
         
                 [Fact]
@@ -575,7 +575,7 @@ select ''
             var result = _splitter.Split(sql).ToList();
 
             Assert.Equal(2, result.Count);
-            Assert.Contains("\nSELECT 1;", result);
+            Assert.Contains("\nSELECT 1", result);
         }
 
         [Fact]
@@ -603,9 +603,9 @@ select ''
         [Fact]
         public void slash_in_a_division_expression_is_not_a_batch_separator()
         {
-            const string sql = "SELECT 10 / 2 FROM dual;";
+            const string sql = "SELECT 10 / 2 FROM dual";
 
-            var result = _splitter.Split(sql).ToList();
+            var result = _splitter.Split(sql + ";").ToList();
 
             Assert.Equal([sql], result);
         }
@@ -613,9 +613,9 @@ select ''
         [Fact]
         public void inline_slash_is_not_a_batch_separator()
         {
-            const string sql = "SELECT 1 / 2 FROM dual;";
+            const string sql = "SELECT 1 / 2 FROM dual";
 
-            var result = _splitter.Split(sql).ToList();
+            var result = _splitter.Split(sql + ";").ToList();
 
             Assert.Equal([sql], result);
         }
@@ -663,7 +663,7 @@ select ''
             var batches = _splitter.Split(sql).ToArray();
 
             Assert.Equal(2, batches.Length);
-            Assert.EndsWith(";", batches[0]);
+            Assert.False(batches[0].EndsWith(';'));
         }
 
         [Fact]
@@ -674,7 +674,7 @@ select ''
             var batches = _splitter.Split(sql).ToArray();
 
             Assert.Equal(2, batches.Length);
-            Assert.EndsWith(";", batches[0]);
+            Assert.False(batches[0].EndsWith(';'));
         }
 
         [Fact]
@@ -685,7 +685,7 @@ select ''
             var batches = _splitter.Split(sql).ToArray();
 
             Assert.Equal(2, batches.Length);
-            Assert.EndsWith(";", batches[0]);
+            Assert.False(batches[0].EndsWith(';'));
         }
 
         [Fact]
