@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/**'
       - 'installers/**'
+      - '.dockerignore'
       - 'Directory.*'
       - 'global.json'
       - 'scripts/verify-dotnet11-packages.ps1'
