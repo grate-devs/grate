@@ -24,7 +24,6 @@ public class Database(SqlServerGrateTestContext testContext, ITestOutputHelper t
         // ToLower is important here, this reproduces the bug in #167
         await using var migrator = GetMigrator(GetConfiguration(db.ToLower(), true));
         // There should be no errors running the migration
-        Action action = () => migrator.Migrate();
-        Assert.Null(Record.Exception(action));
+        await migrator.Migrate();
     }
 }
