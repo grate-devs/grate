@@ -28,3 +28,11 @@ for more configuration options, see the [documentation](https://grate-devs.githu
 Full documentation can be found at [https://grate-devs.github.io/grate/](https://grate-devs.github.io/grate/).
 
 
+
+## Coding-agent skill
+
+After installing this tool, run `grate skills install --global` to install its
+bundled `use-grate` skill for Codex and Claude Code. For a project-local tool,
+run `dotnet tool run grate -- skills install --local` from the repository.
+See the [agent skill guide](https://grate-devs.github.io/grate/agent-skill/) for
+locations and updating existing copies. Installation does not contact a database.

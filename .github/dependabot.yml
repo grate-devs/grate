@@ -2,6 +2,10 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
+    # v5/v6 removed public-feed redirect sanitization; revisit after upstream fixes #830.
+    ignore:
+      - dependency-name: "actions/setup-dotnet"
+        versions: [">=5.0.0"]
     schedule:
       interval: "daily"
 

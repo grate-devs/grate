@@ -162,6 +162,14 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     break;
 
                 case TokenType.BlockEnd:
+                    if (blockDepth == 0)
+                    {
+                        // END can also close a SQL CASE expression. Keep END, but not its SQL terminator.
+                        yield return sql[cutIndex..(token.Index + token.Length - 1)];
+                        cutIndex = token.Index + token.Length;
+                        break;
+                    }
+
                     blockDepth--;
                     if (blockDepth == 0)
                     {
@@ -216,13 +224,13 @@ public partial class OracleStatementSplitter : IStatementSplitter
 
                 case TokenType.StandaloneSemicolon:
                 case TokenType.Semicolon:
-                    // We want to include the semicolon in the batch 
+                    // Semicolons belong to PL/SQL blocks, but only delimit ordinary SQL commands.
                     if (blockDepth > 0)
                     {
                         break;
                     }
 
-                    yield return sql[cutIndex..(token.Index + token.Length)];
+                    yield return sql[cutIndex..token.Index];
                     cutIndex = token.Index + token.Length;
                     break;
 
