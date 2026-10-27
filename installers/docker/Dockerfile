@@ -6,8 +6,7 @@ ARG RUNTIME_VERSION=11.0.0-rc.3.26522.148
 ARG RUNTIME
 ARG VERSION=1.0.0
 WORKDIR /app
-COPY global.json ./
-COPY *.props ./
+COPY global.json *.props ./
 COPY *.ruleset ./
 COPY src/ ./src/
 COPY docs/skills/use-grate/ ./docs/skills/use-grate/
