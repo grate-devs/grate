@@ -3,6 +3,7 @@ using grate.DependencyInjection;
 using grate.Infrastructure;
 using grate.Migration;
 using grate.SqlServer.Migration;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TestCommon.TestInfrastructure;
@@ -12,8 +13,8 @@ namespace Basic_tests;
 public class GrateConfiguration_
 {
     [Theory]
-    [InlineData("Data source=Monomonojono;Initial Catalog=Øyenbryn;Lotsastuff", "Data source=Monomonojono;Initial Catalog=master;Lotsastuff")]
-    [InlineData("Data source=Monomonojono;Database=Øyenbryn;Lotsastuff", "Data source=Monomonojono;Database=master;Lotsastuff")]
+    [InlineData("Data source=Monomonojono;Initial Catalog=Øyenbryn;Application Name=Lotsastuff", "Data source=Monomonojono;Initial Catalog=master;Application Name=Lotsastuff")]
+    [InlineData("Data source=Monomonojono;Database=Øyenbryn;Application Name=Lotsastuff", "Data source=Monomonojono;Database=master;Application Name=Lotsastuff")]
     public void Uses_ConnectionString_with_master_db_if_adminConnectionString_is_not_set_Initial_Catalog(string connectionString, string expectedAdminConnectionString)
     {
         var serviceProvider = new ServiceCollection()
@@ -32,7 +33,8 @@ public class GrateConfiguration_
         var cfg = serviceProvider.GetRequiredService<GrateConfiguration>();
         var database = serviceProvider.GetService<IDatabase>()!;
         var adminConnectionString = database.GetAdminConnectionString(cfg);
-        Assert.Equal(expectedAdminConnectionString, adminConnectionString);
+        Assert.True(new SqlConnectionStringBuilder(expectedAdminConnectionString)
+            .EquivalentTo(new SqlConnectionStringBuilder(adminConnectionString)));
     }
 
     [Fact]
