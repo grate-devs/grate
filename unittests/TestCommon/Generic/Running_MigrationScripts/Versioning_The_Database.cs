@@ -34,13 +34,18 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         {
             await migrator.Migrate();
 
-            // Version again
-            var version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
-            Assert.Equal(2, version);
+            var firstVersionId = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
+            var secondVersionId = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.5");
 
-            // And again
-            version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
-            Assert.Equal(3, version);
+            var table = Context.Syntax.TableWithSchema(config.SchemaName, config.VersionTableName);
+            using var connection = Context.External.CreateDbConnection(db);
+            var versions = (await connection.QueryAsync<(long id, string version)>(
+                $"SELECT id, version FROM {table}")).ToArray();
+
+            // Generated identifiers may have gaps, for example when Oracle ages out a sequence cache.
+            Assert.Equal(Assert.Single(versions, row => row.version == "1.2.3.4").id, firstVersionId);
+            Assert.Equal(Assert.Single(versions, row => row.version == "1.2.3.5").id, secondVersionId);
+            Assert.NotEqual(firstVersionId, secondVersionId);
         }
         
         //await Context.DropDatabase(db);
