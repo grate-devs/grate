@@ -8,10 +8,13 @@
       <IsTestProject>true</IsTestProject>
       <IsPublishable>true</IsPublishable>
       <IsPackable>false</IsPackable>
+      <!-- NuGet project identities are case-insensitive: avoid a cycle with the native SQLite package. -->
+      <PackageId>grate.tests.sqlite</PackageId>
             
     </PropertyGroup>
 
   <ItemGroup>
+      <PackageReference Include="AwesomeAssertions" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" />
       <PackageReference Include="xunit.v3.mtp-v2"/>
       <PackageReference Include="xunit.runner.visualstudio"/>

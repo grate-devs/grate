@@ -37,7 +37,7 @@ internal record DbMigrator : IDbMigrator
 
     public async Task<bool> CreateDatabase()
     {
-        if (Configuration.CreateDatabase)
+        if (Configuration.CreateDatabase && !Configuration.DryRun)
         {
             await Database.CreateDatabase();
             return true;
@@ -48,7 +48,7 @@ internal record DbMigrator : IDbMigrator
     public Task DropDatabase()
     {
         Debug.Assert(Configuration.Drop, "How did we get into a drop command when not configured to do so?");
-        return Database.DropDatabase();
+        return Configuration.DryRun ? Task.CompletedTask : Database.DropDatabase();
     }
 
     public Task OpenConnection() => Database.OpenConnection();
@@ -190,7 +190,10 @@ internal record DbMigrator : IDbMigrator
 
     public async Task RestoreDatabase(string backupPath)
     {
-        await Database.RestoreDatabase(backupPath);
+        if (!Configuration.DryRun)
+        {
+            await Database.RestoreDatabase(backupPath);
+        }
     }
 
     /// <summary>
@@ -361,11 +364,16 @@ internal record DbMigrator : IDbMigrator
     {
         Logger.LogError("{ScriptName}: {ErrorMessage}", scriptName, "One time script changed");
 
+        const string errorMessage = "Script has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set WarnOnOneTimeScriptChanges to true and run again. Stopping execution.";
+
+        if (Configuration.DryRun)
+        {
+            throw new OneTimeScriptChanged(folder, scriptName, errorMessage);
+        }
+
         Database.Rollback();
         await Database.CloseConnection();
         Transaction.Current?.Dispose();
-
-        const string errorMessage = "Script has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set WarnOnOneTimeScriptChanges to true and run again. Stopping execution.";
 
         using (var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
         {
@@ -400,6 +408,11 @@ internal record DbMigrator : IDbMigrator
 
     private async Task RecordScriptInScriptsRunErrorsTable(string scriptName, string sql, string errorSql, string errorMessage, long versionId)
     {
+        if (Configuration.DryRun)
+        {
+            return;
+        }
+
         var sqlToStore = Configuration.DoNotStoreScriptsRunText ? null : sql;
         await Database.InsertScriptRunError(scriptName, sqlToStore, errorSql, errorMessage, versionId);
         await Database.ChangeVersionStatus(MigrationStatus.Error, versionId);

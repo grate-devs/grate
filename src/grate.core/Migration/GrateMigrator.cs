@@ -108,7 +108,10 @@ internal record GrateMigrator : IGrateMigrator
         if (config.Drop)
         {
             await dbMigrator.DropDatabase();
-            _logger.LogInformation("{AppName} has removed database ({DatabaseName}) if it existed.", ApplicationInfo.Name, database.DatabaseName);
+            if (config.DryRun)
+                _logger.LogInformation("Skipping database drop due to --dryrun.");
+            else
+                _logger.LogInformation("{AppName} has removed database ({DatabaseName}) if it existed.", ApplicationInfo.Name, database.DatabaseName);
         }
 
         var databaseCreated = false;
@@ -173,7 +176,7 @@ internal record GrateMigrator : IGrateMigrator
 
                 try
                 {
-                    if (processingFolderInDefaultTransaction)
+                    if (processingFolderInDefaultTransaction || config.DryRun)
                     {
                         anySqlRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
                     }
@@ -256,6 +259,13 @@ internal record GrateMigrator : IGrateMigrator
 
     private async Task EnsureConnectionIsOpen(ConnectionType connectionType)
     {
+        // Preview queries open their own connection when needed. Opening one eagerly can create a missing SQLite database,
+        // and would prevent previewing scripts for a database that does not exist yet.
+        if (Configuration.DryRun)
+        {
+            return;
+        }
+
         switch (connectionType)
         {
             case ConnectionType.Default:
@@ -341,7 +351,8 @@ internal record GrateMigrator : IGrateMigrator
             }
             else
             {
-                databaseCreated = await dbMigrator.CreateDatabase();
+                // Include runAfterCreateDatabase scripts in a preview of a new database.
+                databaseCreated = config.DryRun || await dbMigrator.CreateDatabase();
             }
         }
         return databaseCreated;
