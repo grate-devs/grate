@@ -35,6 +35,9 @@ public class ConnectionStringExtensionTests
                          $"{server};Database=\"app;name\";User ID=demo;Password=\"a\"\"b;c=d\";",
                          $"; {server}; DaTaBaSe = 'app' ; User ID = demo ; Password = '  a;=b  ' ;;",
                          $"{server};Database=app;DATABASE=other;User ID=demo;Password=dummy",
+                         $"{server};Database=app;Password=first;Pwd=second;Password=third",
+                         $"{server};Database=app;Pwd=second;Password=",
+                         $"{server};Database=app;Password=first;Pwd=second;Password=",
                          $"{server};Database=;User ID=demo;Password=dummy",
                          $"{server};Database=\"\";User ID=demo;Password=dummy"
                      })
@@ -50,6 +53,13 @@ public class ConnectionStringExtensionTests
                 cases.Add(provider, $"{server};Initial Catalog=;User ID=demo;Password=dummy");
                 cases.Add(provider, $"{server};Database=app;Initial Catalog=;User ID=demo;Password=dummy");
                 cases.Add(provider, $"{server};Initial Catalog=app;Database=;User ID=demo;Password=dummy");
+                cases.Add(provider, "Server=first;Data Source=second;Server=third;Database=app");
+                cases.Add(provider, $"{server};Database=app;User ID=first;UID=second;User ID=third");
+            }
+            if (provider == "sqlserver")
+            {
+                cases.Add(provider, $"{server};Database=app;Application Name=");
+                cases.Add(provider, $"{server};Database=app;Workstation ID=");
             }
         }
         return cases;
