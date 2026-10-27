@@ -22,9 +22,11 @@ public record OracleTestContainerDatabase(
         // Database creation probes log in as missing users. Oracle delays every failed login
         // by one second; disable that delay only in these disposable test databases.
         // This undocumented parameter is static, so the test container must restart once.
+        // Give the listener headroom for rapid short-lived connections between load updates.
         const string configureTestDatabase = """
             WHENEVER SQLERROR EXIT SQL.SQLCODE
             ALTER SYSTEM SET "_sys_logon_delay"=0 SCOPE=SPFILE;
+            ALTER SYSTEM SET PROCESSES=1000 SCOPE=SPFILE;
             SHUTDOWN IMMEDIATE;
             STARTUP;
             ALTER PLUGGABLE DATABASE ALL OPEN;
