@@ -12,11 +12,15 @@ public partial class OracleStatementSplitter : IStatementSplitter
     private enum TokenType
     {
         StoredProgramStart,
+        WithProgramStart,
+        LocalRoutineStart,
         StandaloneSemicolon,
         QuotedIdentifier,
         BlockStart,
         DeclareBlockStart,
         BlockEnd,
+        CaseStart,
+        EndKeyword,
         Semicolon,
         SQLPLUSEXECUTE,
         StringLiteral,
@@ -43,18 +47,29 @@ public partial class OracleStatementSplitter : IStatementSplitter
     // Their script boundary is an explicit / or Roundhouse ; line, rather than an inner END.
     private const string TriviaPattern = @"(?:\s|--[^\r\n]*(?:\r?\n|$)|/\*[\s\S]*?\*/)+";
     private const string StoredProgramStartPattern =
-        @"(?<StoredProgramStart>\bCREATE" + TriviaPattern +
+        @"(?<StoredProgramStart>(?<![\w$#])CREATE" + TriviaPattern +
         "(?:OR" + TriviaPattern + "REPLACE" + TriviaPattern + ")?" +
         "(?:(?:NON)?EDITIONABLE" + TriviaPattern + ")?" +
-        @"(?:PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)\b)";
+        @"(?:PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)(?![\w$#]))";
+    private const string LocalRoutineStartPattern =
+        @"(?<LocalRoutineStart>(?<![\w$#])(?:FUNCTION|PROCEDURE)(?![\w$#]))";
+    private const string WithProgramStartPattern =
+        @"(?<WithProgramStart>(?<![\w$#])WITH" + TriviaPattern +
+        @"(?:FUNCTION|PROCEDURE)(?![\w$#]))";
     private const string StandaloneSemicolonPattern = @"(?<StandaloneSemicolon>^[ \t]*;[ \t]*(?=\r?$))";
     private const string QuotedIdentifierPattern = "(?<QuotedIdentifier>\")";
-    private const string BlockStartPattern = "(?<BlockStart>\\bBEGIN\\b)";
-    private const string DeclareBlockStartPattern = "(?<DeclareBlockStart>\\bDECLARE\\b)";
+    private const string BlockStartPattern = @"(?<BlockStart>(?<![\w$#])BEGIN(?![\w$#]))";
+    private const string DeclareBlockStartPattern = @"(?<DeclareBlockStart>(?<![\w$#])DECLARE(?![\w$#]))";
 
     // Named routine endings and spaced CASE expression endings do not necessarily close
     // the surrounding anonymous block. Stored programs use explicit script delimiters.
-    private const string BlockEndPattern = @"(?<BlockEnd>\bEND;)";
+    private const string BlockEndPattern = @"(?<BlockEnd>(?<![\w$#])END;)";
+    private const string CaseStartPattern = @"(?<CaseStart>(?<![\w$#])CASE(?![\w$#]))";
+    // Consume END CASE together so its CASE keyword does not open another scope.
+    // END IF and END LOOP belong to their own control-flow statements.
+    private const string EndKeywordPattern =
+        @"(?<EndKeyword>(?<![\w$#])END(?![\w$#])(?!" + TriviaPattern +
+        @"(?:IF|LOOP)(?![\w$#]))(?:" + TriviaPattern + @"CASE(?![\w$#]))?)";
     private const string SemicolonPattern = "(?<Semicolon>;)";
     private const string SqlPlusExecutePattern = "(?<SQLPLUSEXECUTE>^[ \\t]*/[ \\t]*(?=\\r?$))";
     private const string NewLinePattern = "(?<NewLine>\\r\\n|\\r|\\n)";
@@ -66,11 +81,15 @@ public partial class OracleStatementSplitter : IStatementSplitter
         MultiLineCommentEndPattern + "|" +
         SingleLineCommentPattern + "|" +
         StoredProgramStartPattern + "|" +
+        WithProgramStartPattern + "|" +
+        LocalRoutineStartPattern + "|" +
         StandaloneSemicolonPattern + "|" +
         QuotedIdentifierPattern + "|" +
         BlockStartPattern + "|" +
         DeclareBlockStartPattern + "|" +
         BlockEndPattern + "|" +
+        CaseStartPattern + "|" +
+        EndKeywordPattern + "|" +
         SemicolonPattern + "|" +
         SqlPlusExecutePattern + "|" +
         NewLinePattern,
@@ -109,9 +128,11 @@ public partial class OracleStatementSplitter : IStatementSplitter
         using var tokens = Tokenize(sql).GetEnumerator();
         var cutIndex = 0;
         var blockDepth = 0;
+        // A BEGIN/END block can itself be nested inside a CASE statement.
+        var caseBlockDepths = new Stack<int>();
         var inDeclareBlock = false;
-        var inStoredProgram = false;
-        var lastStoredTerminatorEnd = -1;
+        var bufferUntilDelimiter = false;
+        var lastProgramTerminatorEnd = -1;
         var token = default(Token);
 
         bool NextToken()
@@ -124,27 +145,51 @@ public partial class OracleStatementSplitter : IStatementSplitter
             return true;
         }
 
+        bool TryEndCase()
+        {
+            if (!caseBlockDepths.TryPeek(out var depth) || depth != blockDepth)
+            {
+                return false;
+            }
+
+            caseBlockDepths.Pop();
+            return true;
+        }
+
         while(NextToken())
         {
             switch (token.Type)
             {
                 case TokenType.StoredProgramStart:
-                    inStoredProgram = true;
-                    lastStoredTerminatorEnd = -1;
+                case TokenType.WithProgramStart:
+                case TokenType.LocalRoutineStart when !bufferUntilDelimiter && blockDepth > 0 && inDeclareBlock:
+                    // Local routine endings cannot delimit their enclosing anonymous unit.
+                    // Keep complete units until a script separator, including WITH PL/SQL declarations.
+                    bufferUntilDelimiter = true;
+                    lastProgramTerminatorEnd = -1;
+                    caseBlockDepths.Clear();
                     break;
                 // Roundhouse's extra ; follows an actual terminator, not one inside a comment/literal.
-                case TokenType.StandaloneSemicolon when inStoredProgram && lastStoredTerminatorEnd >= 0 &&
-                                                          TriviaOnlyPattern().IsMatch(sql[lastStoredTerminatorEnd..token.Index]):
+                case TokenType.StandaloneSemicolon when bufferUntilDelimiter && lastProgramTerminatorEnd >= 0 &&
+                                                          TriviaOnlyPattern().IsMatch(sql[lastProgramTerminatorEnd..token.Index]):
                     yield return sql[cutIndex..token.Index];
                     cutIndex = token.Index + token.Length;
-                    inStoredProgram = false;
+                    bufferUntilDelimiter = false;
                     blockDepth = 0;
+                    caseBlockDepths.Clear();
                     inDeclareBlock = false;
                     break;
-                case TokenType.BlockEnd or TokenType.Semicolon or TokenType.StandaloneSemicolon when inStoredProgram:
-                    lastStoredTerminatorEnd = token.Index + token.Length;
+                case TokenType.BlockEnd or TokenType.Semicolon or TokenType.StandaloneSemicolon when bufferUntilDelimiter:
+                    lastProgramTerminatorEnd = token.Index + token.Length;
                     break;
-                case TokenType.BlockStart or TokenType.DeclareBlockStart when inStoredProgram:
+                case TokenType.BlockStart or TokenType.DeclareBlockStart or
+                     TokenType.LocalRoutineStart or TokenType.CaseStart or TokenType.EndKeyword when bufferUntilDelimiter:
+                    break;
+                case TokenType.CaseStart:
+                    caseBlockDepths.Push(blockDepth);
+                    break;
+                case TokenType.EndKeyword:
+                    TryEndCase();
                     break;
                 case TokenType.DeclareBlockStart:
                     blockDepth++;
@@ -162,6 +207,12 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     break;
 
                 case TokenType.BlockEnd:
+                    if (TryEndCase() && blockDepth > 0)
+                    {
+                        // This semicolon terminates a CASE expression inside PL/SQL.
+                        break;
+                    }
+
                     if (blockDepth == 0)
                     {
                         // END can also close a SQL CASE expression. Keep END, but not its SQL terminator.
@@ -237,8 +288,9 @@ public partial class OracleStatementSplitter : IStatementSplitter
                 case TokenType.SQLPLUSEXECUTE:
                     yield return sql[cutIndex..token.Index];
                     cutIndex = token.Index + token.Length;
-                    inStoredProgram = false;
+                    bufferUntilDelimiter = false;
                     blockDepth = 0;
+                    caseBlockDepths.Clear();
                     inDeclareBlock = false;
                     break;
             }
