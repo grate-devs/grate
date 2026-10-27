@@ -143,7 +143,7 @@ GO
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
             Assert.Single(result);
-            Assert.Equal(Words_to_check.Trim(), result[0].Trim());
+            Assert.Equal(sql_to_match, result.Single());
         }
 
         [Fact]
@@ -191,7 +191,7 @@ GO
             string sql_to_match = Words_to_check + @" GO " + Words_to_check;
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
-            Assert.Equal([Words_to_check + " ", " " + Words_to_check], result);
+            Assert.Equal([sql_to_match], result);
         }
 
         [Fact]
@@ -201,7 +201,7 @@ GO
                                   " GO BOB" + Symbols_to_check;
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
-            Assert.Equal(2, result.Count);
+            Assert.Equal([sql_to_match], result);
         }
 
         [Fact]
@@ -231,7 +231,7 @@ go";
             string sql_to_match = "jalla GO;";
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
-            Assert.Equal(["jalla ", ";" ], result);
+            Assert.Equal([sql_to_match], result);
         }
 
     }
@@ -520,6 +520,59 @@ GO
     public class Split
     {
         private readonly SqlServerStatementSplitter _splitter = new();
+
+        [Theory]
+        [InlineData("SELECT [go] FROM [settings];")]
+        [InlineData("SELECT \"go\" FROM settings;")]
+        [InlineData("SELECT [escaped]]go] FROM [settings];")]
+        [InlineData("SELECT \"escaped\"\"go\" FROM settings;")]
+        [InlineData("SELECT [-- /* ' \" go] FROM [settings];")]
+        [InlineData("SELECT \"-- /* ' [ go\" FROM settings;")]
+        [InlineData("SELECT [first\ngo\nlast] FROM [settings];")]
+        [InlineData("SELECT \"first\ngo\nlast\" FROM settings;")]
+        [InlineData("SELECT [first]]\ngo\nlast] FROM [settings];")]
+        [InlineData("SELECT \"first\"\"\ngo\nlast\" FROM settings;")]
+        public void preserves_quoted_identifiers(string sql)
+        {
+            Assert.Equal([sql], _splitter.Split(sql));
+        }
+
+        [Theory]
+        [InlineData("SELECT go FROM settings;")]
+        [InlineData("SELECT @go;")]
+        [InlineData("SELECT #go;")]
+        [InlineData("GO;")]
+        [InlineData("GO 2")]
+        [InlineData("GO /* comment */ SELECT 1;")]
+        [InlineData("SELECT 1; /* comment */ GO")]
+        public void preserves_go_that_is_not_a_separator_line(string sql)
+        {
+            Assert.Equal([sql], _splitter.Split(sql));
+        }
+
+        [Theory]
+        [InlineData("SELECT [go] FROM [settings];")]
+        [InlineData("SELECT \"go\" FROM settings;")]
+        [InlineData("SELECT [first]]\ngo\nlast];")]
+        [InlineData("SELECT \"first\"\"\ngo\nlast\";")]
+        [InlineData("SELECT 'first''\ngo\nlast';")]
+        [InlineData("/* outer /* nested */\nGO\n*/ SELECT 1;")]
+        [InlineData("-- [ \" ' /* GO\nSELECT 1;")]
+        public void splits_real_separators_after_protected_text(string sql)
+        {
+            Assert.Equal([sql + "\n", "\nSELECT 2;"], _splitter.Split(sql + "\nGO\nSELECT 2;"));
+        }
+
+        [Theory]
+        [InlineData("\n")]
+        [InlineData("\r\n")]
+        [InlineData("\r")]
+        public void splits_separator_lines_with_whitespace_and_comments(string newline)
+        {
+            var first = "SELECT 1;" + newline + " /* outer /* nested */ */ ";
+            var second = " /* comment */ -- ignored [ \" ' GO" + newline + "SELECT 2;";
+            Assert.Equal([first, second], _splitter.Split(first + "gO" + second));
+        }
 
         [Fact]
         public void Splits_and_removes_GO_statements()
