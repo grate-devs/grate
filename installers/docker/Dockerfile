@@ -5,7 +5,7 @@ ARG TARGETFRAMEWORK=net10.0
 ARG RUNTIME
 ARG VERSION=1.0.0
 WORKDIR /app
-COPY *.props ./
+COPY global.json *.props ./
 COPY *.ruleset ./
 COPY src/ ./src/
 COPY docs/skills/use-grate/ ./docs/skills/use-grate/

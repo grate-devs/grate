@@ -139,7 +139,7 @@ jobs:
          dotnet-version: |
           8.0.x
           9.0.x
-          10.0.x 
+          10.0.x
 
     - name: Build Test DLLs ${{ matrix.arch }}
       run: |
@@ -565,7 +565,7 @@ jobs:
       - name: Setup .NET # Required to execute ReportGenerator
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
         with:
-          dotnet-version: 10.x
+          dotnet-version: 10.0.x
 
       - name: Create HTML test report
         uses: danielpalme/ReportGenerator-GitHub-Action@v5
