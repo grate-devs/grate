@@ -338,36 +338,34 @@ ORDER BY id DESC", 1)}
 
     public virtual async Task<long> VersionTheDatabase(string newVersion)
     {
+        if (await IsInitialBootstrap())
+        {
+            // The bootstrap scripts create their own tracking tables. Their deferred history
+            // belongs to the first version inserted by the following internal migration.
+            return 1;
+        }
+
+        var includeStatus = await VersionTableSupportsStatus();
         var sql = Parameterize($@"
 INSERT INTO {VersionTable}
-(repository_path, version, entry_date, modified_date, entered_by, status)
-VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy, @status)
+(repository_path, version, entry_date, modified_date, entered_by{(includeStatus ? ", status" : "")})
+VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(includeStatus ? ", @status" : "")})
 
 {_syntax.ReturnId}
 ");
         var repositoryPath = Config?.RepositoryPath;
 
-        long versionId;
-
-        try
-        {
-            versionId = (long) await ActiveConnection.ExecuteScalarAsync<int>(
-                sql,
-                new
-                {
-                    repositoryPath,
-                    newVersion,
-                    entryDate = DateTime.UtcNow,
-                    modifiedDate = DateTime.UtcNow,
-                    enteredBy = GetUserName(),
-                    status = MigrationStatus.InProgress
-                });
-        } 
-        catch (Exception ex)
-        {
-            Logger.LogDebug(ex, "Could not find version table in {DbName} database. Using default version Id", DatabaseName);
-            versionId = 1;
-        }
+        var versionId = (long) await ActiveConnection.ExecuteScalarAsync<int>(
+            sql,
+            new
+            {
+                repositoryPath,
+                newVersion,
+                entryDate = DateTime.UtcNow,
+                modifiedDate = DateTime.UtcNow,
+                enteredBy = GetUserName(),
+                status = MigrationStatus.InProgress
+            });
 
         if (repositoryPath != null)
         {
@@ -381,6 +379,24 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy, @sta
         return versionId;
     }
 
+    protected async Task<bool> IsInitialBootstrap() =>
+        Config?.Environment == GrateEnvironment.InternalBootstrap && !await VersionTableExists();
+
+    protected async Task<bool> VersionTableSupportsStatus()
+    {
+        if (Config?.Environment != GrateEnvironment.InternalBootstrap
+            && Config?.Environment != GrateEnvironment.Internal)
+        {
+            return true;
+        }
+
+        // Older internal tracking tables may need to be upgraded by internal migrations.
+        // Inspect the schema instead of treating an arbitrary database failure as compatibility.
+        using var reader = await ActiveConnection.ExecuteReaderAsync($"SELECT * FROM {VersionTable} WHERE 1 = 0");
+        return Enumerable.Range(0, reader.FieldCount)
+            .Any(index => string.Equals(reader.GetName(index), "status", StringComparison.OrdinalIgnoreCase));
+    }
+
     protected string GetUserName()
     {
         return ClaimsPrincipal.Current?.Identity?.Name ?? Environment.UserName;
@@ -388,6 +404,11 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy, @sta
 
     public virtual async Task ChangeVersionStatus(string status, long versionId)
     {
+        if (!await VersionTableSupportsStatus())
+        {
+            return;
+        }
+
         var updateSql = Parameterize($@"
             UPDATE {VersionTable}
             SET status = @status

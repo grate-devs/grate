@@ -218,26 +218,16 @@ internal record GrateMigrator : IGrateMigrator
 
         if (!config.DryRun)
         {
-            // TODO: Clean up the try - catch here - it's only used in initial bootstrapping if the
-            // TODO: version table _does_ exist, but it doesn't have the version table.
-            // TODO: This will be just once for each of legacy RoundhousE databases migrated to grate.
-            try
+            //If we get here this means no exceptions are thrown above, so we can conclude the migration was successful!
+            if (anySqlRun || config.Baseline)
             {
-                //If we get here this means no exceptions are thrown above, so we can conclude the migration was successful!
-                if (anySqlRun || config.Baseline)
-                {
-                    await DbMigrator.Database.ChangeVersionStatus(MigrationStatus.Finished, versionId);
-                }
-                else
-                {
-                    // Delete the version record if no actual migration was performed, to avoid having a lot of "no-op"
-                    // migrations if grate is run a lot without any changes
-                    await DbMigrator.Database.DeleteVersionRecord(versionId);
-                }
+                await DbMigrator.Database.ChangeVersionStatus(MigrationStatus.Finished, versionId);
             }
-            catch (DbException)
+            else
             {
-                // Ignore!
+                // Delete the version record if no actual migration was performed, to avoid having a lot of "no-op"
+                // migrations if grate is run a lot without any changes
+                await DbMigrator.Database.DeleteVersionRecord(versionId);
             }
         }
         

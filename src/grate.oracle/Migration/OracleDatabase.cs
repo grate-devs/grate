@@ -95,10 +95,16 @@ WHERE  version_row_number <= 1
 
     public override async Task<long> VersionTheDatabase(string newVersion)
     {
+        if (await IsInitialBootstrap())
+        {
+            return 1;
+        }
+
+        var includeStatus = await VersionTableSupportsStatus();
         var sql = (string)$@"
 INSERT INTO {VersionTable}
-(repository_path, version, entry_date, modified_date, entered_by, status)
-VALUES(:repositoryPath, :newVersion, :entryDate, :modifiedDate, :enteredBy, :status)
+(repository_path, version, entry_date, modified_date, entered_by{(includeStatus ? ", status" : "")})
+VALUES(:repositoryPath, :newVersion, :entryDate, :modifiedDate, :enteredBy{(includeStatus ? ", :status" : "")})
 RETURNING id into :id
 ";
         var repositoryPath = Config?.RepositoryPath;
@@ -109,24 +115,17 @@ RETURNING id into :id
             newVersion,
             entryDate = DateTime.UtcNow,
             modifiedDate = DateTime.UtcNow,
-            enteredBy = GetUserName(),
-            status = MigrationStatus.InProgress
+            enteredBy = GetUserName()
         };
         var dynParams = new DynamicParameters(parameters);
+        if (includeStatus)
+        {
+            dynParams.Add("status", MigrationStatus.InProgress);
+        }
         dynParams.Add(":id", dbType: DbType.Int64, direction: ParameterDirection.Output);
 
-        long versionId;
-
-        try
-        {
-            await ActiveConnection.ExecuteAsync(sql, dynParams);
-            versionId = dynParams.Get<long>(":id");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogDebug(ex, "Could not find version table in {DbName} database. Using default version Id", DatabaseName);
-            versionId = 1;
-        }
+        await ActiveConnection.ExecuteAsync(sql, dynParams);
+        var versionId = dynParams.Get<long>(":id");
 
         if (repositoryPath != null)
         {
