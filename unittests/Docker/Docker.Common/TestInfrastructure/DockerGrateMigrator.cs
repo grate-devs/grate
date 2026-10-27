@@ -24,6 +24,8 @@ public record DockerGrateMigrator(
 
     public async Task Migrate()
     {
+        await LocalDockerImage.Ensure(DockerImage, Logger, Xunit.TestContext.Current.CancellationToken);
+
         // Sqlite doesn't like to be extracted to a tmpfs mount, so we need to use a bind mount to a temporary folder
         // if not, we get an error like this:
         //  /home/app/.net/grate/fdcA3gxdjBiIcVt0mGoBJ5IgxSbD0kE=/libe_sqlite3.so: failed to map segment from shared object

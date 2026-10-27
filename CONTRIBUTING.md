@@ -42,17 +42,18 @@ as many modules concurrently as there are logical processors. The existing
 `unittests/UnitTests.slnf` also includes these integration projects.
 
 Local Docker integration tests automatically build `grate-local:tests` from your
-checkout during the normal `dotnet test` build phase, before any test modules
-start. All Docker projects and target frameworks share one image build; Docker
-reuses cached layers when inputs are unchanged. No image is pushed:
+checkout immediately before the first migration that needs the application
+container. Building projects, listing tests, or filtering out these tests does
+not run `docker build`. The selected Docker projects and target frameworks share
+one image build per normal .NET build; Docker reuses cached layers when inputs
+are unchanged. No image is pushed:
 
 ```sh
 dotnet test --framework net10.0 --max-parallel-test-modules 1
 ```
 
-CI, ordinary `dotnet build`, and an explicit image other than `grate-local:tests`
-do not trigger this build. Set `GrateBuildLocalDockerImage=false` to disable it
-explicitly, for example when selecting an image with `dotnet test -e`.
+CI and an explicit image other than `grate-local:tests` do not trigger this
+build. Set `GrateBuildLocalDockerImage=false` to disable it explicitly.
 
 The Docker test projects copy `unittests/Docker/testconfig.local.json` beside their
 executables as MTP configuration. It sets
@@ -74,8 +75,10 @@ build and pass a matching application image to them.
 For a focused Docker check, add, for example,
 `--project unittests/Docker/Docker.Sqlite`.
 
-`--no-build`, `--test-modules`, and direct test-executable runs bypass the build
-phase, so they require an image that is already built. To prepare it explicitly:
+`--no-build`, `--test-modules`, and direct test-executable runs reuse the last
+build plan. If it has already built the image, they do not rebuild it. Run without
+`--no-build` after changing application sources to prepare a fresh build plan.
+When automatic image building is disabled, prepare it explicitly:
 
 ```sh
 docker build -f installers/docker/Dockerfile -t grate-local:tests .

@@ -5,14 +5,21 @@
     <GrateBuildLocalDockerImage Condition="'$(GrateBuildLocalDockerImage)' == '' and '$(GrateTestEnvironment)' == 'local' and ('$(GrateTestConfig__ApplicationDockerImage)' == '' or '$(GrateTestConfig__ApplicationDockerImage)' == 'grate-local:tests')">true</GrateBuildLocalDockerImage>
     <GrateDockerExecutable Condition="'$(GrateDockerExecutable)' == ''">docker</GrateDockerExecutable>
   </PropertyGroup>
-  <!-- MTP builds the complete solution before starting any test modules. Calling
-       one project with the same globals shares its target across projects/TFMs. -->
-  <Target Name="PrepareLocalDockerImage" BeforeTargets="_MTPBuild"
-          Condition="'$(GrateBuildLocalDockerImage)' == 'true' and '$(GrateTestEnvironment)' == 'local' and '$(DesignTimeBuild)' != 'true'">
+  <!-- Only write a shared build plan here. Test filters are applied at runtime,
+       so Docker must not run until a selected test actually needs the image. -->
+  <Target Name="PrepareLocalDockerImage" BeforeTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DesignTimeBuild)' != 'true'">
     <MSBuild Projects="$(MSBuildThisFileDirectory)BuildLocalImage.proj"
-             Targets="Build"
+             Targets="Prepare"
+             Condition="'$(GrateBuildLocalDockerImage)' == 'true' and '$(GrateTestEnvironment)' == 'local'"
              RemoveProperties="TargetFramework;TargetFrameworks;RuntimeIdentifier;RuntimeIdentifiers;SelfContained;OutputPath;OutDir;IntermediateOutputPath;BaseIntermediateOutputPath"
-             Properties="GrateDockerExecutable=$(GrateDockerExecutable)" />
+             Properties="GrateDockerExecutable=$(GrateDockerExecutable)">
+      <Output TaskParameter="TargetOutputs" ItemName="_LocalDockerImagePlan" />
+    </MSBuild>
+    <Copy SourceFiles="@(_LocalDockerImagePlan)" DestinationFiles="$(TargetDir)$(AssemblyName).docker-build"
+          Condition="'@(_LocalDockerImagePlan)' != ''" />
+    <Delete Files="$(TargetDir)$(AssemblyName).docker-build"
+            Condition="'@(_LocalDockerImagePlan)' == ''" />
   </Target>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)testconfig.$(GrateTestEnvironment).json"
