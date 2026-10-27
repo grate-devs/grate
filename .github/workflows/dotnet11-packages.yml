@@ -9,6 +9,7 @@ on:
       - 'global.json'
       - 'scripts/verify-dotnet11-packages.ps1'
       - '.github/workflows/dotnet11-packages.yml'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 permissions:
@@ -101,7 +102,7 @@ jobs:
           work="${RUNNER_TEMP}/grate-docker-smoke"
           mkdir -p "$work/sql/up" "$work/output" "$work/skill"
           echo 'CREATE TABLE package_smoke (id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES (1);' > "$work/sql/up/001_create.sql"
-          docker run --rm --entrypoint /app/grate grate-dotnet11:test --version
+          docker run --rm --entrypoint /app/grate grate-dotnet11:test --help
           for _ in 1 2; do
             docker run --rm -e LANG=nb_NO.UTF-8 -v "$work:/smoke" --entrypoint /app/grate grate-dotnet11:test \
               --databasetype sqlite --connectionstring 'Data Source=/smoke/smoke.db' --files /smoke/sql --output /smoke/output --silent

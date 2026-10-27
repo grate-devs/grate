@@ -17,7 +17,7 @@ function Test-Migration([string]$Executable, [string]$Directory) {
     New-Item -ItemType Directory -Force "$Directory/sql/up" | Out-Null
     'CREATE TABLE package_smoke (id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES (1);' |
         Set-Content "$Directory/sql/up/001_create.sql"
-    & $Executable --version
+    & $Executable --help
     # The second invocation must skip the already-run CREATE TABLE and INSERT.
     # Re-execution would fail with a duplicate table/primary key.
     foreach ($attempt in 1..2) {
