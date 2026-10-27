@@ -80,10 +80,8 @@ public partial class OracleStatementSplitter : IStatementSplitter
     [GeneratedRegex(@"\S")]
     private static partial Regex SignificantTextPattern();
 
-    // Roundhouse's extra ; line follows an already-terminated PL/SQL statement.
-    // A semicolon on its own line can also terminate an ordinary statement inside a routine.
-    [GeneratedRegex(@";(?:\s|--[^\r\n]*(?:\r?\n|$)|/\*[\s\S]*?\*/)*\z")]
-    private static partial Regex TerminatedStatementPattern();
+    [GeneratedRegex(@"\A(?:\s|--[^\r\n]*(?:\r?\n|$)|/\*[\s\S]*?\*/)*\z")]
+    private static partial Regex TriviaOnlyPattern();
 
     public IEnumerable<string> Split(string statement) =>
         BreakIntoBatches(statement).Where(batch => SignificantTextPattern().IsMatch(batch));
@@ -113,6 +111,7 @@ public partial class OracleStatementSplitter : IStatementSplitter
         var blockDepth = 0;
         var inDeclareBlock = false;
         var inStoredProgram = false;
+        var lastStoredTerminatorEnd = -1;
         var token = default(Token);
 
         bool NextToken()
@@ -131,17 +130,21 @@ public partial class OracleStatementSplitter : IStatementSplitter
             {
                 case TokenType.StoredProgramStart:
                     inStoredProgram = true;
+                    lastStoredTerminatorEnd = -1;
                     break;
-                case TokenType.StandaloneSemicolon when inStoredProgram &&
-                                                          TerminatedStatementPattern().IsMatch(sql[..token.Index]):
+                // Roundhouse's extra ; follows an actual terminator, not one inside a comment/literal.
+                case TokenType.StandaloneSemicolon when inStoredProgram && lastStoredTerminatorEnd >= 0 &&
+                                                          TriviaOnlyPattern().IsMatch(sql[lastStoredTerminatorEnd..token.Index]):
                     yield return sql[cutIndex..token.Index];
                     cutIndex = token.Index + token.Length;
                     inStoredProgram = false;
                     blockDepth = 0;
                     inDeclareBlock = false;
                     break;
-                case TokenType.BlockStart or TokenType.DeclareBlockStart or TokenType.BlockEnd or
-                     TokenType.Semicolon or TokenType.StandaloneSemicolon when inStoredProgram:
+                case TokenType.BlockEnd or TokenType.Semicolon or TokenType.StandaloneSemicolon when inStoredProgram:
+                    lastStoredTerminatorEnd = token.Index + token.Length;
+                    break;
+                case TokenType.BlockStart or TokenType.DeclareBlockStart when inStoredProgram:
                     break;
                 case TokenType.DeclareBlockStart:
                     blockDepth++;

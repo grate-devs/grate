@@ -217,6 +217,23 @@ public sealed class OraclePackageStatementSplitter_
         Assert.Equal([program], _splitter.Split($"{program}\n;\n").Select(batch => batch.Trim()));
     }
 
+    [Theory]
+    [InlineData("-- comment ending ;")]
+    [InlineData("/* comment containing ; */")]
+    public void semicolons_inside_comments_do_not_turn_statement_terminator_into_separator(string comment)
+    {
+        var program = $"""
+            CREATE OR REPLACE PROCEDURE p AS
+                value NUMBER;
+            BEGIN
+                NULL {comment}
+                ;
+            END p;
+            """;
+
+        Assert.Equal([program], _splitter.Split($"{program}\n;\n").Select(batch => batch.Trim()));
+    }
+
     [Fact]
     public void roundhouse_separator_can_follow_comments_after_completed_program()
     {
