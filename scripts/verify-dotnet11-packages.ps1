@@ -84,15 +84,60 @@ foreach ($name in @($libraryNames) + @('grate')) {
     }
 }
 
-# Restore and compile a consumer of all six local packages, outside repository
-# props, so this exercises NuGet asset selection for net11.0.
+# Restore a consumer of all six local packages outside repository props. Execute
+# the SQLite library API to check packaged bootstrap resources and migration history.
 $consumer = "$OutputDirectory/consumer"
 New-Item -ItemType Directory -Force $consumer | Out-Null
 $references = ($libraryNames | ForEach-Object { "<PackageReference Include='$_' Version='$version' />" }) -join "`n"
 "<Project Sdk='Microsoft.NET.Sdk'><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework></PropertyGroup><ItemGroup>$references</ItemGroup></Project>" |
     Set-Content "$consumer/consumer.csproj"
-'global::System.Console.WriteLine(typeof(grate.Configuration.GrateConfiguration).Assembly.FullName);' | Set-Content "$consumer/Program.cs"
+@'
+using System;
+using System.IO;
+using grate.Configuration;
+using grate.DependencyInjection;
+using grate.Migration;
+using grate.sqlite.DependencyInjection;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+
+var root = Path.GetFullPath(args[0]);
+var scripts = Path.Combine(root, "sql");
+Directory.CreateDirectory(Path.Combine(scripts, "up"));
+File.WriteAllText(Path.Combine(scripts, "up", "001_create.sql"),
+    "CREATE TABLE package_consumer (id INTEGER PRIMARY KEY); INSERT INTO package_consumer VALUES (1);");
+var connectionString = new SqliteConnectionStringBuilder
+    { DataSource = Path.Combine(root, "consumer.db"), Pooling = false }.ToString();
+for (var attempt = 0; attempt < 2; attempt++)
+{
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddGrate(GrateConfiguration.Default with { NonInteractive = true },
+        builder => builder.WithConnectionString(connectionString)
+        .WithSqlFilesDirectory(scripts).WithOutputFolder(Path.Combine(root, "output"))
+        .WithVersion("1.0.0")).UseSqlite();
+    await using var provider = services.BuildServiceProvider();
+    await provider.GetRequiredService<IGrateMigrator>().Migrate();
+}
+using var connection = new SqliteConnection(connectionString);
+connection.Open();
+Check("SELECT COUNT(*) FROM package_consumer WHERE id = 1", 1);
+Check("SELECT COUNT(*) FROM package_consumer", 1);
+Check("SELECT COUNT(*) FROM grate_ScriptsRun", 1);
+Check("SELECT COUNT(*) FROM grate_ScriptsRun WHERE script_name = '001_create.sql' AND text_hash <> '' AND one_time_script = 1", 1);
+Check("SELECT COUNT(*) FROM grate_ScriptsRunErrors", 0);
+Console.WriteLine("Packed SQLite library created schema, data and history exactly once.");
+
+void Check(string sql, long expected)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    var actual = Convert.ToInt64(command.ExecuteScalar());
+    if (actual != expected) throw new InvalidOperationException($"{sql}: expected {expected}, got {actual}.");
+}
+'@ | Set-Content "$consumer/Program.cs"
 dotnet build "$consumer/consumer.csproj" -c Release --source $packages --source https://api.nuget.org/v3/index.json
+dotnet "$consumer/bin/Release/net11.0/consumer.dll" "$consumer/smoke"
 
 $tool = "$OutputDirectory/tool"
 dotnet tool install grate --tool-path $tool --version $version --add-source $packages

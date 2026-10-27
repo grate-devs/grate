@@ -64,6 +64,10 @@ jobs:
         env:
           RUN_SMOKE_TEST: ${{ matrix.smoke }}
         run: ./scripts/verify-dotnet11-packages.ps1 -Kind Standalone -RuntimeIdentifier '${{ matrix.rid }}' -OutputDirectory "${{ runner.temp }}/dotnet11-cli" -RunSmokeTest:($env:RUN_SMOKE_TEST -eq 'true')
+      - name: Check per-user MSI authoring regressions
+        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: ./installers/msi/Test-InstallerAuthoring.Tests.ps1
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
