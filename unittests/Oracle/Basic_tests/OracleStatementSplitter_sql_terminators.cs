@@ -60,4 +60,15 @@ public class OracleStatementSplitter_sql_terminators
 
         Assert.Equal([statement], _splitter.Split(statement + ";"));
     }
+
+    [Fact]
+    public void Removes_sql_case_terminator_without_changing_the_following_plsql_block()
+    {
+        const string statement = "SELECT CASE WHEN 1 = 1 THEN 1 ELSE 0 END";
+        const string block = "\nBEGIN\n    NULL;\nEND;";
+
+        var batches = _splitter.Split(statement + ";" + block).ToArray();
+
+        Assert.Equal([statement, block], batches);
+    }
 }

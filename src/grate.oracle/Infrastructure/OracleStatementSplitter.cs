@@ -122,6 +122,14 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     break;
 
                 case TokenType.BlockEnd:
+                    if (blockDepth == 0)
+                    {
+                        // END can also close a SQL CASE expression. Keep END, but not its SQL terminator.
+                        yield return sql[cutIndex..(token.Index + token.Length - 1)];
+                        cutIndex = token.Index + token.Length;
+                        break;
+                    }
+
                     blockDepth--;
                     if (blockDepth == 0)
                     {
