@@ -1,12 +1,9 @@
-# This is alight weight build and test, suitable for rapid checks of commits on feature branches etc.
+# Build, security analysis, and the full database/runtime test matrix for PRs.
 name: CI
 
-on: 
-  push: # Trigger on pushes to feature branches for safety before a PR
-    branches-ignore:
-      - main # don't run on main (build.yml handles that)
-    paths-ignore:
-      - docs/
+on:
+  # PR updates already include branch pushes. Running both events doubles the
+  # database suites and CodeQL work; use workflow_dispatch for pre-PR checks.
   pull_request:
     branches:
       - main
@@ -14,6 +11,12 @@ on:
       - docs/
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+# Replace obsolete test runs without letting a manual branch run cancel a PR's
+# merge-ref validation. Publishing on main is handled by build.yml separately.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-code:
@@ -90,9 +93,10 @@ jobs:
       run: |
         dotnet test \
         --project unittests/${{ matrix.category }} \
+        --results-directory /tmp/test-results/${{ matrix.category }} \
+        --report-xunit-trx \
         --coverage \
-        --coverage-output-format xml \
-        --coverage-output /tmp/test-results/${{ matrix.category }}.xml
+        --coverage-output-format xml
       env:
         LogLevel: Warning
         TZ: UTC
@@ -103,7 +107,7 @@ jobs:
       with:
         name: "${{ matrix.category }} XML test results"
         path: |
-          /tmp/test-results/${{ matrix.category }}.xml
+          /tmp/test-results/${{ matrix.category }}/
         retention-days: 1
 
 

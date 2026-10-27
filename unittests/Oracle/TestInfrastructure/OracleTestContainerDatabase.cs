@@ -1,4 +1,5 @@
-﻿using DotNet.Testcontainers.Containers;
+﻿using System.Text;
+using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
 using Microsoft.Extensions.Logging;
 using Testcontainers.Oracle;
@@ -18,12 +19,26 @@ public record OracleTestContainerDatabase(
 
     protected override IContainer InitializeTestContainer()
     {
+        // Database creation probes log in as missing users. Oracle delays every failed login
+        // by one second; disable that delay only in these disposable test databases.
+        // This undocumented parameter is static, so the test container must restart once.
+        const string configureTestDatabase = """
+            WHENEVER SQLERROR EXIT SQL.SQLCODE
+            ALTER SYSTEM SET "_sys_logon_delay"=0 SCOPE=SPFILE;
+            SHUTDOWN IMMEDIATE;
+            STARTUP;
+            ALTER PLUGGABLE DATABASE ALL OPEN;
+            ALTER SYSTEM REGISTER;
+            """;
+
         return new OracleBuilder(DockerImage)
             .WithEnvironment("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
             .WithEnvironment("ORACLE_PDB", "FREEPDB1")
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)
             .WithLogger(Logger)
+            .WithResourceMapping(Encoding.UTF8.GetBytes(configureTestDatabase),
+                "/container-entrypoint-startdb.d/01-test-logon-delay.sql")
             .Build();
     }
     
