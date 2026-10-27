@@ -22,7 +22,6 @@ internal record GrateMigrator : IGrateMigrator
         get => DbMigrator.Configuration;
         private init
         {
-            DbMigrator = (IDbMigrator) DbMigrator.Clone();
             DbMigrator.Configuration = value;
 
             _logger = _loggerFactory.CreateLogger(LogCategory);
@@ -35,7 +34,6 @@ internal record GrateMigrator : IGrateMigrator
         get => DbMigrator.Database;
         private init
         {
-            DbMigrator = (IDbMigrator) DbMigrator.Clone();
             DbMigrator.Database = value;
         }
     }
@@ -62,6 +60,14 @@ internal record GrateMigrator : IGrateMigrator
         DbMigrator = migrator;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger(LogCategory);
+    }
+
+    protected GrateMigrator(GrateMigrator original)
+    {
+        _loggerFactory = original._loggerFactory;
+        _logger = original._logger;
+        DbMigrator = (IDbMigrator)original.DbMigrator.Clone();
+        MigrationResult = new();
     }
 
     public async Task Migrate()
@@ -136,6 +142,11 @@ internal record GrateMigrator : IGrateMigrator
             // Start the transaction, if configured
             if (runInTransaction)
             {
+                // Setup and versioning run outside the transaction. Reopen the main connection
+                // inside the scope so providers enlist migration scripts in that transaction.
+                await dbMigrator.CloseConnection();
+                dbMigrator.SetDefaultConnectionActive();
+
                 // use command timeout as the max timeout and transaction scope timeout, if greater than current MaximumTimeout
                 var maxTimeout = TransactionManager.MaximumTimeout;
                 var transactionTimeout = config.CommandTimeout > 0
