@@ -67,7 +67,8 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await migrator.Migrate(); // shouldn't touch anything because of --dryrun
-        var addedTable = await migrator.GetDbMigrator().Database.VersionTableExists();
+        var database = migrator.GetDbMigrator().Database;
+        var addedTable = await database.DatabaseExists() && await database.VersionTableExists();
         Assert.False(addedTable); // we didn't even add the grate infrastructure
         
         //await Context.DropDatabase(db);
