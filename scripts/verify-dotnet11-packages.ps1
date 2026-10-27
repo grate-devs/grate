@@ -61,7 +61,7 @@ if ($Kind -eq 'Standalone') {
 }
 
 $packages = "$OutputDirectory/packages"
-$version = '0.0.0-ci.dotnet11'
+$version = '0.0.0-ci.dotnet11.' + [Guid]::NewGuid().ToString('N')
 $libraryNames = @('grate.core', 'grate.mariadb', 'grate.oracle', 'grate.postgresql', 'grate.sqlite', 'grate.sqlserver')
 foreach ($name in $libraryNames) {
     dotnet pack "src/$name/$name.csproj" -c Release --include-symbols -p:PackageVersion=$version -o $packages
