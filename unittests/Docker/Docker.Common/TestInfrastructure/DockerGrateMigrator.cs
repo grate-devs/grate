@@ -4,7 +4,6 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Networks;
 using grate.Commands;
 using grate.Configuration;
-using grate.Exceptions;
 using grate.Migration;
 using Microsoft.Extensions.Logging;
 using Dir = System.IO.Directory;
@@ -14,14 +13,14 @@ namespace Docker.Common.TestInfrastructure;
 public record DockerGrateMigrator(
     DatabaseType DatabaseType,
     ILogger<DockerGrateMigrator> Logger,
-    INetwork Network
+    INetwork Network,
+    string? ApplicationDockerImage = null
     )
     : IGrateMigrator
 {
     public DatabaseType DatabaseType { get; set; } = DatabaseType;
 
-    private static string DockerImage => "gratedevs/grate";
-    //private static string DockerImage => "grate";
+    internal string DockerImage => ApplicationDockerImage ?? "gratedevs/grate";
 
     public async Task Migrate()
     {
@@ -64,9 +63,6 @@ public record DockerGrateMigrator(
         // Needed when overriding the entrypoint, not the command
         dockerArguments.Insert(0, "./grate");
 
-        var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        var token = cancellationTokenSource.Token;
-
         var containerBuilder = new ContainerBuilder(DockerImage)
             .WithEntrypoint(dockerArguments.ToArray())
             .WithEnvironment("DOTNET_BUNDLE_EXTRACT_BASE_DIR", "/home/app")
@@ -82,49 +78,8 @@ public record DockerGrateMigrator(
             containerBuilder = containerBuilder.WithBindMount(bindMount.Key, bindMount.Value);
         }
 
-        await using var container = containerBuilder.Build();
-
-        try
-        {
-            try
-            {
-                await container.StartAsync(token);
-            }
-            catch (Exception e)
-            {
-                throw new MigrationFailed(e);
-            }
-            finally
-            {
-                var ct = new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token;
-                long? exitCode = null;
-                try
-                {
-                    exitCode = await container.GetExitCodeAsync(ct);
-                }
-                catch (Exception e)
-                {
-                    throw new MigrationFailed(e);
-                }
-                finally
-                {
-                    ct = new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token;
-                    var (output, error) = await container.GetLogsAsync(ct: ct);
-                    if (exitCode != 0)
-                    {
-                        throw new Exception($"grate failed with exit code {exitCode}.\nOutput:\n{output}\nError:\n{error}");
-                    }
-                }
-            }
-        }
-        // Try to just ignore if it times out, and see. If the assertions succeed afterwards, we really don't care
-        // that much.
-        //catch (TimeoutException) {}
-        //catch (OperationCanceledException) {}
-        catch (Exception e)
-        {
-            throw new MigrationFailed(e);
-        }
+        using var executionTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await DockerMigrationRunner.Run(containerBuilder.Build(), Logger, executionTimeout.Token);
     }
 
     public GrateConfiguration Configuration { get; private init; } = null!;

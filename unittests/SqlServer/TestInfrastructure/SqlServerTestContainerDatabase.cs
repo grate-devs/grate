@@ -25,6 +25,8 @@ public record SqlServerTestContainerDatabase(
             .WithEnvironment("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)
+            .WithNetwork(Network)
+            .WithNetworkAliases(NetworkAlias)
             .WithEnvironment("MSSQL_COLLATION", "Danish_Norwegian_CI_AS")
             // SELECT 1 succeeds before MSSQL_COLLATION finishes reindexing the
             // system databases. Test connections can prevent its exclusive lock

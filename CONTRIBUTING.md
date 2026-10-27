@@ -27,8 +27,51 @@ git clone https://github.com/grate-devs/grate.git
 
 ```
 > cd grate
-> dotnet test --framework net10.0
+> dotnet test --solution unittests/CoreTests.slnf --framework net10.0 --max-parallel-test-modules 1
 ```
+
+This runs the same seven core/database test projects as CI. Run one module at a
+time on a development machine: database containers share Docker Desktop's memory,
+and running several SQL Server or Oracle instances together can exhaust it.
+Each CI database job has a separate runner. Omit `--framework net10.0` to test all
+three supported frameworks, provided their runtimes are installed.
+
+Running `dotnet test` from the repository root includes 17 test projects across
+three frameworks, including command-line and Docker integration tests. MTP can run
+as many modules concurrently as there are logical processors. The existing
+`unittests/UnitTests.slnf` also includes these integration projects.
+
+The Docker integration tests require an application image built from your checkout.
+Build it locally before running them; no image is pushed by this command:
+
+```sh
+docker build -f installers/docker/Dockerfile -t grate-local:tests .
+dotnet test --framework net10.0 --max-parallel-test-modules 1
+```
+
+On x64/AMD64 hosts, add `--build-arg RUNTIME=linux-musl-x64` to the image build.
+
+The Docker test projects copy `unittests/Docker/testconfig.local.json` beside their
+executables as MTP configuration. It sets
+`GrateTestConfig__DefaultApplicationDockerImage=grate-local:tests`. An explicit
+`GrateTestConfig__ApplicationDockerImage` takes precedence, so callers can still
+select another image without editing the profile. Local runs need neither
+variable on the command line. The image must still be built before the tests;
+`dotnet test` does not build it automatically.
+
+Builds with `CI=true` or `ContinuousIntegrationBuild=true` select the separate
+`testconfig.ci.json`, which does not set a local image. `GrateTestEnvironment`
+can explicitly select `local` or `ci` during a build. `--no-build` uses whichever
+configuration was copied by the preceding build.
+
+The application-image setting applies only to Docker integration tests.
+`GrateTestConfig__DockerImage` independently selects the database image. The CI
+integration workflow currently disables the Docker tests because it does not
+build and pass a matching application image to them.
+
+For a focused Docker check, add, for example,
+`--project unittests/Docker/Docker.Sqlite`. Rebuild the local image after changing
+the application source so that the container runs the code from your checkout.
 
 ## Build a self-contained executable (if you want)
 

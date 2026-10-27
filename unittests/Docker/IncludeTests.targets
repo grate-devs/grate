@@ -1,4 +1,15 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" >
+  <PropertyGroup>
+    <GrateTestEnvironment Condition="'$(GrateTestEnvironment)' == '' and ('$(CI)' == 'true' or '$(ContinuousIntegrationBuild)' == 'true')">ci</GrateTestEnvironment>
+    <GrateTestEnvironment Condition="'$(GrateTestEnvironment)' == ''">local</GrateTestEnvironment>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)testconfig.$(GrateTestEnvironment).json"
+          Link="$(AssemblyName).testconfig.json"
+          TargetPath="$(AssemblyName).testconfig.json"
+          CopyToOutputDirectory="Always"
+          CopyToPublishDirectory="Always" />
+  </ItemGroup>
   <ItemGroup>
     <Compile 
       Include="$(ProjectToIncludeTestsFrom)/Running_MigrationScripts/**/*.cs"
