@@ -66,6 +66,15 @@ grate is available on [winget](https://docs.microsoft.com/en-us/windows/package-
 
 grate is available as a Homebrew cask. Simply `brew install --cask erikbra/cask/grate` for awesomeness!
 
+## Agent skill
+
+New grate CLI builds bundle the `use-grate` coding-agent skill in every CLI
+distribution. After installing, run `grate skills install --global` for your user,
+or `dotnet tool run grate -- skills install --local` for a repository-local .NET
+tool. See [Agent skill](AgentSkill.md) for locations, updates, Docker and SDK-free
+installation. This is an explicit step; installing grate alone does not change
+your agent configuration.
+
 ## Notes
 
 Plans are afoot for more OS specific package managers, watch this space.
