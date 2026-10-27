@@ -41,23 +41,25 @@ three frameworks, including command-line and Docker integration tests. MTP can r
 as many modules concurrently as there are logical processors. The existing
 `unittests/UnitTests.slnf` also includes these integration projects.
 
-The Docker integration tests require an application image built from your checkout.
-Build it locally before running them; no image is pushed by this command:
+Local Docker integration tests automatically build `grate-local:tests` from your
+checkout during the normal `dotnet test` build phase, before any test modules
+start. All Docker projects and target frameworks share one image build; Docker
+reuses cached layers when inputs are unchanged. No image is pushed:
 
 ```sh
-docker build -f installers/docker/Dockerfile -t grate-local:tests .
 dotnet test --framework net10.0 --max-parallel-test-modules 1
 ```
 
-On x64/AMD64 hosts, add `--build-arg RUNTIME=linux-musl-x64` to the image build.
+CI, ordinary `dotnet build`, and an explicit image other than `grate-local:tests`
+do not trigger this build. Set `GrateBuildLocalDockerImage=false` to disable it
+explicitly, for example when selecting an image with `dotnet test -e`.
 
 The Docker test projects copy `unittests/Docker/testconfig.local.json` beside their
 executables as MTP configuration. It sets
 `GrateTestConfig__DefaultApplicationDockerImage=grate-local:tests`. An explicit
 `GrateTestConfig__ApplicationDockerImage` takes precedence, so callers can still
 select another image without editing the profile. Local runs need neither
-variable on the command line. The image must still be built before the tests;
-`dotnet test` does not build it automatically.
+variable on the command line.
 
 Builds with `CI=true` or `ContinuousIntegrationBuild=true` select the separate
 `testconfig.ci.json`, which does not set a local image. `GrateTestEnvironment`
@@ -70,8 +72,14 @@ integration workflow currently disables the Docker tests because it does not
 build and pass a matching application image to them.
 
 For a focused Docker check, add, for example,
-`--project unittests/Docker/Docker.Sqlite`. Rebuild the local image after changing
-the application source so that the container runs the code from your checkout.
+`--project unittests/Docker/Docker.Sqlite`.
+
+`--no-build`, `--test-modules`, and direct test-executable runs bypass the build
+phase, so they require an image that is already built. To prepare it explicitly:
+
+```sh
+docker build -f installers/docker/Dockerfile -t grate-local:tests .
+```
 
 ## Build a self-contained executable (if you want)
 

@@ -1,0 +1,12 @@
+<Project DefaultTargets="Build">
+  <PropertyGroup>
+    <GrateRepositoryRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..'))</GrateRepositoryRoot>
+    <GrateDockerExecutable Condition="'$(GrateDockerExecutable)' == ''">docker</GrateDockerExecutable>
+  </PropertyGroup>
+
+  <Target Name="Build">
+    <Message Importance="high" Text="Building local Docker test image grate-local:tests." />
+    <Exec WorkingDirectory="$(GrateRepositoryRoot)"
+          Command="&quot;$(GrateDockerExecutable)&quot; build --file installers/docker/Dockerfile --tag grate-local:tests ." />
+  </Target>
+</Project>
