@@ -71,6 +71,8 @@ jobs:
     name: Run tests
 
     runs-on: ubuntu-latest
+    # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
+    timeout-minutes: 30
     #needs: build-code
 
     strategy:
@@ -91,8 +93,24 @@ jobs:
     - name: Test
       # The Sqlite lane also executes the SQL examples shipped with the skill.
       run: |
+        # Keep host state and database crash logs even if a runtime never starts.
+        timeout --kill-after=5s 25m bash .github/scripts/monitor-test-containers.sh \
+          "/tmp/test-results/${{ matrix.category }}" &
+        diagnostics_pid=$!
+        stop_diagnostics() {
+          test_exit_code=$?
+          trap - EXIT
+          kill "$diagnostics_pid" 2>/dev/null || true
+          wait "$diagnostics_pid" 2>/dev/null || true
+          exit "$test_exit_code"
+        }
+        trap stop_diagnostics EXIT
+
         dotnet test \
         --project unittests/${{ matrix.category }} \
+        --stop-on-fail on \
+        --long-running 60 \
+        --timeout 20m \
         --results-directory /tmp/test-results/${{ matrix.category }} \
         --report-xunit-trx \
         --coverage \
