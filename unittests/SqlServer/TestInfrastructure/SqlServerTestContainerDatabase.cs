@@ -1,4 +1,5 @@
-﻿using DotNet.Testcontainers.Containers;
+﻿using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
 using Microsoft.Extensions.Logging;
 using TestCommon.TestInfrastructure;
@@ -25,6 +26,12 @@ public record SqlServerTestContainerDatabase(
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)
             .WithEnvironment("MSSQL_COLLATION", "Danish_Norwegian_CI_AS")
+            // SELECT 1 succeeds before MSSQL_COLLATION finishes reindexing the
+            // system databases. Test connections can prevent its exclusive lock
+            // and shut the server down with errors 5030/3434 (exit 255).
+            .WithWaitStrategy(Wait.ForUnixContainer()
+                .UntilMessageIsLogged("The default collation was successfully changed.",
+                    wait => wait.WithTimeout(TimeSpan.FromMinutes(2))))
             .WithLogger(Logger)
             .Build();
     }
