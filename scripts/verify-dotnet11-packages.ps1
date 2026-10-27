@@ -96,9 +96,11 @@ dotnet tool install grate --tool-path $tool --version $version --framework net11
 # Tool shims must succeed without any .NET 8/9/10 runtime being available.
 # Copy only the selected 11 runtime and host into a private root, leaving runner
 # installations untouched. The SDK used for install is not required for execution.
-$dotnetExecutable = (Get-Command dotnet).Source
-$resolvedDotnet = ([IO.FileInfo]$dotnetExecutable).ResolveLinkTarget($true)
-$sourceRoot = Split-Path $(if ($resolvedDotnet) { $resolvedDotnet.FullName } else { $dotnetExecutable })
+$runtimeLine = @(dotnet --list-runtimes | Where-Object { $_.StartsWith("Microsoft.NETCore.App $expectedRuntime [") })
+if ($runtimeLine.Count -ne 1) { throw "Cannot locate installed runtime $expectedRuntime." }
+$runtimeDirectory = $runtimeLine[0].Substring($runtimeLine[0].IndexOf('[') + 1).TrimEnd(']')
+$sourceRoot = Split-Path (Split-Path $runtimeDirectory)
+$dotnetExecutable = Join-Path $sourceRoot $(if ($IsWindows) { 'dotnet.exe' } else { 'dotnet' })
 $isolatedRoot = "$OutputDirectory/dotnet11-only"
 New-Item -ItemType Directory -Force "$isolatedRoot/host/fxr", "$isolatedRoot/shared/Microsoft.NETCore.App" | Out-Null
 Copy-Item $dotnetExecutable $isolatedRoot
