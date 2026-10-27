@@ -68,7 +68,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet pack ./src/grate/grate.csproj -p:SelfContained=true -p:PackAsTool=true -p:PackageOutputPath=/tmp/grate/nupkg -p:version=${{ needs.set-version-number.outputs.nuGetVersion }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }} #SelfContained for #714
+      run: dotnet pack ./src/grate/grate.csproj -p:SelfContained=false -p:PackAsTool=true -p:PackageOutputPath=/tmp/grate/nupkg -p:version=${{ needs.set-version-number.outputs.nuGetVersion }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }} # Preserve per-framework tool assets; RID packaging remains disabled for #714
       
     - name: Upload published tool artifact
       uses: actions/upload-artifact@v7

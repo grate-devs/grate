@@ -26,6 +26,9 @@ function Test-Migration([string]$Executable, [string]$Directory) {
     if (!(Test-Path "$Directory/smoke.db") -or (Get-Item "$Directory/smoke.db").Length -eq 0) {
         throw 'The packaged CLI did not create a SQLite database.'
     }
+    $python = Get-Command python3, python -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (!$python) { throw 'Python with sqlite3 is required to verify migration effects.' }
+    & $python.Source -c 'import sqlite3, sys; db = sqlite3.connect(sys.argv[1]); rows = db.execute("SELECT id FROM package_smoke ORDER BY id").fetchall(); assert rows == [(1,)], rows' "$Directory/smoke.db"
     & $Executable skills install --local --path "$Directory/skill"
     if (!(Test-Path "$Directory/skill/.agents/skills/use-grate/SKILL.md")) {
         throw 'The packaged CLI did not install its bundled skill.'
@@ -63,8 +66,9 @@ $libraryNames = @('grate.core', 'grate.mariadb', 'grate.oracle', 'grate.postgres
 foreach ($name in $libraryNames) {
     dotnet pack "src/$name/$name.csproj" -c Release --include-symbols -p:PackageVersion=$version -o $packages
 }
-# Match the release pipeline's legacy multi-framework tool packaging (#714).
-dotnet pack src/grate/grate.csproj -c Release -p:PackAsTool=true -p:SelfContained=true -p:PackageVersion=$version -o $packages
+# Framework-dependent packaging retains per-TFM assets usable by older SDKs.
+# SelfContained=true in SDK 11 collapses them into tools/any/any (#867).
+dotnet pack src/grate/grate.csproj -c Release -p:PackAsTool=true -p:SelfContained=false -p:PackageVersion=$version -o $packages
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 foreach ($name in @($libraryNames) + @('grate')) {
@@ -91,7 +95,7 @@ $references = ($libraryNames | ForEach-Object { "<PackageReference Include='$_' 
 dotnet build "$consumer/consumer.csproj" -c Release --source $packages --source https://api.nuget.org/v3/index.json
 
 $tool = "$OutputDirectory/tool"
-dotnet tool install grate --tool-path $tool --version $version --framework net11.0 --add-source $packages
+dotnet tool install grate --tool-path $tool --version $version --add-source $packages
 
 # Tool shims must succeed without any .NET 8/9/10 runtime being available.
 # Copy only the selected 11 runtime and host into a private root, leaving runner

@@ -107,5 +107,6 @@ jobs:
               --databasetype sqlite --connectionstring 'Data Source=/smoke/smoke.db' --files /smoke/sql --output /smoke/output --silent
           done
           test -s "$work/smoke.db"
+          python3 -c 'import sqlite3, sys; db = sqlite3.connect(sys.argv[1]); rows = db.execute("SELECT id FROM package_smoke ORDER BY id").fetchall(); assert rows == [(1,)], rows' "$work/smoke.db"
           docker run --rm -v "$work:/smoke" --entrypoint /app/grate grate-dotnet11:test skills install --local --path /smoke/skill
           test -s "$work/skill/.agents/skills/use-grate/SKILL.md"
