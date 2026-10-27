@@ -6,106 +6,106 @@ public sealed class OraclePackageStatementSplitter_
 {
     private readonly OracleStatementSplitter _splitter = new();
 
-    // Original package from https://github.com/grate-devs/grate/issues/642.
+    // Synthetic names preserve the SQL structure reported in https://github.com/grate-devs/grate/issues/642.
     private const string PackageSpecification = """
-        CREATE OR REPLACE PACKAGE ARGUS_DBA.AnalyticsCommonUtility IS
-        cMAX_CPP          NUMBER(16,2) DEFAULT 10000000;
-        
-        FUNCTION CalculateCPM(
-          Rate    IN  NUMBER,
-          Imps    IN  NUMBER
+        CREATE OR REPLACE PACKAGE EXAMPLE_SCHEMA.CalculationHelpers IS
+        cMAX_RESULT          NUMBER(16,2) DEFAULT 10000000;
+
+        FUNCTION CalculateScaledRatio(
+          Amount    IN  NUMBER,
+          Quantity  IN  NUMBER
         ) RETURN NUMBER;
-        
-        
-        FUNCTION CalculateCPP(
-          Rate    IN  NUMBER,
-          Rating  IN  NUMBER
+
+
+        FUNCTION CalculateRatio(
+          Amount    IN  NUMBER,
+          Divisor   IN  NUMBER
         ) RETURN NUMBER;
-        
-        
-        FUNCTION CalculateIndex(
-          Imps    IN  NUMBER,
-          Gtee    IN  NUMBER
+
+
+        FUNCTION CalculatePercentage(
+          Quantity  IN  NUMBER,
+          Total     IN  NUMBER
         ) RETURN NUMBER;
-        
-        
-        END AnalyticsCommonUtility;
+
+
+        END CalculationHelpers;
         """;
 
     private const string PackageBody = """
-        CREATE OR REPLACE PACKAGE BODY ARGUS_DBA.AnalyticsCommonUtility IS
-        
-        FUNCTION CalculateCPM(
-          Rate    IN  NUMBER,
-          Imps    IN  NUMBER
+        CREATE OR REPLACE PACKAGE BODY EXAMPLE_SCHEMA.CalculationHelpers IS
+
+        FUNCTION CalculateScaledRatio(
+          Amount    IN  NUMBER,
+          Quantity  IN  NUMBER
         )
           RETURN NUMBER
         IS
-          CPM NUMBER;
+          ResultValue NUMBER;
         BEGIN
-        
-          IF (Imps IS NULL OR Imps = 0) THEN
+
+          IF (Quantity IS NULL OR Quantity = 0) THEN
             RETURN 0;
           END IF;
-        
-          CPM := ROUND((Rate * 1000) / Imps, 2);
-        
-          IF CPM >= 10000 THEN
+
+          ResultValue := ROUND((Amount * 1000) / Quantity, 2);
+
+          IF ResultValue >= 10000 THEN
             RETURN 10000;
           ELSE
-            RETURN CPM;
+            RETURN ResultValue;
           END IF;
-        END CalculateCPM;
-        
-        
-        FUNCTION CalculateCPP(
-          Rate    IN  NUMBER,
-          Rating  IN  NUMBER
+        END CalculateScaledRatio;
+
+
+        FUNCTION CalculateRatio(
+          Amount    IN  NUMBER,
+          Divisor   IN  NUMBER
         )
           RETURN NUMBER
         IS
-          CPP NUMBER;
+          ResultValue NUMBER;
         BEGIN
-        
-          IF (Rating IS NULL  OR Rating = 0) THEN
+
+          IF (Divisor IS NULL  OR Divisor = 0) THEN
             RETURN 0;
           END IF;
-        
-          CPP := ROUND(Rate / Rating, 2);
-        
-          IF CPP > cMAX_CPP THEN
-            RETURN cMAX_CPP;
+
+          ResultValue := ROUND(Amount / Divisor, 2);
+
+          IF ResultValue > cMAX_RESULT THEN
+            RETURN cMAX_RESULT;
           ELSE
-            RETURN CPP;
+            RETURN ResultValue;
           END IF;
-        END CalculateCPP;
-        
-        
-        FUNCTION CalculateIndex(
-          Imps    IN  NUMBER,
-          Gtee    IN  NUMBER
+        END CalculateRatio;
+
+
+        FUNCTION CalculatePercentage(
+          Quantity  IN  NUMBER,
+          Total     IN  NUMBER
         )
           RETURN NUMBER
         IS
-          Idx NUMBER;
+          ResultValue NUMBER;
         BEGIN
-        
-          IF (Gtee = 0) THEN
+
+          IF (Total = 0) THEN
             RETURN 0;
           END IF;
-        
-          Idx := (Imps * 1.0 / Gtee * 1.0) * 100;
-        
-          Idx := Round(Idx,2);
-          
-          IF Idx >= 1000 THEN
-            Idx := 999.99;
+
+          ResultValue := (Quantity * 1.0 / Total * 1.0) * 100;
+
+          ResultValue := Round(ResultValue,2);
+
+          IF ResultValue >= 1000 THEN
+            ResultValue := 999.99;
           END IF;
-        
-          RETURN Idx;
-        END CalculateIndex;
-        
-        
+
+          RETURN ResultValue;
+        END CalculatePercentage;
+
+
         END;
         """;
 
@@ -114,7 +114,7 @@ public sealed class OraclePackageStatementSplitter_
     [InlineData("/", "\n")]
     [InlineData(";", "\r\n")]
     [InlineData("/", "\r\n")]
-    public void original_package_and_body_remain_two_complete_commands(string delimiter, string newline)
+    public void sample_package_and_body_remain_two_complete_commands(string delimiter, string newline)
     {
         var specification = PackageSpecification.Replace("\n", newline);
         var body = PackageBody.Replace("\n", newline);

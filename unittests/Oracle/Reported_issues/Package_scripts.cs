@@ -13,7 +13,7 @@ public sealed class Package_scripts(OracleGrateTestContext testContext)
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Creates_and_executes_the_package_from_issue_642(bool useSqlPlusSeparator)
+    public async Task Creates_and_executes_a_package_with_division(bool useSqlPlusSeparator)
     {
         var database = TestConfig.RandomDatabase();
         var directory = TestConfig.CreateRandomTempDirectory();
@@ -28,13 +28,13 @@ public sealed class Package_scripts(OracleGrateTestContext testContext)
             Folders = Folders.Default
         };
 
-        // Only the schema is changed from the reported reproduction, so every test owns its objects.
-        var sql = OriginalPackage.Replace("ARGUS_DBA.", database + ".", StringComparison.Ordinal);
+        // Map the synthetic schema to this test's isolated database.
+        var sql = SamplePackage.Replace("EXAMPLE_SCHEMA.", database + ".", StringComparison.Ordinal);
         if (useSqlPlusSeparator)
         {
             sql = sql.Replace("\n;", "\n/", StringComparison.Ordinal);
         }
-        TestConfig.WriteContent(TestConfig.Wrap(directory, "sprocs"), "0014_ARGUS_ANALYTICS_COMMONUTILITY_PACKAGE.sql", sql);
+        TestConfig.WriteContent(TestConfig.Wrap(directory, "sprocs"), "001_calculation_helpers.sql", sql);
 
         try
         {
@@ -47,23 +47,23 @@ public sealed class Package_scripts(OracleGrateTestContext testContext)
             var objectTypes = (await connection.QueryAsync<string>(
                 """
                 SELECT object_type FROM user_objects
-                WHERE object_name = 'ANALYTICSCOMMONUTILITY' AND status = 'VALID'
+                WHERE object_name = 'CALCULATIONHELPERS' AND status = 'VALID'
                 ORDER BY object_type
                 """)).ToArray();
             Assert.Equal(["PACKAGE", "PACKAGE BODY"], objectTypes);
 
             var compilationErrors = await connection.QueryAsync<string>(
-                "SELECT text FROM user_errors WHERE name = 'ANALYTICSCOMMONUTILITY' AND attribute = 'ERROR' ORDER BY sequence");
+                "SELECT text FROM user_errors WHERE name = 'CALCULATIONHELPERS' AND attribute = 'ERROR' ORDER BY sequence");
             Assert.Empty(compilationErrors);
 
             Assert.Equal(20m, await connection.ExecuteScalarAsync<decimal>(
-                "SELECT AnalyticsCommonUtility.CalculateCPM(100, 5000) FROM dual"));
+                "SELECT CalculationHelpers.CalculateScaledRatio(100, 5000) FROM dual"));
             Assert.Equal(25m, await connection.ExecuteScalarAsync<decimal>(
-                "SELECT AnalyticsCommonUtility.CalculateCPP(100, 4) FROM dual"));
+                "SELECT CalculationHelpers.CalculateRatio(100, 4) FROM dual"));
             Assert.Equal(50m, await connection.ExecuteScalarAsync<decimal>(
-                "SELECT AnalyticsCommonUtility.CalculateIndex(50, 100) FROM dual"));
+                "SELECT CalculationHelpers.CalculatePercentage(50, 100) FROM dual"));
             Assert.Equal(0m, await connection.ExecuteScalarAsync<decimal>(
-                "SELECT AnalyticsCommonUtility.CalculateCPM(100, 0) FROM dual"));
+                "SELECT CalculationHelpers.CalculateScaledRatio(100, 0) FROM dual"));
         }
         finally
         {
@@ -71,106 +71,106 @@ public sealed class Package_scripts(OracleGrateTestContext testContext)
         }
     }
 
-    // https://github.com/grate-devs/grate/issues/642, including Roundhouse's standalone semicolons.
-    private const string OriginalPackage = """
-        CREATE OR REPLACE PACKAGE ARGUS_DBA.AnalyticsCommonUtility IS
-        cMAX_CPP          NUMBER(16,2) DEFAULT 10000000;
-        
-        FUNCTION CalculateCPM(
-          Rate    IN  NUMBER,
-          Imps    IN  NUMBER
+    // Based on #642 with synthetic identifiers and Roundhouse's standalone semicolons.
+    private const string SamplePackage = """
+        CREATE OR REPLACE PACKAGE EXAMPLE_SCHEMA.CalculationHelpers IS
+        cMAX_RESULT          NUMBER(16,2) DEFAULT 10000000;
+
+        FUNCTION CalculateScaledRatio(
+          Amount    IN  NUMBER,
+          Quantity  IN  NUMBER
         ) RETURN NUMBER;
-        
-        
-        FUNCTION CalculateCPP(
-          Rate    IN  NUMBER,
-          Rating  IN  NUMBER
+
+
+        FUNCTION CalculateRatio(
+          Amount    IN  NUMBER,
+          Divisor   IN  NUMBER
         ) RETURN NUMBER;
-        
-        
-        FUNCTION CalculateIndex(
-          Imps    IN  NUMBER,
-          Gtee    IN  NUMBER
+
+
+        FUNCTION CalculatePercentage(
+          Quantity  IN  NUMBER,
+          Total     IN  NUMBER
         ) RETURN NUMBER;
-        
-        
-        END AnalyticsCommonUtility;
+
+
+        END CalculationHelpers;
         ;
-        
-        
-        CREATE OR REPLACE PACKAGE BODY ARGUS_DBA.AnalyticsCommonUtility IS
-        
-        FUNCTION CalculateCPM(
-          Rate    IN  NUMBER,
-          Imps    IN  NUMBER
+
+
+        CREATE OR REPLACE PACKAGE BODY EXAMPLE_SCHEMA.CalculationHelpers IS
+
+        FUNCTION CalculateScaledRatio(
+          Amount    IN  NUMBER,
+          Quantity  IN  NUMBER
         )
           RETURN NUMBER
         IS
-          CPM NUMBER;
+          ResultValue NUMBER;
         BEGIN
-        
-          IF (Imps IS NULL OR Imps = 0) THEN
+
+          IF (Quantity IS NULL OR Quantity = 0) THEN
             RETURN 0;
           END IF;
-        
-          CPM := ROUND((Rate * 1000) / Imps, 2);
-        
-          IF CPM >= 10000 THEN
+
+          ResultValue := ROUND((Amount * 1000) / Quantity, 2);
+
+          IF ResultValue >= 10000 THEN
             RETURN 10000;
           ELSE
-            RETURN CPM;
+            RETURN ResultValue;
           END IF;
-        END CalculateCPM;
-        
-        
-        FUNCTION CalculateCPP(
-          Rate    IN  NUMBER,
-          Rating  IN  NUMBER
+        END CalculateScaledRatio;
+
+
+        FUNCTION CalculateRatio(
+          Amount    IN  NUMBER,
+          Divisor   IN  NUMBER
         )
           RETURN NUMBER
         IS
-          CPP NUMBER;
+          ResultValue NUMBER;
         BEGIN
-        
-          IF (Rating IS NULL  OR Rating = 0) THEN
+
+          IF (Divisor IS NULL  OR Divisor = 0) THEN
             RETURN 0;
           END IF;
-        
-          CPP := ROUND(Rate / Rating, 2);
-        
-          IF CPP > cMAX_CPP THEN
-            RETURN cMAX_CPP;
+
+          ResultValue := ROUND(Amount / Divisor, 2);
+
+          IF ResultValue > cMAX_RESULT THEN
+            RETURN cMAX_RESULT;
           ELSE
-            RETURN CPP;
+            RETURN ResultValue;
           END IF;
-        END CalculateCPP;
-        
-        
-        FUNCTION CalculateIndex(
-          Imps    IN  NUMBER,
-          Gtee    IN  NUMBER
+        END CalculateRatio;
+
+
+        FUNCTION CalculatePercentage(
+          Quantity  IN  NUMBER,
+          Total     IN  NUMBER
         )
           RETURN NUMBER
         IS
-          Idx NUMBER;
+          ResultValue NUMBER;
         BEGIN
-        
-          IF (Gtee = 0) THEN
+
+          IF (Total = 0) THEN
             RETURN 0;
           END IF;
-        
-          Idx := (Imps * 1.0 / Gtee * 1.0) * 100;
-        
-          Idx := Round(Idx,2);
-          
-          IF Idx >= 1000 THEN
-            Idx := 999.99;
+
+          ResultValue := (Quantity * 1.0 / Total * 1.0) * 100;
+
+          ResultValue := Round(ResultValue,2);
+
+          IF ResultValue >= 1000 THEN
+            ResultValue := 999.99;
           END IF;
-        
-          RETURN Idx;
-        END CalculateIndex;
-        
-        
+
+          RETURN ResultValue;
+        END CalculatePercentage;
+
+
         END;
         ;
         """;
