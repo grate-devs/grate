@@ -12,8 +12,11 @@ execute tests for those target frameworks. RC3 has go-live support for productio
 use through November 10, 2026. See [package release guidance](docs/Packaging.md)
 for all distribution formats and the move to .NET 11 GA.
 
-The build requires SDK 10.0.403 or a later stable .NET 10 SDK, as selected by `global.json`.
-CI installs `10.0.x` and Docker uses `10.0-alpine` / `alpine:3` so subsequent builds receive servicing updates.
+CI installs the RC3 SDK selected by `global.json`. Docker uses pinned RC3 SDK
+and runtime-deps images on Alpine 3.24. Update the SDK/runtime pins and image
+digests together for servicing releases and GA; rebuild all self-contained outputs
+to pick up runtime security fixes. Existing .NET 8/9/10 runtime minimum checks
+and the patched native SQLite dependency remain in effect.
 Self-contained distributions use the selected SDK's latest runtime patch and reject versions below
 8.0.33 / 9.0.22 / 10.0.14. These are security minimums, not exact runtime pins.
 Pull fresh base images when rebuilding Docker (`docker buildx build --pull ...`), record the resulting
