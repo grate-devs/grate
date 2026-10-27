@@ -1,5 +1,6 @@
 using Dapper;
 using grate.Configuration;
+using grate.Exceptions;
 using grate.Infrastructure;
 using grate.Migration;
 using grate.Sqlite.Migration;
@@ -33,7 +34,7 @@ public sealed class Version_registration_failures(SqliteGrateTestContext context
             "SELECT script_name, version_id FROM grate_ScriptsRun ORDER BY id")).ToArray();
         await File.WriteAllTextAsync(Path.Combine(up.FullName, "002.sql"), "CREATE TABLE second_table(id INTEGER);", TestContext.Current.CancellationToken);
 
-        var exception = await Assert.ThrowsAsync<SqliteException>(() => Migrate(config with { Version = "v2" }));
+        var exception = await Assert.ThrowsAsync(MigrationExceptionType, () => Migrate(config with { Version = "v2" }));
 
         Assert.Contains("version write denied", exception.Message);
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
@@ -58,7 +59,7 @@ public sealed class Version_registration_failures(SqliteGrateTestContext context
             """);
         await File.WriteAllTextAsync(Path.Combine(up.FullName, "002.sql"), "CREATE TABLE second_table(id INTEGER);", TestContext.Current.CancellationToken);
 
-        var exception = await Assert.ThrowsAsync<SqliteException>(() => Migrate(config with { Version = "v2" }));
+        var exception = await Assert.ThrowsAsync(MigrationExceptionType, () => Migrate(config with { Version = "v2" }));
 
         Assert.Contains("status write denied", exception.Message);
         Assert.Equal(MigrationStatus.InProgress, await connection.ExecuteScalarAsync<string>(
@@ -146,6 +147,11 @@ public sealed class Version_registration_failures(SqliteGrateTestContext context
         SqlFilesDirectory = _root.CreateSubdirectory(Guid.NewGuid().ToString("N")),
         Version = "v1"
     };
+
+    // CLI and Docker tests import this class and report process failures as MigrationFailed.
+    private Type MigrationExceptionType => context.Migrator is GrateMigrator
+        ? typeof(SqliteException)
+        : typeof(MigrationFailed);
 
     private async Task Migrate(GrateConfiguration config)
     {
