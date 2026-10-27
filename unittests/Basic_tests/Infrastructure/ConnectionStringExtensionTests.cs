@@ -38,6 +38,8 @@ public class ConnectionStringExtensionTests
                          $"{server};Database=app;Password=first;Pwd=second;Password=third",
                          $"{server};Database=app;Pwd=second;Password=",
                          $"{server};Database=app;Password=first;Pwd=second;Password=",
+                         $"{server};Database=app;Password=\"\"",
+                         $"{server};Database=app;Password=''",
                          $"{server};Database=;User ID=demo;Password=dummy",
                          $"{server};Database=\"\";User ID=demo;Password=dummy"
                      })
@@ -60,6 +62,15 @@ public class ConnectionStringExtensionTests
             {
                 cases.Add(provider, $"{server};Database=app;Application Name=");
                 cases.Add(provider, $"{server};Database=app;Workstation ID=");
+                cases.Add(provider, $"{server};Database=app;Application Name=\"\"");
+                cases.Add(provider, $"{server};Database=app;Application Name=''");
+                cases.Add(provider, $"{server};Database=app;Workstation ID=\"\"");
+                cases.Add(provider, $"{server};Database=app;Workstation ID=''");
+            }
+            if (provider == "postgresql")
+            {
+                cases.Add(provider, $"{server};Database=app;Search Path=\"\"");
+                cases.Add(provider, $"{server};Database=app;Search Path=''");
             }
         }
         return cases;

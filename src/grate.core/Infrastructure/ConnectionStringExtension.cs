@@ -31,7 +31,13 @@ internal static class ConnectionStringExtension
         var result = new StringBuilder();
         foreach (var (key, value) in builder.Entries)
         {
-            DbConnectionStringBuilder.AppendKeyValuePair(result, key, IsCatalog(key) ? masterDatabaseName : value);
+            var rewrittenValue = IsCatalog(key) ? masterDatabaseName : value;
+            DbConnectionStringBuilder.AppendKeyValuePair(result, key, rewrittenValue);
+            // AppendKeyValuePair emits bare key= for both null and empty. Providers can distinguish a quoted empty value.
+            if (rewrittenValue is { Length: 0 })
+            {
+                result.Append("\"\"");
+            }
         }
         return result.ToString();
     }
@@ -42,7 +48,8 @@ internal static class ConnectionStringExtension
 
     private sealed class ParsedConnectionStringBuilder : DbConnectionStringBuilder
     {
-        // Keep the parsed sequence: collapsing duplicate keys can change precedence between provider aliases.
+        // Keep duplicate keys in order so provider alias precedence is preserved.
+        // null is an unquoted empty assignment; "" is a quoted empty value.
         public List<KeyValuePair<string, string?>> Entries { get; } = new();
 
         [AllowNull]
@@ -59,7 +66,7 @@ internal static class ConnectionStringExtension
         public override bool Remove(string keyword)
         {
             // The parser removes unquoted empty values; retain them as explicit empty overrides.
-            Entries.Add(new(keyword, string.Empty));
+            Entries.Add(new(keyword, null));
             return base.Remove(keyword);
         }
     }
