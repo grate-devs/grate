@@ -230,17 +230,10 @@ internal record DbMigrator : IDbMigrator
     private async Task<bool> ScriptHasChanged(string scriptName, string sql)
     {
         var currentHash = await Database.GetCurrentHash(scriptName);
-        var newHash = GetHash(sql);
-
-        return currentHash != newHash;
+        return !_hashGenerator.Matches(sql, currentHash);
     }
 
     private static string FileName(string path) => new FileInfo(path).Name;
-
-    private string GetHash(string sql)
-    {
-        return _hashGenerator.Hash(sql);
-    }
 
     private async Task<bool> ThisScriptIsAlreadyRun(string scriptName, TransactionHandling transactionHandling) => await Database.HasRun(scriptName, transactionHandling);
 
