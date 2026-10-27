@@ -52,9 +52,9 @@ public partial class OracleStatementSplitter : IStatementSplitter
     private const string BlockStartPattern = "(?<BlockStart>\\bBEGIN\\b)";
     private const string DeclareBlockStartPattern = "(?<DeclareBlockStart>\\bDECLARE\\b)";
 
-    // Consume the terminator of a block, including its optional name, but not END IF/LOOP/CASE.
-    private const string BlockEndPattern =
-        @"(?<BlockEnd>\bEND(?:\s+(?!(?:IF|LOOP|CASE)\b)(?:[\w$#]+|""(?:""""|[^""])*""))?\s*;)";
+    // Named routine endings and spaced CASE expression endings do not necessarily close
+    // the surrounding anonymous block. Stored programs use explicit script delimiters.
+    private const string BlockEndPattern = @"(?<BlockEnd>\bEND;)";
     private const string SemicolonPattern = "(?<Semicolon>;)";
     private const string SqlPlusExecutePattern = "(?<SQLPLUSEXECUTE>^[ \\t]*/[ \\t]*(?=\\r?$))";
     private const string NewLinePattern = "(?<NewLine>\\r\\n|\\r|\\n)";

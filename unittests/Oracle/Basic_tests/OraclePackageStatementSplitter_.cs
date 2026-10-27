@@ -249,12 +249,54 @@ public sealed class OraclePackageStatementSplitter_
     [Theory]
     [InlineData("named_block")]
     [InlineData("\"Named Block\"")]
-    public void named_anonymous_block_ends_before_next_block(string name)
+    public void slash_delimits_named_anonymous_block_before_next_block(string name)
     {
         var first = $"<<{name}>> BEGIN NULL; END {name};";
         const string second = "BEGIN NULL; END;";
 
-        Assert.Equal([first, second], _splitter.Split($"{first}\n{second}").Select(batch => batch.Trim()));
+        Assert.Equal([first, second], _splitter.Split($"{first}\n/\n{second}").Select(batch => batch.Trim()));
+    }
+
+    [Theory]
+    [InlineData("FUNCTION twice(n NUMBER) RETURN NUMBER IS", "RETURN n * 2;", "twice", "value := twice(2);")]
+    [InlineData("PROCEDURE assign_value IS", "value := 2;", "assign_value", "assign_value;")]
+    public void named_local_routine_does_not_end_enclosing_anonymous_block(
+        string declaration, string body, string name, string invocation)
+    {
+        var block = $"""
+            DECLARE
+                value NUMBER;
+                {declaration}
+                BEGIN
+                    {body}
+                END {name};
+            BEGIN
+                {invocation}
+            END;
+            """;
+        const string followingBlock = "BEGIN NULL; END;";
+
+        Assert.Equal([block, followingBlock],
+            _splitter.Split($"{block}\n/\n{followingBlock}\n/\n").Select(batch => batch.Trim()));
+    }
+
+    [Theory]
+    [InlineData("END ;")]
+    [InlineData("END\n;")]
+    public void spaced_case_expression_end_does_not_end_anonymous_block(string expressionEnd)
+    {
+        var block = $"""
+            DECLARE
+                value NUMBER;
+            BEGIN
+                value := CASE WHEN 1 = 1 THEN 1 ELSE 0 {expressionEnd}
+                NULL;
+            END;
+            """;
+        const string followingBlock = "BEGIN NULL; END;";
+
+        Assert.Equal([block, followingBlock],
+            _splitter.Split($"{block}\n/\n{followingBlock}\n/\n").Select(batch => batch.Trim()));
     }
 
     [Theory]
