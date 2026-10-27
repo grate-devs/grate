@@ -11,6 +11,9 @@ public partial class OracleStatementSplitter : IStatementSplitter
 {
     private enum TokenType
     {
+        StoredProgramStart,
+        StandaloneSemicolon,
+        QuotedIdentifier,
         BlockStart,
         DeclareBlockStart,
         BlockEnd,
@@ -36,11 +39,22 @@ public partial class OracleStatementSplitter : IStatementSplitter
     private const string MultiLineCommentStartPattern = "(?<MultiLineCommentStart>/\\*)";
     private const string MultiLineCommentEndPattern = "(?<MultiLineCommentEnd>\\*/)";
     private const string SingleLineCommentPattern = "(?<SingleLineComment>--)";
+    // Stored PL/SQL units include declarations before BEGIN and may contain nested routines.
+    // Their script boundary is an explicit / or Roundhouse ; line, rather than an inner END.
+    private const string TriviaPattern = @"(?:\s|--[^\r\n]*(?:\r?\n|$)|/\*[\s\S]*?\*/)+";
+    private const string StoredProgramStartPattern =
+        @"(?<StoredProgramStart>\bCREATE" + TriviaPattern +
+        "(?:OR" + TriviaPattern + "REPLACE" + TriviaPattern + ")?" +
+        "(?:(?:NON)?EDITIONABLE" + TriviaPattern + ")?" +
+        @"(?:PACKAGE|PROCEDURE|FUNCTION|TRIGGER|TYPE)\b)";
+    private const string StandaloneSemicolonPattern = @"(?<StandaloneSemicolon>^[ \t]*;[ \t]*(?=\r?$))";
+    private const string QuotedIdentifierPattern = "(?<QuotedIdentifier>\")";
     private const string BlockStartPattern = "(?<BlockStart>\\bBEGIN\\b)";
     private const string DeclareBlockStartPattern = "(?<DeclareBlockStart>\\bDECLARE\\b)";
 
-    // Note that this captures ; as well, so that we avoid capturing END IF; etc.
-    private const string BlockEndPattern = "(?<BlockEnd>\\bEND;)";
+    // Consume the terminator of a block, including its optional name, but not END IF/LOOP/CASE.
+    private const string BlockEndPattern =
+        @"(?<BlockEnd>\bEND(?:\s+(?!(?:IF|LOOP|CASE)\b)(?:[\w$#]+|""(?:""""|[^""])*""))?\s*;)";
     private const string SemicolonPattern = "(?<Semicolon>;)";
     private const string SqlPlusExecutePattern = "(?<SQLPLUSEXECUTE>^[ \\t]*/[ \\t]*(?=\\r?$))";
     private const string NewLinePattern = "(?<NewLine>\\r\\n|\\r|\\n)";
@@ -51,6 +65,9 @@ public partial class OracleStatementSplitter : IStatementSplitter
         MultiLineCommentStartPattern + "|" +
         MultiLineCommentEndPattern + "|" +
         SingleLineCommentPattern + "|" +
+        StoredProgramStartPattern + "|" +
+        StandaloneSemicolonPattern + "|" +
+        QuotedIdentifierPattern + "|" +
         BlockStartPattern + "|" +
         DeclareBlockStartPattern + "|" +
         BlockEndPattern + "|" +
@@ -62,6 +79,11 @@ public partial class OracleStatementSplitter : IStatementSplitter
 
     [GeneratedRegex(@"\S")]
     private static partial Regex SignificantTextPattern();
+
+    // Roundhouse's extra ; line follows an already-terminated PL/SQL statement.
+    // A semicolon on its own line can also terminate an ordinary statement inside a routine.
+    [GeneratedRegex(@";(?:\s|--[^\r\n]*(?:\r?\n|$)|/\*[\s\S]*?\*/)*\z")]
+    private static partial Regex TerminatedStatementPattern();
 
     public IEnumerable<string> Split(string statement) =>
         BreakIntoBatches(statement).Where(batch => SignificantTextPattern().IsMatch(batch));
@@ -90,6 +112,7 @@ public partial class OracleStatementSplitter : IStatementSplitter
         var cutIndex = 0;
         var blockDepth = 0;
         var inDeclareBlock = false;
+        var inStoredProgram = false;
         var token = default(Token);
 
         bool NextToken()
@@ -106,6 +129,20 @@ public partial class OracleStatementSplitter : IStatementSplitter
         {
             switch (token.Type)
             {
+                case TokenType.StoredProgramStart:
+                    inStoredProgram = true;
+                    break;
+                case TokenType.StandaloneSemicolon when inStoredProgram &&
+                                                          TerminatedStatementPattern().IsMatch(sql[..token.Index]):
+                    yield return sql[cutIndex..token.Index];
+                    cutIndex = token.Index + token.Length;
+                    inStoredProgram = false;
+                    blockDepth = 0;
+                    inDeclareBlock = false;
+                    break;
+                case TokenType.BlockStart or TokenType.DeclareBlockStart or TokenType.BlockEnd or
+                     TokenType.Semicolon or TokenType.StandaloneSemicolon when inStoredProgram:
+                    break;
                 case TokenType.DeclareBlockStart:
                     blockDepth++;
                     inDeclareBlock = true;
@@ -130,6 +167,11 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     }
                     break;
 
+                case TokenType.QuotedIdentifier:
+                    while (NextToken() && token.Type != TokenType.QuotedIdentifier)
+                    {
+                    }
+                    break;
                 case TokenType.StringLiteral:
                     while(NextToken() && token.Type != TokenType.StringLiteral)
                     {
@@ -169,6 +211,7 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     }
                     break;
 
+                case TokenType.StandaloneSemicolon:
                 case TokenType.Semicolon:
                     // We want to include the semicolon in the batch 
                     if (blockDepth > 0)
@@ -183,6 +226,9 @@ public partial class OracleStatementSplitter : IStatementSplitter
                 case TokenType.SQLPLUSEXECUTE:
                     yield return sql[cutIndex..token.Index];
                     cutIndex = token.Index + token.Length;
+                    inStoredProgram = false;
+                    blockDepth = 0;
+                    inDeclareBlock = false;
                     break;
             }
         }
