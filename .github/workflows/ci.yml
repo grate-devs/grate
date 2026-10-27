@@ -21,9 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+         global-json-file: global.json
          dotnet-version: |
           8.0.x
           9.0.x
@@ -47,9 +48,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
 
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: |
           8.0.x
           9.0.x
@@ -78,9 +80,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: |
           8.0.x
           9.0.x

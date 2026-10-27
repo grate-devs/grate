@@ -1,0 +1,111 @@
+name: .NET 11 packages
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'installers/**'
+      - 'Directory.*'
+      - 'global.json'
+      - 'scripts/verify-dotnet11-packages.ps1'
+      - '.github/workflows/dotnet11-packages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nuget:
+    name: NuGet libraries and installed tool
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Verify package assets, consumer and tool on .NET 11 only
+        shell: pwsh
+        run: ./scripts/verify-dotnet11-packages.ps1 -Kind Packages -OutputDirectory "${{ runner.temp }}/dotnet11-packages"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: dotnet11-nuget-packages
+          retention-days: 3
+          path: |
+            ${{ runner.temp }}/dotnet11-packages/packages/*
+            ${{ runner.temp }}/dotnet11-packages/tool-runtimes.txt
+
+  standalone:
+    name: CLI ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64, os: windows-latest, smoke: true }
+          - { rid: win-x86, os: windows-latest, smoke: true }
+          - { rid: win-arm64, os: windows-11-arm, smoke: true }
+          - { rid: linux-x64, os: ubuntu-latest, smoke: true }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, smoke: true }
+          # musl execution is covered by native Alpine container checks below.
+          - { rid: linux-musl-x64, os: ubuntu-latest, smoke: false }
+          - { rid: linux-musl-arm64, os: ubuntu-24.04-arm, smoke: false }
+          - { rid: osx-x64, os: macos-15-intel, smoke: true }
+          - { rid: osx-arm64, os: macos-15, smoke: true }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Verify self-contained runtime and execution
+        shell: pwsh
+        env:
+          RUN_SMOKE_TEST: ${{ matrix.smoke }}
+        run: ./scripts/verify-dotnet11-packages.ps1 -Kind Standalone -RuntimeIdentifier '${{ matrix.rid }}' -OutputDirectory "${{ runner.temp }}/dotnet11-cli" -RunSmokeTest:($env:RUN_SMOKE_TEST -eq 'true')
+      - name: Build MSI from verified Windows binary
+        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: ./installers/msi/Create-Installer.ps1 -grateExe "${{ runner.temp }}/dotnet11-cli/published/grate.exe" -Version '0.0.1' -arch ('${{ matrix.rid }}' -replace 'win-', '')
+      - name: Build Debian package from verified Linux binary
+        if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
+        shell: pwsh
+        run: ./installers/deb/Create-Package.ps1 -grateExe "${{ runner.temp }}/dotnet11-cli/published/grate" -Version '0.0.1' -arch ('${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64')
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: dotnet11-${{ matrix.rid }}
+          retention-days: 3
+          path: |
+            ${{ runner.temp }}/dotnet11-cli/published/*
+            ${{ runner.temp }}/dotnet11-cli/*.json
+            installers/msi/tmp/*.msi
+            installers/deb/*.deb
+
+  docker:
+    name: Alpine ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, os: ubuntu-latest }
+          - { arch: arm64, os: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build native image without publishing
+        run: docker build --build-arg VERSION=0.0.1 -f installers/docker/Dockerfile -t grate-dotnet11:test .
+      - name: Verify Alpine globalization, migration and bundled skill
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/grate-docker-smoke"
+          mkdir -p "$work/sql/up" "$work/output" "$work/skill"
+          echo 'CREATE TABLE package_smoke (id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES (1);' > "$work/sql/up/001_create.sql"
+          docker run --rm --entrypoint /app/grate grate-dotnet11:test --version
+          for _ in 1 2; do
+            docker run --rm -e LANG=nb_NO.UTF-8 -v "$work:/smoke" --entrypoint /app/grate grate-dotnet11:test \
+              --databasetype sqlite --connectionstring 'Data Source=/smoke/smoke.db' --files /smoke/sql --output /smoke/output --silent
+          done
+          test -s "$work/smoke.db"
+          docker run --rm -v "$work:/smoke" --entrypoint /app/grate grate-dotnet11:test skills install --local --path /smoke/skill
+          test -s "$work/skill/.agents/skills/use-grate/SKILL.md"
