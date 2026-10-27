@@ -100,9 +100,10 @@ WHERE  version_row_number <= 1
             return 1;
         }
 
-        var includeStatus = await VersionTableSupportsStatus();
+        var (_, versionTable) = await ResolveVersionTable();
+        var includeStatus = await VersionTableSupportsStatus(versionTable);
         var sql = (string)$@"
-INSERT INTO {VersionTable}
+INSERT INTO {versionTable}
 (repository_path, version, entry_date, modified_date, entered_by{(includeStatus ? ", status" : "")})
 VALUES(:repositoryPath, :newVersion, :entryDate, :modifiedDate, :enteredBy{(includeStatus ? ", :status" : "")})
 RETURNING id into :id

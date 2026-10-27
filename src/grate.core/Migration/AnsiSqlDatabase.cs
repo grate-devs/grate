@@ -345,9 +345,10 @@ ORDER BY id DESC", 1)}
             return 1;
         }
 
-        var includeStatus = await VersionTableSupportsStatus();
+        var (_, versionTable) = await ResolveVersionTable();
+        var includeStatus = await VersionTableSupportsStatus(versionTable);
         var sql = Parameterize($@"
-INSERT INTO {VersionTable}
+INSERT INTO {versionTable}
 (repository_path, version, entry_date, modified_date, entered_by{(includeStatus ? ", status" : "")})
 VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(includeStatus ? ", @status" : "")})
 
@@ -382,7 +383,18 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
     protected async Task<bool> IsInitialBootstrap() =>
         Config?.Environment == GrateEnvironment.InternalBootstrap && !await VersionTableExists();
 
-    protected async Task<bool> VersionTableSupportsStatus()
+    protected async Task<(string Name, string Sql)> ResolveVersionTable()
+    {
+        // A pending internal migration can rename a legacy table between version
+        // registration and completion, so resolve its stored name for each operation.
+        var name = Config?.Environment == GrateEnvironment.InternalBootstrap
+                   || Config?.Environment == GrateEnvironment.Internal
+            ? await ExistingOrDefault(SchemaName, VersionTableName)
+            : VersionTableName;
+        return (name, _syntax.TableWithSchema(SchemaName, name));
+    }
+
+    protected async Task<bool> VersionTableSupportsStatus(string versionTable)
     {
         if (Config?.Environment != GrateEnvironment.InternalBootstrap
             && Config?.Environment != GrateEnvironment.Internal)
@@ -392,7 +404,7 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
 
         // Older internal tracking tables may need to be upgraded by internal migrations.
         // Inspect the schema instead of treating an arbitrary database failure as compatibility.
-        using var reader = await ActiveConnection.ExecuteReaderAsync($"SELECT * FROM {VersionTable} WHERE 1 = 0");
+        using var reader = await ActiveConnection.ExecuteReaderAsync($"SELECT * FROM {versionTable} WHERE 1 = 0");
         return Enumerable.Range(0, reader.FieldCount)
             .Any(index => string.Equals(reader.GetName(index), "status", StringComparison.OrdinalIgnoreCase));
     }
@@ -404,13 +416,14 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
 
     public virtual async Task ChangeVersionStatus(string status, long versionId)
     {
-        if (!await VersionTableSupportsStatus())
+        var (_, versionTable) = await ResolveVersionTable();
+        if (!await VersionTableSupportsStatus(versionTable))
         {
             return;
         }
 
         var updateSql = Parameterize($@"
-            UPDATE {VersionTable}
+            UPDATE {versionTable}
             SET status = @status
             WHERE id = @versionId");
 
@@ -422,15 +435,16 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
     
     public virtual async Task DeleteVersionRecord(long versionId)
     {
+        var (versionTableName, versionTable) = await ResolveVersionTable();
         var deleteSql = Parameterize($@"
-            DELETE FROM {VersionTable}
+            DELETE FROM {versionTable}
             WHERE id = @versionId");
 
         using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
         await ExecuteAsync(Connection, deleteSql, new { versionId });
         
         // reset the identity column of the table to the previous value
-        await ExecuteAsync(Connection, _syntax.ResetIdentity(SchemaName, VersionTableName, versionId - 1));
+        await ExecuteAsync(Connection, _syntax.ResetIdentity(SchemaName, versionTableName, versionId - 1));
 
         s.Complete();
     }
@@ -594,7 +608,8 @@ INSERT INTO {ScriptsRunErrorsTable}
 (repository_path, version, script_name, text_of_script, erroneous_part_of_script, error_message, entry_date, modified_date, entered_by)
 VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, @now, @now, @usr)");
 
-        var versionSql = Parameterize($"SELECT version FROM {VersionTable} WHERE id = @versionId");
+        var (_, versionTable) = await ResolveVersionTable();
+        var versionSql = Parameterize($"SELECT version FROM {versionTable} WHERE id = @versionId");
 
         var version = await ExecuteScalarAsync<string>(ActiveConnection, versionSql, new { versionId });
         var repositoryPath = Config?.RepositoryPath;
