@@ -8,6 +8,7 @@ param (
 )
 
 $ErrorActionPreference = 'Stop'
+& (Join-Path $PSScriptRoot 'Test-InstallerAuthoring.ps1')
 $grateExe = (Resolve-Path -LiteralPath $grateExe).Path
 
 function Recreate {
@@ -43,6 +44,10 @@ $template.Replace('%%%VERSION%%%', $version).
 
 & (Join-Path $wixDir 'candle.exe') -nologo -arch $arch $wxs -o $wixobj
 if ($LASTEXITCODE -ne 0) { throw "WiX candle failed with exit code $LASTEXITCODE." }
-& (Join-Path $wixDir 'light.exe') -nologo -wx0204 -wx1076 $wixobj -o $msi
+# ICE91 is advisory for this per-user-only package: files intentionally live in
+# LocalAppDataFolder. Keep it visible, without promoting LGHT1076 to an error.
+# Test-InstallerAuthoring guards that exception's scope before building.
+# https://learn.microsoft.com/windows/win32/msi/ice91
+& (Join-Path $wixDir 'light.exe') -nologo -wx0204 $wixobj -o $msi
 if ($LASTEXITCODE -ne 0) { throw "WiX light failed with exit code $LASTEXITCODE." }
 if (-not (Test-Path -LiteralPath $msi)) { throw "MSI was not created: $msi" }

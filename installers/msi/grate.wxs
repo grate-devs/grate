@@ -18,8 +18,8 @@
 
               <!-- Remove all files from the INSTALLFOLDER on uninstall -->
               <RemoveFile Id="ALLFILES" Name="*.*" On="both" />
-              <RemoveFolder Id="INSTALLFOLDER" On="uninstall" />
-              <RemoveFolder Id="ROOTDIRECTORY" On="uninstall" />
+              <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+              <RemoveFolder Id="RemoveCompanyFolder" Directory="ROOTDIRECTORY" On="uninstall" />
 
               <!--Create application registry entry-->
               <RegistryValue Root="HKCU" Key="Software\Microsoft\erikbra\grate" Name="installed" Type="integer" Value="1" KeyPath="yes" />
