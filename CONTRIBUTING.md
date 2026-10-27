@@ -46,7 +46,10 @@ checkout immediately before the first migration that needs the application
 container. Building projects, listing tests, or filtering out these tests does
 not run `docker build`. The selected Docker projects and target frameworks share
 one image build per normal .NET build; Docker reuses cached layers when inputs
-are unchanged. No image is pushed:
+are unchanged. No image is pushed.
+
+A fully cached build can retain the image's original creation timestamp. Test
+helpers run on the host and are not included in the application image.
 
 ```sh
 dotnet test --framework net10.0 --max-parallel-test-modules 1
