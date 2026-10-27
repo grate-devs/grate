@@ -41,22 +41,41 @@ docker kill db  || docker network rm grate_network  || docker rm $(docker ps -f 
 
 grate is available as a [dotnet global tool](https://docs.microsoft.com/en-us/dotnet/core/tools/global-tools).  Simply `dotnet tool install -g grate` to get the [package](https://www.nuget.org/packages/grate/).
 
-Note, pre-requisite is dotnet 6. If the above command gives you: 
+The tool and library packages target .NET 8, 9, 10 and 11. Install a matching
+.NET runtime; installing a local or global tool also requires the .NET SDK.
+For .NET 11, install the [RC3 SDK](https://dotnet.microsoft.com/download/dotnet/11.0)
+(`11.0.100-rc.3.26522.148`) or a newer supported .NET 11 release. An RC3-only
+machine can install and run the tool's `net11.0` assets; no older runtime is needed.
+Use `--version <grate-version>` to select a particular grate release. Only use
+`--prerelease` if the **grate package version** is itself a prerelease.
 
-```
-error NU1202: Package grate *.*.* is not compatible with net5.0 (.NETCoreApp,Version=v5.0) / any. 
-Package grate 0.10.0 supports: net6.0 (.NETCoreApp,Version=v6.0) / any
+## NuGet libraries
 
-please install dotnet 6 (download [here](https://dotnet.microsoft.com/download/dotnet/6.0)).
+Applications can reference `grate.core` and the provider packages
+`grate.sqlserver`, `grate.postgresql`, `grate.mariadb`, `grate.oracle` and
+`grate.sqlite`. Each package includes assets for .NET 8, 9, 10 and 11.
 
-* You are attempting to install a preview release and did not use the --version option to specify the version.
-* A package by this name was found, but it was not a .NET tool.
-* The required NuGet feed cannot be accessed, perhaps because of an Internet connection problem.
-* You mistyped the name of the tool.
+## Runtime and platform requirements
 
-For more reasons, including package naming enforcement, visit https://aka.ms/failure-installing-tool
-```
-please install [dotnet 6](https://dotnet.microsoft.com/download/dotnet/6.0)
+New self-contained CLI archives, MSI and Debian packages, Chocolatey packages,
+and Docker images bundle .NET runtime `11.0.0-rc.3.26522.148`. Homebrew and
+winget install those same release binaries or installers. These distributions
+need no separately installed .NET runtime; native OS dependencies still apply.
+The Docker images use Alpine 3.24 and include the .NET native dependencies and ICU
+for globalization.
+
+.NET 11 RC3 has a go-live license and is supported by Microsoft in production
+until November 10, 2026 ([support policy](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)).
+This allows grate releases before .NET 11 GA. When GA is available, the bundled
+runtime must be updated by rebuilding and reinstalling these distributions;
+installing a newer runtime on the host does not update self-contained grate.
+
+The existing Windows (x86/x64/Arm64), Linux (x64/Arm64, glibc or musl) and macOS
+(x64/Arm64) binaries remain available. Check Microsoft's
+[supported OS list](https://github.com/dotnet/core/blob/main/release-notes/11.0/supported-os.md)
+and [.NET 11 hardware requirements](https://learn.microsoft.com/dotnet/core/compatibility/jit/11/minimum-hardware-requirements).
+In particular, x86/x64 binaries now require the `x86-64-v2` instruction baseline;
+the minimum Arm64 hardware requirements are unchanged.
 
 ## Winget
 

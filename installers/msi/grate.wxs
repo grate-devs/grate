@@ -4,7 +4,7 @@
     UpgradeCode='%%%UPGRADECODE%%%' Language='1033' Codepage='1252' Version='%%%VERSION%%%'>
     <Package Id='*' Keywords='Installer' Description="grate installer" 
       Comments='grate - the SQL scripts migration runner' Manufacturer='erikbra' 
-      InstallerVersion='310' Languages='1033' InstallScope="perUser" InstallPrivileges="limited" Compressed='yes' SummaryCodepage='1252' />
+      InstallerVersion='500' Languages='1033' InstallScope="perUser" InstallPrivileges="limited" Compressed='yes' SummaryCodepage='1252' />
     <Media Id='1' Cabinet='grate.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1' />
     <Property Id='DiskPrompt' Value="grate Installation [1]" />
 
