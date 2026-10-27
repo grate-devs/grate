@@ -1,4 +1,5 @@
-﻿using DotNet.Testcontainers.Containers;
+﻿using System.Text;
+using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
 using Microsoft.Extensions.Logging;
 using Testcontainers.Oracle;
@@ -18,12 +19,29 @@ public record OracleTestContainerDatabase(
 
     protected override IContainer InitializeTestContainer()
     {
+        // Pooling is disabled: migration tests rapidly open and close dedicated connections.
+        // The default listener capacity can reject this churn (ORA-12516), even when
+        // the database's measured process count is below the image's default limit.
+        // Reserve admission headroom only in this disposable database. PROCESSES is static,
+        // so restart before the image emits its readiness message and tests can connect.
+        const string configureTestDatabase = """
+            WHENEVER OSERROR EXIT FAILURE
+            WHENEVER SQLERROR EXIT FAILURE
+            ALTER SYSTEM SET PROCESSES=1000 SCOPE=SPFILE;
+            SHUTDOWN IMMEDIATE;
+            STARTUP;
+            ALTER PLUGGABLE DATABASE ALL OPEN;
+            ALTER SYSTEM REGISTER;
+            """;
+
         return new OracleBuilder(DockerImage)
             .WithEnvironment("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
             .WithEnvironment("ORACLE_PDB", "FREEPDB1")
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)
             .WithLogger(Logger)
+            .WithResourceMapping(Encoding.UTF8.GetBytes(configureTestDatabase),
+                "/container-entrypoint-startdb.d/01-test-connection-capacity.sql")
             .Build();
     }
     
