@@ -395,10 +395,13 @@ jobs:
           9.0.x
           10.0.x
     - name: Test
+      # SDK 11 multi-TFM discovery requires an absolute project-file path.
       # The Sqlite lane also executes the SQL examples shipped with the skill.
+      # Run TFMs sequentially so database fixtures do not compete on one runner.
       run: |
         dotnet test \
-        --project unittests/${{ matrix.category }} \
+        --project "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
+        --max-parallel-test-modules 1 \
         --coverage \
         --coverage-output-format xml \
         --coverage-output /tmp/test-results/${{ matrix.category }}.xml
