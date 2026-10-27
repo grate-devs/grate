@@ -7,6 +7,7 @@
     <IsPublishable>true</IsPublishable>
     <IsPackable>false</IsPackable>
     <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <NoWarn>IL2091;IL2026</NoWarn>
     
     <XunitStartupFullName>Docker.Common.Startup</XunitStartupFullName>
