@@ -70,7 +70,7 @@ grate is available as a Homebrew formula:
 brew install grate
 ```
 
-The formula installs a self-contained binary, so the .NET runtime is not required on the target computer.
+Homebrew automatically installs the required .NET dependency. You do not need to install or configure .NET separately.
 
 ## Notes
 
