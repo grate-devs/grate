@@ -24,6 +24,22 @@ image digests, and verify the embedded runtime and native SQLite versions before
 The Docker final stage supplies Alpine and ICU; the .NET runtime is embedded by `dotnet publish` in the build stage.
 MSI and Debian recipes consume those published standalone binaries; framework-dependent tools and libraries use the consumer's runtime.
 
+### Working with the stable .NET 10 SDK
+
+To work only on the `net10.0` target without installing the .NET 11 prerelease,
+run from a directory outside the checkout so the repository's `global.json`
+does not select the RC SDK. With a stable .NET 10 SDK selected by
+`dotnet --version`, use absolute paths and override the target list, for example:
+
+```sh
+dotnet build /absolute/path/to/grate/unittests/Basic_tests/Basic_tests.csproj -c Release -p:TargetFrameworks=net10.0
+dotnet /absolute/path/to/grate/unittests/Basic_tests/bin/Release/net10.0/Basic_tests.dll --filter-class Basic_tests.CommandLineParsing.CliInvocationTests --minimum-expected-tests 1
+```
+
+The second command runs the test executable directly because the repository's
+`global.json` also selects the test runner. This workflow covers `net10.0` only;
+building and testing `net11.0` still requires the pinned SDK.
+
 ## Get (buy, borrow, rent, or whatever) a computer with an operating system on it
 
 .NET 8+ runs on Windows, macOS or Linux. You choose what you like to use for development.

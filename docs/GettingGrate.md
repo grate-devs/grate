@@ -55,6 +55,12 @@ Applications can reference `grate.core` and the provider packages
 `grate.sqlserver`, `grate.postgresql`, `grate.mariadb`, `grate.oracle` and
 `grate.sqlite`. Each package includes assets for .NET 8, 9, 10 and 11.
 
+Microsoft's support for both .NET 8 and .NET 9 ends on November 10, 2026
+([.NET support policy](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)).
+We expect to retire grate's .NET 8 and 9 targets in a future release after that
+support date; the specific grate release has not been decided. Plan to upgrade
+to a supported runtime. The current packages retain both targets.
+
 ## Runtime and platform requirements
 
 New self-contained CLI archives, MSI and Debian packages, Chocolatey packages,

@@ -12,6 +12,10 @@ Self-contained binaries and the Docker image bundle runtime
 `11.0.0-rc.3.26522.148`. RC3 has [go-live production support](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)
 until November 10, 2026, so a grate release need not wait for .NET 11 GA.
 
+The pinned SDK is used for normal repository builds. Developers who only need
+to work on `net10.0` can use the stable .NET 10 SDK with the
+[documented limited build workflow](https://github.com/grate-devs/grate/blob/main/CONTRIBUTING.md#working-with-the-stable-net-10-sdk).
+
 ## Build outputs
 
 The Build and Publish workflow produces the existing distribution formats:

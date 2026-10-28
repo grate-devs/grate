@@ -250,6 +250,7 @@ jobs:
         name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: ${{ matrix.arch }}/
 
+    # WiX takes an architecture (x64/arm64), while the matrix uses win-* RIDs.
     - name: Create msi
       if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
       run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -arch ("${{ matrix.arch }}" -replace "win-", "")
