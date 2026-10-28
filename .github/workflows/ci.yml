@@ -10,6 +10,9 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # Replace obsolete test runs without letting a manual branch run cancel a PR's
 # merge-ref validation. Publishing on main is handled by build.yml separately.
 concurrency:
