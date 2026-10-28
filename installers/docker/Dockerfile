@@ -10,12 +10,14 @@ COPY global.json *.props ./
 COPY *.ruleset ./
 COPY src/ ./src/
 COPY docs/skills/use-grate/ ./docs/skills/use-grate/
-RUN case "$TARGETARCH" in \
-      amd64) runtime=linux-musl-x64 ;; \
-      arm64) runtime=linux-musl-arm64 ;; \
-      *) echo "Unsupported container architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac && \
-    dotnet publish --framework "$TARGETFRAMEWORK" --runtime "${RUNTIME:-$runtime}" ./src/grate/grate.csproj \
+RUN if [ -z "$RUNTIME" ]; then \
+      case "$TARGETARCH" in \
+        amd64) RUNTIME=linux-musl-x64 ;; \
+        arm64) RUNTIME=linux-musl-arm64 ;; \
+        *) echo "Unsupported target architecture: $TARGETARCH" >&2; exit 1 ;; \
+      esac; \
+    fi; \
+    dotnet publish --framework "$TARGETFRAMEWORK" --runtime "$RUNTIME" ./src/grate/grate.csproj \
     -c release --self-contained -p:SelfContained=true -p:TargetFrameworks="$TARGETFRAMEWORK" \
     -p:RuntimeFrameworkVersion="$RUNTIME_VERSION" /p:Version="$VERSION" /p:RuntimeIdentifiers="" \
     -o /publish

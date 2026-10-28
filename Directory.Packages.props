@@ -14,7 +14,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.14" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.10" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.14" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="MySqlConnector" Version="2.6.2" />
@@ -36,7 +36,7 @@
     <!-- Native SQLite security floor: bundle 3.0.5 selects SQLite 3.53.4,
          including the FTS5 fix for CVE-2026-11822 / CVE-2026-11824 (fixed in 3.53.2). -->
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
-    <PackageVersion Include="Testcontainers" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
     <PackageVersion Include="Testcontainers.MariaDb" Version="4.14.0" />
     <PackageVersion Include="Testcontainers.Oracle" Version="4.14.0" />

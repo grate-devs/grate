@@ -14,6 +14,12 @@ on:
       - docs/
   workflow_dispatch:
 
+# This workflow only builds and tests; superseded revisions need not retain
+# their large database matrix while the newest revision waits for runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   id-token: write # This is required for requesting the JWT
   contents: read  # This is required for actions/checkout
