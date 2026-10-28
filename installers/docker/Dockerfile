@@ -1,7 +1,8 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.3-alpine3.24@sha256:f2542b156e7c9eda7783e4a5745efa6c133a162a1940fd4175849aa80fccfd23 AS build
 
 ARG TARGETARCH
-ARG TARGETFRAMEWORK=net10.0
+ARG TARGETFRAMEWORK=net11.0
+ARG RUNTIME_VERSION=11.0.0-rc.3.26522.148
 ARG RUNTIME
 ARG VERSION=1.0.0
 WORKDIR /app
@@ -17,10 +18,11 @@ RUN if [ -z "$RUNTIME" ]; then \
       esac; \
     fi; \
     dotnet publish --framework "$TARGETFRAMEWORK" --runtime "$RUNTIME" ./src/grate/grate.csproj \
-    -c release --self-contained -p:SelfContained=true /p:Version="$VERSION" /p:RuntimeIdentifiers="" \
+    -c release --self-contained -p:SelfContained=true -p:TargetFrameworks="$TARGETFRAMEWORK" \
+    -p:RuntimeFrameworkVersion="$RUNTIME_VERSION" /p:Version="$VERSION" /p:RuntimeIdentifiers="" \
     -o /publish
 
-FROM alpine:3 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime-deps:11.0.0-rc.3-alpine3.24@sha256:f4d3801cac2204e2f961a931dd67a99975a436a8b5ad055898bc7029b712d44d AS runtime
 RUN apk add --no-cache icu-libs
 WORKDIR /app
 
