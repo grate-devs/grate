@@ -7,6 +7,15 @@ I'll try to jot down a few notes on how to get started developing grate.
 
 Grate is built with .NET 8/9/10. You can get it [here](https://dotnet.microsoft.com/en-us/download) and start building right away.
 
+The build requires SDK 10.0.403 or a later stable .NET 10 SDK, as selected by `global.json`.
+CI installs `10.0.x` and Docker uses `10.0-alpine` / `alpine:3` so subsequent builds receive servicing updates.
+Self-contained distributions use the selected SDK's latest runtime patch and reject versions below
+8.0.33 / 9.0.22 / 10.0.14. These are security minimums, not exact runtime pins.
+Pull fresh base images when rebuilding Docker (`docker buildx build --pull ...`), record the resulting
+image digests, and verify the embedded runtime and native SQLite versions before releasing.
+The Docker final stage supplies Alpine and ICU; the .NET runtime is embedded by `dotnet publish` in the build stage.
+MSI and Debian recipes consume those published standalone binaries; framework-dependent tools and libraries use the consumer's runtime.
+
 ## Get (buy, borrow, rent, or whatever) a computer with an operating system on it
 
 .NET 8+ runs on Windows, macOS or Linux. You choose what you like to use for development.
@@ -27,7 +36,64 @@ git clone https://github.com/grate-devs/grate.git
 
 ```
 > cd grate
-> dotnet test --framework net10.0
+> dotnet test --solution unittests/CoreTests.slnf --framework net10.0 --max-parallel-test-modules 1
+```
+
+This runs the same seven core/database test projects as CI. Run one module at a
+time on a development machine: database containers share Docker Desktop's memory,
+and running several SQL Server or Oracle instances together can exhaust it.
+Each CI database job has a separate runner. Omit `--framework net10.0` to test all
+three supported frameworks, provided their runtimes are installed.
+
+Running `dotnet test` from the repository root includes 17 test projects across
+three frameworks, including command-line and Docker integration tests. MTP can run
+as many modules concurrently as there are logical processors. The existing
+`unittests/UnitTests.slnf` also includes these integration projects.
+
+Local Docker integration tests automatically build `grate-local:tests` from your
+checkout immediately before the first migration that needs the application
+container. Building projects, listing tests, or filtering out these tests does
+not run `docker build`. The selected Docker projects and target frameworks share
+one image build per normal .NET build; Docker reuses cached layers when inputs
+are unchanged. No image is pushed.
+
+A fully cached build can retain the image's original creation timestamp. Test
+helpers run on the host and are not included in the application image.
+
+```sh
+dotnet test --framework net10.0 --max-parallel-test-modules 1
+```
+
+CI and an explicit image other than `grate-local:tests` do not trigger this
+build. Set `GrateBuildLocalDockerImage=false` to disable it explicitly.
+
+The Docker test projects copy `unittests/Docker/testconfig.local.json` beside their
+executables as MTP configuration. It sets
+`GrateTestConfig__DefaultApplicationDockerImage=grate-local:tests`. An explicit
+`GrateTestConfig__ApplicationDockerImage` takes precedence, so callers can still
+select another image without editing the profile. Local runs need neither
+variable on the command line.
+
+Builds with `CI=true` or `ContinuousIntegrationBuild=true` select the separate
+`testconfig.ci.json`, which does not set a local image. `GrateTestEnvironment`
+can explicitly select `local` or `ci` during a build. `--no-build` uses whichever
+configuration was copied by the preceding build.
+
+The application-image setting applies only to Docker integration tests.
+`GrateTestConfig__DockerImage` independently selects the database image. The CI
+integration workflow currently disables the Docker tests because it does not
+build and pass a matching application image to them.
+
+For a focused Docker check, add, for example,
+`--project unittests/Docker/Docker.Sqlite`.
+
+`--no-build`, `--test-modules`, and direct test-executable runs reuse the last
+build plan. If it has already built the image, they do not rebuild it. Run without
+`--no-build` after changing application sources to prepare a fresh build plan.
+When automatic image building is disabled, prepare it explicitly:
+
+```sh
+docker build -f installers/docker/Dockerfile -t grate-local:tests .
 ```
 
 ## Build a self-contained executable (if you want)
