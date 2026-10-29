@@ -46,7 +46,7 @@ public class Script_results : IDisposable
         dbMigrator.RunSql(
                 Arg.Any<string>(), "02_unchanged_view.sql", Arg.Any<MigrationsFolder>(), Arg.Any<long>(),
                 Arg.Any<GrateEnvironment>(), Arg.Any<ConnectionType>(), Arg.Any<TransactionHandling>())
-            .Returns(false);
+            .Returns((SqlRun: false, HistoryRecorded: false));
 
         await migrator.Migrate();
 
@@ -96,7 +96,7 @@ public class Script_results : IDisposable
         dbMigrator.RunSql(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<MigrationsFolder>(), Arg.Any<long>(),
                 Arg.Any<GrateEnvironment>(), Arg.Any<ConnectionType>(), Arg.Any<TransactionHandling>())
-            .Returns(true);
+            .Returns((SqlRun: true, HistoryRecorded: !dryRun));
 
         return (new GrateMigrator(new MockGrateLoggerFactory(), dbMigrator), dbMigrator);
     }

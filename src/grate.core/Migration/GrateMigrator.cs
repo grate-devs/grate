@@ -133,7 +133,7 @@ internal record GrateMigrator : IGrateMigrator
         Separator('=');
         _logger.LogInformation("Migration Scripts");
         Separator('=');
-        bool anySqlRun = false;
+        bool anyScriptRecordedOrRun = false;
         try
         {
             // Start the transaction, if configured
@@ -178,14 +178,14 @@ internal record GrateMigrator : IGrateMigrator
                 {
                     if (processingFolderInDefaultTransaction || config.DryRun)
                     {
-                        anySqlRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
+                        anyScriptRecordedOrRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
                     }
                     else
                     {
                         using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
                         using (await dbMigrator.OpenNewActiveConnection())
                         {
-                            anySqlRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
+                            anyScriptRecordedOrRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
                         }
                         s.Complete();
                     }
@@ -222,13 +222,13 @@ internal record GrateMigrator : IGrateMigrator
         if (!config.DryRun)
         {
             //If we get here this means no exceptions are thrown above, so we can conclude the migration was successful!
-            if (anySqlRun || config.Baseline)
+            if (anyScriptRecordedOrRun || config.Baseline)
             {
                 await DbMigrator.Database.ChangeVersionStatus(MigrationStatus.Finished, versionId);
             }
             else
             {
-                // Delete the version record if no actual migration was performed, to avoid having a lot of "no-op"
+                // Delete the version record if neither SQL ran nor history was recorded, to avoid having a lot of "no-op"
                 // migrations if grate is run a lot without any changes
                 await DbMigrator.Database.DeleteVersionRecord(versionId);
             }
@@ -415,6 +415,7 @@ internal record GrateMigrator : IGrateMigrator
         var files = FileSystem.GetFiles(path, pattern, DbMigrator.Configuration.IgnoreDirectoryNames);
 
         var anySqlRun = false;
+        var anyScriptRecordedOrRun = false;
 
         foreach (var file in files)
         {
@@ -428,10 +429,11 @@ internal record GrateMigrator : IGrateMigrator
                     ? file.Name
                     : string.Join('/', Path.GetRelativePath(path.ToString(), file.FullName).Split(Path.DirectorySeparatorChar));
 
-                bool theSqlRan = await DbMigrator.RunSql(sql, fileNameToLog, folder, versionId, DbMigrator.Configuration.Environment,
+                var result = await DbMigrator.RunSql(sql, fileNameToLog, folder, versionId, DbMigrator.Configuration.Environment,
                     connectionType, transactionHandling);
 
-                if (theSqlRan)
+                anyScriptRecordedOrRun |= result.SqlRun || result.HistoryRecorded;
+                if (result.SqlRun)
                 {
                     anySqlRun = true;
                     AddScriptRunToResult(folder, fileNameToLog);
@@ -456,7 +458,7 @@ internal record GrateMigrator : IGrateMigrator
         {
             _logger.LogInformation(" No sql run, either an empty folder, or all files run against destination previously.");
         }
-        return anySqlRun;
+        return anyScriptRecordedOrRun;
 
     }
 

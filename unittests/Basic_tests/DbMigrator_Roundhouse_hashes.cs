@@ -118,7 +118,7 @@ public class DbMigrator_Roundhouse_hashes
             new GrateConfiguration { DisableTokenReplacement = true });
     }
 
-    private static Task<bool> RunScript(DbMigrator migrator, string sql, MigrationType type) =>
-        migrator.RunSql(sql, ScriptName, new MigrationsFolder("scripts", type), 1, null,
-            ConnectionType.Default, TransactionHandling.Default);
+    private static async Task<bool> RunScript(DbMigrator migrator, string sql, MigrationType type) =>
+        (await migrator.RunSql(sql, ScriptName, new MigrationsFolder("scripts", type), 1, null,
+            ConnectionType.Default, TransactionHandling.Default)).SqlRun;
 }
