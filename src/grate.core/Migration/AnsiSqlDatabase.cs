@@ -148,9 +148,17 @@ public abstract record AnsiSqlDatabase : IDatabase
     public async Task<IDisposable> OpenNewActiveConnection()
     {
         var newConnection = GetSqlConnection(ConnectionString);
-        await Open(newConnection);
-        ActiveConnection = newConnection;
-        return new NewActiveConnectionWrapper(ActiveConnection, this);
+        try
+        {
+            await Open(newConnection);
+            ActiveConnection = newConnection;
+            return new NewActiveConnectionWrapper(ActiveConnection, this);
+        }
+        catch
+        {
+            await newConnection.DisposeAsync();
+            throw;
+        }
     }
 
     protected async Task<TResult> RunInAutonomousTransaction<TResult>(string? connectionString, Func<DbConnection, Task<TResult>> func)
@@ -255,30 +263,7 @@ public abstract record AnsiSqlDatabase : IDatabase
         }
     }
 
-    protected async Task WaitUntilDatabaseIsReady()
-    {
-        const int maxDelay = 10_000;
-        int totalDelay = 0;
-
-        var databaseReady = false;
-        do
-        {
-            try
-            {
-                using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
-                using (await OpenNewActiveConnection())
-                {
-                    databaseReady = true;
-                }
-                s.Complete();
-            }
-            catch (DbException)
-            {
-                await Task.Delay(1000);
-                totalDelay += 1000;
-            }
-        } while (!databaseReady && totalDelay < maxDelay);
-    }
+    protected Task WaitUntilDatabaseIsReady() => DatabaseReadiness.Wait(this);
 
     public async Task<bool> VersionTableExists() => (await ExistingTable(SchemaName, VersionTableName) is not null);
 
