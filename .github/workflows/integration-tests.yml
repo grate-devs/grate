@@ -14,6 +14,12 @@ on:
       - docs/
   workflow_dispatch:
 
+# This workflow only builds and tests; superseded revisions need not retain
+# their large database matrix while the newest revision waits for runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   id-token: write # This is required for requesting the JWT
   contents: read  # This is required for actions/checkout
@@ -30,14 +36,16 @@ jobs:
       #is-release: 'true'
     
     steps:
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
-      with:
-        dotnet-version: 10.0.x
     - name: Checkout
       uses: actions/checkout@v7
       with:
         fetch-depth: 0
+
+    - name: Setup .NET 11 RC3 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+      with:
+        global-json-file: global.json
+        dotnet-version: 10.0.x
     - name: Install GitVersion
       uses: gittools/actions/gitversion/setup@v4.7.0
       with:
@@ -64,13 +72,14 @@ jobs:
           # - osx-x64
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10
+    - name: Setup .NET 11 RC3 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish -f net10.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      run: dotnet publish -f net11.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
@@ -98,13 +107,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10
+    - name: Setup .NET 11 RC3 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish -f net10.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      run: dotnet publish -f net11.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
@@ -127,9 +137,10 @@ jobs:
           #- osx-x64
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+         global-json-file: global.json
          dotnet-version: |
           8.0.x
           9.0.x
@@ -138,7 +149,7 @@ jobs:
     - name: Build Test DLLs ${{ matrix.arch }}
       run: |
         dotnet restore -r ${{ matrix.arch }} unittests/UnitTests.slnf
-        dotnet publish -f net10.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
+        dotnet publish -f net11.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
 
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
@@ -161,9 +172,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: |
           8.0.x
           9.0.x
@@ -172,7 +184,7 @@ jobs:
     - name: Build Test DLLs ${{ matrix.arch }}
       run: |
         dotnet restore -r ${{ matrix.arch }} unittests/UnitTests.slnf
-        dotnet publish -f net10.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
+        dotnet publish -f net11.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
 
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
@@ -358,9 +370,10 @@ jobs:
         name: integration-tests-linux-x64-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: integration-tests/linux-x64
 
-    - name: Setup .NET 10
+    - name: Setup .NET 11 RC3 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: chmod u+x
@@ -473,9 +486,10 @@ jobs:
         name: integration-tests-${{ matrix.os.arch }}-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: integration-tests/${{ matrix.os.arch }}
 
-    - name: Setup .NET 10
+    - name: Setup .NET 11 RC3 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: chmod u+x

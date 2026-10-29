@@ -72,7 +72,7 @@ public class FolderConfiguration_
         {
             {
                 "Mostly defaults",
-                "/tmp/jalla",
+                Path.GetTempPath(),
                 @"--folders=folder1=type:Once;folder2=type:EveryTime;folder3=type:AnyTime",
                 new FoldersConfiguration(
                     new MigrationsFolder("folder1", MigrationType.Once),
@@ -115,8 +115,9 @@ public class FolderConfiguration_
 
     private static Task<GrateConfiguration?> ParseGrateConfiguration(params string[] commandline)
     {
-        var migrateCommand = new MigrateCommand(null!);
-        var parseResult = migrateCommand.Parse(commandline);
+        var migrateCommand = new MigrateCommand((_, _) => Task.FromResult(0));
+        var parseResult = migrateCommand.Parse(["--connectionstring", "unused", .. commandline]);
+        Assert.Empty(parseResult.Errors);
 
         return Task.FromResult<GrateConfiguration?>(migrateCommand.GetConfiguration(parseResult));
     }
