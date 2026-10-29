@@ -37,6 +37,24 @@ public abstract record AnsiSqlDatabase : IDatabase
         Logger = logger;
         _syntax = syntax;
     }
+
+    protected AnsiSqlDatabase(AnsiSqlDatabase original)
+    {
+        Logger = original.Logger;
+        _syntax = original._syntax;
+        Config = original.Config;
+        SchemaName = original.SchemaName;
+        ConnectionString = original.ConnectionString;
+        AdminConnectionString = original.AdminConnectionString;
+        VersionTableName = original.VersionTableName;
+        ScriptsRunTableName = original.ScriptsRunTableName;
+        ScriptsRunErrorsTableName = original.ScriptsRunErrorsTableName;
+
+        // Copies own their connections, history cache and pending writes.
+        _deferredWrites = new();
+        // The active connection is selected by SetDefaultConnectionActive before use.
+        ActiveConnection = default!;
+    }
     
     public string ServerName => Connection.DataSource;
     public virtual string DatabaseName => Connection.Database;
