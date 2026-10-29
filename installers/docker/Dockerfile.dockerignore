@@ -1,0 +1,17 @@
+# Send only the files used by this Dockerfile. Host build output must not
+# invalidate the image cache each time dotnet test builds the solution.
+**
+!global.json
+!*.props
+!*.ruleset
+!src/
+!src/**
+!docs/
+!docs/skills/
+!docs/skills/use-grate/
+!docs/skills/use-grate/**
+!installers/
+!installers/docker/
+!installers/docker/entrypoint.sh
+**/bin
+**/obj

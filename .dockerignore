@@ -1,0 +1,6 @@
+.git
+**/bin
+**/obj
+**/TestResults
+publish
+integration-tests

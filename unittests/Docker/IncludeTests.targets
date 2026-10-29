@@ -1,4 +1,33 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" >
+  <PropertyGroup>
+    <GrateTestEnvironment Condition="'$(GrateTestEnvironment)' == '' and ('$(CI)' == 'true' or '$(ContinuousIntegrationBuild)' == 'true')">ci</GrateTestEnvironment>
+    <GrateTestEnvironment Condition="'$(GrateTestEnvironment)' == ''">local</GrateTestEnvironment>
+    <GrateBuildLocalDockerImage Condition="'$(GrateBuildLocalDockerImage)' == '' and '$(GrateTestEnvironment)' == 'local' and ('$(GrateTestConfig__ApplicationDockerImage)' == '' or '$(GrateTestConfig__ApplicationDockerImage)' == 'grate-local:tests')">true</GrateBuildLocalDockerImage>
+    <GrateDockerExecutable Condition="'$(GrateDockerExecutable)' == ''">docker</GrateDockerExecutable>
+  </PropertyGroup>
+  <!-- Only write a shared build plan here. Test filters are applied at runtime,
+       so Docker must not run until a selected test actually needs the image. -->
+  <Target Name="PrepareLocalDockerImage" BeforeTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)BuildLocalImage.proj"
+             Targets="Prepare"
+             Condition="'$(GrateBuildLocalDockerImage)' == 'true' and '$(GrateTestEnvironment)' == 'local'"
+             RemoveProperties="TargetFramework;TargetFrameworks;RuntimeIdentifier;RuntimeIdentifiers;SelfContained;OutputPath;OutDir;IntermediateOutputPath;BaseIntermediateOutputPath"
+             Properties="GrateDockerExecutable=$(GrateDockerExecutable)">
+      <Output TaskParameter="TargetOutputs" ItemName="_LocalDockerImagePlan" />
+    </MSBuild>
+    <Copy SourceFiles="@(_LocalDockerImagePlan)" DestinationFiles="$(TargetDir)$(AssemblyName).docker-build"
+          Condition="'@(_LocalDockerImagePlan)' != ''" />
+    <Delete Files="$(TargetDir)$(AssemblyName).docker-build"
+            Condition="'@(_LocalDockerImagePlan)' == ''" />
+  </Target>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)testconfig.$(GrateTestEnvironment).json"
+          Link="$(AssemblyName).testconfig.json"
+          TargetPath="$(AssemblyName).testconfig.json"
+          CopyToOutputDirectory="Always"
+          CopyToPublishDirectory="Always" />
+  </ItemGroup>
   <ItemGroup>
     <Compile 
       Include="$(ProjectToIncludeTestsFrom)/Running_MigrationScripts/**/*.cs"

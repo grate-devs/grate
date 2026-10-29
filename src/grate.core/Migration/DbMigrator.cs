@@ -77,11 +77,11 @@ internal record DbMigrator : IDbMigrator
 
     public GrateConfiguration Configuration { get; set; }
 
-    public async Task<bool> RunSql(string sql, string scriptName, MigrationsFolder folder, long versionId,
+    public async Task<(bool SqlRun, bool HistoryRecorded)> RunSql(string sql, string scriptName, MigrationsFolder folder, long versionId,
         GrateEnvironment? environment,
         ConnectionType connectionType, TransactionHandling transactionHandling)
     {
-        var theSqlWasRun = false;
+        var result = (SqlRun: false, HistoryRecorded: false);
 
         var type = folder.Type;
 
@@ -98,7 +98,7 @@ internal record DbMigrator : IDbMigrator
 
         if (!InCorrectEnvironment(scriptName, environment))
         {
-            return false;
+            return (SqlRun: false, HistoryRecorded: false);
         }
 
         // the scripts are stored in the database with tokens replaced. This means we need to do any token work _before_ we start checking hashes etc
@@ -110,7 +110,7 @@ internal record DbMigrator : IDbMigrator
         if (Configuration.Baseline)
         {
             await RecordScriptInScriptsRunTable(scriptName, sql, type, versionId, transactionHandling);
-            return false;
+            return (SqlRun: false, HistoryRecorded: !Configuration.DryRun);
         }
 
         if (await ThisScriptIsAlreadyRun(scriptName, transactionHandling) && !IsEverytimeScript(scriptName, type))
@@ -129,19 +129,20 @@ internal record DbMigrator : IDbMigrator
                         LogScriptChangedWarning(scriptName);
                         Logger.LogDebug("Running script anyway due to WarnOnOneTimeScriptChanges option being set.");
                         await LogAndRunSql();
-                        theSqlWasRun = true;
+                        result = (SqlRun: true, HistoryRecorded: !Configuration.DryRun);
                         break;
 
                     case MigrationType.Once when changeHandling == ChangedScriptHandling.WarnAndIgnore:
                         LogScriptChangedWarning(scriptName);
                         Logger.LogDebug("Ignoring script but marking as run due to WarnAndIgnoreOnOneTimeScriptChanges option being set.");
                         await RecordScriptInScriptsRunTable(scriptName, sql, type, versionId, transactionHandling);
+                        result = (SqlRun: false, HistoryRecorded: !Configuration.DryRun);
                         break;
 
                     case MigrationType.AnyTime:
                     case MigrationType.EveryTime:
                         await LogAndRunSql();
-                        theSqlWasRun = true;
+                        result = (SqlRun: true, HistoryRecorded: !Configuration.DryRun);
                         break;
                 }
             }
@@ -153,10 +154,10 @@ internal record DbMigrator : IDbMigrator
         else
         {
             await LogAndRunSql();
-            theSqlWasRun = true;
+            result = (SqlRun: true, HistoryRecorded: !Configuration.DryRun);
         }
 
-        return theSqlWasRun;
+        return result;
     }
 
     public async Task<bool> RunSqlWithoutLogging(
@@ -233,17 +234,10 @@ internal record DbMigrator : IDbMigrator
     private async Task<bool> ScriptHasChanged(string scriptName, string sql)
     {
         var currentHash = await Database.GetCurrentHash(scriptName);
-        var newHash = GetHash(sql);
-
-        return currentHash != newHash;
+        return !_hashGenerator.Matches(sql, currentHash);
     }
 
     private static string FileName(string path) => new FileInfo(path).Name;
-
-    private string GetHash(string sql)
-    {
-        return _hashGenerator.Hash(sql);
-    }
 
     private async Task<bool> ThisScriptIsAlreadyRun(string scriptName, TransactionHandling transactionHandling) => await Database.HasRun(scriptName, transactionHandling);
 
