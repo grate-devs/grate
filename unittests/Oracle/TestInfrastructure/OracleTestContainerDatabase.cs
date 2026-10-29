@@ -24,7 +24,8 @@ public record OracleTestContainerDatabase(
         // This undocumented parameter is static, so the test container must restart once.
         // Give the listener headroom for rapid short-lived connections between load updates.
         const string configureTestDatabase = """
-            WHENEVER SQLERROR EXIT SQL.SQLCODE
+            WHENEVER OSERROR EXIT FAILURE
+            WHENEVER SQLERROR EXIT FAILURE
             ALTER SYSTEM SET "_sys_logon_delay"=0 SCOPE=SPFILE;
             ALTER SYSTEM SET PROCESSES=1000 SCOPE=SPFILE;
             SHUTDOWN IMMEDIATE;

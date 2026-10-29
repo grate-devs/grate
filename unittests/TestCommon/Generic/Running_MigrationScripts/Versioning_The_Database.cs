@@ -35,17 +35,16 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
             await migrator.Migrate();
 
             var firstVersionId = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
-            var secondVersionId = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
+            var secondVersionId = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.5");
 
             var table = Context.Syntax.TableWithSchema(config.SchemaName, config.VersionTableName);
             using var connection = Context.External.CreateDbConnection(db);
             var versions = (await connection.QueryAsync<(long id, string version)>(
-                $"SELECT id, version FROM {table}")).Where(row => row.version == "1.2.3.4").ToArray();
+                $"SELECT id, version FROM {table}")).ToArray();
 
             // Generated identifiers may have gaps, for example when Oracle ages out a sequence cache.
-            Assert.Equal(2, versions.Length);
-            Assert.Contains(versions, row => row.id == firstVersionId);
-            Assert.Contains(versions, row => row.id == secondVersionId);
+            Assert.Equal(Assert.Single(versions, row => row.version == "1.2.3.4").id, firstVersionId);
+            Assert.Equal(Assert.Single(versions, row => row.version == "1.2.3.5").id, secondVersionId);
             Assert.NotEqual(firstVersionId, secondVersionId);
         }
         
