@@ -360,6 +360,11 @@ internal record GrateMigrator : IGrateMigrator
                     createDatabaseFolder.ConnectionType,
                     createDatabaseFolder.TransactionHandling
                 );
+
+                if (databaseCreated && !config.DryRun)
+                {
+                    await DatabaseReadiness.Wait(database);
+                }
             }
             else
             {
