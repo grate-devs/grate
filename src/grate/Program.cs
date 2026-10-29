@@ -17,62 +17,51 @@ namespace grate;
 
 public static class Program
 {
-    private static IServiceProvider _serviceProvider = default!;
-
-    public static async Task<int> Main(string[] args)
+    public static Task<int> Main(string[] args)
     {
-        // Skill installation is independent of database configuration and migration services.
-        if (args.FirstOrDefault() == "skills")
+        var rootCommand = new MigrateCommand(Migrate)
         {
-            var skillsRoot = new RootCommand();
-            skillsRoot.Subcommands.Add(new SkillsCommand());
-            return await skillsRoot.Parse(args).InvokeAsync();
-        }
-
-        // Temporarily parse the configuration, to get the verbosity level, and potentially set parameters
-        // to support the "IsUpToDate" check.
-        var cfg = ParseGrateConfiguration(args);
-        if (cfg.UpToDateCheck)
-        {
-            cfg = cfg with { Verbosity = LogLevel.Critical, DryRun = true };
-        }
-
-        _serviceProvider = BuildServiceProvider(cfg).CreateAsyncScope().ServiceProvider;
-
-        var rootCommand = Create<MigrateCommand>();
-
-        rootCommand.Description = $"grate v{GetVersion()} - sql for the 20s";
-
-        // System.CommandLine enables help, suggestions, typo corrections and parse-error reporting
-        // by default. We handle exceptions ourselves (see below), so disable the built-in handler.
-        var configuration = new InvocationConfiguration
-        {
-            EnableDefaultExceptionHandler = false
+            Description = $"grate v{GetVersion()} - sql for the 20s"
         };
 
-        var parseResult = rootCommand.Parse(args);
+        // Built-in help and parse-error actions run before the migration action, without
+        // constructing database services or binding configuration from invalid input.
+        return rootCommand.Parse(args).InvokeAsync(new InvocationConfiguration
+        {
+            EnableDefaultExceptionHandler = false
+        });
+    }
+
+    private static async Task<int> Migrate(CommandLineGrateConfiguration config, InvocationConfiguration invocationConfiguration)
+    {
+        if (config.UpToDateCheck)
+        {
+            config = config with { Verbosity = LogLevel.Critical, DryRun = true };
+        }
+
+        await using var serviceProvider = BuildServiceProvider(config);
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<GrateMigrator>>();
 
         int result;
         try
         {
-            result = await parseResult.InvokeAsync(configuration);
+            await scope.ServiceProvider.GetRequiredService<IGrateMigrator>().Migrate();
+            result = 0;
         }
         catch (Exception ex)
         {
-            result = ExceptionHandler(ex, configuration);
+            result = ExceptionHandler(ex, invocationConfiguration, logger);
         }
 
         await WaitForLoggerToFinish();
-
         return result;
     }
 
-    private static int ExceptionHandler(Exception ex, InvocationConfiguration configuration)
+    private static int ExceptionHandler(Exception ex, InvocationConfiguration configuration, ILogger logger)
     {
         // Log the error message at the highest level, and the exception at debug level.
         // Avoids logging the exception stack trace to the end user, if logging level is not set to debug.
-
-        var logger = _serviceProvider.GetRequiredService<ILogger<GrateMigrator>>();
 
         configuration.Error.WriteColoredMessage("An error occurred: ", GrateConsoleColor.Foreground.Red);
 
@@ -84,14 +73,6 @@ public static class Program
 
 
     private static string GetVersion() => Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "1.0.0.1";
-
-    private static CommandLineGrateConfiguration ParseGrateConfiguration(IReadOnlyList<string> commandline)
-    {
-        var cmd = new MigrateCommand(null!);
-        var parseResult = cmd.Parse(commandline);
-        return cmd.GetConfiguration(parseResult);
-    }
-
 
     /// <summary>
     /// Wait for logger to be finished - it logs on a different thread, and we
@@ -122,8 +103,6 @@ public static class Program
     {
         IServiceCollection services = new ServiceCollection();
 
-        services.AddCliCommands();
-
         services.AddLogging(logging => logging.AddConsole(options =>
             {
                 options.FormatterName = GrateConsoleFormatter.FormatterName;
@@ -148,6 +127,4 @@ public static class Program
 
         return services.BuildServiceProvider();
     }
-
-    private static T Create<T>() where T : notnull => _serviceProvider.GetRequiredService<T>();
 }

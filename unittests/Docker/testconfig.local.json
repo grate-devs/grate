@@ -1,0 +1,5 @@
+{
+  "environmentVariables": {
+    "GrateTestConfig__DefaultApplicationDockerImage": "grate-local:tests"
+  }
+}

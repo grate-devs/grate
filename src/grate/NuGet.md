@@ -5,6 +5,13 @@ no EF migrations. It gives you full flexibility, and full control of your migrat
 all the fancy features of you particular database system. You are not constrained to any lowest common
 feature set of all supported databases.
 
+## Supported runtimes
+
+This tool includes .NET 8, 9, 10 and 11 assets. The .NET 11 build supports RC3
+(runtime `11.0.0-rc.3.26522.148`) with Microsoft's go-live license. Install a
+matching supported runtime and use an SDK to install the tool. RC3 support ends
+November 10, 2026; move to the final .NET 11 runtime when available.
+
 ## Minimal example
 The only required argument to pass to grate is a **connection string** to tell it where to find your database. 
 It will deploy to that database, looking for sql scripts in the current directory.

@@ -3,18 +3,42 @@
 I'm very happy that you are reading this page! Grate needs all the contributors it can get!
 I'll try to jot down a few notes on how to get started developing grate.
 
-## Get .NET 10
+## Get .NET 11 RC3
 
-Grate is built with .NET 8/9/10. You can get it [here](https://dotnet.microsoft.com/en-us/download) and start building right away.
+Install the SDK pinned in `global.json`: .NET `11.0.100-rc.3.26522.148`.
+It is available from the [.NET 11 downloads](https://dotnet.microsoft.com/download/dotnet/11.0).
+Grate targets .NET 8/9/10/11; install the .NET 8, 9 and 10 runtimes as well to
+execute tests for those target frameworks. RC3 has go-live support for production
+use through November 10, 2026. See [package release guidance](docs/Packaging.md)
+for all distribution formats and the move to .NET 11 GA.
 
-The build requires SDK 10.0.403 or a later stable .NET 10 SDK, as selected by `global.json`.
-CI installs `10.0.x` and Docker uses `10.0-alpine` / `alpine:3` so subsequent builds receive servicing updates.
+CI installs the RC3 SDK selected by `global.json`. Docker uses pinned RC3 SDK
+and runtime-deps images on Alpine 3.24. Update the SDK/runtime pins and image
+digests together for servicing releases and GA; rebuild all self-contained outputs
+to pick up runtime security fixes. Existing .NET 8/9/10 runtime minimum checks
+and the patched native SQLite dependency remain in effect.
 Self-contained distributions use the selected SDK's latest runtime patch and reject versions below
 8.0.33 / 9.0.22 / 10.0.14. These are security minimums, not exact runtime pins.
 Pull fresh base images when rebuilding Docker (`docker buildx build --pull ...`), record the resulting
 image digests, and verify the embedded runtime and native SQLite versions before releasing.
 The Docker final stage supplies Alpine and ICU; the .NET runtime is embedded by `dotnet publish` in the build stage.
 MSI and Debian recipes consume those published standalone binaries; framework-dependent tools and libraries use the consumer's runtime.
+
+### Working with the stable .NET 10 SDK
+
+To work only on the `net10.0` target without installing the .NET 11 prerelease,
+run from a directory outside the checkout so the repository's `global.json`
+does not select the RC SDK. With a stable .NET 10 SDK selected by
+`dotnet --version`, use absolute paths and override the target list, for example:
+
+```sh
+dotnet build /absolute/path/to/grate/unittests/Basic_tests/Basic_tests.csproj -c Release -p:TargetFrameworks=net10.0
+dotnet /absolute/path/to/grate/unittests/Basic_tests/bin/Release/net10.0/Basic_tests.dll --filter-class Basic_tests.CommandLineParsing.CliInvocationTests --minimum-expected-tests 1
+```
+
+The second command runs the test executable directly because the repository's
+`global.json` also selects the test runner. This workflow covers `net10.0` only;
+building and testing `net11.0` still requires the pinned SDK.
 
 ## Get (buy, borrow, rent, or whatever) a computer with an operating system on it
 
@@ -36,7 +60,64 @@ git clone https://github.com/grate-devs/grate.git
 
 ```
 > cd grate
-> dotnet test --framework net10.0
+> dotnet test --solution "$PWD/unittests/CoreTests.slnf" --framework net11.0 --max-parallel-test-modules 1
+```
+
+This runs the same seven core/database test projects as CI. Run one module at a
+time on a development machine: database containers share Docker Desktop's memory,
+and running several SQL Server or Oracle instances together can exhaust it.
+Each CI database job has a separate runner. Omit `--framework net11.0` to test all
+four supported frameworks, provided their runtimes are installed.
+
+Running `dotnet test` from the repository root includes 17 test projects across
+four frameworks, including command-line and Docker integration tests. MTP can run
+as many modules concurrently as there are logical processors. The existing
+`unittests/UnitTests.slnf` also includes these integration projects.
+
+Local Docker integration tests automatically build `grate-local:tests` from your
+checkout immediately before the first migration that needs the application
+container. Building projects, listing tests, or filtering out these tests does
+not run `docker build`. The selected Docker projects and target frameworks share
+one image build per normal .NET build; Docker reuses cached layers when inputs
+are unchanged. No image is pushed.
+
+A fully cached build can retain the image's original creation timestamp. Test
+helpers run on the host and are not included in the application image.
+
+```sh
+dotnet test --framework net11.0 --max-parallel-test-modules 1
+```
+
+CI and an explicit image other than `grate-local:tests` do not trigger this
+build. Set `GrateBuildLocalDockerImage=false` to disable it explicitly.
+
+The Docker test projects copy `unittests/Docker/testconfig.local.json` beside their
+executables as MTP configuration. It sets
+`GrateTestConfig__DefaultApplicationDockerImage=grate-local:tests`. An explicit
+`GrateTestConfig__ApplicationDockerImage` takes precedence, so callers can still
+select another image without editing the profile. Local runs need neither
+variable on the command line.
+
+Builds with `CI=true` or `ContinuousIntegrationBuild=true` select the separate
+`testconfig.ci.json`, which does not set a local image. `GrateTestEnvironment`
+can explicitly select `local` or `ci` during a build. `--no-build` uses whichever
+configuration was copied by the preceding build.
+
+The application-image setting applies only to Docker integration tests.
+`GrateTestConfig__DockerImage` independently selects the database image. The CI
+integration workflow currently disables the Docker tests because it does not
+build and pass a matching application image to them.
+
+For a focused Docker check, add, for example,
+`--project "$PWD/unittests/Docker/Docker.Sqlite/Docker.Sqlite.csproj"`.
+
+`--no-build`, `--test-modules`, and direct test-executable runs reuse the last
+build plan. If it has already built the image, they do not rebuild it. Run without
+`--no-build` after changing application sources to prepare a fresh build plan.
+When automatic image building is disabled, prepare it explicitly:
+
+```sh
+docker build -f installers/docker/Dockerfile -t grate-local:tests .
 ```
 
 ## Build a self-contained executable (if you want)
@@ -47,7 +128,7 @@ You can build a self-contained executable just using `dotnet publish` (example f
 
 ```
 > cd src/grate
-> dotnet publish -r osx-x64 --self-contained true --framework net10.0 -c Release -o /tmp/grate
+> dotnet publish -r osx-x64 --self-contained true --framework net11.0 -c Release -o /tmp/grate
 ```
 
 Find the fully independent executable, and the noticable size:
