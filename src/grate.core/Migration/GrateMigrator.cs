@@ -145,9 +145,10 @@ internal record GrateMigrator : IGrateMigrator
             // Start the transaction, if configured
             if (runInTransaction)
             {
-                // Setup and versioning run outside the transaction. Reopen the main connection
-                // inside the scope so providers enlist migration scripts in that transaction.
+                // Setup and versioning run outside the transaction. Reopen connections inside
+                // the scope so providers enlist migration scripts in that transaction.
                 await dbMigrator.CloseConnection();
+                await dbMigrator.CloseAdminConnection();
                 dbMigrator.SetDefaultConnectionActive();
 
                 // use command timeout as the max timeout and transaction scope timeout, if greater than current MaximumTimeout
