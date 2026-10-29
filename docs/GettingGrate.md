@@ -89,7 +89,13 @@ grate is available on [winget](https://docs.microsoft.com/en-us/windows/package-
 
 ## Homebrew
 
-grate is available as a Homebrew cask. Simply `brew install --cask erikbra/cask/grate` for awesomeness!
+grate is available as a Homebrew formula:
+
+```sh
+brew install grate
+```
+
+Homebrew automatically installs the required .NET dependency. You do not need to install or configure .NET separately.
 
 ## Agent skill
 
