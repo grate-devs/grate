@@ -37,9 +37,9 @@
          including the FTS5 fix for CVE-2026-11822 / CVE-2026-11824 (fixed in 3.53.2). -->
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <PackageVersion Include="Testcontainers" Version="4.16.0" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.MariaDb" Version="4.14.0" />
-    <PackageVersion Include="Testcontainers.Oracle" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers.Oracle" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.14.0" />
     <PackageVersion Include="Xunit.DependencyInjection.Logging" Version="11.0.0" />
     <PackageVersion Include="MartinCostello.Logging.XUnit.v3" Version="0.7.1" />
