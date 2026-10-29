@@ -166,10 +166,10 @@ internal record GrateMigrator : IGrateMigrator
                 // TransactionScope defaults to Serializable. On SQL Server that leaves key-range locks on the
                 // ScriptsRun table after we read it, which blocks folders that run outside the transaction
                 // (permissions, afterMigration, ...) from writing their own ScriptsRun rows until we commit (#657).
-                // Read committed is enough here, there is only ever one writer during a migration.
+                // Use read committed for a new transaction; joining a caller's transaction must retain its isolation level.
                 var transactionOptions = new TransactionOptions
                 {
-                    IsolationLevel = IsolationLevel.ReadCommitted,
+                    IsolationLevel = Transaction.Current?.IsolationLevel ?? IsolationLevel.ReadCommitted,
                     Timeout = transactionTimeout
                 };
                 scope = new TransactionScope(TransactionScopeOption.Required, transactionOptions, TransactionScopeAsyncFlowOption.Enabled);
