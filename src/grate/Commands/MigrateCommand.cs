@@ -1,6 +1,5 @@
 ﻿using System.CommandLine;
 using grate.Configuration;
-using grate.Migration;
 using Microsoft.Extensions.Logging;
 using static grate.Configuration.DefaultConfiguration;
 
@@ -9,7 +8,7 @@ namespace grate.Commands;
 internal sealed class MigrateCommand : RootCommand
 {
 
-    public MigrateCommand(IGrateMigrator mi) : base("Migrates the database")
+    public MigrateCommand(Func<CommandLineGrateConfiguration, InvocationConfiguration, Task<int>> migrate) : base("Migrates the database")
     {
         // System.CommandLine's RootCommand adds a built-in --version option by default.
         // grate uses --version for its own purpose (the database version being migrated to),
@@ -54,7 +53,7 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(Database);
         Options.Add(ServerName);
 
-        SetAction((_, _) => mi.Migrate());
+        SetAction((result, _) => migrate(GetConfiguration(result), result.InvocationConfiguration));
     }
 
     /// <summary>
@@ -64,62 +63,44 @@ internal sealed class MigrateCommand : RootCommand
     /// </summary>
     public CommandLineGrateConfiguration GetConfiguration(ParseResult parseResult)
     {
-        // Defaults are used for options that have no default value and weren't supplied on the
-        // command line, to preserve the record's initialised defaults (mirroring the old binder,
-        // which left such properties untouched).
+        // Preserve configuration defaults for optional values without a default value factory.
         var defaults = new CommandLineGrateConfiguration();
 
         return new CommandLineGrateConfiguration
         {
-            ConnectionString = GetValueOrDefault(parseResult, ConnectionString),
-            AdminConnectionString = GetValueOrDefault(parseResult, AdminConnectionString),
-            SqlFilesDirectory = GetValueOrDefault(parseResult, SqlFilesDirectory)!,
-            OutputPath = GetValueOrDefault(parseResult, OutputPath)!,
-            Folders = GetValueOrDefault(parseResult, Folders) ?? defaults.Folders,
-            AccessToken = GetValueOrDefault(parseResult, AccessToken),
-            CommandTimeout = GetValueOrDefault(parseResult, CommandTimeout),
-            AdminCommandTimeout = GetValueOrDefault(parseResult, CommandTimeoutAdmin),
-            DatabaseType = GetValueOrDefault(parseResult, DatabaseType),
-            Transaction = GetValueOrDefault(parseResult, RunInTransaction),
-            Environment = GetValueOrDefault(parseResult, Environments),
-            SchemaName = GetValueOrDefault(parseResult, SchemaName)!,
-            NonInteractive = GetValueOrDefault(parseResult, Silent),
-            RepositoryPath = GetValueOrDefault(parseResult, RepositoryPath),
-            Version = GetValueOrDefault(parseResult, Version) ?? defaults.Version,
-            Drop = GetValueOrDefault(parseResult, Drop),
-            CreateDatabase = GetValueOrDefault(parseResult, CreateDatabase),
-            DisableTokenReplacement = GetValueOrDefault(parseResult, Tokens),
-            WarnOnOneTimeScriptChanges = GetValueOrDefault(parseResult, WarnAndRunOnScriptChange),
-            WarnAndIgnoreOnOneTimeScriptChanges = GetValueOrDefault(parseResult, WarnAndIgnoreOnScriptChange),
-            UserTokens = GetValueOrDefault(parseResult, UserTokens),
-            DoNotStoreScriptsRunText = GetValueOrDefault(parseResult, DoNotStoreScriptText),
-            Baseline = GetValueOrDefault(parseResult, Baseline),
-            RunAllAnyTimeScripts = GetValueOrDefault(parseResult, RunAllAnyTimeScripts),
-            DryRun = GetValueOrDefault(parseResult, DryRun),
-            Restore = GetValueOrDefault(parseResult, Restore),
-            IgnoreDirectoryNames = GetValueOrDefault(parseResult, IgnoreDirectoryNames),
-            UpToDateCheck = GetValueOrDefault(parseResult, UpToDateCheck),
+            ConnectionString = parseResult.GetValue(ConnectionString),
+            AdminConnectionString = parseResult.GetValue(AdminConnectionString),
+            SqlFilesDirectory = parseResult.GetValue(SqlFilesDirectory)!,
+            OutputPath = parseResult.GetValue(OutputPath)!,
+            Folders = parseResult.GetValue(Folders) ?? defaults.Folders,
+            AccessToken = parseResult.GetValue(AccessToken),
+            CommandTimeout = parseResult.GetValue(CommandTimeout),
+            AdminCommandTimeout = parseResult.GetValue(CommandTimeoutAdmin),
+            DatabaseType = parseResult.GetValue(DatabaseType),
+            Transaction = parseResult.GetValue(RunInTransaction),
+            Environment = parseResult.GetValue(Environments),
+            SchemaName = parseResult.GetValue(SchemaName)!,
+            NonInteractive = parseResult.GetValue(Silent),
+            RepositoryPath = parseResult.GetValue(RepositoryPath),
+            Version = parseResult.GetValue(Version) ?? defaults.Version,
+            Drop = parseResult.GetValue(Drop),
+            CreateDatabase = parseResult.GetValue(CreateDatabase),
+            DisableTokenReplacement = parseResult.GetValue(Tokens),
+            WarnOnOneTimeScriptChanges = parseResult.GetValue(WarnAndRunOnScriptChange),
+            WarnAndIgnoreOnOneTimeScriptChanges = parseResult.GetValue(WarnAndIgnoreOnScriptChange),
+            UserTokens = parseResult.GetValue(UserTokens),
+            DoNotStoreScriptsRunText = parseResult.GetValue(DoNotStoreScriptText),
+            Baseline = parseResult.GetValue(Baseline),
+            RunAllAnyTimeScripts = parseResult.GetValue(RunAllAnyTimeScripts),
+            DryRun = parseResult.GetValue(DryRun),
+            Restore = parseResult.GetValue(Restore),
+            IgnoreDirectoryNames = parseResult.GetValue(IgnoreDirectoryNames),
+            UpToDateCheck = parseResult.GetValue(UpToDateCheck),
             // Verbosity has no default value factory; when it isn't supplied keep the record default.
             Verbosity = parseResult.GetResult(Verbosity) is { Implicit: false }
-                ? GetValueOrDefault(parseResult, Verbosity)
+                ? parseResult.GetValue(Verbosity)
                 : defaults.Verbosity,
         };
-    }
-
-    // Reads an option value, returning the type default when the option wasn't supplied (or failed to
-    // convert). This keeps configuration binding tolerant - e.g. the required --connectionstring throws
-    // from GetValue when missing, but this preliminary binding must not crash. The authoritative parse
-    // error reporting happens when the command is invoked.
-    private static T? GetValueOrDefault<T>(ParseResult parseResult, Option<T> option)
-    {
-        try
-        {
-            return parseResult.GetValue(option);
-        }
-        catch (InvalidOperationException)
-        {
-            return default;
-        }
     }
 
     //REQUIRED OPTIONS

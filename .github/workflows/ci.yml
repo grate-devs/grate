@@ -1,19 +1,23 @@
-# This is alight weight build and test, suitable for rapid checks of commits on feature branches etc.
+# Build, security analysis, and the full database/runtime test matrix for PRs.
 name: CI
 
-on: 
-  push: # Trigger on pushes to feature branches for safety before a PR
-    branches-ignore:
-      - main # don't run on main (build.yml handles that)
-    paths-ignore:
-      - docs/
+on:
+  # PR updates already include branch pushes. Running both events doubles the
+  # database suites and CodeQL work; use workflow_dispatch for pre-PR checks.
   pull_request:
     branches:
       - main
-    paths-ignore:
-      - docs/
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Replace obsolete test runs without letting a manual branch run cancel a PR's
+# merge-ref validation. Publishing on main is handled by build.yml separately.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-code:
@@ -21,9 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+         global-json-file: global.json
          dotnet-version: |
           8.0.x
           9.0.x
@@ -47,9 +52,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
 
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: |
           8.0.x
           9.0.x
@@ -68,6 +74,8 @@ jobs:
     name: Run tests
 
     runs-on: ubuntu-latest
+    # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
+    timeout-minutes: ${{ matrix.category == 'Oracle' && 45 || 30 }}
     #needs: build-code
 
     strategy:
@@ -78,26 +86,48 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
+    - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: |
           8.0.x
           9.0.x
           10.0.x
     - name: Test
+      # SDK 11 multi-TFM discovery requires an absolute project-file path.
       # The Sqlite lane also executes the SQL examples shipped with the skill.
       # Avoid starting a database container for each TFM concurrently on the same runner.
       run: |
+        # Keep host state and database crash logs even if a runtime never starts.
+        timeout --kill-after=5s "$MONITOR_TIMEOUT" bash .github/scripts/monitor-test-containers.sh \
+          "/tmp/test-results/${{ matrix.category }}" &
+        diagnostics_pid=$!
+        stop_diagnostics() {
+          test_exit_code=$?
+          trap - EXIT
+          kill "$diagnostics_pid" 2>/dev/null || true
+          wait "$diagnostics_pid" 2>/dev/null || true
+          exit "$test_exit_code"
+        }
+        trap stop_diagnostics EXIT
+
         dotnet test \
-        --project unittests/${{ matrix.category }} \
+        --project "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
         --max-parallel-test-modules 1 \
+        --stop-on-fail on \
+        --long-running 60 \
+        --timeout "$TEST_TIMEOUT" \
+        --results-directory /tmp/test-results/${{ matrix.category }} \
+        --report-xunit-trx \
         --coverage \
-        --coverage-output-format xml \
-        --coverage-output /tmp/test-results/${{ matrix.category }}.xml
+        --coverage-output-format xml
       env:
         LogLevel: Warning
         TZ: UTC
+        # Four sequential Oracle TFMs exceed the 20-minute default.
+        TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '35m' || '20m' }}
+        MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '25m' }}
 
     - name: Upload Unit Test Results
       if: always()
@@ -105,7 +135,7 @@ jobs:
       with:
         name: "${{ matrix.category }} XML test results"
         path: |
-          /tmp/test-results/${{ matrix.category }}.xml
+          /tmp/test-results/${{ matrix.category }}/
         retention-days: 1
 
 
@@ -120,6 +150,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: test-results
+          pattern: '* XML test results'
 
       - name: Setup .NET # Required to execute ReportGenerator
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
@@ -194,3 +225,107 @@ jobs:
           retention-days: 1
 
 
+
+  packages:
+    name: NuGet libraries and installed tool
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Verify packages across supported frameworks
+        shell: pwsh
+        run: ./scripts/verify-packages.ps1 -Kind Packages -OutputDirectory "${{ runner.temp }}/grate-packages"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: grate-nuget-packages
+          retention-days: 3
+          path: |
+            ${{ runner.temp }}/grate-packages/packages/*
+            ${{ runner.temp }}/grate-packages/tool-runtimes.txt
+
+  standalone:
+    name: CLI ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64, os: windows-latest, smoke: true }
+          - { rid: win-x86, os: windows-latest, smoke: true }
+          - { rid: win-arm64, os: windows-11-arm, smoke: true }
+          - { rid: linux-x64, os: ubuntu-latest, smoke: true }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, smoke: true }
+          # musl execution is covered by native Alpine container checks below.
+          - { rid: linux-musl-x64, os: ubuntu-latest, smoke: false }
+          - { rid: linux-musl-arm64, os: ubuntu-24.04-arm, smoke: false }
+          - { rid: osx-x64, os: macos-15-intel, smoke: true }
+          - { rid: osx-arm64, os: macos-15, smoke: true }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Verify self-contained runtime and execution
+        shell: pwsh
+        env:
+          RUN_SMOKE_TEST: ${{ matrix.smoke }}
+        run: ./scripts/verify-packages.ps1 -Kind Standalone -RuntimeIdentifier '${{ matrix.rid }}' -OutputDirectory "${{ runner.temp }}/grate-cli" -RunSmokeTest:($env:RUN_SMOKE_TEST -eq 'true')
+      - name: Check per-user MSI authoring regressions
+        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: ./installers/msi/Test-InstallerAuthoring.Tests.ps1
+      - name: Build MSI from verified Windows binary
+        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: ./installers/msi/Create-Installer.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate.exe" -Version '0.0.1' -arch ('${{ matrix.rid }}' -replace 'win-', '')
+      - name: Build Debian package from verified Linux binary
+        if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
+        shell: pwsh
+        run: ./installers/deb/Create-Package.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate" -Version '0.0.1' -arch ('${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64')
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: grate-package-${{ matrix.rid }}
+          retention-days: 3
+          path: |
+            ${{ runner.temp }}/grate-cli/published/*
+            ${{ runner.temp }}/grate-cli/*.json
+            installers/msi/tmp/*.msi
+            installers/deb/*.deb
+
+  docker:
+    name: Alpine ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, os: ubuntu-latest }
+          - { arch: arm64, os: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build native image for verification
+        run: docker build --build-arg VERSION=0.0.1 -f installers/docker/Dockerfile -t grate-package-test:local .
+      - name: Verify Alpine globalization, migration and bundled skill
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/grate-docker-smoke"
+          mkdir -p "$work/sql/up" "$work/output" "$work/skill"
+          echo 'CREATE TABLE package_smoke (id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES (1); CREATE TEMP TABLE package_check (value INTEGER CHECK(value = 1)); INSERT INTO package_check SELECT CASE WHEN COUNT(*) = 1 AND MIN(id) = 1 THEN 1 ELSE 0 END FROM package_smoke;' > "$work/sql/up/001_create.sql"
+          docker run --rm --entrypoint /app/grate grate-package-test:local --help
+          for _ in 1 2; do
+            docker run --rm -e LANG=nb_NO.UTF-8 -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local \
+              --databasetype sqlite --connectionstring 'Data Source=/smoke/smoke.db' --files /smoke/sql --output /smoke/output --silent
+          done
+          test -s "$work/smoke.db"
+          test "$(find "$work/output" -path '*/itemsRan/up/001_create.sql' | wc -l)" -eq 1
+          docker run --rm -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local skills install --local --path /smoke/skill
+          test -s "$work/skill/.agents/skills/use-grate/SKILL.md"

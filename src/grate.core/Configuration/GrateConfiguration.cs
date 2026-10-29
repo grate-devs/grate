@@ -5,8 +5,8 @@ using Microsoft.Extensions.Logging;
 namespace grate.Configuration;
 
 /// <summary>
-/// This is the 'schema' that System.CommandLine parses into for the MigrateCommand.
-/// This means that this object's properties should align with the options and arguments in `MigrateCommand` by convention.
+/// Configuration shared by CLI migrations and programmatic use.
+/// The CLI maps parsed option values explicitly onto this configuration.
 /// </summary>
 public record GrateConfiguration
 {
