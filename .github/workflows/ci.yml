@@ -125,9 +125,10 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
-        # Four sequential Oracle TFMs exceed the 20-minute default.
-        TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '35m' || '20m' }}
-        MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '25m' }}
+        # The 35-minute budget can expire during the fourth sequential Oracle TFM.
+        # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
+        TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
+        MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
 
     - name: Upload Unit Test Results
       if: always()
