@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\grate\grate.csproj" />
     <ProjectReference Include="..\TestCommon\TestCommon.csproj" />
+    <ProjectReference Include="..\Docker\Docker.Common\Docker.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>

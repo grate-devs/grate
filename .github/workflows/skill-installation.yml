@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
       - name: Build test runner and distributions
         shell: pwsh
         run: |
@@ -59,9 +59,9 @@ jobs:
           $version = "0.0.0-ci.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT"
           $os = if ($IsWindows) { 'win' } elseif ($IsMacOS) { 'osx' } else { 'linux' }
           $arch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
-          dotnet build unittests/Basic_tests -c Release -p:TargetFrameworks=net10.0
-          dotnet pack src/grate/grate.csproj -c Release -p:TargetFrameworks=net10.0 -p:PackAsTool=true -p:SelfContained=false -p:PackageVersion=$version -o "$root/packages"
-          dotnet publish src/grate/grate.csproj -c Release -f net10.0 -r "$os-$arch" --self-contained -p:SelfContained=true -p:TargetFrameworks=net10.0 -o "$root/published"
+          dotnet build unittests/Basic_tests -c Release -p:TargetFrameworks=net11.0
+          dotnet pack src/grate/grate.csproj -c Release -p:TargetFrameworks=net11.0 -p:PackAsTool=true -p:SelfContained=false -p:PackageVersion=$version -o "$root/packages"
+          dotnet publish src/grate/grate.csproj -c Release -f net11.0 -r "$os-$arch" --self-contained -p:SelfContained=true -p:TargetFrameworks=net11.0 -o "$root/published"
           New-Item -ItemType Directory -Force "$root/tool/.config" | Out-Null
           '{"version":1,"isRoot":true,"tools":{}}' | Set-Content "$root/tool/.config/dotnet-tools.json"
           "<configuration><packageSources><clear/><add key='local' value='$root/packages'/></packageSources></configuration>" | Set-Content "$root/nuget.config"
@@ -72,7 +72,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           $root = Join-Path $env:RUNNER_TEMP 'grate-skill-installation'
-          $tests = (Resolve-Path 'unittests/Basic_tests/bin/Release/net10.0/Basic_tests.dll').Path
+          $tests = (Resolve-Path 'unittests/Basic_tests/bin/Release/net11.0/Basic_tests.dll').Path
           $binary = Join-Path "$root/published" $(if ($IsWindows) { 'grate.exe' } else { 'grate' })
           foreach ($kind in @('tool', 'self-contained')) {
             $env:GRATE_SKILL_TEST_COMMAND = if ($kind -eq 'tool') { ConvertTo-Json -Compress -InputObject @('dotnet', 'tool', 'run', 'grate', '--') } else { ConvertTo-Json -Compress -InputObject @($binary) }

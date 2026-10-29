@@ -52,4 +52,10 @@ RoundhousE with grate in a 5-year-in-development folder of SQL scripts, without 
 
 ## Contributing
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md)
+We welcome AI-assisted contributions. You are responsible for understanding,
+reviewing, and verifying the changes you submit, with the same quality standards
+as code you wrote yourself. Include good automated test coverage for new behavior
+and regression tests for bug fixes, and describe the checks you ran and any gaps.
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md). Coding agents should also follow
+[AGENTS.md](AGENTS.md), including the [test and artifact guide](docs/agents/testing.md).
