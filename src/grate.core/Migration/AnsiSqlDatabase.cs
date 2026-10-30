@@ -100,6 +100,8 @@ public abstract record AnsiSqlDatabase : IDatabase
         ScriptsRunErrorsTableName = configuration.ScriptsRunErrorsTableName;
 
         Config = configuration;
+        // A new migration must read committed history again: a previous attempt may have rolled back.
+        _scriptsRunCache = null;
 
         return Task.CompletedTask;
     }
@@ -577,10 +579,7 @@ WHERE script_name = @scriptName";
     public async Task InsertScriptRun(string scriptName, string? sql, string hash, bool runOnce, long versionId,
         TransactionHandling transactionHandling)
     {
-        // Keep the cache in sync so later HasRun/GetCurrentHash calls for this script are answered from memory,
-        // instead of querying a table that may hold rows this run has not committed yet.
         var cache = await GetScriptsRunCache();
-        cache[scriptName] = hash;
 
         var insertSql = Parameterize($@"
 INSERT INTO {ScriptsRunTable}
@@ -604,6 +603,10 @@ VALUES (@versionId, @scriptName, @sql, @hash, @runOnce, @now, @now, @usr)");
         {
             await ExecuteAsync(ActiveConnection, insertSql, scriptRun);
         }
+
+        // Cache only recorded or queued writes. Later folders can use the current hash without
+        // querying history that this migration has not committed yet.
+        cache[scriptName] = hash;
     }
 
     public async Task InsertScriptRunError(string scriptName, string? sql, string errorSql, string errorMessage, long versionId)

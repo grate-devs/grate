@@ -51,6 +51,21 @@ public sealed class LocalDockerImage_ : IDisposable
     }
 
     [Fact]
+    public async Task Separate_plans_preserve_their_own_build_commands()
+    {
+        var successfulPlan = CreatePlan();
+        var failingPlan = CreatePlan(exitCode: 17);
+
+        await Ensure("grate-local:tests", successfulPlan);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => Ensure("grate-local:tests", failingPlan));
+
+        Assert.Contains("exit code 17", failure.Message);
+        Assert.True(File.Exists(successfulPlan + ".built"));
+        Assert.False(File.Exists(failingPlan + ".built"));
+        Assert.Equal(["build", "build"], BuildEvents());
+    }
+
+    [Fact]
     public async Task An_already_completed_shared_plan_does_not_rebuild()
     {
         var plan = CreatePlan();
@@ -121,18 +136,21 @@ public sealed class LocalDockerImage_ : IDisposable
 
     private string CreatePlan(int exitCode = 0)
     {
+        var commandDirectory = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString())).FullName;
         var windows = OperatingSystem.IsWindows();
-        var docker = Path.Combine(_root, windows ? "docker.cmd" : "docker");
+        // Run Unix scripts through the stable shell executable to avoid Linux ETXTBSY
+        // races when other tests fork while a temporary executable is being written.
+        // RunBuild passes "build" first, so the shell reads that file in its working directory.
+        var docker = windows ? Path.Combine(commandDirectory, "docker.cmd") : "/bin/sh";
+        var scriptPath = windows ? docker : Path.Combine(commandDirectory, "build");
         var events = Path.Combine(_root, "events.txt");
         var script = windows
             ? $"@echo off\r\necho build>>\"{events}\"\r\necho fake Docker build failure 1>&2\r\nexit /b {exitCode}\r\n"
             : $"#!/bin/sh\nprintf 'build\\n' >> '{events}'\nprintf 'fake Docker build failure\\n' >&2\nexit {exitCode}\n";
-        File.WriteAllText(docker, script, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        if (!windows)
-            File.SetUnixFileMode(docker, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.WriteAllText(scriptPath, script, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
         var plan = Path.Combine(_root, Guid.NewGuid() + ".plan");
-        File.WriteAllLines(plan, [_root, docker, plan]);
+        File.WriteAllLines(plan, [commandDirectory, docker, plan]);
         return plan;
     }
 
