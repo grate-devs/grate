@@ -924,6 +924,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish != true) }}
     strategy:
+      fail-fast: false
       matrix:
         category: [ "Basic_tests", "SqlServer", "PostgreSQL", "MariaDB", "Sqlite", "Oracle"  ]
 
@@ -942,7 +943,7 @@ jobs:
     - name: Test
       run: |
         dotnet test \
-        --project unittests/${{ matrix.category }} \
+        --project "$PWD/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
         --max-parallel-test-modules 1 \
         --report-junit \
         --results-directory /tmp/test-results/${{ matrix.category }} \
