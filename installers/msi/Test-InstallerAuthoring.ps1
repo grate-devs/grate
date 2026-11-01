@@ -28,3 +28,36 @@ foreach ($directoryId in @('INSTALLFOLDER', 'ROOTDIRECTORY')) {
         throw "The MSI must explicitly remove $directoryId exactly once on uninstall."
     }
 }
+
+# The WinGet package identifier is independent of the MSI identity. Preserve the
+# released MSI contract while preparing the new WinGet listing. Changing these
+# values needs a separately verified installer migration, not a publisher rename.
+$identityAttributes = @(
+    @('/w:Wix/w:Product', 'Id', 'E281998A-D8A2-4926-AAA3-066EFA4B2E74'),
+    @('/w:Wix/w:Product', 'Name', 'grate'),
+    @('/w:Wix/w:Product', 'Manufacturer', 'erikbra'),
+    @('/w:Wix/w:Product', 'UpgradeCode', '%%%UPGRADECODE%%%'),
+    @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'erikbra'),
+    @("//w:Directory[@Id='ROOTDIRECTORY']", 'Name', 'erikbra'),
+    @("//w:Directory[@Id='INSTALLFOLDER']", 'Name', 'grate'),
+    @("//w:Component[@Id='MainExecutable']", 'Guid', 'C544280E-4F9B-443D-BE6D-4A82CFEE3723'),
+    @("//w:Component[@Id='PathVariable']", 'Guid', 'E7507A5D-D78E-4082-BD75-986A11F54E68'),
+    @("//w:Component[@Id='MainExecutable']/w:RegistryValue", 'Root', 'HKCU'),
+    @("//w:Component[@Id='MainExecutable']/w:RegistryValue", 'Key', 'Software\Microsoft\erikbra\grate')
+)
+foreach ($contract in $identityAttributes) {
+    $node = $template.SelectSingleNode($contract[0], $namespaces)
+    if (!$node -or $node.GetAttribute($contract[1]) -cne $contract[2]) {
+        throw "The WinGet migration must preserve the MSI identity: $($contract[0])/@$($contract[1])."
+    }
+}
+$directory = $template.SelectSingleNode("//w:Directory[@Id='INSTALLFOLDER']", $namespaces)
+if ($directory.ParentNode.Id -ne 'ROOTDIRECTORY' -or $directory.ParentNode.ParentNode.Id -ne 'LocalAppDataFolder') {
+    throw 'The WinGet migration must preserve the per-user MSI installation path.'
+}
+# Existing builders generated a new UpgradeCode for each build. Adding a single
+# MajorUpgrade element cannot discover all those installed releases. Keep the
+# current minor-update contract until a separate Windows-tested migration exists.
+if ($template.SelectSingleNode('//w:MajorUpgrade | //w:Upgrade', $namespaces)) {
+    throw 'The WinGet migration must preserve the current MSI minor-update contract.'
+}

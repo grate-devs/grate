@@ -1,0 +1,42 @@
+name: WinGet manifest preparation
+
+on:
+  pull_request:
+    paths:
+      - 'installers/winget/**'
+      - 'installers/msi/**'
+      - '.github/workflows/winget-validation.yml'
+  push:
+    branches: [main, feat/800-winget-migration]
+    paths:
+      - 'installers/winget/**'
+      - 'installers/msi/**'
+      - '.github/workflows/winget-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Test preparation and MSI authoring contracts
+        run: |
+          ./installers/winget/Test-CreateInstaller.Tests.ps1
+          ./installers/msi/Test-InstallerAuthoring.Tests.ps1
+      - name: Prepare manifests from a real stable release and inspect MSI metadata
+        run: ./installers/winget/Test-ReleasePreparation.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-evidence"
+      - name: Retain candidates and inspection evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: winget-preparation
+          path: ${{ runner.temp }}/winget-evidence
+          if-no-files-found: warn
+          retention-days: 14
