@@ -87,7 +87,7 @@ $unrelatedFile = $null
 $failures = [Collections.Generic.List[Exception]]::new()
 $results = [Collections.Generic.List[object]]::new()
 
-function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0), [switch]$ObserveExitCode) {
+function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0)) {
     $start = [Diagnostics.ProcessStartInfo]::new($Executable)
     $start.UseShellExecute = $false
     $start.RedirectStandardOutput = $true
@@ -97,18 +97,27 @@ function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [
     $process.StartInfo = $start
     try {
         [void]$process.Start()
+        @{ executable = $Executable; arguments = $Arguments; processId = $process.Id; state = 'Running'; startedUtc = [DateTime]::UtcNow.ToString('o') } |
+            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.command.json")
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
         $timedOut = !$process.WaitForExit(180000)
-        if ($timedOut) { $process.Kill($true); $process.WaitForExit() }
-        $output = $stdout.GetAwaiter().GetResult()
-        $errorOutput = $stderr.GetAwaiter().GetResult()
+        if ($timedOut) { $process.Kill($true); [void]$process.WaitForExit(5000) }
+        # A child/WER process can retain inherited pipe handles after the parent
+        # exits. Bound the combined stream drain rather than waiting forever.
+        $drainFailure = $null
+        try {
+            [void][Threading.Tasks.Task]::WhenAll([Threading.Tasks.Task[]]@($stdout, $stderr)).WaitAsync([TimeSpan]::FromSeconds(5)).GetAwaiter().GetResult()
+        } catch { $drainFailure = $_.Exception.Message }
+        $output = if ($stdout.IsCompletedSuccessfully) { $stdout.GetAwaiter().GetResult() } else { '[stdout drain did not complete successfully]' }
+        $errorOutput = if ($stderr.IsCompletedSuccessfully) { $stderr.GetAwaiter().GetResult() } else { '[stderr drain did not complete successfully]' }
         $output | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.stdout.log")
         $errorOutput | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.stderr.log")
-        $command = [pscustomobject]@{ executable = $Executable; arguments = $Arguments; exitCode = $process.ExitCode; timedOut = $timedOut }
+        $command = [pscustomobject]@{ executable = $Executable; arguments = $Arguments; exitCode = $(if ($process.HasExited) { $process.ExitCode } else { $null }); timedOut = $timedOut; streamDrainFailure = $drainFailure }
         $command | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.command.json")
         if ($timedOut) { throw "$Name exceeded its three-minute timeout; inspect retained logs." }
-        if (!$ObserveExitCode -and $process.ExitCode -notin $AllowedExitCodes) { throw "$Name failed with exit code $($process.ExitCode); inspect retained logs." }
+        if ($drainFailure) { throw "$Name output drain failed or exceeded five seconds: $drainFailure" }
+        if ($process.ExitCode -notin $AllowedExitCodes) { throw "$Name failed with exit code $($process.ExitCode); inspect retained logs." }
         return [pscustomobject]@{ ExitCode = $process.ExitCode; StandardOutput = $output; StandardError = $errorOutput }
     } finally { $process.Dispose() }
 }
@@ -133,12 +142,9 @@ function Check-Installed($Metadata, [string]$Payload, [string]$Name) {
     @{ ProductCode = $productCode; ProductState = $state; AssignmentType = $assignment; InventorySource = 'WindowsInstaller.ProductInfo'; CurrentUserSid = $currentUserSid; DisplayName = $arp.DisplayName; Publisher = $arp.Publisher; DisplayVersion = $arp.DisplayVersion; ConventionalHkcuUninstallKeyPresent = (Test-Path -LiteralPath $arpKey); DiagnosticUserDataKey = $userDataKey; DiagnosticUserData = $userData; PayloadSha256 = (Get-FileHash $installedExe -Algorithm SHA256).Hash; FileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).FileVersion } |
         ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.installed.json")
     Check-Protected
-    # --version specifies the database migration version, including on current
-    # main; it is not a print-package-version contract. 2.0.0 crashes for this
-    # missing argument and 2.1.6 rejects it with exit 1. Keep those observations
-    # separate from required payload/file/MSI version, help and migration checks.
-    $versionResult = Run-Process $installedExe @('--version') "$Name-version" -ObserveExitCode
-    @{ Option = '--version'; OptionRole = 'DatabaseMigrationVersion'; RequiredForLifecyclePass = $false; Outcome = $(if ($versionResult.ExitCode -eq 0) { 'ObservedZeroExit' } else { 'ObservedNonzeroExit' }); ExitCode = $versionResult.ExitCode; StandardOutput = $versionResult.StandardOutput; StandardError = $versionResult.StandardError } |
+    # --version requires a database migration version; it is not a package
+    # information command. Package identity is asserted from MSI/file metadata.
+    @{ Option = '--version'; Outcome = 'NotRun'; NotRunReason = 'DatabaseMigrationVersionOption'; RequiredForLifecyclePass = $false } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name-version.observation.json")
     $null = Run-Process $installedExe @('--help') "$Name-help"
 }

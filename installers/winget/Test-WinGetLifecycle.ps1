@@ -43,7 +43,7 @@ function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$
         $stderr = $process.StandardError.ReadToEndAsync()
         $timeout = !$process.WaitForExit(300000)
         if ($timeout) { $process.Kill($true); $process.WaitForExit() }
-        $output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
+        $output = $stdout.WaitAsync([TimeSpan]::FromSeconds(5)).GetAwaiter().GetResult() + $stderr.WaitAsync([TimeSpan]::FromSeconds(5)).GetAwaiter().GetResult()
         $result = [pscustomobject]@{ Executable=$Executable; Arguments=$Arguments; ExitCode=$process.ExitCode; ExitHex=('0x{0:X8}' -f ($process.ExitCode -band [long]4294967295)); TimedOut=$timeout; Output=$output }
         $output | Set-Content "$OutputDirectory/$Name.log"
         $result | Select-Object * -ExcludeProperty Output | ConvertTo-Json -Depth 8 | Set-Content "$OutputDirectory/$Name.command.json"
@@ -147,8 +147,7 @@ function Assert-Installed([string]$Version, [string]$Id) {
     $exe = Installed-Executable
     if (!(Test-Path $exe) -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne (Get-FileHash $expected.Executable -Algorithm SHA256).Hash) { throw "Installed payload is not $Version." }
     # grate's --version option is a database migration version, including on
-    # current main. Keep the historical probe as evidence, not a version oracle.
-    $null = Run $exe @('--version') "installed-$Version-version" -Observe
+    # current main. Read the executable version without invoking that option.
     $null = Run $exe @('--help') "installed-$Version-help"
     $fileVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
     $actualVersion=[version]::new($fileVersion.FileMajorPart,$fileVersion.FileMinorPart,$fileVersion.FileBuildPart)
