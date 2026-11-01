@@ -1,0 +1,31 @@
+name: Docker distribution policy
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/docker-*.yml'
+      - '.github/workflows/build.yml'
+      - 'build-docker-local.sh'
+      - 'installers/docker/**'
+      - 'eng/*docker*.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test Docker tag selection and local build commands
+        run: python3 -m unittest discover -s installers/docker -p 'test_*.py' -v
+      - name: Test history preservation and release digest verification
+        run: python3 -m unittest discover -s eng -p 'test_*docker*.py' -v
+      - name: Check local helper syntax
+        run: bash -n build-docker-local.sh
+      - name: Exercise identical multi-platform tags and stable latest locally
+        run: python3 installers/docker/check_local_registry.py
