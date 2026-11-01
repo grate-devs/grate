@@ -1,0 +1,110 @@
+name: WinGet Windows lifecycle
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/800-winget-migration]
+    paths:
+      - 'installers/winget/**'
+      - 'installers/msi/**'
+      - '.github/workflows/winget-lifecycle.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: Build test candidate (${{ matrix.arch }})
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86, x64, arm64]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1, repository SDK/security pin
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - name: Build current-source payload and MSI (test-only version 2.1.7)
+        env:
+          TEST_ARCH: ${{ matrix.arch }}
+        run: |
+          New-Item -ItemType Directory -Force candidate | Out-Null
+          dotnet publish ./src/grate/grate.csproj -c Release -f net11.0 -r "win-$env:TEST_ARCH" --self-contained true -p:Version=2.1.7 -o ./test-publish
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate publish failed.' }
+          Compress-Archive -Path ./test-publish/* -DestinationPath ./candidate/grate.zip
+          if ($env:TEST_ARCH -ne 'x86') {
+            ./installers/msi/Create-Installer.ps1 -grateExe ./test-publish/grate.exe -version 2.1.7 -arch $env:TEST_ARCH
+            Copy-Item ./installers/msi/tmp/grate-2.1.7.msi ./candidate/grate.msi
+          }
+          Get-FileHash ./candidate/* -Algorithm SHA256 | Format-Table
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: winget-lifecycle-candidate-${{ matrix.arch }}
+          path: candidate/
+          retention-days: 7
+
+  lifecycle:
+    name: Install and upgrade (${{ matrix.type }}, ${{ matrix.arch }})
+    needs: candidate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { type: zip, arch: x86, runner: windows-latest }
+          - { type: zip, arch: x64, runner: windows-latest }
+          - { type: zip, arch: arm64, runner: windows-11-arm }
+          - { type: wix, arch: x64, runner: windows-latest }
+          - { type: wix, arch: arm64, runner: windows-11-arm }
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TEST_ARCH: ${{ matrix.arch }}
+      TEST_TYPE: ${{ matrix.type }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: winget-lifecycle-candidate-${{ matrix.arch }}
+          path: candidate/
+      - name: Download and verify historical payloads
+        id: assets
+        run: ./installers/winget/Get-LifecycleAssets.ps1 -Architecture $env:TEST_ARCH -InstallerType $env:TEST_TYPE -CandidateDirectory ./candidate -OutputDirectory "$env:RUNNER_TEMP/lifecycle"
+      - name: Actual MSI upgrade and reinstall with current-source candidate
+        if: matrix.type == 'wix'
+        run: |
+          ./installers/msi/Test-WinGetMsiLifecycle.Assertions.Tests.ps1
+          $inventory = Get-Content "$env:RUNNER_TEMP/lifecycle/inventory.json" -Raw | ConvertFrom-Json
+          $old = @($inventory.Versions | Where-Object Version -ne '2.1.7')
+          $candidate = $inventory.Versions | Where-Object Version -eq '2.1.7'
+          ./installers/msi/Test-WinGetMsiLifecycle.ps1 -HistoricalMsiPaths @($old.MsiPath) -HistoricalExecutablePaths @($old.Executable) -CandidateMsiPath $candidate.MsiPath -CandidateExecutable $candidate.Executable -Architecture $env:TEST_ARCH -OutputDirectory "$env:RUNNER_TEMP/lifecycle/direct-msi"
+      - name: Install pinned WinGet on disposable runner
+        id: winget
+        if: ${{ !cancelled() && steps.assets.outcome == 'success' }}
+        run: |
+          $winget = ./installers/winget/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+          "TEST_WINGET=$winget" | Out-File $env:GITHUB_ENV -Append
+      - name: Actual WinGet package-ID transition in isolated HTTPS source
+        if: ${{ !cancelled() && steps.winget.outcome == 'success' }}
+        run: ./installers/winget/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests"
+      - name: Retain raw lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: winget-lifecycle-${{ matrix.type }}-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/lifecycle/**/*.json
+            ${{ runner.temp }}/lifecycle/**/*.log
+            ${{ runner.temp }}/lifecycle/**/*.yaml
+            ${{ runner.temp }}/lifecycle/**/*.txt
+          if-no-files-found: warn
+          retention-days: 7
