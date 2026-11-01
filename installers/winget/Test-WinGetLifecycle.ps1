@@ -217,18 +217,22 @@ try {
     $sourceAdded=$true
     $null=W @('source','list','--name',$sourceName) 'source-details'
     $testOwnsInstallation=$true
-    $common=@('--source',$sourceName,'--exact','--scope','user','--architecture',$arch,'--installer-type',$type,'--silent','--accept-package-agreements','--accept-source-agreements')
-    $null=W (@('install','--id',$oldId,'--version','2.0.0')+$common) 'old-install'
+    $upgradeOptions=@('--source',$sourceName,'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
+    $installOptions=$upgradeOptions+@('--scope','user','--architecture',$arch,'--installer-type',$type)
+    # The source contains one architecture and installer type per version. Do
+    # not reuse install selectors when searching the installed package: WinGet
+    # can classify a per-user MSI ARP entry as Machine despite MSI Assignment=0.
+    $null=W (@('install','--id',$oldId,'--version','2.0.0')+$installOptions) 'old-install'
     Assert-Installed '2.0.0' $oldId
     Migrate 'old'
     Snapshot 'old-installed'
-    $upgrade=W (@('upgrade','--id',$oldId,'--version','2.1.6')+$common) 'same-id-upgrade' -Observe
+    $upgrade=W (@('upgrade','--id',$oldId,'--version','2.1.6')+$upgradeOptions) 'same-id-upgrade' -Observe
     $summary.SameIdDefaultUpgrade=$upgrade.ExitHex
     if ($upgrade.ExitCode -ne 0) {
         Assert-KnownRejection $upgrade
         if ($type -eq 'zip') { throw 'Same-ID portable upgrade must succeed.' }
         Assert-Installed '2.0.0' $oldId
-        $previous=W (@('upgrade','--id',$oldId,'--version','2.1.6','--uninstall-previous')+$common) 'same-id-uninstall-previous' -Observe
+        $previous=W (@('upgrade','--id',$oldId,'--version','2.1.6','--uninstall-previous')+$upgradeOptions) 'same-id-uninstall-previous' -Observe
         $summary.SameIdUninstallPrevious=$previous.ExitHex
         if ($previous.ExitCode -ne 0) {
             if ($previous.ExitHex -ne '0x8A150014') { throw 'Uninstall-previous failed unexpectedly.' }
@@ -243,7 +247,7 @@ try {
     Write-Catalog -Both
     foreach ($id in @($oldId,$newId)) { $null=W @('show','--id',$id,'--exact','--source',$sourceName,'--accept-source-agreements') "both-visible-$id" }
     Snapshot 'both-visible'
-    $transition=W (@('upgrade','--id',$newId,'--version','2.1.7')+$common) 'new-id-upgrade-attempt' -Observe
+    $transition=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) 'new-id-upgrade-attempt' -Observe
     $summary.NewIdUpgradeExit=$transition.ExitHex
     if ($transition.ExitCode -eq 0) {
         Assert-Installed '2.1.7' $newId
@@ -251,7 +255,7 @@ try {
         Snapshot 'after-direct-transition'
         $summary.ResetUninstall=Uninstall $newId 'reset-new-id'
         Write-Catalog
-        $null=W (@('install','--id',$oldId,'--version','2.1.6')+$common) 'reset-old-id'
+        $null=W (@('install','--id',$oldId,'--version','2.1.6')+$installOptions) 'reset-old-id'
         Write-Catalog -Both
     } else {
         Assert-KnownRejection $transition
@@ -262,7 +266,7 @@ try {
     $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
     $summary.FallbackOldUninstall=Uninstall $oldId 'fallback-old-uninstall'
     if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Uninstall modified migration data outside the installation directory.' }
-    $null=W (@('install','--id',$newId,'--version','2.1.7')+$common) 'fallback-new-install'
+    $null=W (@('install','--id',$newId,'--version','2.1.7')+$installOptions) 'fallback-new-install'
     Assert-Installed '2.1.7' $newId
     Migrate 'fallback-new-id'
     Snapshot 'new-id-installed'

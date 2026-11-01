@@ -54,6 +54,17 @@ Add `grate-devs.grate` as another package. MSI installers retain their actual
 ProductCode, UpgradeCode, scope, and AppsAndFeaturesEntries. Search responses
 include product/upgrade codes from every version and installer, including codes in
 AppsAndFeaturesEntries, so duplicate identity is exposed to the client.
+Windows reference fields (`ProductCode`, `UpgradeCode`, and `PackageFamilyName`)
+match case-insensitively even in an `Exact` correlation request. Search-response
+reference arrays use folded case, while downloaded manifest metadata keeps its
+authored values. This follows the Windows identity semantics used by the current
+[client match resolver](https://github.com/microsoft/winget-cli/blob/master/src/AppInstallerRepositoryCore/MatchCriteriaResolver.cpp)
+and the [composite source](https://github.com/microsoft/winget-cli/blob/master/src/AppInstallerRepositoryCore/CompositeSource.cpp),
+which folds reference strings before constructing its correlation requests.
+Ordinary package-ID and package-name `Exact` searches remain case-sensitive.
+This is an explicit fixture policy: the reference REST server's general predicate
+implementation applies raw case-sensitive `Exact` matching. A Windows lifecycle
+result must therefore retain its client-version and source-type qualifications.
 
 The server rereads the catalog for every request. Write an updated catalog to a
 temporary file and atomically replace the original to expose a later release.

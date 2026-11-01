@@ -17,6 +17,12 @@ import sys
 from urllib.parse import parse_qs, unquote, urlsplit
 
 
+# Windows reference identities are case-insensitive. CompositeSource folds them
+# before sending Exact correlation queries. Keep ordinary package/name Exact
+# searches case-sensitive; the rule applies only to these reference fields.
+CORRELATION_FIELDS = frozenset(("ProductCode", "UpgradeCode", "PackageFamilyName"))
+
+
 def load_catalog(path):
     catalog = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     if not isinstance(catalog.get("SourceIdentifier"), str) or not catalog["SourceIdentifier"]:
@@ -68,6 +74,8 @@ def search_result(package):
                               ("DisplayVersion", "AppsAndFeaturesEntryVersions")):
             values = installer_values(version, field)
             if values:
+                if field in CORRELATION_FIELDS:
+                    values = list(dict.fromkeys(value.casefold() for value in values))
                 result[output] = values
         versions.append(result)
     return {"PackageIdentifier": package["PackageIdentifier"], "PackageName": locale["PackageName"],
@@ -99,6 +107,11 @@ def matches_value(value, request):
 
 def field_matches(package, item):
     field, request = item["PackageMatchField"], item["RequestMatch"]
+    if field in CORRELATION_FIELDS and request.get("MatchType", "Exact") == "Exact":
+        # The real client emits lower-case reference strings even if the MSI's
+        # authored GUID uses capitals. A raw string Exact comparison would hide
+        # an installed package or a duplicate identity from this test source.
+        request = dict(request, MatchType="CaseInsensitive")
     if field == "Market":
         # Test installers have no market restrictions.
         return True

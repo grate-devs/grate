@@ -142,8 +142,39 @@ class SourceProtocolTests(unittest.TestCase):
             with self.subTest(field=field):
                 packages = self.search({"Inclusions": [selector(field, value)]})
                 self.assertEqual(2, len(packages))
-                self.assertEqual([value], packages[0]["Versions"][0][output])
+                self.assertEqual([value.casefold()], packages[0]["Versions"][0][output])
         self.assertEqual(2, len(self.search({"Inclusions": [selector("NormalizedPackageNameAndPublisher", "grate")]})))
+
+    def test_captured_lowercase_exact_product_code_matches_uppercase_msi_metadata(self):
+        # Captured from WinGet v1.29.380's native ARM64 installed-package search.
+        # Test the ProductCode without the name fallback so a GUID case defect
+        # cannot be hidden by another inclusion matching the package name.
+        request = {"Inclusions": [{"PackageMatchField": "ProductCode", "RequestMatch": {
+            "KeyWord": "{e281998a-d8a2-4926-aaa3-066efa4b2e74}", "MatchType": "Exact"}}]}
+        packages = self.search(request)
+        self.assertEqual(["erikbra.grate", "grate-devs.grate"], [p["PackageIdentifier"] for p in packages])
+        self.assertEqual(["{e281998a-d8a2-4926-aaa3-066efa4b2e74}"], packages[0]["Versions"][0]["ProductCodes"])
+        with self.request("/packageManifests/erikbra.grate?Version=2.0.0") as response:
+            installer = json.load(response)["Data"]["Versions"][0]["Installers"][0]
+        self.assertEqual(PRODUCT_CODE, installer["ProductCode"])
+
+    def test_reference_matching_is_case_insensitive_without_broadening_ordinary_exact(self):
+        for field, value in (("ProductCode", PRODUCT_CODE), ("UpgradeCode", UPGRADE_CODE)):
+            for kind in ("Inclusions", "Filters"):
+                with self.subTest(field=field, kind=kind):
+                    packages = self.search({kind: [selector(field, value.lower())]})
+                    self.assertEqual(2, len(packages))
+                    self.assertEqual([], self.search({kind: [selector(field, "{00000000-0000-0000-0000-000000000000}")]}))
+        updated = catalog()
+        for package in updated["Packages"]:
+            for item in package["Versions"]:
+                item["Installers"][0]["PackageFamilyName"] = "Publisher.Grate_abC123"
+        self.write_catalog(updated)
+        packages = self.search({"Filters": [selector("PackageFamilyName", "publisher.grate_abc123")]})
+        self.assertEqual(2, len(packages))
+        self.assertEqual(["publisher.grate_abc123"], packages[0]["Versions"][0]["PackageFamilyNames"])
+        self.assertEqual([], self.search({"Filters": [selector("PackageIdentifier", "ERIKBRA.GRATE")]}))
+        self.assertEqual([], self.search({"Filters": [selector("PackageName", "GRATE")]}))
 
     def test_version_filter_and_installer_metadata_are_not_lost(self):
         with self.request("/packageManifests/erikbra.grate?Version=2.0.0") as response:
