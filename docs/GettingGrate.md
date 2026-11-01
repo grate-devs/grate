@@ -64,11 +64,14 @@ to a supported runtime. The current packages retain both targets.
 ## Runtime and platform requirements
 
 New self-contained CLI archives, MSI and Debian packages, Chocolatey packages,
-and Docker images bundle .NET runtime `11.0.0-rc.3.26522.148`. The existing Homebrew
-cask and winget install those same release binaries or installers. These distributions
+and Docker images bundle .NET runtime `11.0.0-rc.3.26522.148`. These distributions
 need no separately installed .NET runtime; native OS dependencies still apply.
 The Docker images use Alpine 3.24 and include the .NET native dependencies and ICU
 for globalization.
+
+Homebrew casks and winget packages use the runtime bundled in the release version
+they install. A package-manager channel can lag behind the latest grate release;
+the existing personal Homebrew tap is still at 1.8.0, as described below.
 
 The proposed [Homebrew/core formula](#homebrew) instead builds from source and
 uses Homebrew's shared .NET installation. Homebrew installs that dependency automatically.
@@ -97,6 +100,11 @@ The existing Homebrew cask is installed from the personal tap:
 ```sh
 brew install --cask erikbra/cask/grate
 ```
+
+That legacy tap currently declares grate 1.8.0; this command does not yet install
+2.2.0. Use the [release binaries](https://github.com/grate-devs/grate/releases/latest)
+or the [.NET tool](#dotnet-tool) for newer published releases while the Homebrew
+channels are being updated.
 
 A source-built formula is being prepared for `homebrew/core` alongside grate 2.2.0.
 It is not available in core yet. Once the formula has been accepted, the command will be:
