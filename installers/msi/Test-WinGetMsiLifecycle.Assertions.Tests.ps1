@@ -34,6 +34,39 @@ $arp.DisplayVersion = '2.1.6'
 Assert-Rejected { Assert-WinGetMsiRegistration -State 5 -Version '2.1.7' -AssignmentType 0 -Arp $arp -ExpectedVersion '2.1.7' } '*ARP entry*'
 Assert-Rejected { Assert-WinGetMsiRegistration -State -1 -Version '2.1.7' -AssignmentType 0 -Arp $arp -ExpectedVersion '2.1.7' } '*product state*'
 
+function Native-Inventory {
+    $properties = @{}
+    foreach ($entry in @{ ProductState = '5'; AssignmentType = '0'; InstalledProductName = 'grate'; VersionString = '2.1.7'; Publisher = 'erikbra' }.GetEnumerator()) {
+        $properties[$entry.Key] = [pscustomobject]@{ Value = $entry.Value; ErrorCode = 0 }
+    }
+    [pscustomobject]@{
+        ProductCode = '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'
+        CurrentUserSid = 'S-1-5-21-100-200-300-1000'
+        Contexts = @([pscustomobject]@{ ProductCode = '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'; Context = 2; UserSid = 'S-1-5-21-100-200-300-1000'; Properties = $properties })
+    }
+}
+$inventory = Native-Inventory
+Assert-WinGetMsiNativeContext $inventory '2.1.7'
+$inventory.Contexts[0].Context = 1
+Assert-WinGetMsiNativeContext $inventory '2.1.7'
+# AssignmentType=0 alone must not hide an actual machine/foreign/duplicate
+# registration, or an API failure. Native context and owner are independent.
+$inventory.Contexts[0].Context = 4
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*per-user context*'
+$inventory = Native-Inventory
+$inventory.Contexts[0].UserSid = 'S-1-5-21-100-200-300-1001'
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*per-user context*'
+$inventory = Native-Inventory
+$inventory.Contexts += $inventory.Contexts[0]
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*exactly one current-user MSI instance*'
+$inventory = Native-Inventory
+$inventory.Contexts[0].Properties['VersionString'].ErrorCode = 1605
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*property VersionString*'
+$inventory = Native-Inventory
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.6' } '*property VersionString*'
+$inventory.Contexts = @()
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*exactly one current-user MSI instance*'
+
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('winget-msi-assertions-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $fixture | Out-Null
 try {

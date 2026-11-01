@@ -29,15 +29,14 @@ foreach ($directoryId in @('INSTALLFOLDER', 'ROOTDIRECTORY')) {
     }
 }
 
-# The WinGet package identifier is independent of the MSI identity. Preserve the
-# released MSI contract while preparing the new WinGet listing. Changing these
-# values needs a separately verified installer migration, not a publisher rename.
+# The new product identity has an explicit legacy major-upgrade bridge. Keep the
+# filesystem/component contract while deriving product/family identity centrally.
 $identityAttributes = @(
-    @('/w:Wix/w:Product', 'Id', 'E281998A-D8A2-4926-AAA3-066EFA4B2E74'),
+    @('/w:Wix/w:Product', 'Id', '%%%PRODUCTCODE%%%'),
     @('/w:Wix/w:Product', 'Name', 'grate'),
-    @('/w:Wix/w:Product', 'Manufacturer', 'erikbra'),
+    @('/w:Wix/w:Product', 'Manufacturer', 'grate-devs'),
     @('/w:Wix/w:Product', 'UpgradeCode', '%%%UPGRADECODE%%%'),
-    @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'erikbra'),
+    @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'grate-devs'),
     @("//w:Directory[@Id='ROOTDIRECTORY']", 'Name', 'erikbra'),
     @("//w:Directory[@Id='INSTALLFOLDER']", 'Name', 'grate'),
     @("//w:Component[@Id='MainExecutable']", 'Guid', 'C544280E-4F9B-443D-BE6D-4A82CFEE3723'),
@@ -55,9 +54,12 @@ $directory = $template.SelectSingleNode("//w:Directory[@Id='INSTALLFOLDER']", $n
 if ($directory.ParentNode.Id -ne 'ROOTDIRECTORY' -or $directory.ParentNode.ParentNode.Id -ne 'LocalAppDataFolder') {
     throw 'The WinGet migration must preserve the per-user MSI installation path.'
 }
-# Existing builders generated a new UpgradeCode for each build. Adding a single
-# MajorUpgrade element cannot discover all those installed releases. Keep the
-# current minor-update contract until a separate Windows-tested migration exists.
-if ($template.SelectSingleNode('//w:MajorUpgrade | //w:Upgrade', $namespaces)) {
-    throw 'The WinGet migration must preserve the current MSI minor-update contract.'
+$major = @($template.SelectNodes('//w:MajorUpgrade', $namespaces))
+$detect = $template.SelectSingleNode("//w:CustomAction[@Id='DetectLegacyGrate']", $namespaces)
+$sequence = $template.SelectSingleNode("//w:InstallExecuteSequence/w:Custom[@Action='DetectLegacyGrate']", $namespaces)
+if ($major.Count -ne 1 -or $major[0].Schedule -ne 'afterInstallInitialize' -or !$major[0].DowngradeErrorMessage -or
+    !$detect -or $detect.BinaryKey -ne 'GrateUpgradeActions' -or $detect.DllEntry -ne 'DetectLegacyGrate' -or $detect.Execute -ne 'immediate' -or $detect.Return -ne 'check' -or
+    !$sequence -or $sequence.After -ne 'FindRelatedProducts' -or $sequence.InnerText.Trim() -ne 'NOT Installed AND NOT WIX_DOWNGRADE_DETECTED' -or
+    $template.SelectSingleNode('//w:Upgrade', $namespaces)) {
+    throw 'The MSI requires one transactional MajorUpgrade with verified legacy detection after FindRelatedProducts.'
 }

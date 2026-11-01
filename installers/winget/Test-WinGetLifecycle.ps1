@@ -10,6 +10,7 @@ if (!$IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -
     throw 'Installation tests require a disposable GitHub-hosted Windows runner.'
 }
 $inventory = Get-Content $InventoryPath -Raw | ConvertFrom-Json
+. "$PSScriptRoot/../msi/WinGetMsiLifecycle.Assertions.ps1"
 $type = $inventory.InstallerType
 $arch = $inventory.Architecture
 $native = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
@@ -84,56 +85,44 @@ function Registrations {
     if ($type -eq 'wix') {
         # Per-user MSI inventory is registered through Windows Installer; it need
         # not author a conventional HKCU Uninstall key. Read the supported API.
-        $msiEngine=New-Object -ComObject WindowsInstaller.Installer
-        $code='{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'
-        try {
-            $productState=[int]$msiEngine.GetType().InvokeMember('ProductState',[Reflection.BindingFlags]::GetProperty,$null,$msiEngine,@($code))
-            if ($productState -eq 5) {
-                $values=@{}
-                foreach ($property in @('InstalledProductName','Publisher','VersionString','AssignmentType')) {
-                    $values[$property]=$msiEngine.GetType().InvokeMember('ProductInfo',[Reflection.BindingFlags]::GetProperty,$null,$msiEngine,@($code,$property))
-                }
-                if ([int]$values.AssignmentType -ne 0) { throw 'Expected a per-user MSI registration.' }
-                $rows=@($rows)+[pscustomobject]@{KeyName=$code; DisplayName=$values.InstalledProductName; DisplayVersion=$values.VersionString; Publisher=$values.Publisher; InstallLocation="$env:LOCALAPPDATA/erikbra/grate"; WinGetPackageIdentifier=$null; WinGetSourceIdentifier=$null; Context='WindowsInstaller per-user'}
-            } elseif ($productState -ne -1) { throw "Unexpected pre-existing MSI state $productState." }
-        } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($msiEngine) }
+        $codes=@($inventory.Versions.MsiMetadata.ProductCode | Select-Object -Unique)
+        foreach ($code in $codes) {
+            $nativeInventory=& "$PSScriptRoot/../msi/Get-InstalledProductInventory.ps1" -ProductCode $code
+            foreach ($instance in @($nativeInventory.Contexts)) {
+                if ($instance.Context -notin @(1,2) -or $instance.UserSid -ne $nativeInventory.CurrentUserSid) { throw 'Unexpected machine or foreign-user MSI installation.' }
+                $values=$instance.Properties
+                $rows=@($rows)+[pscustomobject]@{KeyName=$code; DisplayName=$values['InstalledProductName'].Value; DisplayVersion=$values['VersionString'].Value; Publisher=$values['Publisher'].Value; InstallLocation="$env:LOCALAPPDATA/erikbra/grate"; WinGetPackageIdentifier=$null; WinGetSourceIdentifier=$null; Context=$instance.Context}
+            }
+        }
     }
     @($rows | Group-Object KeyName | ForEach-Object { $_.Group[0] })
 }
 function Snapshot([string]$Name) {
     @(Registrations) | ConvertTo-Json -Depth 6 | Set-Content "$OutputDirectory/$Name.arp.json"
+    if ($type -eq 'wix') {
+        @($inventory.Versions.MsiMetadata.ProductCode | Select-Object -Unique | ForEach-Object {
+            & "$PSScriptRoot/../msi/Get-InstalledProductInventory.ps1" -ProductCode $_
+        }) | ConvertTo-Json -Depth 12 | Set-Content "$OutputDirectory/$Name.native-msi.json"
+    }
     foreach ($id in @($oldId,$newId)) { $null = W @('list','--id',$id,'--exact','--source',$sourceName,'--accept-source-agreements') "$Name-list-$id" -Observe }
     $null = W @('export','--output',"$OutputDirectory/$Name.export.json",'--source',$sourceName,'--accept-source-agreements') "$Name-export" -Observe
     $env:Path = $originalProcessPath + ';' + [Environment]::GetEnvironmentVariable('Path','User')
     @(Get-Command grate -All -ErrorAction SilentlyContinue | Select-Object Source,CommandType) | ConvertTo-Json | Set-Content "$OutputDirectory/$Name.commands.json"
     $null = Run 'where.exe' @('grate') "$Name-where" -Observe
 }
-function Package([string]$Id, [object[]]$Versions) {
-    $entries = foreach ($version in $Versions) {
-        $extension = if ($type -eq 'zip') { 'zip' } else { 'msi' }
-        $installer = [ordered]@{
-            Architecture=$arch; InstallerType=$type; Scope='user'
-            InstallerUrl="https://127.0.0.1:8765/assets/grate-$($version.Version).$extension"
-            InstallerSha256=$(if ($type -eq 'zip') { $version.ZipHash } else { $version.MsiHash })
-        }
-        if ($type -eq 'zip') {
-            $installer.NestedInstallerType='portable'
-            $installer.NestedInstallerFiles=@(@{RelativeFilePath='grate.exe'; PortableCommandAlias='grate'})
-        } else {
-            $meta=$version.MsiMetadata
-            $installer.ProductCode=$meta.ProductCode
-            $installer.AppsAndFeaturesEntries=@(@{DisplayName=$meta.ProductName; Publisher=$meta.Manufacturer; DisplayVersion=$meta.ProductVersion; ProductCode=$meta.ProductCode; UpgradeCode=$meta.UpgradeCode})
-            $installer.InstallationMetadata=@{DefaultInstallLocation='%LocalAppData%/erikbra/grate'}
-        }
-        @{ PackageVersion=$version.Version; DefaultLocale=@{PackageLocale='en-US'; Publisher=$(if ($Id -eq $oldId) {'erikbra'} else {'grate-devs'}); PackageName='grate'; License='MIT'; ShortDescription='grate migration lifecycle test'}; Installers=@($installer) }
-    }
-    @{PackageIdentifier=$Id; Versions=@($entries)}
-}
 function Write-Catalog([switch]$Both) {
-    $packages = @(Package $oldId @($inventory.Versions | Where-Object Version -ne '2.1.7'))
-    if ($Both) { $packages += Package $newId @($inventory.Versions | Where-Object Version -eq '2.1.7') }
-    @{SourceIdentifier=$sourceIdentifier; Packages=$packages} | ConvertTo-Json -Depth 15 | Set-Content "$catalogPath.tmp"
+    & "$PSScriptRoot/New-LifecycleCatalog.ps1" -Inventory $inventory -Both:$Both |
+        ConvertTo-Json -Depth 15 | Set-Content "$catalogPath.tmp"
     [IO.File]::Move("$catalogPath.tmp", $catalogPath, $true)
+}
+function Assert-NewIdCorrelation([string]$Name) {
+    Snapshot $Name
+    $new=Get-Content "$OutputDirectory/$Name-list-$newId.command.json" -Raw | ConvertFrom-Json
+    $old=Get-Content "$OutputDirectory/$Name-list-$oldId.command.json" -Raw | ConvertFrom-Json
+    if ($new.ExitCode -ne 0 -or $old.ExitHex -ne '0x8A150014') { throw 'Both-ID catalog must correlate the installed corrected package exclusively to the new ID.' }
+    $export=Get-Content "$OutputDirectory/$Name.export.json" -Raw | ConvertFrom-Json
+    $ids=@($export.Sources.Packages.PackageIdentifier)
+    if ($newId -notin $ids -or $oldId -in $ids) { throw 'WinGet export did not exclusively select the new package ID.' }
 }
 function Installed-Executable {
     if ($type -eq 'wix') { return (Join-Path $env:LOCALAPPDATA 'erikbra/grate/grate.exe') }
@@ -144,6 +133,11 @@ function Assert-Installed([string]$Version, [string]$Id) {
     if ($rows.Count -ne 1 -or $rows[0].DisplayVersion -ne $Version) { throw "Expected one $Version ARP registration: $($rows | ConvertTo-Json -Compress)" }
     if ($type -eq 'zip' -and ($rows[0].WinGetPackageIdentifier -ne $Id -or $rows[0].WinGetSourceIdentifier -ne $sourceIdentifier)) { throw 'Portable ID/source registration did not match the requested source package.' }
     $expected = $inventory.Versions | Where-Object Version -eq $Version
+    if ($type -eq 'wix') {
+        $nativeInventory=& "$PSScriptRoot/../msi/Get-InstalledProductInventory.ps1" -ProductCode $expected.MsiMetadata.ProductCode
+        Assert-WinGetMsiNativeContext -Inventory $nativeInventory -ExpectedVersion $Version -ExpectedPublisher $expected.MsiMetadata.Manufacturer
+        if ($rows[0].Publisher -ne $expected.MsiMetadata.Manufacturer -or $rows[0].KeyName -ne $expected.MsiMetadata.ProductCode) { throw 'The installed MSI identity does not match the requested version.' }
+    }
     $exe = Installed-Executable
     if (!(Test-Path $exe) -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne (Get-FileHash $expected.Executable -Algorithm SHA256).Hash) { throw "Installed payload is not $Version." }
     # grate's --version option is a database migration version, including on
@@ -233,74 +227,110 @@ try {
     $testOwnsInstallation=$true
     $upgradeOptions=@('--source',$sourceName,'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
     $installOptions=$upgradeOptions+@('--scope','user','--architecture',$arch,'--installer-type',$type)
-    # The source contains one architecture and installer type per version. Do
-    # not reuse install selectors when searching the installed package: WinGet
-    # can classify a per-user MSI ARP entry as Machine despite MSI Assignment=0.
-    $null=W (@('install','--id',$oldId,'--version','2.0.0')+$installOptions) 'old-install'
-    Assert-Installed '2.0.0' $oldId
-    Migrate 'old'
-    Snapshot 'old-installed'
-    $upgrade=W (@('upgrade','--id',$oldId,'--version','2.1.6')+$upgradeOptions) 'same-id-upgrade' -Observe
-    $summary.SameIdDefaultUpgrade=$upgrade.ExitHex
-    if ($upgrade.ExitCode -ne 0) {
-        Assert-KnownRejection $upgrade
-        if ($type -eq 'zip') { throw 'Same-ID portable upgrade must succeed.' }
-        Assert-Installed '2.0.0' $oldId
-        $previous=W (@('upgrade','--id',$oldId,'--version','2.1.6','--uninstall-previous')+$upgradeOptions) 'same-id-uninstall-previous' -Observe
-        $summary.SameIdUninstallPrevious=$previous.ExitHex
-        if ($previous.ExitCode -ne 0) {
-            if ($previous.ExitHex -notin @('0x8A150014','0x8A150010')) { throw 'Uninstall-previous failed unexpectedly.' }
-            Assert-KnownRejection $previous
-            Assert-Installed '2.0.0' $oldId
-            $target=$inventory.Versions | Where-Object Version -eq '2.1.6'
-            Native-Msi @('/i',$target.MsiPath,'REINSTALL=ALL','REINSTALLMODE=vomus') 'same-id-native-minor-update-fallback'
-            $summary.SameIdNativeMsiUpdateFallback='Passed; WinGet rejected the upgrade (see HRESULT and native diagnostics)'
-        }
-    }
-    Assert-Installed '2.1.6' $oldId
-    Migrate 'same-id-upgraded'
-    Write-Catalog -Both
-    foreach ($id in @($oldId,$newId)) { $null=W @('show','--id',$id,'--exact','--source',$sourceName,'--accept-source-agreements') "both-visible-$id" }
-    Snapshot 'both-visible'
-    $transition=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) 'new-id-upgrade-attempt' -Observe
-    $summary.NewIdUpgradeExit=$transition.ExitHex
-    $summary.DirectNewIdCorrelationVerified=$false
-    if ($transition.ExitCode -eq 0) {
-        Assert-Installed '2.1.7' $newId
-        $summary.NewIdPayloadUpgrade='Passed'
-        Snapshot 'after-direct-transition'
-        $directNewQuery=W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'direct-new-id-correlation' -Observe
-        $directOldQuery=Get-Content "$OutputDirectory/after-direct-transition-list-$oldId.command.json" -Raw | ConvertFrom-Json
-        $summary.DirectNewIdCorrelationVerified=$directNewQuery.ExitCode -eq 0 -and $directOldQuery.ExitHex -eq '0x8A150014'
-        $summary.ResetUninstall=Uninstall $newId 'reset-new-id'
-        Write-Catalog
-        $null=W (@('install','--id',$oldId,'--version','2.1.6')+$installOptions) 'reset-old-id'
+    if ($type -eq 'wix') {
         Write-Catalog -Both
+        $summary.LegacyUpgrades=@()
+        foreach ($legacy in @('2.0.0','2.1.6')) {
+            $name="legacy-$legacy"
+            $null=W (@('install','--id',$oldId,'--version',$legacy)+$installOptions) "$name-install"
+            Assert-Installed $legacy $oldId
+            Migrate "$name-before"
+            Snapshot "$name-before"
+            # New ID has no historic aliases: its direct upgrade must leave the
+            # old package intact. The publisher bridge is reached via old ID.
+            $direct=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) "$name-new-id-direct" -Observe
+            if ($direct.ExitHex -ne '0x8A150014') { throw "New ID unexpectedly matched a legacy MSI: $($direct.ExitHex)." }
+            Assert-Installed $legacy $oldId
+            $null=W (@('upgrade','--id',$oldId,'--version','2.1.7')+$upgradeOptions) "$name-bridge-upgrade"
+            Assert-Installed '2.1.7' $newId
+            Assert-NewIdCorrelation "$name-after-bridge"
+            Migrate "$name-after-bridge"
+            $null=W (@('upgrade','--id',$newId,'--version','2.1.8')+$upgradeOptions) "$name-next-upgrade"
+            Assert-Installed '2.1.8' $newId
+            Assert-NewIdCorrelation "$name-after-next"
+            Migrate "$name-after-next"
+            $null=Uninstall $newId "$name-uninstall"
+            $summary.LegacyUpgrades+=@{From=$legacy; Bridge='2.1.7'; Next='2.1.8'; WinGetUpgrade='Passed'; ExclusiveNewId=$true; DataPreserved=$true}
+        }
+        # Probe the explicit scope selector separately. Some clients reject
+        # unspecified manifest scope; either outcome must preserve actual
+        # per-user context and exclusive package identity.
+        $scope=W (@('install','--id',$newId,'--version','2.1.7')+$installOptions) 'fresh-explicit-user-scope' -Observe
+        $summary.ExplicitUserScopeSelector=$scope.ExitHex
+        if ($scope.ExitCode -eq 0) {
+            Assert-Installed '2.1.7' $newId
+            Assert-NewIdCorrelation 'fresh-explicit-user-scope'
+            $null=Uninstall $newId 'fresh-explicit-user-scope-uninstall'
+        } elseif ($scope.ExitHex -eq '0x8A150010') { Assert-Absent }
+        else { throw "Unexpected explicit-scope result $($scope.ExitHex)." }
+        $null=W (@('install','--id',$newId,'--version','2.1.7')+$upgradeOptions+@('--architecture',$arch,'--installer-type',$type)) 'fresh-new-id-install'
+        Assert-Installed '2.1.7' $newId
+        Assert-NewIdCorrelation 'fresh-new-id'
+        Migrate 'fresh-new-id'
+        $null=Uninstall $newId 'fresh-new-id-uninstall'
+        $summary.ExclusiveWinGetNewIdCorrelationVerified=$true
+        $summary.LegacyPublisherBridgeUpgradeVerified=$true
+        $summary.Completed=$true
+        Write-Host "PASS: $type $arch native per-user scope, both legacy upgrades, exclusive new ID, next-version upgrade, fresh install and data preservation."
     } else {
-        Assert-KnownRejection $transition
+        $null=W (@('install','--id',$oldId,'--version','2.0.0')+$installOptions) 'old-install'
+        Assert-Installed '2.0.0' $oldId
+        Migrate 'old'
+        Snapshot 'old-installed'
+        $upgrade=W (@('upgrade','--id',$oldId,'--version','2.1.6')+$upgradeOptions) 'same-id-upgrade' -Observe
+        $summary.SameIdDefaultUpgrade=$upgrade.ExitHex
+        if ($upgrade.ExitCode -ne 0) { throw 'Same-ID portable upgrade must succeed.' }
         Assert-Installed '2.1.6' $oldId
-        $summary.NewIdPayloadUpgrade='Rejected; old payload and registration preserved'
-        Snapshot 'after-direct-transition'
+        Migrate 'same-id-upgraded'
+        Write-Catalog -Both
+        foreach ($id in @($oldId,$newId)) { $null=W @('show','--id',$id,'--exact','--source',$sourceName,'--accept-source-agreements') "both-visible-$id" }
+        Snapshot 'both-visible'
+        $transition=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) 'new-id-upgrade-attempt' -Observe
+        $summary.NewIdUpgradeExit=$transition.ExitHex
+        $summary.DirectNewIdCorrelationVerified=$false
+        if ($transition.ExitCode -eq 0) {
+            Assert-Installed '2.1.7' $newId
+            $summary.NewIdPayloadUpgrade='Passed'
+            Snapshot 'after-direct-transition'
+            $directNewQuery=W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'direct-new-id-correlation' -Observe
+            $directOldQuery=Get-Content "$OutputDirectory/after-direct-transition-list-$oldId.command.json" -Raw | ConvertFrom-Json
+            $summary.DirectNewIdCorrelationVerified=$directNewQuery.ExitCode -eq 0 -and $directOldQuery.ExitHex -eq '0x8A150014'
+            $summary.ResetUninstall=Uninstall $newId 'reset-new-id'
+            Write-Catalog
+            $null=W (@('install','--id',$oldId,'--version','2.1.6')+$installOptions) 'reset-old-id'
+            Write-Catalog -Both
+        } else {
+            Assert-KnownRejection $transition
+            Assert-Installed '2.1.6' $oldId
+            $summary.NewIdPayloadUpgrade='Rejected; old payload and registration preserved'
+            Snapshot 'after-direct-transition'
+        }
+        $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
+        $summary.FallbackOldUninstall=Uninstall $oldId 'fallback-old-uninstall'
+        if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Uninstall modified migration data outside the installation directory.' }
+        $null=W (@('install','--id',$newId,'--version','2.1.7')+$installOptions) 'fallback-new-install'
+        Assert-Installed '2.1.7' $newId
+        Migrate 'fallback-new-id'
+        Snapshot 'new-id-installed'
+        $summary.NewIdListExit=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'new-id-correlation' -Observe).ExitHex
+        $summary.WinGetNewIdExactQuerySucceeded=$summary.NewIdListExit -eq '0x00000000'
+        $oldQuery=Get-Content "$OutputDirectory/new-id-installed-list-$oldId.command.json" -Raw | ConvertFrom-Json
+        $summary.OldIdAlsoMatchesAfterFallback=$oldQuery.ExitCode -eq 0
+        $summary.ExclusiveWinGetNewIdCorrelationVerified=$summary.WinGetNewIdExactQuerySucceeded -and $oldQuery.ExitHex -eq '0x8A150014'
+        if (!$summary.ExclusiveWinGetNewIdCorrelationVerified) { throw 'Portable new ID must correlate exclusively after the explicit transition.' }
+        $summary.AutomaticWinGetMigrationVerified=$transition.ExitCode -eq 0 -and $summary.DirectNewIdCorrelationVerified
+        $null=W (@('upgrade','--id',$newId,'--version','2.1.8')+$upgradeOptions) 'new-id-next-upgrade'
+        Assert-Installed '2.1.8' $newId
+        Assert-NewIdCorrelation 'new-id-next'
+        Migrate 'new-id-next'
+        $summary.NewIdNextVersionUpgrade='Passed'
+        $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
+        $summary.FinalUninstall=Uninstall $newId 'final-new-uninstall'
+        if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Final uninstall modified migration data.' }
+        $summary.FallbackPayloadAndData='Passed'
+        $summary.Completed=$true
+        Write-Host "PASS: actual $type $arch install/upgrade and both-ID transition characterization. See summary.json for automatic-transition/correlation limitations."
     }
-    $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
-    $summary.FallbackOldUninstall=Uninstall $oldId 'fallback-old-uninstall'
-    if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Uninstall modified migration data outside the installation directory.' }
-    $null=W (@('install','--id',$newId,'--version','2.1.7')+$installOptions) 'fallback-new-install'
-    Assert-Installed '2.1.7' $newId
-    Migrate 'fallback-new-id'
-    Snapshot 'new-id-installed'
-    $summary.NewIdListExit=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'new-id-correlation' -Observe).ExitHex
-    $summary.WinGetNewIdExactQuerySucceeded=$summary.NewIdListExit -eq '0x00000000'
-    $oldQuery=Get-Content "$OutputDirectory/new-id-installed-list-$oldId.command.json" -Raw | ConvertFrom-Json
-    $summary.OldIdAlsoMatchesAfterFallback=$oldQuery.ExitCode -eq 0
-    $summary.ExclusiveWinGetNewIdCorrelationVerified=$summary.WinGetNewIdExactQuerySucceeded -and $oldQuery.ExitHex -eq '0x8A150014'
-    $summary.AutomaticWinGetMigrationVerified=$transition.ExitCode -eq 0 -and $summary.DirectNewIdCorrelationVerified
-    $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
-    $summary.FinalUninstall=Uninstall $newId 'final-new-uninstall'
-    if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Final uninstall modified migration data.' }
-    $summary.FallbackPayloadAndData='Passed'
-    $summary.Completed=$true
-    Write-Host "PASS: actual $type $arch install/upgrade and both-ID transition characterization. See summary.json for automatic-transition/correlation limitations."
 } finally {
     try {
         if ($testOwnsInstallation) {

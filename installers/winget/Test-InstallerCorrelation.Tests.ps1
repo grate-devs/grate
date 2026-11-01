@@ -42,5 +42,35 @@ try {
         }
         throw "Correlation validator accepted $defect defect."
     }
+    $new = $content.Replace("  - UpgradeCode: '{22222222-2222-2222-2222-222222222222}'", "  - Publisher: grate-devs`n    ProductCode: '{11111111-1111-1111-1111-111111111111}'`n    UpgradeCode: '{22222222-2222-2222-2222-222222222222}'")
+    $new | Set-Content $fixture
+    & $validator @parameters -Policy NewIdentity -Publisher grate-devs
+    $bridge = [regex]::Replace($new, '(?m)^\s*(?:- )?(?:ProductCode|UpgradeCode): [^\r\n]*\r?\n', '').Replace('Publisher: grate-devs','Publisher: erikbra')
+    $bridge | Set-Content $fixture
+    & $validator @parameters -Policy Bridge
+    foreach ($defect in @('publisher','rootScope','nodeScope','missingEntryCode','bridgeCode','bridgePublisher')) {
+        $policy = if ($defect -like 'bridge*') {'Bridge'} else {'NewIdentity'}
+        $faulty = switch ($defect) {
+            publisher {$new.Replace('Publisher: grate-devs','Publisher: erikbra')}
+            rootScope {"Scope: user`n"+$new}
+            nodeScope {$new.Replace('- Architecture: x64',"- Architecture: x64`n  Scope: user")}
+            missingEntryCode {$new.Replace("    ProductCode: '{11111111-1111-1111-1111-111111111111}'`n",'')}
+            bridgeCode {$bridge.Replace('ManifestType: installer',"ProductCode: '{11111111-1111-1111-1111-111111111111}'`nManifestType: installer")}
+            bridgePublisher {$bridge.Replace('Publisher: erikbra','Publisher: grate-devs')}
+        }
+        $faulty | Set-Content $fixture
+        try { & $validator @parameters -Policy $policy }
+        catch {
+            $expected = switch ($defect) {
+                {$_ -in @('publisher','bridgePublisher')} {'*incorrect Publisher*'}
+                {$_ -in @('rootScope','nodeScope')} {'*Scope must be omitted*'}
+                missingEntryCode {'*installer and AppsAndFeaturesEntries levels*'}
+                bridgeCode {'*must not contain strong MSI reference codes*'}
+            }
+            if ($_.Exception.Message -like $expected) { continue }
+            throw
+        }
+        throw "Correlation validator accepted $defect defect."
+    }
 } finally { Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue }
-Write-Host 'PASS: MSI correlation uses the matching URL node (4 rejected mutations, including misplaced UpgradeCode).'
+Write-Host 'PASS: historical/new/bridge MSI correlation contracts; 10 rejected mutations including misplaced UpgradeCode, code aliases, scope and publisher.'

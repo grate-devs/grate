@@ -15,13 +15,14 @@ $assets = Join-Path $OutputDirectory 'assets'
 New-Item -ItemType Directory -Force $assets | Out-Null
 $headers = @{ Accept = 'application/vnd.github+json' }
 if ($env:GH_TOKEN) { $headers.Authorization = "Bearer $env:GH_TOKEN" }
-$versions = foreach ($version in @('2.0.0', '2.1.6', '2.1.7')) {
+$versions = foreach ($version in @('2.0.0', '2.1.6', '2.1.7', '2.1.8')) {
     $zip = Join-Path $assets "grate-$version.zip"
     $msi = Join-Path $assets "grate-$version.msi"
-    if ($version -eq '2.1.7') {
+    if ($version -in @('2.1.7','2.1.8')) {
         # Fixture version of the current source, built only for this test run.
-        Copy-Item "$CandidateDirectory/grate.zip" $zip
-        if ($InstallerType -eq 'wix') { Copy-Item "$CandidateDirectory/grate.msi" $msi }
+        $name = if ($version -eq '2.1.7') { 'grate' } else { 'grate-next' }
+        Copy-Item "$CandidateDirectory/$name.zip" $zip
+        if ($InstallerType -eq 'wix') { Copy-Item "$CandidateDirectory/$name.msi" $msi }
     } else {
         $release = Invoke-RestMethod "https://api.github.com/repos/grate-devs/grate/releases/tags/$version" -Headers $headers
         $requested = @(@{Name="grate-win-$Architecture-self-contained-$version.zip"; Path=$zip})

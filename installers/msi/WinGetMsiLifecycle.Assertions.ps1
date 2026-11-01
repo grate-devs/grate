@@ -14,11 +14,11 @@ function Assert-WinGetMsiPayload {
 }
 
 function Assert-WinGetMsiRegistration {
-    param([int]$State, [string]$Version, [int]$AssignmentType, $Arp, [string]$ExpectedVersion)
+    param([int]$State, [string]$Version, [int]$AssignmentType, $Arp, [string]$ExpectedVersion, [string]$ExpectedPublisher = 'erikbra')
     if ($State -ne 5) { throw "Expected installed MSI product state 5, got $State." }
     if ($Version -ne $ExpectedVersion) { throw "Expected registered MSI version $ExpectedVersion, got $Version." }
     if ($AssignmentType -ne 0) { throw "Expected per-user MSI registration, got assignment type $AssignmentType." }
-    if (!$Arp -or $Arp.DisplayName -ne 'grate' -or $Arp.Publisher -ne 'erikbra' -or $Arp.DisplayVersion -ne $ExpectedVersion) {
+    if (!$Arp -or $Arp.DisplayName -ne 'grate' -or $Arp.Publisher -ne $ExpectedPublisher -or $Arp.DisplayVersion -ne $ExpectedVersion) {
         throw 'The per-user ARP entry does not match the expected product, publisher and version.'
     }
 }
@@ -51,6 +51,29 @@ function ConvertTo-WinGetMsiProductRegistryKey {
         [void]$builder.Append($compact[$offset + 1]).Append($compact[$offset])
     }
     $builder.ToString()
+}
+
+function Assert-WinGetMsiNativeContext {
+    param($Inventory, [string]$ExpectedVersion, [string]$ExpectedPublisher = 'erikbra')
+    $contexts = @($Inventory.Contexts)
+    if ($contexts.Count -ne 1) { throw "Expected exactly one current-user MSI instance and no machine instance, found $($contexts.Count)." }
+    $instance = $contexts[0]
+    if ($instance.Context -notin @(1, 2) -or $instance.UserSid -ne $Inventory.CurrentUserSid -or $instance.ProductCode -ne $Inventory.ProductCode) {
+        throw 'Native MSI enumeration did not return an instance owned by the current user in a per-user context.'
+    }
+    $expected = @{
+        ProductState = '5'
+        AssignmentType = '0'
+        InstalledProductName = 'grate'
+        VersionString = $ExpectedVersion
+        Publisher = $ExpectedPublisher
+    }
+    foreach ($property in $expected.GetEnumerator()) {
+        $read = $instance.Properties[$property.Key]
+        if (!$read -or $read.ErrorCode -ne 0 -or $read.Value -ne $property.Value) {
+            throw "Native MSI context property $($property.Key) is missing, failed or does not match the installed package."
+        }
+    }
 }
 
 function Get-WinGetMsiOrdinaryUpdateOutcome {

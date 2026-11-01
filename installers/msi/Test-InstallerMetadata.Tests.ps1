@@ -11,10 +11,12 @@ Set-StrictMode -Version Latest
 $reader = Join-Path $PSScriptRoot 'Get-InstallerMetadata.ps1'
 $hash = (Get-FileHash -LiteralPath $MsiPath -Algorithm SHA256).Hash
 $metadata = & $reader -MsiPath $MsiPath
+$identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $ExpectedVersion -Architecture $ExpectedArchitecture
 foreach ($expected in @{
-    ProductCode = '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'
+    ProductCode = $identity.ProductCode
+    UpgradeCode = $identity.UpgradeCode
     ProductName = 'grate'
-    Manufacturer = 'erikbra'
+    Manufacturer = $identity.Manufacturer
     ProductVersion = $ExpectedVersion
     Platform = $ExpectedArchitecture
 }.GetEnumerator()) {

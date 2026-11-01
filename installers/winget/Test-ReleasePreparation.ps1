@@ -21,8 +21,18 @@ if ((Get-FileHash $tool -Algorithm SHA256).Hash -ne '24042BD37915805615E6CF969AC
 $helper = Join-Path $PSScriptRoot 'Create-Installer.ps1'
 & $helper -version $version -wingetCreate $tool -outputDirectory "$OutputDirectory/accepted-identity" *>&1 |
     Tee-Object -FilePath "$OutputDirectory/update.log"
-& $helper -version $version -wingetCreate $tool -outputDirectory "$OutputDirectory/migration-candidate" -PrepareMigration *>&1 |
-    Tee-Object -FilePath "$OutputDirectory/migration.log"
+# This historical release must remain available under its accepted ID, but must
+# never become the new identity: its MSI publisher/codes predate the contract.
+$rejected = $false
+try {
+    & $helper -version $version -wingetCreate $tool -outputDirectory "$OutputDirectory/migration-candidate" -PrepareMigration *>&1 |
+        Tee-Object -FilePath "$OutputDirectory/migration.log"
+} catch {
+    if ($_.Exception.Message -notlike '*corrected*MSI*actual grate-devs publisher*') { throw }
+    $_.Exception.Message | Set-Content "$OutputDirectory/migration-rejection.log"
+    $rejected = $true
+}
+if (!$rejected -or (Test-Path "$OutputDirectory/migration-candidate/manifests")) { throw 'Historical MSI migration was not rejected cleanly.' }
 
 $msiDirectory = Join-Path (Split-Path $PSScriptRoot) 'msi'
 $requestHeaders = @{ Accept = 'application/vnd.github+json' }
@@ -46,11 +56,11 @@ foreach ($arch in @('x64', 'arm64')) {
         Write-Warning 'Historical 2.1.6 arm64-named MSI has x64 installer platform. Native ARM64 compatibility remains unverified.'
     }
     & "$PSScriptRoot/Test-InstallerCorrelation.ps1" `
-        -ManifestPath "$OutputDirectory/migration-candidate/manifests/g/grate-devs/grate/$version/grate-devs.grate.installer.yaml" `
+        -ManifestPath "$OutputDirectory/accepted-identity/manifests/e/erikbra/grate/$version/erikbra.grate.installer.yaml" `
         -InstallerUrl $asset[0].browser_download_url -Architecture $arch `
         -ProductCode $metadata.ProductCode -UpgradeCode $metadata.UpgradeCode `
         -Sha256 ((Get-FileHash $msi -Algorithm SHA256).Hash)
     Remove-Item -LiteralPath $msi
 }
 Remove-Item -LiteralPath $tool
-Write-Host 'PASS: actual release manifest generation and read-only MSI inspection. No install, upgrade, migration or upstream acceptance was tested.'
+Write-Host 'PASS: historical release generation/inspection and refusal to migrate its legacy MSI. Local corrected-candidate YAML/schema checks run separately. No installation or upstream submission was performed.'

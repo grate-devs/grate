@@ -1,53 +1,87 @@
 #!/usr/bin/env pwsh
-# Contract tests use a release inventory and a recording wingetcreate substitute.
-# They exercise argument/output behavior; Windows/tool/schema tests are separate.
+# Release preparation contract: recording tools and independent MSI metadata.
+# Windows/schema and actual install/upgrade checks remain separate.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $helper = Join-Path $PSScriptRoot 'Create-Installer.ps1'
 $state = Join-Path ([IO.Path]::GetTempPath()) ('grate-winget-tests-' + [Guid]::NewGuid().ToString('N'))
-$wingetTest = @{ apiCalls = 0; toolCalls = 0; toolExitCode = 0; wrongOutput = $false; arguments = @(); testCount = 0; release = $null }
-
-function New-Release {
-    [pscustomobject]@{
-        tag_name = '2.1.6'; draft = $false; prerelease = $false; published_at = '2026-07-31T21:00:00Z'
-        assets = @(
-            'grate-win-x86-self-contained-2.1.6.zip', 'grate-win-x64-self-contained-2.1.6.zip',
-            'grate-win-arm64-self-contained-2.1.6.zip', 'grate-msi-win-x64-2.1.6.msi', 'grate-msi-win-arm64-2.1.6.msi'
-        ) | ForEach-Object {
-            [pscustomobject]@{ name = $_; browser_download_url = "https://github.com/grate-devs/grate/releases/download/2.1.6/$_"; state = 'uploaded'; size = 123 }
+$wingetTest = @{ apiCalls=0; toolCalls=0; downloadCalls=0; metadataCalls=0; schemaCalls=0; toolExitCode=0; wrongOutput=$false; arguments=@(); testCount=0; release=$null; metadata=@{} }
+function Test-Hash([string]$Architecture) {
+    [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("payload-$Architecture")))
+}
+function Set-Release([string]$Version='2.1.7', [switch]$Corrected) {
+    $wingetTest.release = [pscustomobject]@{
+        tag_name=$Version; draft=$false; prerelease=$false; published_at='2026-07-31T21:00:00Z'
+        assets=@("grate-win-x86-self-contained-$Version.zip", "grate-win-x64-self-contained-$Version.zip", "grate-win-arm64-self-contained-$Version.zip", "grate-msi-win-x64-$Version.msi", "grate-msi-win-arm64-$Version.msi") | ForEach-Object {
+            $arch = if ($_ -like '*arm64*') {'arm64'} else {'x64'}
+            [pscustomobject]@{name=$_; browser_download_url="https://github.com/grate-devs/grate/releases/download/$Version/$_"; state='uploaded'; size=123; digest=('sha256:'+(Test-Hash $arch).ToLowerInvariant())}
+        }
+    }
+    foreach ($arch in @('x64','arm64')) {
+        $identity = & "$PSScriptRoot/../msi/Get-InstallerIdentity.ps1" -Version $Version -Architecture $arch
+        $wingetTest.metadata[$arch] = [pscustomobject]@{
+            ProductCode=$(if ($Corrected) {$identity.ProductCode} else {'{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'})
+            UpgradeCode=$(if ($Corrected) {$identity.UpgradeCode} else {'{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'})
+            Manufacturer=$(if ($Corrected) {'grate-devs'} else {'erikbra'})
+            ProductName='grate'; ProductVersion=$Version; Platform=$arch
         }
     }
 }
 function Invoke-RestMethod([string]$Uri, [hashtable]$Headers) {
     $wingetTest.apiCalls++
-    if ($Uri -cne 'https://api.github.com/repos/grate-devs/grate/releases/tags/2.1.6') { throw "Unexpected API call: $Uri" }
+    if ($Uri -cne "https://api.github.com/repos/grate-devs/grate/releases/tags/$($wingetTest.release.tag_name)") { throw "Unexpected API call: $Uri" }
     $wingetTest.release
+}
+function Invoke-WebRequest([string]$Uri, [string]$OutFile) {
+    $wingetTest.downloadCalls++
+    $arch = if ($Uri -like '*arm64*') {'arm64'} else {'x64'}
+    [IO.File]::WriteAllText($OutFile, "payload-$arch")
+}
+function Read-TestMsiMetadata([string]$MsiPath) {
+    $wingetTest.metadataCalls++
+    $arch = if ($MsiPath -like '*arm64*') {'arm64'} else {'x64'}
+    $wingetTest.metadata[$arch]
 }
 function Invoke-TestWingetCreate {
     $wingetTest.toolCalls++
-    # A native executable receives array arguments expanded by PowerShell.
     $wingetTest.arguments = @($args | ForEach-Object { $_ })
     $global:LASTEXITCODE = $wingetTest.toolExitCode
     if ($wingetTest.toolExitCode -ne 0) { return }
-    $path = Join-Path $args[($args.IndexOf('-o') + 1)] 'manifests/e/erikbra/grate/2.1.6'
+    $version = $args[($args.IndexOf('-v')+1)]
+    $path = Join-Path $args[($args.IndexOf('-o')+1)] "manifests/e/erikbra/grate/$version"
     New-Item -ItemType Directory -Path $path -Force | Out-Null
-    $version = if ($wingetTest.wrongOutput) { '2.0.0' } else { '2.1.6' }
-    $common = "PackageIdentifier: erikbra.grate`nPackageVersion: $version`n"
-    ($common + "DefaultLocale: en-US`nManifestType: version`nManifestVersion: 1.12.0`n") |
-        Set-Content (Join-Path $path 'erikbra.grate.yaml')
-    ($common + "Publisher: erikbra`nPackageName: grate`nManifestType: defaultLocale`nManifestVersion: 1.12.0`n") |
-        Set-Content (Join-Path $path 'erikbra.grate.locale.en-US.yaml')
-    # Distinct MSI identity values must survive migration conversion unchanged.
-    ($common + "Installers:`n- Architecture: x64`n  ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'`n  AppsAndFeaturesEntries:`n  - Publisher: erikbra`n    UpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'`nManifestType: installer`nManifestVersion: 1.12.0`n") |
-        Set-Content (Join-Path $path 'erikbra.grate.installer.yaml')
+    $writtenVersion = if ($wingetTest.wrongOutput) {'0.0.1'} else {$version}
+    $common = "PackageIdentifier: erikbra.grate`nPackageVersion: $writtenVersion`n"
+    ($common+"DefaultLocale: en-US`nManifestType: version`nManifestVersion: 1.12.0`n") | Set-Content (Join-Path $path 'erikbra.grate.yaml')
+    ($common+"PackageLocale: en-US`nPublisher: erikbra`nPackageName: grate`nLicense: MIT`nShortDescription: SQL migrations`nManifestType: defaultLocale`nManifestVersion: 1.12.0`n") | Set-Content (Join-Path $path 'erikbra.grate.locale.en-US.yaml')
+    $nodes = foreach ($arch in @('x86','x64','arm64')) {
+        "- Architecture: $arch`n  InstallerType: zip`n  NestedInstallerType: portable`n  NestedInstallerFiles:`n  - RelativeFilePath: grate.exe`n  InstallerUrl: https://github.com/grate-devs/grate/releases/download/$version/grate-win-$arch-self-contained-$version.zip`n  InstallerSha256: $('A'*64)`n"
+    }
+    foreach ($arch in @('x64','arm64')) {
+        # Stale upstream AFE values must be replaced using actual inspected MSI
+        # metadata, never mistaken for evidence that the payload was corrected.
+        $nodes += "- InstallerLocale: en-US`n  Architecture: $arch`n  InstallerType: wix`n  Scope: user`n  InstallerUrl: https://github.com/grate-devs/grate/releases/download/$version/grate-msi-win-$arch-$version.msi`n  InstallerSha256: $(Test-Hash $arch)`n  ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'`n  AppsAndFeaturesEntries:`n  - Publisher: erikbra`n    UpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'`n"
+    }
+    ($common+"Scope: user`nProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'`nUpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'`nInstallers:`n"+($nodes -join '')+"ManifestType: installer`nManifestVersion: 1.12.0`n") | Set-Content (Join-Path $path 'erikbra.grate.installer.yaml')
 }
-function Assert-True([bool]$Condition, [string]$Message) {
-    if (!$Condition) { throw $Message }
+function Read-TestCandidateMetadata([string]$MsiPath) {
+    if ($MsiPath -notmatch 'candidate-(?<version>2\.1\.[78])\.msi$') { throw 'Unexpected candidate MSI fixture path.' }
+    $identity=& "$PSScriptRoot/../msi/Get-InstallerIdentity.ps1" -Version $Matches.version -Architecture x64
+    [pscustomobject]@{ProductCode=$identity.ProductCode; UpgradeCode=$identity.UpgradeCode; Manufacturer=$identity.Manufacturer; ProductName=$identity.ProductName; ProductVersion=$identity.Version; Platform='x64'}
+}
+function Invoke-TestWingetValidate {
+    if ($args[0] -ne 'validate' -or $args[1] -ne '--manifest' -or !(Test-Path $args[2])) { throw 'Schema command was not forwarded with its manifest directory.' }
+    $wingetTest.schemaCalls++
+    $global:LASTEXITCODE=0
+}
+function Assert-True([bool]$Condition, [string]$Message) { if (!$Condition) { throw $Message } }
+function Prepare([string]$Directory, [switch]$Migration) {
+    & $helper -version $wingetTest.release.tag_name -wingetCreate Invoke-TestWingetCreate -MsiMetadataReader Read-TestMsiMetadata -outputDirectory $Directory -PrepareMigration:$Migration
 }
 function Assert-Rejected([hashtable]$Parameters, [string]$Message, [switch]$AllowToolCall) {
     $before = $wingetTest.toolCalls
-    if (!$Parameters.ContainsKey('outputDirectory')) { $Parameters.outputDirectory = Join-Path $state ([guid]::NewGuid().ToString('N')) }
-    try { & $helper @Parameters -wingetCreate Invoke-TestWingetCreate }
+    if (!$Parameters.ContainsKey('outputDirectory')) { $Parameters.outputDirectory=Join-Path $state ([guid]::NewGuid().ToString('N')) }
+    try { & $helper @Parameters -wingetCreate Invoke-TestWingetCreate -MsiMetadataReader Read-TestMsiMetadata }
     catch {
         if ($_.Exception.Message -notlike $Message) { throw }
         if (!$AllowToolCall) { Assert-True ($wingetTest.toolCalls -eq $before) 'Rejected input still invoked wingetcreate.' }
@@ -56,68 +90,96 @@ function Assert-Rejected([hashtable]$Parameters, [string]$Message, [switch]$Allo
     }
     throw "Expected rejection: $Message"
 }
-
 try {
-    $wingetTest.release = New-Release
-    & $helper -version 2.1.6 -wingetCreate Invoke-TestWingetCreate -outputDirectory "$state/update"
-    $expectedUrls = @(
-        'https://github.com/grate-devs/grate/releases/download/2.1.6/grate-win-x86-self-contained-2.1.6.zip|x86',
-        'https://github.com/grate-devs/grate/releases/download/2.1.6/grate-win-x64-self-contained-2.1.6.zip|x64',
-        'https://github.com/grate-devs/grate/releases/download/2.1.6/grate-win-arm64-self-contained-2.1.6.zip|arm64',
-        'https://github.com/grate-devs/grate/releases/download/2.1.6/grate-msi-win-x64-2.1.6.msi|x64',
-        'https://github.com/grate-devs/grate/releases/download/2.1.6/grate-msi-win-arm64-2.1.6.msi|arm64'
-    )
+    Set-Release -Version 2.1.6
+    Prepare "$state/update"
+    $expectedUrls = @('win-x86-self-contained-2.1.6.zip|x86','win-x64-self-contained-2.1.6.zip|x64','win-arm64-self-contained-2.1.6.zip|arm64','msi-win-x64-2.1.6.msi|x64','msi-win-arm64-2.1.6.msi|arm64') | ForEach-Object {"https://github.com/grate-devs/grate/releases/download/2.1.6/grate-$_"}
     Assert-True ($wingetTest.arguments[0] -eq 'update' -and $wingetTest.arguments[1] -eq 'erikbra.grate') 'Default must update the accepted identity.'
-    Assert-True (($wingetTest.arguments[3..7] -join "`n") -ceq ($expectedUrls -join "`n")) 'The five asset URLs/architectures were not passed intact.'
+    Assert-True (($wingetTest.arguments[3..7] -join "`n") -ceq ($expectedUrls -join "`n")) 'Five asset URLs/architectures were not passed intact.'
     Assert-True ('-s' -notin $wingetTest.arguments -and '--submit' -notin $wingetTest.arguments) 'Preparation must not submit.'
     Assert-True ('https://github.com/grate-devs/grate/releases/tag/2.1.6' -in $wingetTest.arguments -and '2026-07-31' -in $wingetTest.arguments) 'Release metadata missing.'
-    Assert-True (Test-Path "$state/update/manifests/e/erikbra/grate/2.1.6/erikbra.grate.yaml") 'Legacy output path missing.'
+    $historical = Get-Content "$state/update/manifests/e/erikbra/grate/2.1.6/erikbra.grate.installer.yaml" -Raw
+    Assert-True ($historical.Contains('Scope: user') -and $historical.Contains("ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'") -and $wingetTest.metadataCalls -eq 0) 'Ordinary legacy update behavior changed.'
     $wingetTest.testCount++
+    Assert-Rejected @{version='2.1.6'; PrepareMigration=$true} '*corrected*MSI*actual grate-devs publisher*'
 
-    & $helper -version 2.1.6 -wingetCreate Invoke-TestWingetCreate -outputDirectory "$state/migration" -PrepareMigration
-    $candidate = "$state/migration/manifests/g/grate-devs/grate/2.1.6"
-    Assert-True (@(Get-ChildItem $candidate).Count -eq 3) 'Candidate requires exactly three manifests.'
-    foreach ($name in @('grate-devs.grate.yaml', 'grate-devs.grate.installer.yaml', 'grate-devs.grate.locale.en-US.yaml')) {
-        $text = Get-Content (Join-Path $candidate $name) -Raw
-        Assert-True ($text.Contains('PackageIdentifier: grate-devs.grate') -and !$text.Contains('PackageIdentifier: erikbra.grate')) 'Candidate identity was not converted.'
+    Set-Release -Corrected
+    Prepare "$state/migration" -Migration
+    $old = "$state/migration/manifests/e/erikbra/grate/2.1.7"
+    $new = "$state/migration/manifests/g/grate-devs/grate/2.1.7"
+    foreach ($item in @(@{Path=$old;Id='erikbra.grate'}, @{Path=$new;Id='grate-devs.grate'})) {
+        Assert-True (@(Get-ChildItem $item.Path).Count -eq 3) 'Each identity requires exactly three manifests.'
+        foreach ($file in Get-ChildItem $item.Path) { Assert-True ((Get-Content $file.FullName -Raw).Contains("PackageIdentifier: $($item.Id)")) 'Package identity was not converted.' }
     }
-    $installer = Get-Content "$candidate/grate-devs.grate.installer.yaml" -Raw
-    Assert-True ($installer.Contains("ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'") -and $installer.Contains("UpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'") -and $installer.Contains('  - Publisher: erikbra')) 'Migration modified MSI ARP identity.'
-    Assert-True ((Get-Content "$candidate/grate-devs.grate.locale.en-US.yaml" -Raw).Contains('Publisher: grate-devs')) 'Candidate display publisher missing.'
-    Assert-True (!(Test-Path "$state/migration/manifests/e")) 'Candidate must not overwrite historical manifests.'
+    $bridge = Get-Content "$old/erikbra.grate.installer.yaml" -Raw
+    $candidate = Get-Content "$new/grate-devs.grate.installer.yaml" -Raw
+    Assert-True ($bridge -notmatch '(?m)^\s*(?:- )?(?:ProductCode|UpgradeCode):') 'Bridge introduced strong reference aliases.'
+    Assert-True ((Get-Content "$old/erikbra.grate.locale.en-US.yaml" -Raw).Contains('Publisher: erikbra')) 'Bridge locale publisher changed.'
+    Assert-True ((Get-Content "$new/grate-devs.grate.locale.en-US.yaml" -Raw).Contains('Publisher: grate-devs')) 'New locale publisher missing.'
+    foreach ($arch in @('x64','arm64')) {
+        $metadata=$wingetTest.metadata[$arch]
+        $argsForValidator=@{InstallerUrl="https://github.com/grate-devs/grate/releases/download/2.1.7/grate-msi-win-$arch-2.1.7.msi";Architecture=$arch;ProductCode=$metadata.ProductCode;UpgradeCode=$metadata.UpgradeCode;Sha256=(Test-Hash $arch)}
+        & "$PSScriptRoot/Test-InstallerCorrelation.ps1" @argsForValidator -ManifestPath "$old/erikbra.grate.installer.yaml" -Policy Bridge
+        & "$PSScriptRoot/Test-InstallerCorrelation.ps1" @argsForValidator -ManifestPath "$new/grate-devs.grate.installer.yaml" -Policy NewIdentity -Publisher grate-devs
+    }
+    Assert-True ([regex]::Matches($bridge,'(?m)^  Scope: user$').Count -eq 3 -and [regex]::Matches($candidate,'(?m)^  Scope: user$').Count -eq 3) 'Only ZIP nodes must explicitly use user scope.'
     $wingetTest.testCount++
-
-    foreach ($unstable in @('2.1.7-beta.1', '2.1.7+build.1', '2.1', '02.1.6')) {
-        Assert-Rejected @{ version = $unstable } '*stable three-part version*'
-    }
-    Assert-Rejected @{ version = '2.1.6'; releaseTag = '2.1.5' } '*matching release tag*'
-    Assert-True ($wingetTest.apiCalls -eq 2) 'Invalid versions must fail before API calls.'
-    foreach ($flag in @('draft', 'prerelease')) {
-        $wingetTest.release = New-Release
-        $wingetTest.release.$flag = $true
-        Assert-Rejected @{ version = '2.1.6' } '*published stable GitHub release*'
-    }
-    foreach ($defect in @('missing', 'duplicate', 'empty', 'pending', 'wrongUrl')) {
-        $wingetTest.release = New-Release
+    Assert-Rejected @{version='2.1.7';outputDirectory="$state/migration";PrepareMigration=$true} '*Refusing to overwrite*'
+    foreach ($defect in @('Publisher','LegacyProduct','WrongProduct','UpgradeCode','Platform','Version','Digest')) {
+        Set-Release -Corrected
         switch ($defect) {
-            missing { $wingetTest.release.assets = $wingetTest.release.assets[0..3] }
-            duplicate { $wingetTest.release.assets += $wingetTest.release.assets[0] }
-            empty { $wingetTest.release.assets[0].size = 0 }
-            pending { $wingetTest.release.assets[0].state = 'new' }
-            wrongUrl { $wingetTest.release.assets[0].browser_download_url = 'https://example.org/wrong.zip' }
+            Publisher {$wingetTest.metadata.x64.Manufacturer='erikbra'}
+            LegacyProduct {$wingetTest.metadata.x64.ProductCode='{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'}
+            WrongProduct {$wingetTest.metadata.x64.ProductCode='{11111111-1111-1111-1111-111111111111}'}
+            UpgradeCode {$wingetTest.metadata.x64.UpgradeCode='{11111111-1111-1111-1111-111111111111}'}
+            Platform {$wingetTest.metadata.arm64.Platform='x64'}
+            Version {$wingetTest.metadata.arm64.ProductVersion='2.1.6'}
+            Digest {$wingetTest.release.assets[3].digest='sha256:'+('0'*64)}
         }
-        Assert-Rejected @{ version = '2.1.6' } $(if ($defect -eq 'wrongUrl') { '*Unexpected download URL*' } else { '*exactly one uploaded, nonempty release asset*' })
+        $expected=switch($defect) {LegacyProduct {'*legacy fixed ProductCode*'} WrongProduct {'*version-specific*ProductCode*'} UpgradeCode {'*stable*UpgradeCode*'} Digest {'*release digest*'} default {'*corrected*MSI*'}}
+        Assert-Rejected @{version='2.1.7';PrepareMigration=$true} $expected
     }
-    $wingetTest.release = New-Release
-    Assert-Rejected @{ version = '2.1.6'; outputDirectory = "$state/migration"; PrepareMigration = $true } '*Refusing to overwrite*'
-    $wingetTest.toolExitCode = 19
-    Assert-Rejected @{ version = '2.1.6'; outputDirectory = "$state/failed" } '*wingetcreate failed with exit code 19*' -AllowToolCall
-    Assert-True (!(Test-Path "$state/failed")) 'Failed tool left output that could be mistaken for a usable manifest.'
-    $wingetTest.toolExitCode = 0
-    $wingetTest.wrongOutput = $true
-    Assert-Rejected @{ version = '2.1.6'; outputDirectory = "$state/malformed" } '*Unexpected package identity/version*' -AllowToolCall
-    Assert-True (!(Test-Path "$state/malformed")) 'Malformed tool output was promoted.'
-} finally {
-    Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction SilentlyContinue
-}
+    $before=$wingetTest.apiCalls
+    foreach ($unstable in @('2.1.7-beta.1','2.1.7+build.1','2.1','02.1.6')) {Assert-Rejected @{version=$unstable} '*stable three-part version*'}
+    Assert-Rejected @{version='2.1.7';releaseTag='2.1.6'} '*matching release tag*'
+    Assert-True ($wingetTest.apiCalls -eq $before) 'Invalid versions must fail before API calls.'
+    foreach ($flag in @('draft','prerelease')) {
+        Set-Release -Corrected
+        $wingetTest.release.$flag=$true
+        Assert-Rejected @{version='2.1.7';PrepareMigration=$true} '*published stable GitHub release*'
+    }
+    foreach ($defect in @('missing','duplicate','empty','pending','wrongUrl')) {
+        Set-Release -Corrected
+        switch($defect) {
+            missing {$wingetTest.release.assets=$wingetTest.release.assets[0..3]}
+            duplicate {$wingetTest.release.assets+=$wingetTest.release.assets[0]}
+            empty {$wingetTest.release.assets[0].size=0}
+            pending {$wingetTest.release.assets[0].state='new'}
+            wrongUrl {$wingetTest.release.assets[0].browser_download_url='https://example.org/wrong.zip'}
+        }
+        Assert-Rejected @{version='2.1.7'} $(if($defect -eq 'wrongUrl'){'*Unexpected download URL*'}else{'*exactly one uploaded, nonempty release asset*'})
+    }
+    Set-Release -Corrected
+    $wingetTest.toolExitCode=19
+    Assert-Rejected @{version='2.1.7';outputDirectory="$state/failed";PrepareMigration=$true} '*wingetcreate failed with exit code 19*' -AllowToolCall
+    Assert-True (!(Test-Path "$state/failed")) 'Failed tool left usable-looking manifests.'
+    $wingetTest.toolExitCode=0; $wingetTest.wrongOutput=$true
+    Assert-Rejected @{version='2.1.7';outputDirectory="$state/malformed";PrepareMigration=$true} '*Unexpected package identity/version*' -AllowToolCall
+    Assert-True (!(Test-Path "$state/malformed")) 'Malformed output was promoted.'
+
+    # The local-candidate entrypoint shares policy with production while doing
+    # neither release lookup nor publication. Its validator here is a recorder;
+    # the actual Windows CI invocation uses real MSI inspection and winget.exe.
+    $records=foreach ($number in @('2.1.7','2.1.8')) {
+        $msi=Join-Path $state "candidate-$number.msi"; $zip=Join-Path $state "candidate-$number.zip"
+        'local msi fixture' | Set-Content $msi; 'local zip fixture' | Set-Content $zip
+        @{Version=$number;MsiPath=$msi;ZipPath=$zip;MsiHash=(Get-FileHash $msi).Hash;ZipHash=(Get-FileHash $zip).Hash}
+    }
+    @{Architecture='x64';InstallerType='wix';Versions=@($records)} | ConvertTo-Json -Depth 5 | Set-Content "$state/inventory.json"
+    $before=$wingetTest.apiCalls
+    & "$PSScriptRoot/Test-MigrationManifestPreparation.ps1" -InventoryPath "$state/inventory.json" -OutputDirectory "$state/candidate-policy" -MsiMetadataReader Read-TestCandidateMetadata -Winget Invoke-TestWingetValidate
+    $summary=@(Get-Content "$state/candidate-policy/summary.json" -Raw | ConvertFrom-Json)
+    Assert-True ($summary.Count -eq 4 -and $wingetTest.schemaCalls -eq 4 -and $wingetTest.apiCalls -eq $before) 'Local entrypoint omitted a candidate/identity validation or queried the release API.'
+    $wingetTest.testCount++
+} finally {Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction SilentlyContinue}
 Write-Host "PASS: $($wingetTest.testCount) WinGet preparation contract cases."

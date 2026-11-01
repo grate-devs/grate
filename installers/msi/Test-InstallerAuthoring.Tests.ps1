@@ -41,14 +41,14 @@ try {
         Assert-Rejected $faulty '*must not author ALLUSERS or MSIINSTALLPERUSER*'
     }
 
-    # Changing the WinGet publisher must not silently create a different MSI or
-    # break Windows Installer/ARP correlation for installed erikbra.grate MSIs.
+    # New identity is intentional; persisted component/path identities and the
+    # explicit legacy bridge must survive future authoring edits.
     $identityChanges = @(
         @('/w:Wix/w:Product', 'Id', '*'),
         @('/w:Wix/w:Product', 'Name', 'grate-devs.grate'),
-        @('/w:Wix/w:Product', 'Manufacturer', 'grate-devs'),
+        @('/w:Wix/w:Product', 'Manufacturer', 'erikbra'),
         @('/w:Wix/w:Product', 'UpgradeCode', '00000000-0000-0000-0000-000000000001'),
-        @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'grate-devs'),
+        @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'erikbra'),
         @("//w:Directory[@Id='ROOTDIRECTORY']", 'Name', 'grate-devs'),
         @("//w:Directory[@Id='INSTALLFOLDER']", 'Name', 'grate-devs.grate'),
         @("//w:Component[@Id='MainExecutable']", 'Guid', '*'),
@@ -71,9 +71,15 @@ try {
         [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
         $element = $faulty.CreateElement($upgradeElement, $faulty.DocumentElement.NamespaceURI)
         $null = $faulty.Wix.Product.AppendChild($element)
-        Assert-Rejected $faulty '*must preserve the current MSI minor-update contract*'
+        Assert-Rejected $faulty '*transactional MajorUpgrade*'
     }
+    [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+    $faulty.Wix.Product.MajorUpgrade.SetAttribute('Schedule', 'afterInstallValidate')
+    Assert-Rejected $faulty '*transactional MajorUpgrade*'
+    [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+    $faulty.Wix.Product.InstallExecuteSequence.Custom.SetAttribute('After', 'InstallValidate')
+    Assert-Rejected $faulty '*transactional MajorUpgrade*'
 } finally {
     Remove-Item -LiteralPath $fixture -ErrorAction SilentlyContinue
 }
-Write-Host 'PASS: MSI directory cleanup, per-user-only ICE91 advisory and WinGet migration identity contract (19 rejected mutations).'
+Write-Host 'PASS: MSI directory cleanup, per-user-only ICE91 advisory, persistent components and transactional legacy upgrade authoring.'
