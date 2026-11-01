@@ -1,0 +1,52 @@
+name: Copy and verify Docker history
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-history-migration
+  cancel-in-progress: false
+
+jobs:
+  copy-history:
+    name: Preserve grate image digests and platforms
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the reviewed migration revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Verify migration behavior
+        run: python3 -m unittest discover -s eng -p test_migrate_docker_tags.py
+
+      - name: Install registry copy tool from Ubuntu's signed package repositories
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends skopeo
+          mkdir -p docker-migration-report
+          skopeo --version | tee docker-migration-report/tool-version.txt
+
+      - name: Copy frozen source digests and verify every tag
+        env:
+          DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+        run: >-
+          python3 eng/migrate_docker_tags.py
+          --plan docs/release-evidence/docker-copy-2026-11-01/plan.json
+          --report-dir docker-migration-report --copy
+
+      - name: Retain migration evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: docker-migration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: docker-migration-report/
+          if-no-files-found: error
+          retention-days: 90

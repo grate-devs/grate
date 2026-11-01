@@ -1,0 +1,105 @@
+name: Check Docker publishing permissions (no publication)
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check-access:
+    name: Check CI push grants without uploading
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Request repository access grants
+        env:
+          DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+        shell: python
+        run: |
+          import base64
+          import json
+          import os
+          import sys
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          REPOSITORIES = ("erikbra/grate", "gratedevs/grate")
+
+          class NoRedirects(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          def check_access(repository, authorization, opener):
+              query = urllib.parse.urlencode({
+                  "service": "registry.docker.io",
+                  "scope": f"repository:{repository}:pull,push",
+              })
+              request = urllib.request.Request(
+                  "https://auth.docker.io/token?" + query,
+                  headers={"Authorization": authorization},
+                  method="GET",
+              )
+              try:
+                  with opener.open(request, timeout=30) as response:
+                      data = json.load(response)
+                  token = data.get("token") or data.get("access_token")
+                  # Inspect only claims returned directly by Docker over HTTPS.
+                  # Do not print credentials, the token, or its complete payload.
+                  parts = token.split(".")
+                  if len(parts) != 3:
+                      raise ValueError("Unexpected token format")
+                  payload = parts[1] + "=" * (-len(parts[1]) % 4)
+                  claims = json.loads(base64.urlsafe_b64decode(payload))
+                  if claims.get("aud") != "registry.docker.io":
+                      raise ValueError("Unexpected token audience")
+                  if claims.get("exp", 0) <= time.time():
+                      raise ValueError("Expired token")
+                  actions = set()
+                  for grant in claims.get("access", []):
+                      if grant.get("type") == "repository" and grant.get("name") == repository:
+                          actions.update(grant.get("actions", []))
+                  allowed = "push" in actions
+                  return {
+                      "repository": repository,
+                      "pull": "pull" in actions,
+                      "push": allowed,
+                      "status": "push granted" if allowed else "push not granted",
+                  }
+              except urllib.error.HTTPError as error:
+                  return {"repository": repository, "push": False,
+                          "status": f"token endpoint HTTP {error.code}"}
+              except Exception:
+                  # Exception text or response bodies could contain credentials.
+                  return {"repository": repository, "push": False,
+                          "status": "token request or response validation failed"}
+
+          def main():
+              user = os.environ.get("DOCKER_HUB_USER", "")
+              secret = os.environ.get("DOCKER_HUB_TOKEN", "")
+              if not user or not secret:
+                  print("::error::DOCKER_HUB_USER and DOCKER_HUB_TOKEN must both be configured.")
+                  return 2
+              credentials = base64.b64encode((user + ":" + secret).encode()).decode()
+              opener = urllib.request.build_opener(NoRedirects())
+              results = [check_access(repo, "Basic " + credentials, opener)
+                         for repo in REPOSITORIES]
+              for result in results:
+                  print(json.dumps(result, sort_keys=True))
+              summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+              if summary_path:
+                  with open(summary_path, "a", encoding="utf-8") as summary:
+                      summary.write("## Docker CI access grants\n\n")
+                      summary.write("| Repository | Result |\n| --- | --- |\n")
+                      for result in results:
+                          summary.write(f"| `{result['repository']}` | {result['status']} |\n")
+                      summary.write("\nUsed the repository's DOCKER_HUB_USER and DOCKER_HUB_TOKEN secrets. "
+                                    "Only GET requests to auth.docker.io were made. "
+                                    "No image build, pull, upload, tag change, or publication occurred. "
+                                    "This checks Docker-issued access grants, not an end-to-end push.\n")
+              return 0 if all(result["push"] for result in results) else 1
+
+          if __name__ == "__main__":
+              sys.exit(main())
