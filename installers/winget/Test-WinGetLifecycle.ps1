@@ -55,7 +55,9 @@ function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$
 function W([string[]]$Arguments, [string]$Name, [switch]$Observe) {
     $dataHash=$null
     if ($Arguments[0] -in @('install','upgrade','uninstall') -and (Test-Path $database)) { $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash }
-    try { Run $Winget ($Arguments + @('--disable-interactivity', '--verbose-logs', '--no-proxy')) $Name -Observe:$Observe }
+    $options=@('--disable-interactivity','--verbose-logs')
+    if ($Arguments[0] -in @('install','upgrade','uninstall','show','list') -or ($Arguments[0] -eq 'source' -and $Arguments[1] -eq 'add')) { $options+='--no-proxy' }
+    try { Run $Winget ($Arguments + $options) $Name -Observe:$Observe }
     finally {
         if ($dataHash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash)) {
             throw "$Name removed or modified migration data outside the installation directory."
@@ -190,7 +192,7 @@ New-Item -ItemType Directory -Force "$sql/up","$sql/afterMigration" | Out-Null
 'CREATE TABLE lifecycle_data(id INTEGER PRIMARY KEY); INSERT INTO lifecycle_data VALUES(42);' | Set-Content "$sql/up/001_create.sql"
 "CREATE TEMP TABLE lifecycle_assert(value INTEGER CHECK(value=1)); INSERT INTO lifecycle_assert SELECT CASE WHEN COUNT(*)=1 AND MIN(id)=42 THEN 1 ELSE 0 END FROM lifecycle_data; INSERT INTO lifecycle_assert SELECT CASE WHEN COUNT(*)=1 THEN 1 ELSE 0 END FROM grate_ScriptsRun WHERE script_name='001_create.sql'; INSERT INTO lifecycle_assert SELECT CASE WHEN COUNT(*)=0 THEN 1 ELSE 0 END FROM grate_ScriptsRunErrors;" | Set-Content "$sql/afterMigration/900_assert.sql"
 try {
-    $summary.WinGetVersion=(W @('--version') 'winget-version').Output.Trim()
+    $summary.WinGetVersion=(Run $Winget @('--version') 'winget-version').Output.Trim()
     # Remove unrelated catalogs only inside the disposable VM. Source identity
     # stays constant throughout the single-ID and simultaneous-ID phases below.
     $null=W @('source','export') 'original-sources'

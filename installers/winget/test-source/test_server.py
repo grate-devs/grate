@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import threading
 import unittest
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from server import TestSource, load_catalog
@@ -115,8 +115,12 @@ class SourceProtocolTests(unittest.TestCase):
 
     def test_https_requires_certificate_name_and_trust_validation(self):
         request = Request(self.url + "/information")
-        with self.assertRaises(Exception):
+        with self.assertRaises(URLError) as error:
             urlopen(request, context=ssl.create_default_context(), timeout=3)
+        self.assertIsInstance(error.exception.reason, ssl.SSLCertVerificationError)
+        with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=3) as connection:
+            with self.assertRaises(ssl.SSLCertVerificationError):
+                self.context.wrap_socket(connection, server_hostname="wrong-host.invalid")
 
     def test_exact_identifier_does_not_match_the_other_package(self):
         packages = self.search({"Filters": [selector("PackageIdentifier", "grate-devs.grate")]})

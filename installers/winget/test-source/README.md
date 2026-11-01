@@ -65,9 +65,11 @@ version's default locale for package search display metadata.
 
 The launcher requires PowerShell 7, Python 3.9+, an elevated disposable GitHub-hosted
 Windows runner, `GITHUB_ACTIONS=true`, and `RUNNER_ENVIRONMENT=github-hosted`. It
-creates a one-day localhost certificate, trusts its public certificate in
+creates a one-day certificate covering DNS `localhost` and IP `127.0.0.1`, trusts its public certificate in
 `LocalMachine\Root`, exports its key to a unique temporary directory, and launches
-Python. Readiness checks use ordinary certificate validation.
+Python. The source URL uses `https://127.0.0.1:8765`, matching the listening address
+and certificate IP SAN without DNS/IPv6 fallback. Readiness requests bypass proxies
+and use ordinary certificate validation with a bounded five-second timeout.
 
 ```powershell
 $source = $null
@@ -112,6 +114,11 @@ python3 -m unittest discover -s installers/winget/test-source -p 'test_*.py' -v
 These checks make real HTTPS requests and cover both IDs, exact/substring
 selection, inclusion/filter semantics, duplicate MSI correlation data, version
 filtering, dynamic catalog updates, source identity stability, and asset isolation.
+They also verify certificate trust/name rejection and that an incomplete TLS
+connection cannot block another request. TLS handshakes run in separate workers
+with a ten-second timeout; server logs distinguish TCP acceptance, TLS success or
+failure, and HTTP requests. Public certificate metadata and startup errors are
+recorded alongside those logs.
 They do not establish successful WinGet client negotiation, installation, or
 upgrade. Those require the Windows lifecycle workflow.
 
