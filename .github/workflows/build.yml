@@ -276,60 +276,110 @@ jobs:
 
 
   build-docker-image:
-    name: Build and push docker image
-    needs: 
-     - set-version-number
-     #- build-standalone ## no need, we build directly from source
-
+    name: Build and push Docker image
+    needs: set-version-number
     runs-on: ubuntu-latest
-
-    #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-    env:
-      #REGISTRY: ghcr.io
-      IMAGE_NAME: grate
+    permissions:
+      contents: read
+    # Serialize version/latest publication across release runs.
+    concurrency:
+      group: docker-publication
+      cancel-in-progress: false
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+
+    - name: Check Docker release policy
+      run: |
+        python3 -m unittest discover -s installers/docker -p 'test_*.py'
+        python3 -m unittest discover -s eng -p 'test_verify_docker_release.py'
+
+    - name: Select identical tags for canonical and compatibility names
+      id: tags
+      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
+      env:
+        VERSION: ${{ needs.set-version-number.outputs.semVer }}
+        # #804 integration: use needs.set-version-number.outputs.is-prerelease
+        # here, including manual recovery. Current main has no such output.
+        PRERELEASE: ${{ github.event.release.prerelease || false }}
+      shell: bash
+      run: |
+        args=()
+        if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
+        python3 installers/docker/release_tags.py "$VERSION" "${args[@]}" --github-output "$GITHUB_OUTPUT"
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       with:
         driver: docker-container
 
-    - name: Log in to the Container registry
-      uses: docker/login-action@v4.7.0
+    - name: Log in to Docker Hub
+      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
       if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
       with:
-        #registry: ${{ env.REGISTRY }}
-        username: ${{ secrets.DOCKER_HUB_USER}}
+        username: ${{ secrets.DOCKER_HUB_USER }}
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-    - name: Extract metadata (tags, labels) for Docker
+    - name: Retain OCI image labels
       id: meta
-      uses: docker/metadata-action@v6
       if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
       with:
-        tags: |
-          type=semver,pattern={{version}}
-          type=semver,pattern={{version}},value=${{ needs.set-version-number.outputs.semVer }}
-          type=ref,event=tag
+        images: |
+          gratedevs/grate
+          erikbra/grate
+        flavor: latest=false
+        tags: type=raw,value=${{ steps.tags.outputs.version }}
 
-        #images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        images: ${{ secrets.DOCKER_HUB_USER}}/${{ env.IMAGE_NAME }}
-
-
+    # One build/export sends the same manifest graph to both repositories.
     - name: Build and push Docker image
-      uses: docker/build-push-action@v7
+      id: image
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
       with:
         file: ./installers/docker/Dockerfile
         context: .
         platforms: linux/amd64,linux/arm64
         pull: true
         push: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-        tags: ${{ steps.meta.outputs.tags }}
+        tags: ${{ steps.tags.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
-          VERSION=${{ needs.set-version-number.outputs.nuGetVersion }}
+          VERSION=${{ steps.tags.outputs.version || needs.set-version-number.outputs.semVer }}
+
+    - name: Verify every published tag against the built digest
+      if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' && steps.tags.outputs.tags != '' }}
+      env:
+        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
+        EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
+        BUILD_OUTCOME: ${{ steps.image.outcome }}
+        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      run: python3 eng/verify_docker_release.py --report docker-publication.json
+
+    - name: Retain publication results, including partial failures
+      if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' }}
+      env:
+        BUILD_OUTCOME: ${{ steps.image.outcome }}
+        EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
+      shell: bash
+      run: |
+        echo "Build/push outcome: $BUILD_OUTCOME; built digest: $EXPECTED_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+        if [[ ! -f docker-publication.json ]]; then
+          echo 'Publication did not reach verification. Some registry tags may already have changed; inspect both repositories before retrying.' >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Upload Docker publication evidence
+      if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      with:
+        name: docker-publication-${{ github.run_id }}-${{ github.run_attempt }}
+        path: docker-publication.json
+        if-no-files-found: warn
 
   build-deb:
     name: Build Debian package
