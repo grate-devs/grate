@@ -236,14 +236,29 @@ try {
             Assert-Installed $legacy $oldId
             $null=W (@('upgrade','--id',$oldId,'--version','2.1.7')+$upgradeOptions) "$name-bridge-upgrade"
             Assert-Installed '2.1.7' $newId
-            Assert-NewIdCorrelation "$name-after-bridge"
+            Snapshot "$name-after-bridge"
+            $afterNew=Get-Content "$OutputDirectory/$name-after-bridge-list-$newId.command.json" -Raw | ConvertFrom-Json
+            $afterOld=Get-Content "$OutputDirectory/$name-after-bridge-list-$oldId.command.json" -Raw | ConvertFrom-Json
+            if ($afterNew.ExitCode -ne 0 -or $afterOld.ExitHex -notin @('0x00000000','0x8A150014')) { throw 'Unexpected package correlation after the bridge payload upgrade.' }
+            $trackingAlias=$afterOld.ExitCode -eq 0
             Migrate "$name-after-bridge"
+            # A WinGet upgrade records detected new product/family codes under
+            # the ID used for the command, even when the bridge omits them.
+            # Remove that record through the supported uninstall command. The
+            # resolved ID transition must then be exclusive without editing
+            # WinGet's private tracking database or accepting a fallback.
+            $uninstallId=if ($trackingAlias) {$oldId} else {$newId}
+            $null=Uninstall $uninstallId "$name-transition-uninstall"
+            $null=W (@('install','--id',$newId,'--version','2.1.7')+$upgradeOptions+@('--architecture',$arch,'--installer-type',$type)) "$name-transition-new-install"
+            Assert-Installed '2.1.7' $newId
+            Assert-NewIdCorrelation "$name-after-explicit-transition"
+            Migrate "$name-after-explicit-transition"
             $null=W (@('upgrade','--id',$newId,'--version','2.1.8')+$upgradeOptions) "$name-next-upgrade"
             Assert-Installed '2.1.8' $newId
             Assert-NewIdCorrelation "$name-after-next"
             Migrate "$name-after-next"
             $null=Uninstall $newId "$name-uninstall"
-            $summary.LegacyUpgrades+=@{From=$legacy; Bridge='2.1.7'; Next='2.1.8'; WinGetUpgrade='Passed'; ExclusiveNewId=$true; DataPreserved=$true}
+            $summary.LegacyUpgrades+=@{From=$legacy; Bridge='2.1.7'; Next='2.1.8'; WinGetUpgrade='Passed'; OldIdTrackingAliasAfterBridge=$trackingAlias; AutomaticBridgeCorrelationVerified=(!$trackingAlias); ExplicitNewIdTransitionVerified=$true; ExclusiveNewId=$true; DataPreserved=$true}
         }
         # Probe the explicit scope selector separately. Some clients reject
         # unspecified manifest scope; either outcome must preserve actual
@@ -262,9 +277,11 @@ try {
         Migrate 'fresh-new-id'
         $null=Uninstall $newId 'fresh-new-id-uninstall'
         $summary.ExclusiveWinGetNewIdCorrelationVerified=$true
-        $summary.LegacyPublisherBridgeUpgradeVerified=$true
+        $summary.LegacyWinGetMsiUpgradeVerified=$true
+        $summary.AutomaticBridgeCorrelationVerified=@($summary.LegacyUpgrades | Where-Object { !$_.AutomaticBridgeCorrelationVerified }).Count -eq 0
+        $summary.ExplicitNewIdTransitionVerified=$true
         $summary.Completed=$true
-        Write-Host "PASS: $type $arch native per-user scope, both legacy upgrades, exclusive new ID, next-version upgrade, fresh install and data preservation."
+        Write-Host "PASS: $type $arch per-user MSI, both legacy upgrades, explicit exclusive ID transition, next-version upgrade, fresh install and data preservation. Automatic tracking behavior is recorded separately."
     } else {
         $null=W (@('install','--id',$oldId,'--version','2.0.0')+$installOptions) 'old-install'
         Assert-Installed '2.0.0' $oldId

@@ -4,6 +4,7 @@ param (
     [Parameter(Mandatory=$true)] [ValidateSet('x64', 'arm64')] [string]$Architecture
 )
 $ErrorActionPreference = 'Stop'
+$Architecture = $Architecture.ToLowerInvariant()
 if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'MSI identity requires a stable three-part numeric version.' }
 $number = [version]$Version
 if ($number.Major -gt 255 -or $number.Minor -gt 255 -or $number.Build -gt 65535) { throw 'MSI version exceeds Windows Installer limits.' }

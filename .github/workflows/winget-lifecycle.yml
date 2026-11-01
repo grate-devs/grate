@@ -116,7 +116,7 @@ jobs:
           $headers = @{Authorization="Bearer $env:GH_TOKEN"; Accept='application/vnd.github+json'}
           $run = Invoke-RestMethod "https://api.github.com/repos/grate-devs/grate/actions/runs/$env:CANDIDATE_RUN_ID" -Headers $headers
           @{ CandidateRunId=$run.id; CandidateSourceCommit=$run.head_sha; ScriptCommit=$env:GITHUB_SHA; Architecture=$env:TEST_ARCH; DirectMsiRequested=$env:DIRECT_MSI_REQUESTED } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/lifecycle/candidate-provenance.json"
-      - name: Actual MSI upgrade and reinstall with current-source candidate
+      - name: Actual MSI major upgrade and rollback
         if: matrix.type == 'wix' && inputs.direct_msi
         timeout-minutes: 8
         run: |

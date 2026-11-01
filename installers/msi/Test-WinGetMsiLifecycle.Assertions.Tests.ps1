@@ -67,6 +67,32 @@ Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.6' } '*property 
 $inventory.Contexts = @()
 Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*exactly one current-user MSI instance*'
 
+# Reduced ordered excerpts of the real Windows ARM64 rollback log. This package
+# has no localized "RemoveExistingProducts: Application" description.
+$legacy = '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'
+$family = '{67B1619D-BF0A-4861-B0DF-C7A1AE13AC8F}'
+$candidate = '{BFB0EA52-37D5-59D1-A1F1-3CF697A7E598}'
+$rollbackLines = @(
+    'grate: verified current-user legacy MSI added to transactional major upgrade.',
+    "******* Product: $legacy",
+    "Command Line: UPGRADINGPRODUCTCODE=$candidate CLIENTPROCESSID=3728 REMOVE=ALL",
+    "Executing op: ProductUnregister(UpgradeCode=$family)",
+    'Executing op: FileRemove(,FileName=grate.exe,,)',
+    'Action ended 15:38:36: RemoveExistingProducts. Return value 1.',
+    'Action start 15:38:36: FailRollbackVerification.',
+    'Product: grate -- Injected rollback verification failure.',
+    'Action ended 15:38:36: FailRollbackVerification. Return value 3.',
+    "Executing op: ProductInfo(ProductKey=$legacy,ProductName=grate)",
+    'Executing op: FileCopy(SourceName=C:\Config.Msi\old.rbf,,DestName=C:\Users\runneradmin\AppData\Local\erikbra\grate\grate.exe)'
+)
+Assert-WinGetMsiRollbackLog ($rollbackLines -join "`n") $legacy $family $candidate
+foreach ($missingIndex in @(2, 3, 4, 5, 6, 8, 9, 10)) {
+    $faultyLog = @(for ($i = 0; $i -lt $rollbackLines.Count; $i++) { if ($i -ne $missingIndex) { $rollbackLines[$i] } }) -join "`n"
+    Assert-Rejected { Assert-WinGetMsiRollbackLog $faultyLog $legacy $family $candidate } '*Rollback log lacks ordered native execution evidence*'
+}
+$reordered = @($rollbackLines[9..10]) + @($rollbackLines[0..8])
+Assert-Rejected { Assert-WinGetMsiRollbackLog ($reordered -join "`n") $legacy $family $candidate } '*Rollback log lacks ordered native execution evidence*'
+
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('winget-msi-assertions-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $fixture | Out-Null
 try {
@@ -95,4 +121,4 @@ try {
         Assert-Rejected { Assert-WinGetMsiPayloadArchitecture $pe $other } '*does not match native*'
     }
 } finally { Remove-Item -LiteralPath $fixture -Recurse -Force }
-Write-Host 'PASS: MSI upgrade outcome classification, ARP/context, data preservation and PE architecture assertions.'
+Write-Host 'PASS: MSI upgrade outcomes, ARP/native context, ordered rollback evidence, data preservation and PE architecture assertions.'

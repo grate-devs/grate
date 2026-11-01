@@ -76,6 +76,33 @@ function Assert-WinGetMsiNativeContext {
     }
 }
 
+function Assert-WinGetMsiRollbackLog {
+    param([string]$Log, [string]$LegacyProductCode, [string]$LegacyUpgradeCode, [string]$CandidateProductCode)
+    # Minimal WiX packages do not have localized Error/ActionText rows, so an
+    # "Application: grate" description need not be logged. Require actual native
+    # execution in order: identified legacy removal, injected failure, then old
+    # registration and payload restoration. Runtime state/hash checks follow.
+    $patterns = @(
+        'grate: verified current-user legacy MSI',
+        ('Product: ' + [regex]::Escape($LegacyProductCode)),
+        ('Command Line: [^\r\n]*UPGRADINGPRODUCTCODE=' + [regex]::Escape($CandidateProductCode) + '[^\r\n]*REMOVE=ALL'),
+        ('Executing op: ProductUnregister\(UpgradeCode=' + [regex]::Escape($LegacyUpgradeCode) + '\)'),
+        'Executing op: FileRemove\([^\r\n]*FileName=grate\.exe',
+        'Action ended[^\r\n]*RemoveExistingProducts\. Return value 1\.',
+        'Action start[^\r\n]*FailRollbackVerification\.',
+        'Injected rollback verification failure',
+        'Action ended[^\r\n]*FailRollbackVerification\. Return value 3\.',
+        ('Executing op: ProductInfo\(ProductKey=' + [regex]::Escape($LegacyProductCode)),
+        'Executing op: FileCopy\([^\r\n]*DestName=[^\r\n]*\\erikbra\\grate\\grate\.exe'
+    )
+    $at = 0
+    foreach ($pattern in $patterns) {
+        $match = [regex]::Match($Log.Substring($at), $pattern, [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if (!$match.Success) { throw "Rollback log lacks ordered native execution evidence: $pattern" }
+        $at += $match.Index + $match.Length
+    }
+}
+
 function Get-WinGetMsiOrdinaryUpdateOutcome {
     param([int]$ExitCode, [string]$RegisteredVersion, [string]$OldVersion, [string]$NewVersion, [string]$InstalledHash, [string]$OldHash, [string]$NewHash)
     if ($ExitCode -in @(0, 3010) -and $RegisteredVersion -eq $NewVersion -and $InstalledHash -eq $NewHash) {

@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $helper = Join-Path $PSScriptRoot 'Create-Installer.ps1'
 $state = Join-Path ([IO.Path]::GetTempPath()) ('grate-winget-tests-' + [Guid]::NewGuid().ToString('N'))
-$wingetTest = @{ apiCalls=0; toolCalls=0; downloadCalls=0; metadataCalls=0; schemaCalls=0; toolExitCode=0; wrongOutput=$false; arguments=@(); testCount=0; release=$null; metadata=@{} }
+$wingetTest = @{ apiCalls=0; toolCalls=0; downloadCalls=0; metadataCalls=0; schemaCalls=0; schemaExitCode=0; toolExitCode=0; wrongOutput=$false; arguments=@(); testCount=0; release=$null; metadata=@{} }
 function Test-Hash([string]$Architecture) {
     [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("payload-$Architecture")))
 }
@@ -82,7 +82,8 @@ function Invoke-TestWingetValidate {
         if ($type -eq 'installer' -and $text -match '(?m)^\s*(?:- )?Scope:') { throw 'Candidate manifests must omit unsupported portable/MSI Scope.' }
     }
     $wingetTest.schemaCalls++
-    $global:LASTEXITCODE=0
+    $global:LASTEXITCODE=$wingetTest.schemaExitCode
+    if ($wingetTest.schemaExitCode) { Write-Output 'Manifest validation succeeded with warnings.' }
 }
 function Assert-True([bool]$Condition, [string]$Message) { if (!$Condition) { throw $Message } }
 function Prepare([string]$Directory, [switch]$Migration) {
@@ -109,10 +110,15 @@ try {
     Assert-True ('-s' -notin $wingetTest.arguments -and '--submit' -notin $wingetTest.arguments) 'Preparation must not submit.'
     Assert-True ('https://github.com/grate-devs/grate/releases/tag/2.1.6' -in $wingetTest.arguments -and '2026-07-31' -in $wingetTest.arguments) 'Release metadata missing.'
     $historical = Get-Content "$state/update/manifests/e/erikbra/grate/2.1.6/erikbra.grate.installer.yaml" -Raw
-    Assert-True ($historical.Contains('Scope: user') -and $historical.Contains("ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'") -and $wingetTest.metadataCalls -eq 0) 'Ordinary legacy update behavior changed.'
+    Assert-True ($historical.Contains('Scope: user') -and $historical.Contains("ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'") -and $wingetTest.metadataCalls -eq 2) 'Ordinary legacy metadata was changed or actual MSI inspection was omitted.'
     $wingetTest.testCount++
     Assert-Rejected @{version='2.1.6'; PrepareMigration=$true} '*corrected*MSI*actual grate-devs publisher*'
 
+    Set-Release -Corrected
+    # Even when upstream/wingetcreate still reports old AFE values, actual new
+    # MSI identity must force the opt-in migration path before invoking the tool.
+    Assert-Rejected @{version='2.1.7';outputDirectory="$state/default-corrected"} '*requires -PrepareMigration*'
+    Assert-True (!(Test-Path "$state/default-corrected")) 'Default mode promoted corrected MSI identities under the old package ID.'
     Set-Release -Corrected
     Prepare "$state/migration" -Migration
     $old = "$state/migration/manifests/e/erikbra/grate/2.1.7"
@@ -197,6 +203,16 @@ try {
     & "$PSScriptRoot/Test-MigrationManifestPreparation.ps1" -InventoryPath "$state/inventory.json" -OutputDirectory "$state/candidate-policy" -MsiMetadataReader Read-TestCandidateMetadata -Winget Invoke-TestWingetValidate
     $summary=@(Get-Content "$state/candidate-policy/summary.json" -Raw | ConvertFrom-Json)
     Assert-True ($summary.Count -eq 4 -and $wingetTest.schemaCalls -eq 4 -and $wingetTest.apiCalls -eq $before) 'Local entrypoint omitted a candidate/identity validation or queried the release API.'
+    $wingetTest.testCount++
+    $wingetTest.schemaExitCode=1
+    $schemaRejected=$false
+    try {
+        & "$PSScriptRoot/Test-MigrationManifestPreparation.ps1" -InventoryPath "$state/inventory.json" -OutputDirectory "$state/candidate-schema-warning" -MsiMetadataReader Read-TestCandidateMetadata -Winget Invoke-TestWingetValidate
+    } catch {
+        if ($_.Exception.Message -notlike '*WinGet schema validation failed*') { throw }
+        $schemaRejected=$true
+    }
+    Assert-True ($schemaRejected -and !(Test-Path "$state/candidate-schema-warning/summary.json")) 'A nonzero schema-warning result was promoted as successful candidate verification.'
     $wingetTest.testCount++
 } finally {Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction SilentlyContinue}
 Write-Host "PASS: $($wingetTest.testCount) WinGet preparation contract cases."

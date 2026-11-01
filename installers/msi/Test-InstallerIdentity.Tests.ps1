@@ -14,6 +14,11 @@ foreach ($example in $examples) {
     if ($identity.ProductCode -cne $example[2] -or $identity.UpgradeCode -cne $example[3] -or $identity.Manufacturer -cne 'grate-devs') { throw 'MSI identity does not match the independent version/architecture contract.' }
     $repeated = & $helper -Architecture $example[0] -Version $example[1]
     if ($repeated.ProductCode -ne $identity.ProductCode) { throw 'MSI ProductCode must be reproducible for the same release/architecture.' }
+    $variants = @($example[0].ToUpperInvariant(), $(if ($example[0] -eq 'arm64') { 'ArM64' } else { 'X64' }))
+    foreach ($variant in $variants) {
+        $same = & $helper -Architecture $variant -Version $example[1]
+        if ($same.ProductCode -cne $example[2] -or $same.UpgradeCode -cne $example[3] -or $same.Architecture -cne $example[0]) { throw 'Architecture case must not create a second MSI identity for the same release.' }
+    }
 }
 foreach ($version in @('2.1.7-beta', '2.1.7.0', '02.1.7', '256.0.0', '1.256.0', '1.0.65536')) {
     $rejected = $false

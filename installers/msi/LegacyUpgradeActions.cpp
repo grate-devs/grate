@@ -198,7 +198,7 @@ extern "C" __declspec(dllexport) UINT __stdcall DetectLegacyGrate(MSIHANDLE sess
         const auto version = ParseVersion(Property(session, L"ProductVersion"));
         const auto family = Upper(Property(session, L"UpgradeCode"));
         const wchar_t* other = family == GRATE_X64_UPGRADE_CODE ? GRATE_ARM64_UPGRADE_CODE : GRATE_X64_UPGRADE_CODE;
-        if (family != GRATE_X64_UPGRADE_CODE && family != GRATE_ARM64_UPGRADE_CODE) { throw std::runtime_error("Unexpected grate upgrade family"); }
+        if (family != GRATE_CURRENT_UPGRADE_CODE) { throw std::runtime_error("Unexpected grate upgrade family for this installer architecture"); }
         if (!CurrentUserFamily(other, sid).empty()) { throw std::runtime_error("The other architecture of grate is already installed for this user; uninstall it before changing architecture"); }
         const auto allowed = CurrentUserFamily(family.c_str(), sid);
         const auto legacy = CurrentUserInstances(GRATE_LEGACY_PRODUCT_CODE, sid);

@@ -164,7 +164,8 @@ function Check-Installed($Metadata, [string]$Payload, [string]$Name) {
     Assert-WinGetMsiPayload $installedExe $Payload $Metadata.ProductVersion
     if ((Get-ItemPropertyValue $marker -Name installed) -ne 1) { throw 'The per-user installed marker is missing.' }
     $path = [Environment]::GetEnvironmentVariable('Path', 'User')
-    if ($installDirectory.TrimEnd('\') -notin @($path.Split(';') | ForEach-Object { $_.TrimEnd('\') })) { throw 'The per-user PATH entry is missing.' }
+    $pathEntries = @($path.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\', '/') } | Where-Object { $_ -eq $installDirectory.TrimEnd('\', '/') })
+    if ($pathEntries.Count -ne 1) { throw "Expected exactly one per-user grate PATH entry, found $($pathEntries.Count)." }
     Check-Protected
     $null = Run-Process $installedExe @('--help') "$Name-help"
 }
@@ -244,7 +245,7 @@ try {
             if ($rollbackSource) {
                 $null = Run-Msi @('/i', $rollbackSource) 'injected-rollback' @(1603)
                 $log = Get-Content "$caseDirectory/injected-rollback.msi.log" -Raw
-                if ($log -notmatch 'grate: verified current-user legacy MSI' -or $log -notmatch 'RemoveExistingProducts: Application: grate' -or $log -notmatch 'Injected rollback verification failure' -or $log -notmatch 'Rollback') { throw 'Failure did not prove legacy removal followed by the injected late failure/rollback.' }
+                Assert-WinGetMsiRollbackLog -Log $log -LegacyProductCode $legacyCode -LegacyUpgradeCode $old.UpgradeCode -CandidateProductCode $candidate.ProductCode
                 Check-Installed $old $historical.Executable 'rollback-restored-legacy'
                 Check-Absent $candidate.ProductCode 'rollback-candidate-absent'
                 $observation.Rollback = 'LegacyRegistrationPayloadAndDataRestored'

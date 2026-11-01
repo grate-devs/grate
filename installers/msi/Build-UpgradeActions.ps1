@@ -12,6 +12,7 @@ $contract = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'identity-contract
 #define GRATE_LEGACY_PRODUCT_CODE L"$($contract.LegacyProductCode)"
 #define GRATE_X64_UPGRADE_CODE L"$($contract.Architectures.x64.UpgradeCode)"
 #define GRATE_ARM64_UPGRADE_CODE L"$($contract.Architectures.arm64.UpgradeCode)"
+#define GRATE_CURRENT_UPGRADE_CODE L"$($contract.Architectures.$Architecture.UpgradeCode)"
 "@ | Set-Content -LiteralPath (Join-Path $OutputDirectory 'IdentityContract.h')
 $vswhere = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio/Installer/vswhere.exe'
 if (!(Test-Path -LiteralPath $vswhere)) { throw 'MSI upgrade actions require Visual Studio C++ build tools (vswhere.exe not found).' }
