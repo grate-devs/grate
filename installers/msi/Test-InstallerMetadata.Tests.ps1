@@ -7,6 +7,7 @@ param (
 )
 
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 $reader = Join-Path $PSScriptRoot 'Get-InstallerMetadata.ps1'
 $hash = (Get-FileHash -LiteralPath $MsiPath -Algorithm SHA256).Hash
 $metadata = & $reader -MsiPath $MsiPath

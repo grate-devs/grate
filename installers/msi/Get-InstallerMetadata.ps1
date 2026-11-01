@@ -45,8 +45,8 @@ try {
         Manufacturer = $properties.Manufacturer
         Platform = $template.Split(';')[0].ToLowerInvariant()
         PackageCode = [string](Invoke-MsiMember $summary 'Property' GetProperty @(9))
-        AllUsers = $properties.ALLUSERS
-        MsiInstallPerUser = $properties.MSIINSTALLPERUSER
+        AllUsers = $properties['ALLUSERS']
+        MsiInstallPerUser = $properties['MSIINSTALLPERUSER']
     }
 } finally {
     foreach ($comObject in @($summary, $view, $database, $installer)) {

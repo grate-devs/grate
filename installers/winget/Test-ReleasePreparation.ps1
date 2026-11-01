@@ -33,13 +33,20 @@ foreach ($arch in @('x64', 'arm64')) {
     if ('sha256:' + (Get-FileHash $msi -Algorithm SHA256).Hash.ToLowerInvariant() -cne $asset[0].digest) {
         throw "Release digest mismatch for $arch MSI."
     }
-    & "$msiDirectory/Test-InstallerMetadata.Tests.ps1" -MsiPath $msi -ExpectedVersion $version -ExpectedArchitecture $arch
     $metadata = & "$msiDirectory/Get-InstallerMetadata.ps1" -MsiPath $msi
     $metadata | ConvertTo-Json | Set-Content "$OutputDirectory/msi-$arch.json"
-    $manifest = Get-Content "$OutputDirectory/migration-candidate/manifests/g/grate-devs/grate/$version/grate-devs.grate.installer.yaml" -Raw
-    foreach ($value in @($metadata.ProductCode, $metadata.UpgradeCode)) {
-        if (!$manifest.Contains($value)) { throw "Candidate does not contain inspected $arch MSI identity: $value" }
+    # Release 2.1.6 compiled both MSI wrappers with candle -arch x64. Characterize
+    # that historical defect explicitly, without mistaking the asset name or URL
+    # override for proof of a native ARM64 installer. Current main fixed authoring.
+    & "$msiDirectory/Test-InstallerMetadata.Tests.ps1" -MsiPath $msi -ExpectedVersion $version -ExpectedArchitecture x64
+    if ($arch -eq 'arm64') {
+        Write-Warning 'Historical 2.1.6 arm64-named MSI has x64 installer platform. Native ARM64 compatibility remains unverified.'
     }
+    & "$PSScriptRoot/Test-InstallerCorrelation.ps1" `
+        -ManifestPath "$OutputDirectory/migration-candidate/manifests/g/grate-devs/grate/$version/grate-devs.grate.installer.yaml" `
+        -InstallerUrl $asset[0].browser_download_url -Architecture $arch `
+        -ProductCode $metadata.ProductCode -UpgradeCode $metadata.UpgradeCode `
+        -Sha256 ((Get-FileHash $msi -Algorithm SHA256).Hash)
     Remove-Item -LiteralPath $msi
 }
 Remove-Item -LiteralPath $tool
