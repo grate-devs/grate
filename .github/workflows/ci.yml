@@ -327,6 +327,7 @@ jobs:
             installers/deb/*.deb
             ${{ runner.temp }}/grate-msi-lifecycle/
             ${{ runner.temp }}/grate-debian-lifecycle/
+            !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/
 
   docker:
     name: Alpine ${{ matrix.arch }}
