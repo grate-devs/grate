@@ -269,7 +269,9 @@ try {
         Assert-Installed '2.1.7' $newId
         $summary.NewIdPayloadUpgrade='Passed'
         Snapshot 'after-direct-transition'
-        $summary.DirectNewIdCorrelationVerified=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'direct-new-id-correlation' -Observe).ExitCode -eq 0
+        $directNewQuery=W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'direct-new-id-correlation' -Observe
+        $directOldQuery=Get-Content "$OutputDirectory/after-direct-transition-list-$oldId.command.json" -Raw | ConvertFrom-Json
+        $summary.DirectNewIdCorrelationVerified=$directNewQuery.ExitCode -eq 0 -and $directOldQuery.ExitHex -eq '0x8A150014'
         $summary.ResetUninstall=Uninstall $newId 'reset-new-id'
         Write-Catalog
         $null=W (@('install','--id',$oldId,'--version','2.1.6')+$installOptions) 'reset-old-id'
@@ -288,7 +290,10 @@ try {
     Migrate 'fallback-new-id'
     Snapshot 'new-id-installed'
     $summary.NewIdListExit=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'new-id-correlation' -Observe).ExitHex
-    $summary.WinGetNewIdCorrelationVerified=$summary.NewIdListExit -eq '0x00000000'
+    $summary.WinGetNewIdExactQuerySucceeded=$summary.NewIdListExit -eq '0x00000000'
+    $oldQuery=Get-Content "$OutputDirectory/new-id-installed-list-$oldId.command.json" -Raw | ConvertFrom-Json
+    $summary.OldIdAlsoMatchesAfterFallback=$oldQuery.ExitCode -eq 0
+    $summary.ExclusiveWinGetNewIdCorrelationVerified=$summary.WinGetNewIdExactQuerySucceeded -and $oldQuery.ExitHex -eq '0x8A150014'
     $summary.AutomaticWinGetMigrationVerified=$transition.ExitCode -eq 0 -and $summary.DirectNewIdCorrelationVerified
     $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
     $summary.FinalUninstall=Uninstall $newId 'final-new-uninstall'

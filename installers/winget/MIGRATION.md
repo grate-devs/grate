@@ -1,6 +1,7 @@
 # WinGet identity migration preparation (#800)
 
-Status: preparation only. `erikbra.grate` remains the release identity.
+Status: Windows installation and fallback behavior tested in a private source;
+automatic identity migration remains blocked. `erikbra.grate` remains the release identity.
 `grate-devs.grate` is a proposed new package, not an alias or an in-place rename.
 Do not advertise or submit it until Windows migration tests and upstream review
 have resolved the correlation contract below. Keep the old listing during the
@@ -34,8 +35,9 @@ transfer to `grate-devs.grate`. A local `winget install --manifest` uses a
 different source identity from the community repository, so it is only rehearsal
 evidence, not proof of a community-source transition.
 
-Proposed supported transition: explicit uninstall of the old portable package,
-then install of the accepted new ID. Keep the `grate` command name. Do not use
+The private Windows tests verify explicit uninstall of the old portable package,
+then install of the new ID. Repeat against the community source after acceptance.
+Keep the `grate` command name. Do not use
 `--force` to overwrite registration or allow competing command links. Existing
 exports/imports retain the old ID while the old listing remains available.
 
@@ -57,7 +59,8 @@ The fixed ProductCode, changing UpgradeCodes, and absence of an Upgrade table
 mean that simply adding `MajorUpgrade`, changing Manufacturer, or allocating a
 new ProductCode is not a compatibility fix. This change preserves the installer
 and adds read-only inspection plus guards against accidental identity edits.
-It does not establish a working WinGet MSI upgrade.
+The native minor-update path is now verified below. WinGet's MSI upgrade path is
+blocked by an observed installed-scope mismatch; the installer identity is unchanged.
 
 The [WinGet publisher-transition FAQ](https://github.com/microsoft/winget-pkgs/blob/master/doc/FAQ.md#what-should-i-do-if-a-package-is-being-published-by-a-new-publisher)
 describes an ARP-driven transition using both IDs and different metadata in the
@@ -115,15 +118,17 @@ Local contract checks:
 Use disposable Windows systems. Record OS/architecture, WinGet version and source
 ID, old/new release versions, both manifest revisions, installer hashes, exit
 codes, verbose installer logs, ARP entries, `winget list`, `winget upgrade`,
-`winget export`, `Get-Command grate -All`, `where.exe grate` and `grate --version`.
+`winget export`, `Get-Command grate -All`, `where.exe grate` and executable file
+versions. `grate --version` specifies a database migration version; it is not a
+CLI version-display command. CLI operation is checked with `--help` and SQLite.
 
 | Boundary | Cases and assertions still required |
 | --- | --- |
-| Portable same-ID upgrade | x86/x64 on Windows x64, arm64 on native Windows arm64; installed old community package upgrades without switching installer type, losing registration or creating duplicate command links |
-| Portable identity transition | Both IDs visible in the same source; observe attempted new-ID upgrade, then test explicit old-ID uninstall/new-ID install and final cleanup; repeat against the community source after acceptance |
-| MSI same-ID upgrade | Historical 1.2.0 x64, 2.0.0 and 2.1.6 x64/arm64 to the candidate built from current main; inspect each actual ProductCode/UpgradeCode/PackageCode and validate actual binary replacement and ARP version |
-| MSI identity transition | Both IDs visible simultaneously; test detection before/after new-ID install and upgrade; require unambiguous correlation, one installation/ARP product and correct payload; verify uninstall/reinstall fallback |
-| Installed behavior and data | Run SQLite migration and rerun using installed grate, preserve DB/scripts outside the installation directory, verify PATH resolution and uninstall removes the intended payload/registration |
+| Portable same-ID upgrade | Verified x86/x64/arm64 in the private source; community-source baseline/upgrade remains to be repeated |
+| Portable identity transition | Verified simultaneous IDs, direct-upgrade rejection and uninstall/reinstall in the private source; repeat community-source transition after acceptance |
+| MSI same-ID upgrade | Native 2.0.0 and 2.1.6 x64/arm64 to current-source candidate verified; WinGet scope mismatch observed; 1.2.0 remains untested |
+| MSI identity transition | Simultaneous IDs and uninstall/reinstall verified privately; exclusive correlation remains unresolved because both ID queries match the same MSI |
+| Installed behavior and data | Verified installed SQLite migration/rerun, independent payload hash/file version, registration, PATH, uninstall and preserved external data in completed cases |
 | New source listing | After upstream acceptance, `winget show --exact --id grate-devs.grate --source winget` and repeat source-dependent migration checks |
 
 Example fallback commands **for testing after the new ID is available**, selecting
@@ -139,7 +144,7 @@ Confirm the old installation and command link were removed before the install.
 MSI authoring currently makes its user PATH entry permanent; uninstall/reinstall
 testing must check for stale entries explicitly. Do not delete migration data.
 
-## Verification performed
+## Manifest preparation evidence
 
 Source `71dc9d43ff15d1ac87ac59f4be27c5579a0c58fe` passed
 [the bounded Windows run](https://github.com/grate-devs/grate/actions/runs/41353274428)
@@ -172,9 +177,102 @@ architecture argument, which must still be tested with a newly built candidate.
 This is an additional reason not to submit the historical five-installer
 migration candidate unchanged.
 
-No grate MSI/portable install, repair, uninstall, upgrade, source-to-source
-migration or upstream submission was performed. No .NET application or new MSI
-payload was built in this check; main's current SDK/installer changes are preserved.
+That earlier preparation check did not execute installers. The following runtime
+checks build and install real payloads. No upstream submission has been performed.
+
+## Windows installation and upgrade results
+
+The test-only candidate version `2.1.7` is built from source commit
+`6270e36417bde90fa89feea7dcfb9718b61f0c6d` in
+[candidate build 41354744686](https://github.com/grate-devs/grate/actions/runs/41354744686).
+It preserves the main baseline's .NET 11 RC3, servicing and installer configuration.
+It is an Actions artifact, not a published grate release. Later script revisions
+reuse those immutable artifacts and record both candidate and test-script commits
+in `candidate-provenance.json`.
+
+The actual WinGet client is pinned to **1.29.380**. A local, TLS-validated
+`Microsoft.Rest` source serves both package IDs from the same stable source
+identifier. Real GitHub release ZIPs/MSIs are downloaded and hash-checked before
+being served locally. The same-ID stage starts with the old ID alone; both IDs
+are then simultaneously available during the identity-transition stage. This
+avoids conflating an existing upgrade problem with a two-ID correlation problem.
+
+| Boundary | Actual observation |
+| --- | --- |
+| Portable x86, x64, native arm64 | 2.0.0 -> 2.1.6 under the old ID succeeds. Direct upgrade to the new ID returns `0x8A150014` with the old installation intact. Old-ID uninstall followed by new-ID candidate install succeeds. |
+| Direct MSI x64, native arm64 | Both 2.0.0 and 2.1.6 -> current-source 2.1.7: ordinary `/i` returns **1638**; explicit `REINSTALL=ALL REINSTALLMODE=vomus` succeeds. Historical uninstall/candidate reinstall succeeds. |
+| WinGet MSI x64, native arm64 | Unscoped old-ID and new-ID upgrade attempts return `0x8A150010`. Native diagnostics prove `Installer scope does not match currently installed scope: User != Machine`. `--uninstall-previous` has the same selection failure. |
+| MSI fallback | Native minor update to 2.1.6, then old-ID WinGet uninstall and new-ID candidate install succeed. The new ID can be queried and exported; final uninstall succeeds. |
+| MSI two-ID correlation | After new-ID installation, **both old-ID and new-ID exact queries match the same physical MSI**. Export selects the new ID. This is not exclusive/unambiguous migration. |
+| Installed behavior and data | Required file hashes and versions, one installed payload/registration, per-user MSI context, PATH resolution, installed `--help`, real SQLite schema/data/history assertions and reruns pass. Database hashes are checked across installer operations and uninstall. |
+
+Windows Installer inventory reports `ProductState=5` and `AssignmentType=0`
+(per-user), while WinGet inventories the MSI ARP entry as Machine. Standard HKCU
+Uninstall keys are not a reliable MSI inventory API for these packages; the tests
+use Windows Installer's supported `ProductInfo` API. Keeping `--scope user` on
+the upgrade search initially filtered out the installed MSI. Removing that test
+selector exposed the separate, concrete installer-selection scope mismatch.
+Neither result should be confused with a package-identifier rename.
+
+Evidence cohorts:
+
+- Portable jobs at source `5ec7ecc`:
+  [x86](https://github.com/grate-devs/grate/actions/runs/41356308891/job/124996986502),
+  [x64](https://github.com/grate-devs/grate/actions/runs/41356308891/job/124996986578),
+  [arm64](https://github.com/grate-devs/grate/actions/runs/41356308891/job/124996986598).
+  All three jobs passed, including source-driven installation and fallback.
+- Direct x64 MSI: [run 41357947694, x64 job](https://github.com/grate-devs/grate/actions/runs/41357947694/job/125001955842),
+  `direct-msi/summary.json` succeeded for both historical versions. The later
+  tool-bootstrap step in that diagnostic job failed; it does not invalidate the
+  completed direct MSI evidence, nor make the whole job a pass.
+- Direct arm64 MSI: [run 41356308891, arm64 job](https://github.com/grate-devs/grate/actions/runs/41356308891/job/124996986370),
+  `direct-msi/summary.json` succeeded for both historical versions. The later
+  source step exposed the upgrade-selection issue described above.
+- Completed MSI source/fallback verification at script `902b95a`:
+  [run 41358735255](https://github.com/grate-devs/grate/actions/runs/41358735255),
+  [x64 artifact](https://github.com/grate-devs/grate/actions/runs/41358735255/artifacts/13103834788),
+  [arm64 artifact](https://github.com/grate-devs/grate/actions/runs/41358735255/artifacts/13104277986).
+  Both jobs passed. `direct_msi=false` explicitly reused the separate direct MSI
+  evidence above; it did not rerun or claim those suites passed in this run.
+
+Portable x86/x64 executed on Windows Server 2025 x64, portable/MSI arm64 on
+native Windows 11 arm64, and the completed x64 MSI checks on Server 2022.
+Some earlier direct-MSI diagnostic VMs stalled, including Server 2025. Those runs
+were canceled, not passed. The harness now uses MTA, scopes inventory COM objects,
+bounds child-process waits/output draining and records query timing; the original
+hang cause is not proven. Server 2025 direct-MSI compatibility/reliability remains
+a gap. Historical 1.2.0 and community-source transition/import are also untested.
+
+`NewIdListExit=0` (called `WinGetNewIdCorrelationVerified` in the 902b95a artifact)
+means only that an exact new-ID query succeeds. Current summaries distinguish
+that observation from `ExclusiveWinGetNewIdCorrelationVerified` and record old-ID
+matches separately. `AutomaticWinGetMigrationVerified` uses evidence captured
+immediately after the direct attempt, before any reset or manual fallback.
+It is false in the completed MSI cases.
+
+### Reproducing the disposable checks
+
+The opt-in `WinGet Windows lifecycle` workflow has no publishing permissions.
+By default it builds current-source test artifacts for all three architectures
+and runs the full matrix plus direct MSI checks. For focused source retesting
+with separately verified direct MSI evidence:
+
+```sh
+gh workflow run winget-lifecycle.yml --ref feat/800-winget-migration \
+  -f candidate_run_id=41354744686 -f cases=msi -f direct_msi=false
+```
+
+Keep the provenance JSON and the direct-suite evidence when using that mode.
+Raw command/exit JSON, native WinGet/MSI logs, TLS request logs, catalog snapshots,
+ARP/API inventory, PATH resolution and WinGet exports are retained for seven days.
+Local source-protocol tests cover real HTTPS and the case-insensitive Windows
+reference identifiers; see [test-source/README.md](test-source/README.md).
+
+The private REST fixture is not the community's pre-indexed source. Its reference
+normalization policy and the pinned client's behavior are explicit in that
+README. No successful source fixture check grants upstream acceptance or proves
+community-source correlation. Both IDs must still be tested in that source after
+acceptance, with maintainer agreement on the MSI overlap strategy.
 
 ## Handoff to the shared release/documentation track
 
