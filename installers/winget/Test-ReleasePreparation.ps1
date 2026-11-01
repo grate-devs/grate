@@ -9,8 +9,9 @@ if (!$IsWindows) { throw 'Real WinGet preparation and MSI inspection require Win
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
-# Fixed input provides reproducible preparation evidence, independently of what
-# happens to be the latest release. This is not a release/publishing workflow.
+# Fixed release input provides preparation evidence independent of the latest
+# release. wingetcreate still selects the current upstream manifest template.
+# This is not a release/publishing workflow.
 $version = '2.1.6'
 $tool = Join-Path $OutputDirectory 'wingetcreate.exe'
 Invoke-WebRequest 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $tool

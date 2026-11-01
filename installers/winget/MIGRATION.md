@@ -136,6 +136,43 @@ Confirm the old installation and command link were removed before the install.
 MSI authoring currently makes its user PATH entry permanent; uninstall/reinstall
 testing must check for stale entries explicitly. Do not delete migration data.
 
+## Verification performed
+
+Source `71dc9d43ff15d1ac87ac59f4be27c5579a0c58fe` passed
+[the bounded Windows run](https://github.com/grate-devs/grate/actions/runs/41353274428)
+on Windows Server 2025 x64. It ran 17 preparation cases, 19 rejected MSI authoring
+mutations, four rejected correlation mutations, both real manifest-generation
+modes and read-only inspection of both 2.1.6 MSI assets. A separate review
+identified and rechecked fixes for StrictMode handling of optional MSI properties
+and historical architecture expectations. No substantiated review findings remain.
+
+The [artifact](https://github.com/grate-devs/grate/actions/runs/41353274428/artifacts/13102606042)
+contains both complete manifest sets, tool logs and actual MSI metadata. All six
+YAML documents, including the converted new-ID candidate, passed the official
+[WinGet 1.12.0 JSON schemas](https://github.com/microsoft/winget-cli/tree/v1.29.380/schemas/JSON/manifests/v1.12.0)
+in a separate local validation using PyYAML 6.0.3 (BaseLoader) and jsonschema
+4.26.0. CI artifact retention is seven days; rerun the preparation workflow for
+fresh artifacts. The release is fixed but the upstream template is selected live
+by wingetcreate; compare it when regenerating.
+
+Actual 2.1.6 MSI identities (common ProductCode as above):
+
+| Asset label | MSI platform | UpgradeCode | PackageCode |
+| --- | --- | --- | --- |
+| x64 | x64 | `{C82EDA9E-4872-480E-9154-90E9E94ECA5D}` | `{726EE661-B24E-4DBB-B7C2-E23520847EE3}` |
+| arm64 | **x64** | `{A9DEC2DB-6ADE-49F9-A6B3-00460CE9D18F}` | `{3BE93E43-3AD2-48F7-AD78-4C06B571DEC8}` |
+
+The historical arm64-named MSI has an x64 wrapper: the 2.1.6 helper built both
+with `candle -arch x64`. The workflow explicitly characterizes that defect; it
+does not certify native ARM64 installation. Current main's helper supports the
+architecture argument, which must still be tested with a newly built candidate.
+This is an additional reason not to submit the historical five-installer
+migration candidate unchanged.
+
+No grate MSI/portable install, repair, uninstall, upgrade, source-to-source
+migration or upstream submission was performed. No .NET application or new MSI
+payload was built in this check; main's current SDK/installer changes are preserved.
+
 ## Handoff to the shared release/documentation track
 
 Do not copy the old draft #804 pipeline wholesale. Preserve main's .NET 11 RC3,
