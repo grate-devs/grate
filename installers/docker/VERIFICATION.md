@@ -91,11 +91,34 @@ were not modified, and no further history-copy operation was run.
 
 ## Evidence limits
 
-No release or Docker Hub publication workflow was run. Environment protection,
-credential lifecycle, Hub description edits and the transition end condition
-remain as listed in [RELEASE.md](RELEASE.md). The build.yml part still requires
+No release or Docker Hub publication workflow was run. After the maintainer
+selected the environment policy, `docker-hub` was created without reviewers or a
+wait timer, permitting branch `main` and tag pattern `*`; API read-back confirmed
+the exact settings. Credential lifecycle, the pending organization-identity
+migration, Hub description edits and the transition end condition remain as
+listed in [RELEASE.md](RELEASE.md). The build.yml part still requires
 integration with the common release-event workflow; it is not a separate release
 mechanism. Product image execution here covers linux/arm64. Multi-platform
 manifest publication was tested with scratch fixtures, not both grate binaries.
 Host tests cover net10.0; net8.0/net9.0/net11.0 host suites and other database
 providers were not run for this bounded distribution change.
+
+## Maintainer clarification and environment follow-up
+
+The maintainer confirmed that the existing CI token is owned by Docker ID
+`erikbra` and selected organization-managed access under `gratedevs` as the target.
+The requested GitHub `docker-hub` environment was created with no required
+reviewers or wait timer. API read-back verified custom ref policies exactly:
+branch `main`, tag `*`. These refs support normal tag releases and manual recovery
+from the current workflow; the workflow must still restrict usage to its
+release-only publishing job. The configuration and observed API evidence are
+stored alongside [RELEASE.md](RELEASE.md).
+
+The maintainer then provided an authenticated Edge window. Read-only inspection
+of `https://app.docker.com/billing/gratedevs` confirmed Docker-Sponsored Open Source
+with all Team features, renewal 1 January 2027. The authenticated OIDC overview
+showed no connections; the unsaved create form exposed repository-scoped rules
+including `grate`. Returning to the overview still showed no connections. No
+Docker authentication or billing settings were saved. The initial in-app-browser
+session had been signed out; that limitation was resolved by using the window
+provided by the maintainer.
