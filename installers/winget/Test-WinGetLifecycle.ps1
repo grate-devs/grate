@@ -264,10 +264,12 @@ try {
     Snapshot 'both-visible'
     $transition=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) 'new-id-upgrade-attempt' -Observe
     $summary.NewIdUpgradeExit=$transition.ExitHex
+    $summary.DirectNewIdCorrelationVerified=$false
     if ($transition.ExitCode -eq 0) {
         Assert-Installed '2.1.7' $newId
         $summary.NewIdPayloadUpgrade='Passed'
         Snapshot 'after-direct-transition'
+        $summary.DirectNewIdCorrelationVerified=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'direct-new-id-correlation' -Observe).ExitCode -eq 0
         $summary.ResetUninstall=Uninstall $newId 'reset-new-id'
         Write-Catalog
         $null=W (@('install','--id',$oldId,'--version','2.1.6')+$installOptions) 'reset-old-id'
@@ -287,7 +289,7 @@ try {
     Snapshot 'new-id-installed'
     $summary.NewIdListExit=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'new-id-correlation' -Observe).ExitHex
     $summary.WinGetNewIdCorrelationVerified=$summary.NewIdListExit -eq '0x00000000'
-    $summary.AutomaticWinGetMigrationVerified=$transition.ExitCode -eq 0 -and $summary.WinGetNewIdCorrelationVerified
+    $summary.AutomaticWinGetMigrationVerified=$transition.ExitCode -eq 0 -and $summary.DirectNewIdCorrelationVerified
     $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
     $summary.FinalUninstall=Uninstall $newId 'final-new-uninstall'
     if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Final uninstall modified migration data.' }
