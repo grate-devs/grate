@@ -216,6 +216,13 @@ Neither result should be confused with a package-identifier rename.
 
 Evidence cohorts:
 
+- Final complete source/fallback matrix at script `9b05677`:
+  [run 41359444074](https://github.com/grate-devs/grate/actions/runs/41359444074).
+  All five actual Windows installation/upgrade jobs passed: portable x86/x64/arm64
+  and MSI x64/arm64. This run reused the same candidate artifacts and explicitly
+  selected `direct_msi=false`; the direct MSI suites below are separate evidence.
+  All five result JSONs confirm completed fallback, no automatic identity
+  migration, exclusive new-ID portable correlation and nonexclusive MSI queries.
 - Portable jobs at source `5ec7ecc`:
   [x86](https://github.com/grate-devs/grate/actions/runs/41356308891/job/124996986502),
   [x64](https://github.com/grate-devs/grate/actions/runs/41356308891/job/124996986578),
