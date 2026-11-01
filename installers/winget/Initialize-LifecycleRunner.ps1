@@ -38,5 +38,7 @@ $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller
 $winget = Join-Path $package.InstallLocation 'winget.exe'
 $actual = & $winget --version
 if ($LASTEXITCODE -ne 0 -or $actual.Trim() -cne 'v1.29.380') { throw "Unexpected WinGet CLI version: $actual" }
+$proxySetting = & $winget settings --enable ProxyCommandLineOptions
+if ($LASTEXITCODE -ne 0) { throw "Cannot enable deterministic loopback proxy handling: $proxySetting" }
 Write-Host "Pinned WinGet $actual installed on disposable $arch runner."
 $winget
