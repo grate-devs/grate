@@ -102,6 +102,7 @@ class SourceProtocolTests(unittest.TestCase):
             information = json.load(response)["Data"]
         self.assertEqual("GrateMigrationCI", information["SourceIdentifier"])
         self.assertEqual(["1.10.0"], information["ServerSupportedVersions"])
+        self.assertEqual(["NormalizedPackageNameAndPublisher"], information["UnsupportedPackageMatchFields"])
         packages = self.search({"Query": {"KeyWord": "grate", "MatchType": "Substring"}})
         self.assertEqual(["erikbra.grate", "grate-devs.grate"], [p["PackageIdentifier"] for p in packages])
         self.assertEqual(["2.0.0", "2.1.6"], [v["PackageVersion"] for v in packages[0]["Versions"]])
@@ -143,7 +144,24 @@ class SourceProtocolTests(unittest.TestCase):
                 packages = self.search({"Inclusions": [selector(field, value)]})
                 self.assertEqual(2, len(packages))
                 self.assertEqual([value.casefold()], packages[0]["Versions"][0][output])
-        self.assertEqual(2, len(self.search({"Inclusions": [selector("NormalizedPackageNameAndPublisher", "grate")]})))
+
+    def test_advertised_unsupported_pair_search_is_rejected_without_name_only_fallback(self):
+        with self.request("/information") as response:
+            self.assertEqual(["NormalizedPackageNameAndPublisher"], json.load(response)["Data"]["UnsupportedPackageMatchFields"])
+        for request in (
+            {"Inclusions": [selector("NormalizedPackageNameAndPublisher", "grate")]},
+            {"Filters": [selector("NormalizedPackageNameAndPublisher", "grate")]},
+            {"Inclusions": [selector("ProductCode", PRODUCT_CODE), selector("NormalizedPackageNameAndPublisher", "grate")]}
+        ):
+            with self.subTest(request=request), self.assertRaises(HTTPError) as error:
+                self.search(request)
+            self.assertEqual(400, error.exception.code)
+            self.assertIn("Unsupported match field: NormalizedPackageNameAndPublisher", json.load(error.exception)["message"])
+            error.exception.close()
+        # This is the inclusion left after a conforming client removes the
+        # unsupported pair field. It must still expose every strong collision.
+        packages = self.search({"Inclusions": [selector("ProductCode", PRODUCT_CODE.lower())]})
+        self.assertEqual(["erikbra.grate", "grate-devs.grate"], [p["PackageIdentifier"] for p in packages])
 
     def test_captured_lowercase_exact_product_code_matches_uppercase_msi_metadata(self):
         # Captured from WinGet v1.29.380's native ARM64 installed-package search.

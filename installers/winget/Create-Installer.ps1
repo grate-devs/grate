@@ -61,14 +61,16 @@ $created = @()
 try {
     New-Item -ItemType Directory -Path $temporary | Out-Null
     $msiMetadata = @()
-    if ($PrepareMigration) {
-        foreach ($asset in @($releaseAssets | Where-Object Name -Like '*.msi')) {
+    # Inspect the actual payload in every mode. wingetcreate can retain stale
+    # upstream AFE metadata; default mode must never publish a corrected MSI's
+    # new strong reference codes under the old ID before migration activation.
+    foreach ($asset in @($releaseAssets | Where-Object Name -Like '*.msi')) {
             $published = @($release.assets | Where-Object name -CEQ $asset.Name)[0]
-            if ($published.digest -cnotmatch '^sha256:[a-f0-9]{64}$') { throw 'Migration requires published SHA256 release digests for both MSIs.' }
+            if ($published.digest -cnotmatch '^sha256:[a-f0-9]{64}$') { throw 'WinGet preparation requires published SHA256 release digests for both MSIs.' }
             $localMsi = Join-Path $temporary $asset.Name
             Invoke-WebRequest -Uri $published.browser_download_url -OutFile $localMsi
             $hash = (Get-FileHash -LiteralPath $localMsi -Algorithm SHA256).Hash
-            if ("sha256:$($hash.ToLowerInvariant())" -cne $published.digest) { throw 'Downloaded migration MSI does not match its release digest.' }
+            if ("sha256:$($hash.ToLowerInvariant())" -cne $published.digest) { throw 'Downloaded MSI does not match its release digest.' }
             $actual = & $MsiMetadataReader -MsiPath $localMsi
             $msiMetadata += [pscustomobject]@{
                 Architecture=$asset.Architecture; InstallerUrl=$published.browser_download_url; Sha256=$hash
@@ -76,10 +78,22 @@ try {
                 ProductName=$actual.ProductName; ProductVersion=$actual.ProductVersion; Platform=$actual.Platform
                 AllUsers=$actual.AllUsers; MsiInstallPerUser=$actual.MsiInstallPerUser
             }
-        }
+    }
+    $contractPath = Join-Path (Split-Path $PSScriptRoot) 'msi/identity-contract.json'
+    if ($PrepareMigration) {
         # Reject legacy releases before generating a new identity. Successful
         # YAML conversion cannot turn an uncorrected MSI into a migration.
-        Assert-WinGetMigrationMetadata $msiMetadata $version (Join-Path (Split-Path $PSScriptRoot) 'msi/identity-contract.json')
+        Assert-WinGetMigrationMetadata $msiMetadata $version $contractPath
+    } else {
+        $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+        $newFamilies = @($contract.Architectures.x64.UpgradeCode, $contract.Architectures.arm64.UpgradeCode)
+        foreach ($metadata in $msiMetadata) {
+            if ($metadata.ProductCode -ine $contract.LegacyProductCode -or
+                $metadata.Manufacturer -cne $contract.LegacyManufacturer -or
+                $metadata.UpgradeCode -iin $newFamilies) {
+                throw 'Corrected or unrecognized MSI identity requires -PrepareMigration; ordinary updates are limited to the historical erikbra MSI.'
+            }
+        }
     }
     & $wingetCreate update $sourceId -u $urls -v $version -o $temporary --release-notes-url "https://github.com/grate-devs/grate/releases/tag/$releaseTag" --release-date ([datetime]$release.published_at).ToString('yyyy-MM-dd')
     if ($LASTEXITCODE -ne 0) { throw "wingetcreate failed with exit code $LASTEXITCODE." }

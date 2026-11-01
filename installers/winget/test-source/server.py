@@ -11,7 +11,6 @@ import json
 import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-import re
 import ssl
 import sys
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -21,6 +20,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 # before sending Exact correlation queries. Keep ordinary package/name Exact
 # searches case-sensitive; the rule applies only to these reference fields.
 CORRELATION_FIELDS = frozenset(("ProductCode", "UpgradeCode", "PackageFamilyName"))
+UNSUPPORTED_PACKAGE_MATCH_FIELDS = ("NormalizedPackageNameAndPublisher",)
 
 
 def load_catalog(path):
@@ -82,12 +82,6 @@ def search_result(package):
             "Publisher": locale["Publisher"], "Versions": versions}
 
 
-def normalize_name(value):
-    # The CI catalog only contains grate. General Windows name normalization is
-    # intentionally outside this fixture's scope; do not claim general parity.
-    return re.sub(r"[^a-z0-9]", "", value.casefold())
-
-
 def matches_value(value, request):
     keyword = request.get("KeyWord", "")
     kind = request.get("MatchType", "Exact")
@@ -132,21 +126,18 @@ def field_matches(package, item):
         elif field == "HasInstallerType":
             for installer in version["Installers"]:
                 values.extend([installer.get("InstallerType", ""), installer.get("NestedInstallerType", "")])
-        elif field == "NormalizedPackageNameAndPublisher":
-            # The REST request schema carries only KeyWord (the normalized name),
-            # not the publisher's additional value. Return name candidates; let
-            # the real client decide correlation. Never invent a unique match.
-            values.append(normalize_name(locale["PackageName"]))
-            for installer in version["Installers"]:
-                for entry in installer.get("AppsAndFeaturesEntries", []):
-                    values.append(normalize_name(entry.get("DisplayName", locale["PackageName"])))
-            request = dict(request, KeyWord=normalize_name(request["KeyWord"]))
         else:
             raise ValueError(f"Unsupported match field: {field}")
     return any(matches_value(value, request) for value in values if value)
 
 
 def search(packages, request):
+    for item in request.get("Inclusions", []) + request.get("Filters", []):
+        if item["PackageMatchField"] in UNSUPPORTED_PACKAGE_MATCH_FIELDS:
+            # The advertised REST contract makes the client remove unsupported
+            # inclusions. A name-only fallback would pretend to match a publisher
+            # absent from this request and manufacture false migration collisions.
+            raise ValueError(f"Unsupported match field: {item['PackageMatchField']}")
     results = []
     for package in packages:
         selectors = []
@@ -224,7 +215,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/information":
                 return self.respond(200, {"Data": {"SourceIdentifier": self.server.source_identifier,
-                                                   "ServerSupportedVersions": ["1.10.0"]}})
+                                                   "ServerSupportedVersions": ["1.10.0"],
+                                                   "UnsupportedPackageMatchFields": list(UNSUPPORTED_PACKAGE_MATCH_FIELDS)}})
             if parsed.path.startswith("/assets/") and self.server.assets_path:
                 return self.serve_asset(unquote(parsed.path[len("/assets/"):]))
             if parsed.path.startswith("/packageManifests/"):

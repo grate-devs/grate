@@ -134,10 +134,27 @@ They do not establish successful WinGet client negotiation, installation, or
 upgrade. Those require the Windows lifecycle workflow.
 
 This fixture is intentionally small: all test installers are available in every
-market; fuzzy matching and paginated results are rejected. Normalized name search
-only handles grate's simple name and returns all name candidates. The REST request
-schema carries the normalized name without a separate publisher value; the
-[client serializer](https://github.com/microsoft/winget-cli/blob/master/src/AppInstallerRepositoryCore/Rest/Schema/1_0/Json/SearchRequestSerializer_1_0.cpp)
-shows that restriction. A private REST-source result is useful compatibility
+market; fuzzy matching and paginated results are rejected. The REST pair-search
+request carries a normalized name without a separate publisher value. The source
+therefore advertises this unsupported capability in its information response:
+
+```json
+{"Data":{"SourceIdentifier":"GrateMigrationCI","ServerSupportedVersions":["1.10.0"],"UnsupportedPackageMatchFields":["NormalizedPackageNameAndPublisher"]}}
+```
+
+The [pinned client's REST implementation](https://github.com/microsoft/winget-cli/blob/v1.29.380/src/AppInstallerRepositoryCore/Rest/Schema/1_1/RestInterface_1_1.cpp)
+removes unsupported inclusions before submitting a search and rejects unsupported
+filters. If a caller nevertheless sends this field, the fixture returns HTTP 400
+rather than pretending a name-only comparison also matched the publisher. Searches
+for supported product/upgrade codes still return every matching package, including
+real strong-identity collisions.
+
+This is an explicit capability limitation, not a claim of identical configuration
+with Microsoft's reference server. Its
+[API constants](https://github.com/microsoft/winget-cli-restsource/blob/main/src/WinGet.RestSource.Utils/Constants/ApiConstants.cs)
+currently omit the unsupported-field announcement as a historical client
+compatibility workaround tracked in
+[reference-source issue #59](https://github.com/microsoft/winget-cli-restsource/issues/59).
+A private REST-source result is useful compatibility
 evidence, but does not establish identical correlation with the community source's
 pre-indexed catalog or upstream acceptance.

@@ -121,11 +121,18 @@ jobs:
         timeout-minutes: 8
         run: |
           ./installers/msi/Test-WinGetMsiLifecycle.Assertions.Tests.ps1
+          ./installers/msi/Test-MsiLifecycleSupervisor.Tests.ps1
           $inventory = Get-Content "$env:RUNNER_TEMP/lifecycle/inventory.json" -Raw | ConvertFrom-Json
           $old = @($inventory.Versions | Where-Object Version -in @('2.0.0','2.1.6'))
           $candidate = $inventory.Versions | Where-Object Version -eq '2.1.7'
           $next = $inventory.Versions | Where-Object Version -eq '2.1.8'
-          ./installers/msi/Test-WinGetMsiLifecycle.ps1 -HistoricalMsiPaths @($old.MsiPath) -HistoricalExecutablePaths @($old.Executable) -CandidateMsiPath $candidate.MsiPath -CandidateExecutable $candidate.Executable -NextMsiPath $next.MsiPath -NextExecutable $next.Executable -OtherArchitectureMsiPath ./other-candidate/grate.msi -RollbackMsiPath ./candidate/grate-rollback.msi -Architecture $env:TEST_ARCH -OutputDirectory "$env:RUNNER_TEMP/lifecycle/direct-msi"
+          ./installers/msi/Invoke-MsiLifecycle.ps1 -Parameters @{
+            HistoricalMsiPaths=@($old.MsiPath); HistoricalExecutablePaths=@($old.Executable)
+            CandidateMsiPath=$candidate.MsiPath; CandidateExecutable=$candidate.Executable
+            NextMsiPath=$next.MsiPath; NextExecutable=$next.Executable
+            OtherArchitectureMsiPath='./other-candidate/grate.msi'; RollbackMsiPath='./candidate/grate-rollback.msi'
+            Architecture=$env:TEST_ARCH; OutputDirectory="$env:RUNNER_TEMP/lifecycle/direct-msi"
+          }
       - name: Install pinned WinGet on disposable runner
         id: winget
         if: ${{ !cancelled() && steps.assets.outcome == 'success' }}

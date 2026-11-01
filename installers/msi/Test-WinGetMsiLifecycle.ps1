@@ -20,13 +20,66 @@ if (!$HistoricalMsiPaths.Count -or $HistoricalMsiPaths.Count -ne $HistoricalExec
 if ([bool]$NextMsiPath -ne [bool]$NextExecutable) { throw 'Supply both NextMsiPath and NextExecutable.' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 if ((Test-Path $OutputDirectory) -and @(Get-ChildItem $OutputDirectory -Force).Count) { throw 'The evidence directory must be new or empty.' }
-$reader = Join-Path $PSScriptRoot 'Get-InstallerMetadata.ps1'
+New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+$caseDirectory = $OutputDirectory
+function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0), [int]$TimeoutMilliseconds = 180000) {
+    $start = [Diagnostics.ProcessStartInfo]::new($Executable)
+    $start.UseShellExecute = $false
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $start
+    try {
+        [void]$process.Start()
+        @{ executable = $Executable; arguments = $Arguments; processId = $process.Id; state = 'Running'; startedUtc = [DateTime]::UtcNow.ToString('o') } |
+            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.command.json")
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $timedOut = !$process.WaitForExit($TimeoutMilliseconds)
+        if ($timedOut) { $process.Kill($true); [void]$process.WaitForExit(5000) }
+        # A child/WER process can retain inherited pipe handles after the parent
+        # exits. Bound the combined stream drain rather than waiting forever.
+        $drainFailure = $null
+        try {
+            [void][Threading.Tasks.Task]::WhenAll([Threading.Tasks.Task[]]@($stdout, $stderr)).WaitAsync([TimeSpan]::FromSeconds(5)).GetAwaiter().GetResult()
+        } catch { $drainFailure = $_.Exception.Message }
+        $output = if ($stdout.IsCompletedSuccessfully) { $stdout.GetAwaiter().GetResult() } else { '[stdout drain did not complete successfully]' }
+        $errorOutput = if ($stderr.IsCompletedSuccessfully) { $stderr.GetAwaiter().GetResult() } else { '[stderr drain did not complete successfully]' }
+        $output | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.stdout.log")
+        $errorOutput | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.stderr.log")
+        $command = [pscustomobject]@{ executable = $Executable; arguments = $Arguments; exitCode = $(if ($process.HasExited) { $process.ExitCode } else { $null }); timedOut = $timedOut; streamDrainFailure = $drainFailure }
+        $command | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.command.json")
+        if ($timedOut) { throw "$Name exceeded its $TimeoutMilliseconds millisecond timeout; inspect retained logs." }
+        if ($drainFailure) { throw "$Name output drain failed or exceeded five seconds: $drainFailure" }
+        if ($process.ExitCode -notin $AllowedExitCodes) { throw "$Name failed with exit code $($process.ExitCode); inspect retained logs." }
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; StandardOutput = $output; StandardError = $errorOutput }
+    } finally { $process.Dispose() }
+}
+function Run-Msi([string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0, 3010)) {
+    Run-Process (Join-Path $env:SystemRoot 'System32/msiexec.exe') ($Arguments + @('/qn', '/norestart', '/l*v', (Join-Path $caseDirectory "$Name.msi.log"))) $Name $AllowedExitCodes
+}
+
+$metadataPaths = @($HistoricalMsiPaths) + @($CandidateMsiPath)
+foreach ($optional in @($NextMsiPath, $RollbackMsiPath, $OtherArchitectureMsiPath)) { if ($optional) { $metadataPaths += $optional } }
+$metadataPaths = @($metadataPaths | ForEach-Object { (Resolve-Path -LiteralPath $_).Path } | Select-Object -Unique)
+$metadataRequest = Join-Path $OutputDirectory 'metadata-request.json'
+$metadataOutput = Join-Path $OutputDirectory 'metadata-snapshot.json'
+$metadataPaths | ConvertTo-Json | Set-Content -LiteralPath $metadataRequest
+$null = Run-Process (Join-Path $PSHOME 'pwsh.exe') @('-NoLogo', '-NoProfile', '-NonInteractive', '-MTA', '-File', (Join-Path $PSScriptRoot 'Get-InstallerMetadataBatch.ps1'), '-RequestPath', $metadataRequest, '-OutputPath', $metadataOutput) 'metadata-worker' -TimeoutMilliseconds 60000
+$metadataLookup = @{}
+foreach ($row in @(Get-Content -LiteralPath $metadataOutput -Raw | ConvertFrom-Json)) { $metadataLookup[$row.Path] = $row.Metadata }
+function Read-Metadata([string]$Path) {
+    $resolved = (Resolve-Path -LiteralPath $Path).Path
+    if (!$metadataLookup.ContainsKey($resolved)) { throw "No isolated metadata snapshot for $resolved." }
+    $metadataLookup[$resolved]
+}
 $inventoryReader = Join-Path $PSScriptRoot 'Get-InstalledProductInventory.ps1'
 $contract = Get-Content (Join-Path $PSScriptRoot 'identity-contract.json') -Raw | ConvertFrom-Json
 $legacyCode = $contract.LegacyProductCode
 $CandidateMsiPath = (Resolve-Path $CandidateMsiPath).Path
 $CandidateExecutable = (Resolve-Path $CandidateExecutable).Path
-$candidate = & $reader -MsiPath $CandidateMsiPath
+$candidate = Read-Metadata $CandidateMsiPath
 $identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $candidate.ProductVersion -Architecture $Architecture
 foreach ($name in @('ProductCode', 'UpgradeCode', 'ProductName', 'Manufacturer')) {
     if ($candidate.$name -ne $identity.$name) { throw "Unexpected candidate $name." }
@@ -37,7 +90,7 @@ $history = @()
 for ($index = 0; $index -lt $HistoricalMsiPaths.Count; $index++) {
     $msi = (Resolve-Path $HistoricalMsiPaths[$index]).Path
     $exe = (Resolve-Path $HistoricalExecutablePaths[$index]).Path
-    $metadata = & $reader -MsiPath $msi
+    $metadata = Read-Metadata $msi
     $allowedPlatforms = if ($Architecture -eq 'arm64') { @('arm64', 'x64') } else { @('x64') }
     if ($metadata.ProductCode -ne $legacyCode -or $metadata.Manufacturer -ne 'erikbra' -or $metadata.ProductName -ne 'grate' -or $metadata.Platform -notin $allowedPlatforms -or $metadata.AllUsers -or $metadata.MsiInstallPerUser) { throw 'Unexpected historical MSI identity/platform/context.' }
     if ([version]$candidate.ProductVersion -le [version]$metadata.ProductVersion) { throw 'Candidate must be newer than the historical MSI.' }
@@ -48,7 +101,7 @@ $next = $null
 if ($NextMsiPath) {
     $NextMsiPath = (Resolve-Path $NextMsiPath).Path
     $NextExecutable = (Resolve-Path $NextExecutable).Path
-    $next = & $reader -MsiPath $NextMsiPath
+    $next = Read-Metadata $NextMsiPath
     $nextIdentity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $next.ProductVersion -Architecture $Architecture
     if ($next.ProductCode -ne $nextIdentity.ProductCode -or $next.UpgradeCode -ne $candidate.UpgradeCode -or $next.ProductCode -eq $candidate.ProductCode -or $next.Manufacturer -ne $candidate.Manufacturer -or $next.Platform -ne $Architecture -or [version]$next.ProductVersion -le [version]$candidate.ProductVersion) { throw 'Next MSI must be a newer product in the same stable architecture family.' }
     Assert-WinGetMsiPayloadArchitecture $NextExecutable $Architecture
@@ -56,13 +109,13 @@ if ($NextMsiPath) {
 $rollback = $null
 if ($RollbackMsiPath) {
     $RollbackMsiPath = (Resolve-Path $RollbackMsiPath).Path
-    $rollback = & $reader -MsiPath $RollbackMsiPath
+    $rollback = Read-Metadata $RollbackMsiPath
     if ($rollback.ProductCode -ne $candidate.ProductCode -or $rollback.UpgradeCode -ne $candidate.UpgradeCode -or $rollback.ProductVersion -ne $candidate.ProductVersion -or $rollback.PackageCode -eq $candidate.PackageCode) { throw 'Rollback variant must target the candidate product with a separate PackageCode.' }
 }
 $other = $null
 if ($OtherArchitectureMsiPath) {
     $OtherArchitectureMsiPath = (Resolve-Path $OtherArchitectureMsiPath).Path
-    $other = & $reader -MsiPath $OtherArchitectureMsiPath
+    $other = Read-Metadata $OtherArchitectureMsiPath
     $otherArchitecture = if ($Architecture -eq 'arm64') { 'x64' } else { 'arm64' }
     $otherIdentity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $other.ProductVersion -Architecture $otherArchitecture
     if ($other.ProductCode -ne $otherIdentity.ProductCode -or $other.UpgradeCode -ne $otherIdentity.UpgradeCode -or $other.Platform -ne $otherArchitecture) { throw 'Other-architecture candidate has unexpected identity/platform.' }
@@ -80,73 +133,26 @@ $installationAttempted = $false
 $unrelatedFile = $null
 $originalUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 $companyAlreadyExisted = Test-Path $companyDirectory
-function Invoke-InstallerMember([string]$Name, [Reflection.BindingFlags]$Flags, [object[]]$Arguments) {
-    # Do not retain an apartment-bound Windows Installer object while blocking
-    # on msiexec. Windows message broadcasts and COM can require STA dispatch.
-    # This bounds COM ownership to an inventory query; it does not establish the
-    # cause of a particular runner hang. Keep entry/exit evidence for diagnosis.
-    # https://learn.microsoft.com/windows/win32/sync/wait-functions
-    $installer = $null
+function Read-ProductInventory([string]$Code) {
     $watch = [Diagnostics.Stopwatch]::StartNew()
-    if (Test-Path -LiteralPath $OutputDirectory) {
-        @{ phase = 'InventoryQueryStart'; member = $Name; arguments = $Arguments; utc = [DateTime]::UtcNow.ToString('o'); apartment = [Threading.Thread]::CurrentThread.GetApartmentState().ToString() } |
-            ConvertTo-Json -Depth 4 -Compress | Add-Content -LiteralPath (Join-Path $OutputDirectory 'inventory-calls.log')
-    }
-    try {
-        $installer = New-Object -ComObject WindowsInstaller.Installer
-        $installer.GetType().InvokeMember($Name, $Flags, $null, $installer, $Arguments)
-    } finally {
-        if ($null -ne $installer) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
-        if (Test-Path -LiteralPath $OutputDirectory) {
-            @{ phase = 'InventoryQueryReleased'; member = $Name; utc = [DateTime]::UtcNow.ToString('o'); elapsedMilliseconds = $watch.ElapsedMilliseconds } |
-                ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $OutputDirectory 'inventory-calls.log')
-        }
-    }
+    @{ phase = 'NativeInventoryStart'; productCode = $Code; utc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress | Add-Content "$OutputDirectory/inventory-calls.log"
+    try { & $inventoryReader -ProductCode $Code }
+    finally { @{ phase = 'NativeInventoryEnd'; productCode = $Code; elapsedMilliseconds = $watch.ElapsedMilliseconds; utc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress | Add-Content "$OutputDirectory/inventory-calls.log" }
 }
-function Product-State([string]$Code) { [int](Invoke-InstallerMember 'ProductState' GetProperty @($Code)) }
-function Product-Info([string]$Code, [string]$Name) { Invoke-InstallerMember 'ProductInfo' GetProperty @($Code, $Name) }
+function Product-State([string]$Code) {
+    $native = Read-ProductInventory $Code
+    $contexts = @($native.Contexts)
+    if (!$contexts.Count) { return -1 }
+    if ($contexts.Count -ne 1 -or $contexts[0].Context -notin @(1, 2) -or $contexts[0].UserSid -ne $native.CurrentUserSid) { throw 'Refusing to act on ambiguous, machine or foreign-user MSI context.' }
+    $read = $contexts[0].Properties['ProductState']
+    if ($read.ErrorCode -ne 0) { throw "Native MSI state query failed: $($read.ErrorCode)." }
+    return [int]$read.Value
+}
 foreach ($code in $knownCodes) {
-    $existing = & $inventoryReader -ProductCode $code
+    $existing = Read-ProductInventory $code
     if (@($existing.Contexts).Count -or @($existing.RegistryEntries).Count) { throw 'Refusing to replace a pre-existing MSI registration.' }
 }
 if ((Test-Path $installDirectory) -or (Test-Path $marker)) { throw 'Refusing to replace a pre-existing grate directory or marker.' }
-function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0)) {
-    $start = [Diagnostics.ProcessStartInfo]::new($Executable)
-    $start.UseShellExecute = $false
-    $start.RedirectStandardOutput = $true
-    $start.RedirectStandardError = $true
-    foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $start
-    try {
-        [void]$process.Start()
-        @{ executable = $Executable; arguments = $Arguments; processId = $process.Id; state = 'Running'; startedUtc = [DateTime]::UtcNow.ToString('o') } |
-            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.command.json")
-        $stdout = $process.StandardOutput.ReadToEndAsync()
-        $stderr = $process.StandardError.ReadToEndAsync()
-        $timedOut = !$process.WaitForExit(180000)
-        if ($timedOut) { $process.Kill($true); [void]$process.WaitForExit(5000) }
-        # A child/WER process can retain inherited pipe handles after the parent
-        # exits. Bound the combined stream drain rather than waiting forever.
-        $drainFailure = $null
-        try {
-            [void][Threading.Tasks.Task]::WhenAll([Threading.Tasks.Task[]]@($stdout, $stderr)).WaitAsync([TimeSpan]::FromSeconds(5)).GetAwaiter().GetResult()
-        } catch { $drainFailure = $_.Exception.Message }
-        $output = if ($stdout.IsCompletedSuccessfully) { $stdout.GetAwaiter().GetResult() } else { '[stdout drain did not complete successfully]' }
-        $errorOutput = if ($stderr.IsCompletedSuccessfully) { $stderr.GetAwaiter().GetResult() } else { '[stderr drain did not complete successfully]' }
-        $output | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.stdout.log")
-        $errorOutput | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.stderr.log")
-        $command = [pscustomobject]@{ executable = $Executable; arguments = $Arguments; exitCode = $(if ($process.HasExited) { $process.ExitCode } else { $null }); timedOut = $timedOut; streamDrainFailure = $drainFailure }
-        $command | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.command.json")
-        if ($timedOut) { throw "$Name exceeded its three-minute timeout; inspect retained logs." }
-        if ($drainFailure) { throw "$Name output drain failed or exceeded five seconds: $drainFailure" }
-        if ($process.ExitCode -notin $AllowedExitCodes) { throw "$Name failed with exit code $($process.ExitCode); inspect retained logs." }
-        return [pscustomobject]@{ ExitCode = $process.ExitCode; StandardOutput = $output; StandardError = $errorOutput }
-    } finally { $process.Dispose() }
-}
-function Run-Msi([string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0, 3010)) {
-    Run-Process (Join-Path $env:SystemRoot 'System32/msiexec.exe') ($Arguments + @('/qn', '/norestart', '/l*v', (Join-Path $caseDirectory "$Name.msi.log"))) $Name $AllowedExitCodes
-}
 function Protect-File([string]$Path) { $protectedFiles[$Path] = (Get-FileHash $Path -Algorithm SHA256).Hash }
 function Check-Protected { Assert-WinGetMsiProtectedFiles $protectedFiles }
 function Stage-Msi([string]$Source, [string]$Directory) {
@@ -156,11 +162,12 @@ function Stage-Msi([string]$Source, [string]$Directory) {
     return $path
 }
 function Check-Installed($Metadata, [string]$Payload, [string]$Name) {
-    $native = & $inventoryReader -ProductCode $Metadata.ProductCode
+    $native = Read-ProductInventory $Metadata.ProductCode
     $native | ConvertTo-Json -Depth 8 | Set-Content "$caseDirectory/$Name.native-inventory.json"
     Assert-WinGetMsiNativeContext $native $Metadata.ProductVersion $Metadata.Manufacturer
-    $arp = Get-WinGetMsiRegisteredProduct -ReadProductInfo { param($property) Product-Info $Metadata.ProductCode $property }
-    Assert-WinGetMsiRegistration -State (Product-State $Metadata.ProductCode) -Version (Product-Info $Metadata.ProductCode 'VersionString') -AssignmentType ([int](Product-Info $Metadata.ProductCode 'AssignmentType')) -Arp $arp -ExpectedVersion $Metadata.ProductVersion -ExpectedPublisher $Metadata.Manufacturer
+    $values = $native.Contexts[0].Properties
+    $arp = [pscustomobject]@{ DisplayName = $values['InstalledProductName'].Value; Publisher = $values['Publisher'].Value; DisplayVersion = $values['VersionString'].Value }
+    Assert-WinGetMsiRegistration -State ([int]$values['ProductState'].Value) -Version $values['VersionString'].Value -AssignmentType ([int]$values['AssignmentType'].Value) -Arp $arp -ExpectedVersion $Metadata.ProductVersion -ExpectedPublisher $Metadata.Manufacturer
     Assert-WinGetMsiPayload $installedExe $Payload $Metadata.ProductVersion
     if ((Get-ItemPropertyValue $marker -Name installed) -ne 1) { throw 'The per-user installed marker is missing.' }
     $path = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -170,7 +177,7 @@ function Check-Installed($Metadata, [string]$Payload, [string]$Name) {
     $null = Run-Process $installedExe @('--help') "$Name-help"
 }
 function Check-Absent([string]$Code, [string]$Name) {
-    $native = & $inventoryReader -ProductCode $Code
+    $native = Read-ProductInventory $Code
     $native | ConvertTo-Json -Depth 8 | Set-Content "$caseDirectory/$Name.absent-inventory.json"
     if (@($native.Contexts).Count -or @($native.RegistryEntries).Count) { throw "Previous MSI registration/ARP entry remains: $Code" }
 }
