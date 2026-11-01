@@ -536,7 +536,7 @@ jobs:
     - name: Download release assets
       uses: actions/download-artifact@v8
       with:
-        pattern: release-*
+        pattern: release-grate*
         path: artifacts/release
         merge-multiple: true
 
@@ -958,6 +958,6 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: release-tests-${{ matrix.category }}
+        name: test-results-${{ matrix.category }}
         path: /tmp/test-results/
         if-no-files-found: warn
