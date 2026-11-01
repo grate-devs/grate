@@ -79,7 +79,7 @@ The release event is suitable for stable and prerelease publication. It provides
 
 ## External publication and credentials
 
-Publishing jobs that use long-lived credentials should use protected GitHub environments so those credentials are unavailable to pull-request builds.
+Only publishing jobs reference external publishing credentials. Environment association does not change the scope of existing repository secrets; ordinary build/test jobs have no credential references, and publishing eligibility is enforced by the release resolver and job conditions. Docker environment ref policies additionally limit which refs can use its OIDC identity.
 
 - NuGet: the existing OIDC trusted-publishing policy and `NUGET_USER` repository secret. Do not add an environment to this job without updating the NuGet.org trusted-publisher policy at the same time, because an environment changes the GitHub OIDC subject.
 - Docker Hub: `docker-hub` environment with `DOCKERHUB_OIDC_CONNECTIONID` for canonical publication and the retained `DOCKER_HUB_USER`/`DOCKER_HUB_TOKEN` repository secrets for compatibility. No manual environment approval is configured; ordinary builds cannot use the OIDC identity. See [Docker release details](../installers/docker/RELEASE.md).

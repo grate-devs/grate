@@ -1,0 +1,17 @@
+{
+  "destination": "gratedevs/grate",
+  "mode": "preflight",
+  "status": "failed",
+  "started_at": "2026-11-01T23:03:13.261685+00:00",
+  "tags": {
+    "2.1.6": {
+      "status": "pending",
+      "already_present": false
+    },
+    "latest": {
+      "status": "pending"
+    }
+  },
+  "expected_digest": "sha256:6dba7f9e914c5e8dda7f4eed3fb0c8d6c77a7598bd64dc7cdf48ad36fa7392a9",
+  "completed_at": "2026-11-01T23:03:13.897236+00:00"
+}

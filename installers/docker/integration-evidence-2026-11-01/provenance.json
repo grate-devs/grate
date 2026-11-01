@@ -1,0 +1,55 @@
+{
+  "run_id": 41357832522,
+  "source_commit": "afcc8f4b88314fe12710949713bc5ad79d29222d",
+  "workflow": ".github/workflows/build.yml",
+  "workflow_sha256": "c9332a3c0096766ca52cc27db29abe87de0b171937b358dad9579b0b46e8b2a2",
+  "invocation": {
+    "event": "workflow_dispatch",
+    "ref": "feat/799-docker-distribution",
+    "inputs": {
+      "publish": false,
+      "release_tag": ""
+    }
+  },
+  "jobs": {
+    "success": 30,
+    "skipped": 5,
+    "failed": 0
+  },
+  "publication_jobs": [
+    {
+      "databaseId": 125002735081,
+      "name": "Publish NuGet packages",
+      "conclusion": "skipped"
+    },
+    {
+      "databaseId": 125002735127,
+      "name": "Publish assets to the existing GitHub release",
+      "conclusion": "skipped"
+    },
+    {
+      "databaseId": 125002735732,
+      "name": "Submit WinGet update (erikbra.grate)",
+      "conclusion": "skipped"
+    },
+    {
+      "databaseId": 125002735753,
+      "name": "Update Homebrew cask (erikbra/cask/grate)",
+      "conclusion": "skipped"
+    },
+    {
+      "databaseId": 125002735755,
+      "name": "Publish canonical Docker image and compatibility digest",
+      "conclusion": "skipped"
+    }
+  ],
+  "local_policy_tests": 96,
+  "actionlint": "passed: build.yml, docker-access-check.yml, docker-distribution.yml",
+  "registry_writes": false,
+  "release_publication": false,
+  "limits": [
+    "No end-to-end external publishing operation was executed.",
+    "Packaging release-ready gate does not depend on the database-test job; all database tests completed successfully in this validation.",
+    "Later commit adds evidence/documentation and offline Docker policy workflow; production build.yml is byte-identical to the tested source."
+  ]
+}

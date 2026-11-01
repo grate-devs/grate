@@ -1,0 +1,2552 @@
+{
+  "conclusion": "success",
+  "createdAt": "2026-11-01T22:34:44Z",
+  "databaseId": 41357832522,
+  "event": "workflow_dispatch",
+  "headSha": "afcc8f4b88314fe12710949713bc5ad79d29222d",
+  "jobs": [
+    {
+      "completedAt": "2026-11-01T22:36:10Z",
+      "conclusion": "success",
+      "databaseId": 125001877696,
+      "name": "Resolve release context",
+      "startedAt": "2026-11-01T22:35:48Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:35:50Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:35:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:35:52Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:35:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:01Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:35:52Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:04Z",
+          "conclusion": "success",
+          "name": "Install GitVersion",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:07Z",
+          "conclusion": "success",
+          "name": "Determine version",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:07Z",
+          "conclusion": "success",
+          "name": "Resolve and validate release context",
+          "number": 6,
+          "startedAt": "2026-11-01T22:36:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:07Z",
+          "conclusion": "success",
+          "name": "Pin all artifact builds to one source commit",
+          "number": 7,
+          "startedAt": "2026-11-01T22:36:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:08Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:36:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:08Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:36:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:08Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:36:08Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001877696"
+    },
+    {
+      "completedAt": "2026-11-01T22:36:18Z",
+      "conclusion": "success",
+      "databaseId": 125001983315,
+      "name": "Test release policy without publishing",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:14Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run python3 -m unittest discover -s eng -p 'test_*.py' -v",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:17Z",
+          "conclusion": "success",
+          "name": "Run python3 -m unittest discover -s installers/docker -p 'test_*.py' -v",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:17Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 8,
+          "startedAt": "2026-11-01T22:36:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:17Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-01T22:36:17Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983315"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:19Z",
+      "conclusion": "success",
+      "databaseId": 125001983436,
+      "name": "Build .NET Core (global) tool",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:24Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:38Z",
+          "conclusion": "success",
+          "name": "Restore dependencies",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:09Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:38Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:17Z",
+          "conclusion": "success",
+          "name": "Upload published tool artifact",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:09Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:17Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 11,
+          "startedAt": "2026-11-01T22:37:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:17Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:37:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:17Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:17Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983436"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:42Z",
+      "conclusion": "success",
+      "databaseId": 125001983466,
+      "name": "Build and verify Docker OCI archive without publishing",
+      "startedAt": "2026-11-01T22:36:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:37:01Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:02Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 2,
+          "startedAt": "2026-11-01T22:37:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:07Z",
+          "conclusion": "success",
+          "name": "Set up QEMU",
+          "number": 3,
+          "startedAt": "2026-11-01T22:37:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:12Z",
+          "conclusion": "success",
+          "name": "Set up Docker Buildx",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:25Z",
+          "conclusion": "success",
+          "name": "Build current source into a local archive",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:31Z",
+          "conclusion": "success",
+          "name": "Verify OCI archive and preflight intended publication before the release gate",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:35Z",
+          "conclusion": "success",
+          "name": "Retain the exact Docker artifact for gated publication",
+          "number": 7,
+          "startedAt": "2026-11-01T22:38:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:37Z",
+          "conclusion": "success",
+          "name": "Post Build current source into a local archive",
+          "number": 11,
+          "startedAt": "2026-11-01T22:38:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:39Z",
+          "conclusion": "success",
+          "name": "Post Set up Docker Buildx",
+          "number": 12,
+          "startedAt": "2026-11-01T22:38:37Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:40Z",
+          "conclusion": "success",
+          "name": "Post Set up QEMU",
+          "number": 13,
+          "startedAt": "2026-11-01T22:38:39Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:40Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 14,
+          "startedAt": "2026-11-01T22:38:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:40Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:38:40Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983466"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:05Z",
+      "conclusion": "success",
+      "databaseId": 125001983486,
+      "name": "Build Nuget (grate.sqlite)",
+      "startedAt": "2026-11-01T22:36:14Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:31Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:49Z",
+          "conclusion": "success",
+          "name": "Restore dependencies",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:00Z",
+          "conclusion": "success",
+          "name": "Pack Nuget package grate.sqlite",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:02Z",
+          "conclusion": "success",
+          "name": "Upload NuGet package grate.sqlite",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:02Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 11,
+          "startedAt": "2026-11-01T22:37:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:02Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:37:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:02Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:02Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983486"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:09Z",
+      "conclusion": "success",
+      "databaseId": 125001983497,
+      "name": "Build cli (osx-arm64)",
+      "startedAt": "2026-11-01T22:36:46Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:47Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:49Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:47Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:08Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:56Z",
+          "conclusion": "success",
+          "name": "Publish self-contained osx-arm64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:00Z",
+          "conclusion": "success",
+          "name": "Upload self-contained osx-arm64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:01Z",
+          "conclusion": "success",
+          "name": "Package release archive osx-arm64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:04Z",
+          "conclusion": "success",
+          "name": "Upload release archive osx-arm64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:38:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:04Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:38:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:04Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:38:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:07Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:38:04Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983497"
+    },
+    {
+      "completedAt": "2026-11-01T22:36:55Z",
+      "conclusion": "success",
+      "databaseId": 125001983504,
+      "name": "Build Nuget (grate.core)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:25Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:43Z",
+          "conclusion": "success",
+          "name": "Restore dependencies",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Pack Nuget package grate.core",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:53Z",
+          "conclusion": "success",
+          "name": "Upload NuGet package grate.core",
+          "number": 6,
+          "startedAt": "2026-11-01T22:36:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:53Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 11,
+          "startedAt": "2026-11-01T22:36:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:53Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:36:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:53Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:36:53Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983504"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:05Z",
+      "conclusion": "success",
+      "databaseId": 125001983506,
+      "name": "Build Nuget (grate.oracle)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:26Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:43Z",
+          "conclusion": "success",
+          "name": "Restore dependencies",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:02Z",
+          "conclusion": "success",
+          "name": "Pack Nuget package grate.oracle",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:03Z",
+          "conclusion": "success",
+          "name": "Upload NuGet package grate.oracle",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:03Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 11,
+          "startedAt": "2026-11-01T22:37:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:03Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:37:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:03Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:03Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983506"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:00Z",
+      "conclusion": "success",
+      "databaseId": 125001983522,
+      "name": "Build Nuget (grate.postgresql)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:17Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:27Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:45Z",
+          "conclusion": "success",
+          "name": "Restore dependencies",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:56Z",
+          "conclusion": "success",
+          "name": "Pack Nuget package grate.postgresql",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:57Z",
+          "conclusion": "success",
+          "name": "Upload NuGet package grate.postgresql",
+          "number": 6,
+          "startedAt": "2026-11-01T22:36:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:58Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 11,
+          "startedAt": "2026-11-01T22:36:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:58Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:36:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:58Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:36:58Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983522"
+    },
+    {
+      "completedAt": "2026-11-01T22:36:52Z",
+      "conclusion": "success",
+      "databaseId": 125001983537,
+      "name": "Build cli (win-arm64)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:22Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:44Z",
+          "conclusion": "success",
+          "name": "Publish self-contained win-arm64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:47Z",
+          "conclusion": "success",
+          "name": "Upload self-contained win-arm64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:44Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:49Z",
+          "conclusion": "success",
+          "name": "Package release archive win-arm64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:36:47Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Upload release archive win-arm64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:36:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:36:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:36:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:36:51Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983537"
+    },
+    {
+      "completedAt": "2026-11-01T22:36:53Z",
+      "conclusion": "success",
+      "databaseId": 125001983551,
+      "name": "Build cli (win-x64)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:17Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:24Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:43Z",
+          "conclusion": "success",
+          "name": "Publish self-contained win-x64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:46Z",
+          "conclusion": "success",
+          "name": "Upload self-contained win-x64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:36:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:48Z",
+          "conclusion": "success",
+          "name": "Package release archive win-x64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:36:46Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Upload release archive win-x64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:36:48Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:36:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:36:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:51Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:36:51Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983551"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:23Z",
+      "conclusion": "success",
+      "databaseId": 125001983570,
+      "name": "Run tests (Basic_tests)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:23Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:20Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:21Z",
+          "conclusion": "success",
+          "name": "Retain test results even on failure",
+          "number": 5,
+          "startedAt": "2026-11-01T22:38:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:21Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 9,
+          "startedAt": "2026-11-01T22:38:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:21Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 10,
+          "startedAt": "2026-11-01T22:38:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:21Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-11-01T22:38:21Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983570"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:48Z",
+      "conclusion": "success",
+      "databaseId": 125001983571,
+      "name": "Build Nuget (grate.mariadb)",
+      "startedAt": "2026-11-01T22:37:03Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:37:05Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:37:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:07Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:37:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:14Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:37:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:32Z",
+          "conclusion": "success",
+          "name": "Restore dependencies",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:43Z",
+          "conclusion": "success",
+          "name": "Pack Nuget package grate.mariadb",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:45Z",
+          "conclusion": "success",
+          "name": "Upload NuGet package grate.mariadb",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:45Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 11,
+          "startedAt": "2026-11-01T22:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:46Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:46Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:46Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983571"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:41Z",
+      "conclusion": "success",
+      "databaseId": 125001983576,
+      "name": "Build cli (linux-arm64)",
+      "startedAt": "2026-11-01T22:36:56Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:57Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:58Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:06Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:35Z",
+          "conclusion": "success",
+          "name": "Publish self-contained linux-arm64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:37Z",
+          "conclusion": "success",
+          "name": "Upload self-contained linux-arm64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:38Z",
+          "conclusion": "success",
+          "name": "Package release archive linux-arm64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:37Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:40Z",
+          "conclusion": "success",
+          "name": "Upload release archive linux-arm64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:37:38Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:40Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:40Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:37:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:40Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:37:40Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983576"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:06Z",
+      "conclusion": "success",
+      "databaseId": 125001983577,
+      "name": "Build cli (linux-musl-x64)",
+      "startedAt": "2026-11-01T22:37:11Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:37:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:37:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:37:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:24Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:37:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:57Z",
+          "conclusion": "success",
+          "name": "Publish self-contained linux-musl-x64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:00Z",
+          "conclusion": "success",
+          "name": "Upload self-contained linux-musl-x64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:01Z",
+          "conclusion": "success",
+          "name": "Package release archive linux-musl-x64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:03Z",
+          "conclusion": "success",
+          "name": "Upload release archive linux-musl-x64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:38:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:04Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:38:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:04Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:38:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:04Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:38:04Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983577"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:06Z",
+      "conclusion": "success",
+      "databaseId": 125001983594,
+      "name": "Build cli (osx-x64)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:22Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:00Z",
+          "conclusion": "success",
+          "name": "Publish self-contained osx-x64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:02Z",
+          "conclusion": "success",
+          "name": "Upload self-contained osx-x64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:03Z",
+          "conclusion": "success",
+          "name": "Package release archive osx-x64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:05Z",
+          "conclusion": "success",
+          "name": "Upload release archive osx-x64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:37:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:05Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:05Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:37:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:05Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:37:05Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983594"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:50Z",
+      "conclusion": "success",
+      "databaseId": 125001983595,
+      "name": "Build cli (linux-x64)",
+      "startedAt": "2026-11-01T22:36:55Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:57Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:59Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:06Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:40Z",
+          "conclusion": "success",
+          "name": "Publish self-contained linux-x64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:43Z",
+          "conclusion": "success",
+          "name": "Upload self-contained linux-x64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:45Z",
+          "conclusion": "success",
+          "name": "Package release archive linux-x64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:47Z",
+          "conclusion": "success",
+          "name": "Upload release archive linux-x64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:47Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:48Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:48Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:37:48Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983595"
+    },
+    {
+      "completedAt": "2026-11-01T22:37:54Z",
+      "conclusion": "success",
+      "databaseId": 125001983598,
+      "name": "Build Nuget (grate.sqlserver)",
+      "startedAt": "2026-11-01T22:37:07Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:37:09Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:37:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:10Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:37:09Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:19Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:37:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:38Z",
+          "conclusion": "success",
+          "name": "Restore dependencies",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:50Z",
+          "conclusion": "success",
+          "name": "Pack Nuget package grate.sqlserver",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:38Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:51Z",
+          "conclusion": "success",
+          "name": "Upload NuGet package grate.sqlserver",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:52Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 11,
+          "startedAt": "2026-11-01T22:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:52Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:52Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:52Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983598"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:01Z",
+      "conclusion": "success",
+      "databaseId": 125001983608,
+      "name": "Build cli (linux-musl-arm64)",
+      "startedAt": "2026-11-01T22:37:09Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:37:11Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:37:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:12Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:37:11Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:20Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:37:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:53Z",
+          "conclusion": "success",
+          "name": "Publish self-contained linux-musl-arm64",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:55Z",
+          "conclusion": "success",
+          "name": "Upload self-contained linux-musl-arm64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:56Z",
+          "conclusion": "success",
+          "name": "Package release archive linux-musl-arm64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:55Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:59Z",
+          "conclusion": "success",
+          "name": "Upload release archive linux-musl-arm64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:37:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:59Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:37:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:59Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:37:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:59Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:37:59Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983608"
+    },
+    {
+      "completedAt": "2026-11-01T22:43:14Z",
+      "conclusion": "success",
+      "databaseId": 125001983610,
+      "name": "Run tests (PostgreSQL)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:23Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:43:10Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:43:12Z",
+          "conclusion": "success",
+          "name": "Retain test results even on failure",
+          "number": 5,
+          "startedAt": "2026-11-01T22:43:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:43:12Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 9,
+          "startedAt": "2026-11-01T22:43:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:43:12Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 10,
+          "startedAt": "2026-11-01T22:43:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:43:12Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-11-01T22:43:12Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983610"
+    },
+    {
+      "completedAt": "2026-11-01T22:51:43Z",
+      "conclusion": "success",
+      "databaseId": 125001983614,
+      "name": "Run tests (SqlServer)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:17Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:25Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:51:39Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:51:40Z",
+          "conclusion": "success",
+          "name": "Retain test results even on failure",
+          "number": 5,
+          "startedAt": "2026-11-01T22:51:39Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:51:40Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 9,
+          "startedAt": "2026-11-01T22:51:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:51:41Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 10,
+          "startedAt": "2026-11-01T22:51:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:51:41Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-11-01T22:51:41Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983614"
+    },
+    {
+      "completedAt": "2026-11-01T22:44:04Z",
+      "conclusion": "success",
+      "databaseId": 125001983623,
+      "name": "Run tests (MariaDB)",
+      "startedAt": "2026-11-01T22:37:08Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:37:10Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:37:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:11Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:37:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:19Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:37:11Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:44:00Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:44:02Z",
+          "conclusion": "success",
+          "name": "Retain test results even on failure",
+          "number": 5,
+          "startedAt": "2026-11-01T22:44:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:44:02Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 9,
+          "startedAt": "2026-11-01T22:44:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:44:02Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 10,
+          "startedAt": "2026-11-01T22:44:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:44:02Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-11-01T22:44:02Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983623"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:32Z",
+      "conclusion": "success",
+      "databaseId": 125001983630,
+      "name": "Run tests (Sqlite)",
+      "startedAt": "2026-11-01T22:36:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:16Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:26Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:29Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:30Z",
+          "conclusion": "success",
+          "name": "Retain test results even on failure",
+          "number": 5,
+          "startedAt": "2026-11-01T22:38:29Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:31Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 9,
+          "startedAt": "2026-11-01T22:38:30Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:31Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 10,
+          "startedAt": "2026-11-01T22:38:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:31Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-11-01T22:38:31Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983630"
+    },
+    {
+      "completedAt": "2026-11-01T23:02:46Z",
+      "conclusion": "success",
+      "databaseId": 125001983655,
+      "name": "Run tests (Oracle)",
+      "startedAt": "2026-11-01T22:36:21Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:36:22Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:36:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:23Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:36:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:36:33Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and earlier",
+          "number": 3,
+          "startedAt": "2026-11-01T22:36:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T23:02:43Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 4,
+          "startedAt": "2026-11-01T22:36:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T23:02:45Z",
+          "conclusion": "success",
+          "name": "Retain test results even on failure",
+          "number": 5,
+          "startedAt": "2026-11-01T23:02:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T23:02:45Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and earlier",
+          "number": 9,
+          "startedAt": "2026-11-01T23:02:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T23:02:45Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 10,
+          "startedAt": "2026-11-01T23:02:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T23:02:45Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-11-01T23:02:45Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983655"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:04Z",
+      "conclusion": "success",
+      "databaseId": 125001983683,
+      "name": "Build cli (win-x86)",
+      "startedAt": "2026-11-01T22:37:22Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:37:24Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:37:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:25Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:37:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:31Z",
+          "conclusion": "success",
+          "name": "Setup .NET 11 RC3 and .NET 10",
+          "number": 3,
+          "startedAt": "2026-11-01T22:37:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:53Z",
+          "conclusion": "success",
+          "name": "Publish self-contained win-x86",
+          "number": 4,
+          "startedAt": "2026-11-01T22:37:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:57Z",
+          "conclusion": "success",
+          "name": "Upload self-contained win-x86",
+          "number": 5,
+          "startedAt": "2026-11-01T22:37:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:37:58Z",
+          "conclusion": "success",
+          "name": "Package release archive win-x86",
+          "number": 6,
+          "startedAt": "2026-11-01T22:37:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:01Z",
+          "conclusion": "success",
+          "name": "Upload release archive win-x86",
+          "number": 7,
+          "startedAt": "2026-11-01T22:37:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:02Z",
+          "conclusion": "success",
+          "name": "Post Setup .NET 11 RC3 and .NET 10",
+          "number": 13,
+          "startedAt": "2026-11-01T22:38:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:02Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:38:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:02Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:38:02Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125001983683"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:31Z",
+      "conclusion": "success",
+      "databaseId": 125002462963,
+      "name": "Build Debian package (linux-x64)",
+      "startedAt": "2026-11-01T22:38:09Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:38:10Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:38:09Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:11Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:13Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v8",
+          "number": 3,
+          "startedAt": "2026-11-01T22:38:11Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:13Z",
+          "conclusion": "success",
+          "name": "Get architecture",
+          "number": 4,
+          "startedAt": "2026-11-01T22:38:13Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:26Z",
+          "conclusion": "success",
+          "name": "Create dpkg",
+          "number": 5,
+          "startedAt": "2026-11-01T22:38:13Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:26Z",
+          "conclusion": "success",
+          "name": "Prepare Debian release asset amd64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:29Z",
+          "conclusion": "success",
+          "name": "Upload Debian release asset amd64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:38:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:29Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:38:29Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:29Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:38:29Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002462963"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:31Z",
+      "conclusion": "success",
+      "databaseId": 125002462983,
+      "name": "Build Debian package (linux-arm64)",
+      "startedAt": "2026-11-01T22:38:09Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:38:11Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:13Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:38:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:15Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v8",
+          "number": 3,
+          "startedAt": "2026-11-01T22:38:13Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:15Z",
+          "conclusion": "success",
+          "name": "Get architecture",
+          "number": 4,
+          "startedAt": "2026-11-01T22:38:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:26Z",
+          "conclusion": "success",
+          "name": "Create dpkg",
+          "number": 5,
+          "startedAt": "2026-11-01T22:38:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:26Z",
+          "conclusion": "success",
+          "name": "Prepare Debian release asset arm64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:29Z",
+          "conclusion": "success",
+          "name": "Upload Debian release asset arm64",
+          "number": 7,
+          "startedAt": "2026-11-01T22:38:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:29Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-11-01T22:38:29Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:29Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-01T22:38:29Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002462983"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:44Z",
+      "conclusion": "success",
+      "databaseId": 125002463049,
+      "name": "Build MSI (win-arm64)",
+      "startedAt": "2026-11-01T22:38:09Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:38:12Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:18Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:38:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:20Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v8",
+          "number": 3,
+          "startedAt": "2026-11-01T22:38:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:35Z",
+          "conclusion": "success",
+          "name": "Create msi",
+          "number": 4,
+          "startedAt": "2026-11-01T22:38:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:36Z",
+          "conclusion": "success",
+          "name": "Prepare MSI release asset win-arm64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:38:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:40Z",
+          "conclusion": "success",
+          "name": "Upload MSI release asset win-arm64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:36Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:42Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:38:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:42Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:38:42Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002463049"
+    },
+    {
+      "completedAt": "2026-11-01T22:38:47Z",
+      "conclusion": "success",
+      "databaseId": 125002463080,
+      "name": "Build MSI (win-x64)",
+      "startedAt": "2026-11-01T22:38:09Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:38:11Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:17Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-01T22:38:11Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:19Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v8",
+          "number": 3,
+          "startedAt": "2026-11-01T22:38:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:40Z",
+          "conclusion": "success",
+          "name": "Create msi",
+          "number": 4,
+          "startedAt": "2026-11-01T22:38:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:41Z",
+          "conclusion": "success",
+          "name": "Prepare MSI release asset win-x64",
+          "number": 5,
+          "startedAt": "2026-11-01T22:38:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:44Z",
+          "conclusion": "success",
+          "name": "Upload MSI release asset win-x64",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:41Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:46Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-01T22:38:44Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:46Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-01T22:38:46Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002463080"
+    },
+    {
+      "completedAt": "2026-11-01T22:39:11Z",
+      "conclusion": "success",
+      "databaseId": 125002634541,
+      "name": "Release contract ready",
+      "startedAt": "2026-11-01T22:38:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-01T22:38:51Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-01T22:38:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:51Z",
+          "conclusion": "success",
+          "name": "Reject failed, cancelled or unexpectedly skipped prerequisites",
+          "number": 2,
+          "startedAt": "2026-11-01T22:38:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:56Z",
+          "conclusion": "success",
+          "name": "Download release assets",
+          "number": 3,
+          "startedAt": "2026-11-01T22:38:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:56Z",
+          "conclusion": "success",
+          "name": "Summarize release contract",
+          "number": 4,
+          "startedAt": "2026-11-01T22:38:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:38:56Z",
+          "conclusion": "success",
+          "name": "Validate release assets and generate manifest",
+          "number": 5,
+          "startedAt": "2026-11-01T22:38:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:39:09Z",
+          "conclusion": "success",
+          "name": "Upload validated release contract",
+          "number": 6,
+          "startedAt": "2026-11-01T22:38:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-01T22:39:09Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 7,
+          "startedAt": "2026-11-01T22:39:09Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002634541"
+    },
+    {
+      "completedAt": "2026-11-01T22:39:11Z",
+      "conclusion": "skipped",
+      "databaseId": 125002735081,
+      "name": "Publish NuGet packages",
+      "startedAt": "2026-11-01T22:39:11Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002735081"
+    },
+    {
+      "completedAt": "2026-11-01T22:39:11Z",
+      "conclusion": "skipped",
+      "databaseId": 125002735127,
+      "name": "Publish assets to the existing GitHub release",
+      "startedAt": "2026-11-01T22:39:11Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002735127"
+    },
+    {
+      "completedAt": "2026-11-01T22:39:11Z",
+      "conclusion": "skipped",
+      "databaseId": 125002735732,
+      "name": "Submit WinGet update (erikbra.grate)",
+      "startedAt": "2026-11-01T22:39:11Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002735732"
+    },
+    {
+      "completedAt": "2026-11-01T22:39:11Z",
+      "conclusion": "skipped",
+      "databaseId": 125002735753,
+      "name": "Update Homebrew cask (erikbra/cask/grate)",
+      "startedAt": "2026-11-01T22:39:11Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002735753"
+    },
+    {
+      "completedAt": "2026-11-01T22:39:11Z",
+      "conclusion": "skipped",
+      "databaseId": 125002735755,
+      "name": "Publish canonical Docker image and compatibility digest",
+      "startedAt": "2026-11-01T22:39:11Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/grate-devs/grate/actions/runs/41357832522/job/125002735755"
+    }
+  ],
+  "status": "completed",
+  "updatedAt": "2026-11-01T23:02:47Z",
+  "url": "https://github.com/grate-devs/grate/actions/runs/41357832522"
+}

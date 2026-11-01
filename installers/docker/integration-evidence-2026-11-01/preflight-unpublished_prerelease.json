@@ -1,0 +1,14 @@
+{
+  "destination": "gratedevs/grate",
+  "mode": "preflight",
+  "status": "verified",
+  "started_at": "2026-11-01T23:03:12.642195+00:00",
+  "tags": {
+    "0.0.0-ci-804-afcc8f4": {
+      "status": "preflight_verified",
+      "already_present": false
+    }
+  },
+  "expected_digest": "sha256:6dba7f9e914c5e8dda7f4eed3fb0c8d6c77a7598bd64dc7cdf48ad36fa7392a9",
+  "completed_at": "2026-11-01T23:03:13.230453+00:00"
+}

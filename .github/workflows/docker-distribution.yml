@@ -9,13 +9,18 @@ on:
       - 'installers/docker/**'
       - 'eng/*docker*.py'
   workflow_dispatch:
+    inputs:
+      local_registry_check:
+        description: Run the disposable loopback-registry check (local fixture image publication)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   policy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -27,5 +32,11 @@ jobs:
         run: python3 -m unittest discover -s eng -p 'test_*docker*.py' -v
       - name: Check local helper syntax
         run: bash -n build-docker-local.sh
-      - name: Exercise identical multi-platform tags and stable latest locally
+      - name: Verify digest preservation using local files without registry publication
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends skopeo
+          python3 eng/check_docker_oci_copy.py
+      - name: Exercise loopback-registry publication only when explicitly requested
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.local_registry_check == true }}
         run: python3 installers/docker/check_local_registry.py

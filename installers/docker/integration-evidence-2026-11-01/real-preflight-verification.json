@@ -1,0 +1,21 @@
+{
+  "status": "verified",
+  "mode": "preflight-only",
+  "root_digest": "sha256:6dba7f9e914c5e8dda7f4eed3fb0c8d6c77a7598bd64dc7cdf48ad36fa7392a9",
+  "cases": [
+    {
+      "case": "unpublished_prerelease",
+      "status": "verified",
+      "exit_code": 0,
+      "expected_conflict": false
+    },
+    {
+      "case": "existing_stable_conflict",
+      "status": "verified",
+      "exit_code": 1,
+      "expected_conflict": true
+    }
+  ],
+  "credential_use": false,
+  "registry_writes": false
+}

@@ -1,8 +1,8 @@
 # Docker distribution handoff for #799
 
 The canonical Docker Hub image is `gratedevs/grate`. GitHub remains
-`grate-devs/grate`. The organization OIDC identity publishes one Buildx image to
-`gratedevs/grate`. During the transition, `erikbra/grate` receives the exact same
+`grate-devs/grate`. Buildx produces one OCI archive; the organization OIDC
+identity publishes that verified archive to `gratedevs/grate`. During the transition, `erikbra/grate` receives the exact same
 immutable digest through a Skopeo copy using the retained personal credential.
 There is no second application build. Login identity does not choose the repository.
 
@@ -13,41 +13,44 @@ metadata (`+...`) is rejected because it is not legal in a Docker tag; silently
 dropping it could collide with another release. The local helper asks GitVersion
 for metadata-free `SemVer`, falls back to `1.0.0-local`, and never pushes.
 
-## Integration with the common release workflow
+## Integrated release workflow
 
-The `.github/workflows/build.yml` change on this branch is a **Docker-only
-integration part**, based on current main. The common release/documentation owner
-must integrate the publishing steps into #804's `publish-docker` job while
-preserving the common workflow contract. This branch separates nonpublishing
-`build-docker-image` from release-only `publish-docker`:
+The Docker changes are integrated with #804's release-event contract and current
+main's .NET 11/security settings. All artifact jobs use one resolved source
+commit. `resolve_release_context.py` accepts only strict metadata-free SemVer;
+publishing requires a published non-draft release event, or explicit manual
+publishing against an existing non-draft GitHub release. Ordinary push/PR events
+and the default manual `publish=false` cannot enable publication.
 
-- Preserve the `release-ready` dependency, release-only job condition,
-  `environment: docker-hub`, and checkout at the selected `checkout-ref`.
-- Use the common job's validated `semVer` and `is-prerelease` outputs, including
-  manual recovery of a GitHub release marked prerelease with a stable-looking tag.
-  Set the tag-selection step's `PRERELEASE` environment variable to
-  `${{ needs.set-version-number.outputs.is-prerelease }}` in that integration.
-  Current main has no such output; this branch uses the release event flag plus
-  the helper's SemVer prerelease detection.
-- Keep one canonical publishing build with `canonical-tags` only. The subsequent
-  copy must use its exact digest, `--all --preserve-digests`, organization source
-  authentication and separate legacy destination authentication. Preserve QEMU,
-  `--pull`, pinned SDK/runtime base images, entrypoint, bundled skill and current
-  source. The old #804 Dockerfile/SDK is not the integration baseline.
-- Grant `id-token: write` only to the publishing job and the explicit manual
-  access diagnostic. Keep canonical login password-free, with username
-  `gratedevs` and `DOCKERHUB_OIDC_CONNECTIONID` from the environment variable.
-  The release login requests a 3600-second token for a job bounded to 45 minutes;
-  the login action's 300-second default is too short for an uncached build/copy.
-- Retain the separate nonpublishing Docker build for ordinary checks and point
-  its metadata at `gratedevs/grate`. Run Docker policy tests in PR CI; the new
-  `docker-distribution.yml` has no Docker Hub credentials or external publishing.
-- Keep the publication concurrency group with `cancel-in-progress: false` and
-  the digest verification/report steps. Check final workflow YAML with actionlint.
+`build-docker-image` runs without registry publishing credentials or an OIDC
+permission. It builds amd64/arm64 into an OCI archive with `push: false`, verifies
+its raw manifest digest, and retains that exact archive as an Actions artifact.
+When publishing is requested, its read-only preflight also rejects an existing
+canonical version with a conflicting digest before any GitHub asset upload.
 
-The main-shaped `versionSourceDistance` release detection is deliberately outside
-this channel's ownership. Do not merge that integration part as an alternative
-to the agreed published-release contract.
+The read-only `release-ready` gate requires all packaging and policy prerequisites
+to succeed; it rejects failures, cancellations and unexpected skips. It validates
+the 13-file release asset contract and generates checksums/manifest. The separate
+application test job and normal required CI checks supply test evidence; the
+packaging gate does not claim to include those database tests.
+
+A release-only `publish-github-release` job uploads the validated assets.
+`publish-docker` waits for that job and the gate, downloads the OCI archive and
+uses `publish_docker_archive.py` to promote it without rebuilding. The canonical
+job uses password-free login with username `gratedevs`, environment
+`docker-hub`, its `DOCKERHUB_OIDC_CONNECTIONID` variable and `id-token: write`.
+Its 3600-second credential outlives the bounded 45-minute publication job.
+Compatibility then copies the same immutable digest using the personal token.
+
+Version and stable-only `latest` policies come from `release_tags.py`, using the
+validated `is-prerelease` output for both release events and manual recovery.
+Per-tag verification, publication serialization (`cancel-in-progress: false`),
+credential isolation, and redacted partial-outcome reports remain in place.
+
+For partial publication, rerun failed publishing jobs in the **original run** so
+its verified artifact and digest are reused. A fresh build may have different
+provenance even at the same source commit; preflight blocks a conflicting
+published version before GitHub assets can be replaced. Never rebuild blindly.
 
 ## Verification and partial publication
 
@@ -158,8 +161,9 @@ were removed afterward. The final environment allows only branch `main` and tag
 pattern `*`, as before. Sanitized grants and provenance are retained under
 [oidc-evidence-2026-11-01](oidc-evidence-2026-11-01/).
 
-No images or releases were published during OIDC setup. The workflow change still
-needs integration into the common release-event workflow before use. The personal
+No images or releases were published during OIDC setup. The common release-event
+workflow integration is now implemented; its no-publication validation is recorded
+in [VERIFICATION.md](VERIFICATION.md). The personal
 token's expiration and renewal/recovery ownership remain unrecorded operational
 metadata; retaining it does not authorize extending or changing its permissions.
 

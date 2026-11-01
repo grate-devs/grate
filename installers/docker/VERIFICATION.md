@@ -96,9 +96,9 @@ selected the environment policy, `docker-hub` was created without reviewers or a
 wait timer, permitting branch `main` and tag pattern `*`; API read-back confirmed
 the exact settings. Legacy credential lifecycle, Hub description edits and the transition end
 condition remain as
-listed in [RELEASE.md](RELEASE.md). The build.yml part still requires
-integration with the common release-event workflow; it is not a separate release
-mechanism. Product image execution here covers linux/arm64. Multi-platform
+listed in [RELEASE.md](RELEASE.md). At that checkpoint, the build.yml part still required integration with the
+common release-event workflow. The later combined-workflow record below supersedes
+that integration limitation. Product image execution here covers linux/arm64. Multi-platform
 manifest publication was tested with scratch fixtures, not both grate binaries.
 Host tests cover net10.0; net8.0/net9.0/net11.0 host suites and other database
 providers were not run for this bounded distribution change.
@@ -185,7 +185,67 @@ It was removed afterward, and the temporary branch was deleted only after checki
 its head still matched the diagnostic commit. API read-back confirmed the original
 allowed refs (`main` branch, `*` tags) were restored. The production workflow was
 not dispatched and no images were published to any registry for this update.
-A live end-to-end image push/copy remains intentionally untested; the common
-release workflow integration described in RELEASE.md remains required. Product
+A live end-to-end image push/copy remains intentionally untested; at that checkpoint the common
+release workflow integration was still pending; the later combined-workflow
+record below supersedes that limitation. Product
 code and Dockerfile were unchanged, so earlier application test results were not
 rerun or represented as new OIDC test results.
+
+## Combined #804 workflow validation
+
+Docker distribution is now integrated with #804's published-release contract,
+preserving current main's .NET 11/security baseline, Dockerfile and MSI scripts.
+The successful [combined run 41357832522](https://github.com/grate-devs/grate/actions/runs/41357832522)
+used source `afcc8f4b88314fe12710949713bc5ad79d29222d`, manual `publish=false`
+and an empty release tag. Thirty jobs succeeded and all five external publication
+jobs were skipped: GitHub assets, NuGet, Docker, Homebrew and WinGet. No image or
+release was published during this validation.
+
+The run built the tool/provider packages, nine standalone targets, two MSI and
+two Debian packages. Independent download checks verified all 13 release assets'
+sizes and SHA-256 values against the generated manifest. Test reports use a
+separate artifact prefix and are excluded from the release asset contract.
+
+| Test project | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Basic_tests | 1,752 | 8 | 0 |
+| PostgreSQL | 740 | 0 | 0 |
+| SqlServer | 1,076 | 0 | 0 |
+| MariaDB | 700 | 0 | 0 |
+| Sqlite | 812 | 12 | 0 |
+| Oracle | 1,264 | 4 | 0 |
+| Total | 6,344 | 24 | 0 |
+
+Every project executed on net8.0, net9.0, net10.0 and net11.0. Existing skipped
+tests remain skips. The initial integrated run exposed .NET 11 MTP resolving
+relative project paths twice; absolute `.csproj` paths fixed it. Matrix
+fail-fast is disabled so one provider failure cannot hide the other results.
+
+The Docker build produced one OCI archive with linux/amd64 and linux/arm64 plus
+two attestations, digest
+`sha256:6dba7f9e914c5e8dda7f4eed3fb0c8d6c77a7598bd64dc7cdf48ad36fa7392a9`.
+Independent local inspection verified all 26 OCI blob hashes. The archive was
+retained without registry publication. Its publisher's real read-only preflight
+accepted an absent prerelease tag and rejected the conflicting existing `2.1.6`
+version without credentials or registry writes. The disposable Ubuntu check
+required `ca-certificates` in addition to Python/Skopeo; no product change was
+needed.
+
+All 96 focused Python/policy tests and actionlint for the three changed workflows
+passed. Eight checks of the actual gate expression accepted complete success and
+rejected failure, cancellation, skip, missing/unknown results and empty input.
+Independent critical review rechecked artifact promotion, publication conditions,
+credential isolation and recovery preflight; no substantiated findings remain.
+The packaging gate does not depend on database tests; those tests and normal CI
+provide separate evidence, and all six completed successfully here.
+
+The Docker policy workflow now uses offline OCI copies on PRs; loopback-registry
+publication requires explicit manual opt-in and was not exercised here. The final
+evidence/documentation commit leaves production `build.yml` byte-identical to the
+tested source. Live external publish/copy execution remains intentionally
+untested. The earlier no-push OIDC grant check remains the identity evidence.
+
+The [evidence directory](integration-evidence-2026-11-01/) contains run and artifact
+metadata, per-framework test totals with raw-log hashes, the asset manifest and
+checksums, independent OCI/asset checks, gate cases, read-only preflight reports
+and invocation provenance. It contains no credentials or large build binaries.

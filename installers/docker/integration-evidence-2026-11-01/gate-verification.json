@@ -1,0 +1,46 @@
+{
+  "gate_expression": "length > 0 and all(.[]; .result == \"success\")",
+  "cases": [
+    {
+      "case": "all_success",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "case": "failed",
+      "expected": false,
+      "actual": false
+    },
+    {
+      "case": "cancelled",
+      "expected": false,
+      "actual": false
+    },
+    {
+      "case": "skipped",
+      "expected": false,
+      "actual": false
+    },
+    {
+      "case": "missing_result",
+      "expected": false,
+      "actual": false
+    },
+    {
+      "case": "empty",
+      "expected": false,
+      "actual": false
+    },
+    {
+      "case": "unknown",
+      "expected": false,
+      "actual": false
+    },
+    {
+      "case": "mixed",
+      "expected": false,
+      "actual": false
+    }
+  ],
+  "status": "verified"
+}
