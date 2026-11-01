@@ -18,7 +18,7 @@ function New-Release {
         }
     }
 }
-function Invoke-RestMethod([string]$Uri) {
+function Invoke-RestMethod([string]$Uri, [hashtable]$Headers) {
     $wingetTest.apiCalls++
     if ($Uri -cne 'https://api.github.com/repos/grate-devs/grate/releases/tags/2.1.6') { throw "Unexpected API call: $Uri" }
     $wingetTest.release

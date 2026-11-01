@@ -33,6 +33,9 @@ jobs:
           ./installers/msi/Test-InstallerAuthoring.Tests.ps1
       - name: Prepare manifests from a real stable release and inspect MSI metadata
         run: ./installers/winget/Test-ReleasePreparation.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-evidence"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ github.token }}
       - name: Retain candidates and inspection evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

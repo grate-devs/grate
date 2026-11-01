@@ -18,7 +18,9 @@ if ($version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' -o
     $releaseTag -cnotin @($version, "v$version")) {
     throw 'WinGet requires a stable three-part version and its matching release tag.'
 }
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/grate-devs/grate/releases/tags/$releaseTag"
+$requestHeaders = @{ Accept = 'application/vnd.github+json' }
+if ($env:GH_TOKEN) { $requestHeaders.Authorization = "Bearer $env:GH_TOKEN" }
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/grate-devs/grate/releases/tags/$releaseTag" -Headers $requestHeaders
 if ($release.draft -or $release.prerelease -or $release.tag_name -cne $releaseTag) {
     throw 'WinGet requires a published stable GitHub release with the requested tag.'
 }

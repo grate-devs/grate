@@ -25,7 +25,9 @@ $helper = Join-Path $PSScriptRoot 'Create-Installer.ps1'
     Tee-Object -FilePath "$OutputDirectory/migration.log"
 
 $msiDirectory = Join-Path (Split-Path $PSScriptRoot) 'msi'
-$release = Invoke-RestMethod "https://api.github.com/repos/grate-devs/grate/releases/tags/$version"
+$requestHeaders = @{ Accept = 'application/vnd.github+json' }
+if ($env:GH_TOKEN) { $requestHeaders.Authorization = "Bearer $env:GH_TOKEN" }
+$release = Invoke-RestMethod "https://api.github.com/repos/grate-devs/grate/releases/tags/$version" -Headers $requestHeaders
 foreach ($arch in @('x64', 'arm64')) {
     $asset = @($release.assets | Where-Object name -CEQ "grate-msi-win-$arch-$version.msi")
     if ($asset.Count -ne 1) { throw "Missing unique $arch MSI asset." }

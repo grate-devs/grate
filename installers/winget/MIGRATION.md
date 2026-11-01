@@ -99,6 +99,9 @@ The dedicated `WinGet manifest preparation` workflow uses pinned wingetcreate
 1.12.13.0 and release 2.1.6. It retains both manifest sets, logs and read-only
 Windows MSI metadata as a `winget-preparation` artifact. This job has read-only
 repository permissions and no submission, installer execution or release steps.
+It uses the short-lived read-only Actions token for GitHub API reads via
+`GH_TOKEN` and wingetcreate's `WINGET_CREATE_GITHUB_TOKEN`, avoiding shared-runner
+unauthenticated rate limits without adding a publishing token or CLI token arguments.
 
 Local contract checks:
 
