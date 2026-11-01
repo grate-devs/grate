@@ -9,7 +9,8 @@ $arch = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().
 New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
 $downloads = @(
     @{ Name = 'DesktopAppInstaller_Dependencies.zip'; Hash = 'BA875AFE9D190F61218985AC0292A99D1DB710BF93E13C68944CA9D89F0D82D1' },
-    @{ Name = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'; Hash = '65DEA9C01CE08EE7B763366B27C0E651F97DB857C11CA9B9C301826C10092F2E' }
+    @{ Name = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'; Hash = '65DEA9C01CE08EE7B763366B27C0E651F97DB857C11CA9B9C301826C10092F2E' },
+    @{ Name = 'e53e159d00e04f729cc2180cffd1c02e_License1.xml'; Hash = 'BCB15118EC47DF24E3E6013A7006147C3A15B3A8104ED660FE87C8B4ED01F485' }
 )
 foreach ($item in $downloads) {
     $path = Join-Path $OutputDirectory $item.Name
@@ -34,6 +35,13 @@ foreach ($pattern in @('*VCLibs.140.00_*', '*UWPDesktop*', '*WindowsAppRuntime*'
     }
 }
 Add-AppxPackage -Path "$OutputDirectory/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -ForceUpdateFromAnyVersion -ForceApplicationShutdown
+if ([Environment]::OSVersion.Version.Build -lt 26100) {
+    # Server 2022 has no Store-provided App Installer license. Use Microsoft's
+    # offline license from the same pinned release, as documented for provisioning.
+    # https://github.com/microsoft/winget-cli/blob/v1.29.380/doc/troubleshooting/README.md#machine-wide-provisioning
+    Import-Module Dism -UseWindowsPowerShell
+    $null=Add-AppxProvisionedPackage -Online -PackagePath "$OutputDirectory/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -LicensePath "$OutputDirectory/e53e159d00e04f729cc2180cffd1c02e_License1.xml"
+}
 $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller
 $winget = Join-Path $package.InstallLocation 'winget.exe'
 function Invoke-PinnedWinGet([string[]]$Arguments) {
