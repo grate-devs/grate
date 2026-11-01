@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
 import ssl
+import sys
 from urllib.parse import parse_qs, unquote, urlsplit
 
 
@@ -158,7 +159,31 @@ class TestSource(ThreadingHTTPServer):
         self.catalog_path = Path(catalog_path)
         self.source_identifier = load_catalog(self.catalog_path)["SourceIdentifier"]
         self.assets_path = Path(assets_path).resolve() if assets_path else None
+        self.ssl_context = None
         super().__init__(address, Handler)
+
+    def enable_https(self, certificate, private_key):
+        self.ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        self.ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        self.ssl_context.set_alpn_protocols(["http/1.1"])
+        self.ssl_context.load_cert_chain(certificate, private_key)
+
+    def process_request_thread(self, request, client_address):
+        # Handshake after thread dispatch, never in the single accept loop. A
+        # connection probe or canceled TLS negotiation must not stall all future
+        # requests, even though this fixture only listens on loopback.
+        if self.ssl_context:
+            print(f"TCP accepted {client_address}", file=sys.stderr, flush=True)
+            try:
+                request.settimeout(10)
+                request = self.ssl_context.wrap_socket(request, server_side=True)
+                print(f"TLS ready {client_address}: {request.version()}", file=sys.stderr, flush=True)
+                request.settimeout(30)
+            except (OSError, ssl.SSLError) as error:
+                print(f"TLS failed {client_address}: {error}", file=sys.stderr, flush=True)
+                self.shutdown_request(request)
+                return
+        super().process_request_thread(request, client_address)
 
     def catalog(self):
         catalog = load_catalog(self.catalog_path)
@@ -244,11 +269,8 @@ def main():
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     with TestSource(("127.0.0.1", args.port), args.catalog, args.assets) as server:
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.minimum_version = ssl.TLSVersion.TLSv1_2
-        context.load_cert_chain(args.certificate, args.private_key)
-        server.socket = context.wrap_socket(server.socket, server_side=True)
-        print(f"Serving {server.source_identifier} at https://localhost:{server.server_port}", flush=True)
+        server.enable_https(args.certificate, args.private_key)
+        print(f"Serving {server.source_identifier} at https://127.0.0.1:{server.server_port}", flush=True)
         server.serve_forever()
 
 

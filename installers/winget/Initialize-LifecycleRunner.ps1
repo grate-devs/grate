@@ -23,10 +23,17 @@ Import-Module Appx -UseWindowsPowerShell
 # otherwise serializes the DependencyPath array as one newline-separated path.
 foreach ($pattern in @('*VCLibs.140.00_*', '*UWPDesktop*', '*WindowsAppRuntime*')) {
     foreach ($dependency in @(Get-ChildItem "$OutputDirectory/dependencies/$arch" -Filter $pattern)) {
-        Add-AppxPackage -Path $dependency.FullName -ForceUpdateFromAnyVersion
+        $identity=[regex]::Match($dependency.BaseName,'^(.+)_(\d+\.\d+\.\d+\.\d+)_(?:x64|arm64)$')
+        if (!$identity.Success) { throw "Unexpected dependency filename: $($dependency.Name)" }
+        $existing=@(Get-AppxPackage -Name $identity.Groups[1].Value | Where-Object {
+            [string]$_.Architecture -eq $arch -and [version]$_.Version -ge [version]$identity.Groups[2].Value
+        })
+        if ($existing.Count -eq 0) {
+            Add-AppxPackage -Path $dependency.FullName -ForceUpdateFromAnyVersion -ForceApplicationShutdown
+        }
     }
 }
-Add-AppxPackage -Path "$OutputDirectory/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -ForceUpdateFromAnyVersion
+Add-AppxPackage -Path "$OutputDirectory/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -ForceUpdateFromAnyVersion -ForceApplicationShutdown
 $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller
 $winget = Join-Path $package.InstallLocation 'winget.exe'
 $actual = & $winget --version

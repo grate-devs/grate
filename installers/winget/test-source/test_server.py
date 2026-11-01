@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 import shutil
+import socket
 import ssl
 import subprocess
 import tempfile
@@ -53,7 +54,7 @@ class SourceProtocolTests(unittest.TestCase):
         certificate, key = cls.root / "cert.pem", cls.root / "key.pem"
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
                         "-keyout", str(key), "-out", str(certificate), "-subj", "/CN=localhost",
-                        "-addext", "subjectAltName=DNS:localhost"], check=True, capture_output=True)
+                        "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"], check=True, capture_output=True)
         cls.context = ssl.create_default_context(cafile=str(certificate))
         cls.certificate, cls.key = certificate, key
 
@@ -70,12 +71,10 @@ class SourceProtocolTests(unittest.TestCase):
         self.assets.mkdir()
         (self.assets / "candidate.zip").write_bytes(b"test candidate asset")
         self.server = TestSource(("127.0.0.1", 0), self.path, self.assets)
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(self.certificate, self.key)
-        self.server.socket = context.wrap_socket(self.server.socket, server_side=True)
+        self.server.enable_https(self.certificate, self.key)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
-        self.url = f"https://localhost:{self.server.server_port}"
+        self.url = f"https://127.0.0.1:{self.server.server_port}"
 
     def tearDown(self):
         self.server.shutdown()
@@ -106,6 +105,18 @@ class SourceProtocolTests(unittest.TestCase):
         packages = self.search({"Query": {"KeyWord": "grate", "MatchType": "Substring"}})
         self.assertEqual(["erikbra.grate", "grate-devs.grate"], [p["PackageIdentifier"] for p in packages])
         self.assertEqual(["2.0.0", "2.1.6"], [v["PackageVersion"] for v in packages[0]["Versions"]])
+
+    def test_incomplete_tls_connection_does_not_block_other_requests(self):
+        # The old listening-socket TLS wrapper blocked inside accept while this
+        # first connection sent no ClientHello, timing out every HTTPS client.
+        with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=3):
+            with self.request("/information") as response:
+                self.assertEqual("GrateMigrationCI", json.load(response)["Data"]["SourceIdentifier"])
+
+    def test_https_requires_certificate_name_and_trust_validation(self):
+        request = Request(self.url + "/information")
+        with self.assertRaises(Exception):
+            urlopen(request, context=ssl.create_default_context(), timeout=3)
 
     def test_exact_identifier_does_not_match_the_other_package(self):
         packages = self.search({"Filters": [selector("PackageIdentifier", "grate-devs.grate")]})

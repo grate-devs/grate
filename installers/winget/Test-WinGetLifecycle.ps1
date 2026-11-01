@@ -27,7 +27,7 @@ $originalProcessPath = $env:Path
 $state = $null
 $sourceAdded = $false
 $testOwnsInstallation = $false
-$summary = [ordered]@{ InstallerType=$type; Architecture=$arch; SourceIdentifier=$sourceIdentifier; CommunitySourceMigrationTested=$false }
+$summary = [ordered]@{ InstallerType=$type; Architecture=$arch; SourceIdentifier=$sourceIdentifier; CommunitySourceMigrationTested=$false; GrateVersionOptionRole='database migration version, not CLI version display' }
 
 function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$Observe) {
     $info = [Diagnostics.ProcessStartInfo]::new($Executable)
@@ -55,7 +55,7 @@ function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$
 function W([string[]]$Arguments, [string]$Name, [switch]$Observe) {
     $dataHash=$null
     if ($Arguments[0] -in @('install','upgrade','uninstall') -and (Test-Path $database)) { $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash }
-    try { Run $Winget ($Arguments + @('--disable-interactivity', '--verbose-logs')) $Name -Observe:$Observe }
+    try { Run $Winget ($Arguments + @('--disable-interactivity', '--verbose-logs', '--no-proxy')) $Name -Observe:$Observe }
     finally {
         if ($dataHash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash)) {
             throw "$Name removed or modified migration data outside the installation directory."
@@ -111,7 +111,7 @@ function Package([string]$Id, [object[]]$Versions) {
         $extension = if ($type -eq 'zip') { 'zip' } else { 'msi' }
         $installer = [ordered]@{
             Architecture=$arch; InstallerType=$type; Scope='user'
-            InstallerUrl="https://localhost:8765/assets/grate-$($version.Version).$extension"
+            InstallerUrl="https://127.0.0.1:8765/assets/grate-$($version.Version).$extension"
             InstallerSha256=$(if ($type -eq 'zip') { $version.ZipHash } else { $version.MsiHash })
         }
         if ($type -eq 'zip') {
@@ -144,8 +144,13 @@ function Assert-Installed([string]$Version, [string]$Id) {
     $expected = $inventory.Versions | Where-Object Version -eq $Version
     $exe = Installed-Executable
     if (!(Test-Path $exe) -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne (Get-FileHash $expected.Executable -Algorithm SHA256).Hash) { throw "Installed payload is not $Version." }
-    $versionResult = Run $exe @('--version') "installed-$Version-version"
-    if ($versionResult.Output -notmatch "\b$([regex]::Escape($Version))\b") { throw 'Installed CLI reports an unexpected version.' }
+    # grate's --version option is a database migration version, including on
+    # current main. Keep the historical probe as evidence, not a version oracle.
+    $null = Run $exe @('--version') "installed-$Version-version" -Observe
+    $null = Run $exe @('--help') "installed-$Version-help"
+    $fileVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+    $actualVersion=[version]::new($fileVersion.FileMajorPart,$fileVersion.FileMinorPart,$fileVersion.FileBuildPart)
+    if ($actualVersion -ne [version]$Version) { throw "Installed file version $actualVersion does not match $Version." }
     $env:Path = $originalProcessPath + ';' + [Environment]::GetEnvironmentVariable('Path','User')
     $commands = @(Get-Command grate -All -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -Unique)
     if ($commands.Count -ne 1 -or (Get-FileHash $commands[0] -Algorithm SHA256).Hash -ne (Get-FileHash $expected.Executable -Algorithm SHA256).Hash) { throw 'PATH does not resolve exactly one expected grate payload.' }

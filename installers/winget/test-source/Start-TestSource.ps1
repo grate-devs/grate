@@ -18,7 +18,7 @@ $logs = (New-Item -ItemType Directory -Path $LogDirectory -Force).FullName
 $certificateDirectory = (New-Item -ItemType Directory -Path (Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString()))).FullName
 $state = [pscustomobject]@{
     Pid = $null
-    Url = "https://localhost:$Port"
+    Url = "https://127.0.0.1:$Port"
     SourceIdentifier = $sourceIdentifier
     CertificateThumbprint = $null
     CertificateDirectory = $certificateDirectory
@@ -26,7 +26,11 @@ $state = [pscustomobject]@{
 }
 
 try {
-    $certificate = New-SelfSignedCertificate -DnsName localhost -CertStoreLocation Cert:\CurrentUser\My `
+    # Use the exact listening address in both URL and IP SAN, avoiding localhost
+    # DNS/IPv6 fallback inside short startup probes. Keep DNS localhost valid too.
+    # https://learn.microsoft.com/powershell/module/pki/new-selfsignedcertificate#example-9
+    $certificate = New-SelfSignedCertificate -Subject localhost -Type SSLServerAuthentication `
+        -TextExtension @('2.5.29.17={text}DNS=localhost&IPAddress=127.0.0.1') -CertStoreLocation Cert:\CurrentUser\My `
         -KeyExportPolicy Exportable -NotAfter (Get-Date).AddDays(1) -FriendlyName 'grate disposable WinGet CI source'
     $state.CertificateThumbprint = $certificate.Thumbprint
     $certificateFile = Join-Path $certificateDirectory 'localhost.pem'
@@ -44,6 +48,14 @@ try {
     # WinGet's HTTP stack must trust the certificate itself; readiness does not
     # bypass certificate checks. This store is removed by Stop-TestSource.
     $null = Import-Certificate -FilePath $publicCertificateFile -CertStoreLocation Cert:\LocalMachine\Root
+    @{
+        Url = $state.Url
+        CertificateSubject = $certificate.Subject
+        CertificateThumbprint = $certificate.Thumbprint
+        CertificateNotBefore = $certificate.NotBefore.ToUniversalTime().ToString('o')
+        CertificateNotAfter = $certificate.NotAfter.ToUniversalTime().ToString('o')
+        CertificateExtensions = @($certificate.Extensions | ForEach-Object { @{Oid=$_.Oid.Value; Value=$_.Format($true)} })
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $logs 'test-source.bootstrap.json')
 
     $arguments = @('-u', (Join-Path $PSScriptRoot 'server.py'), '--catalog', $catalogPath,
         '--certificate', $certificateFile, '--private-key', $privateKeyFile, '--port', "$Port")
@@ -57,14 +69,16 @@ try {
         -RedirectStandardOutput (Join-Path $logs 'test-source.stdout.log') `
         -RedirectStandardError (Join-Path $logs 'test-source.stderr.log')
     $state.Pid = $process.Id
-    for ($attempt = 0; $attempt -lt 100; $attempt++) {
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
         if ($process.HasExited) { throw "Test source exited with code $($process.ExitCode). See $logs." }
         try {
-            $information = Invoke-RestMethod -Uri "$($state.Url)/information" -TimeoutSec 1
+            $information = Invoke-RestMethod -Uri "$($state.Url)/information" -TimeoutSec 5 -NoProxy
             if ($information.Data.SourceIdentifier -ne $sourceIdentifier) { throw 'Unexpected source identity.' }
             return $state
         } catch {
-            if ($attempt -eq 99) { throw }
+            "Attempt $($attempt + 1): $($_.Exception.ToString())" |
+                Add-Content -LiteralPath (Join-Path $logs 'test-source.readiness.log')
+            if ($attempt -eq 9) { throw }
             Start-Sleep -Milliseconds 100
         }
     }
