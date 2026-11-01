@@ -72,6 +72,15 @@ function Read-TestCandidateMetadata([string]$MsiPath) {
 }
 function Invoke-TestWingetValidate {
     if ($args[0] -ne 'validate' -or $args[1] -ne '--manifest' -or !(Test-Path $args[2])) { throw 'Schema command was not forwarded with its manifest directory.' }
+    if ('--ignore-warnings' -in $args) { throw 'Candidate schema validation must not suppress warnings.' }
+    foreach ($file in Get-ChildItem -LiteralPath $args[2] -Filter *.yaml) {
+        $text = Get-Content -LiteralPath $file.FullName -Raw
+        if ($text -notmatch '(?m)^ManifestType: (?<type>installer|defaultLocale|version)\r?$') { throw 'Missing candidate manifest type.' }
+        $type=$Matches.type
+        $expectedHeader='# yaml-language-server: $schema=https://aka.ms/winget-manifest.' + $type + '.1.12.0.schema.json'
+        if ($text.Split("`n")[0].TrimEnd("`r") -cne $expectedHeader) { throw 'Missing or incorrect candidate schema header.' }
+        if ($type -eq 'installer' -and $text -match '(?m)^\s*(?:- )?Scope:') { throw 'Candidate manifests must omit unsupported portable/MSI Scope.' }
+    }
     $wingetTest.schemaCalls++
     $global:LASTEXITCODE=0
 }
@@ -123,7 +132,8 @@ try {
         & "$PSScriptRoot/Test-InstallerCorrelation.ps1" @argsForValidator -ManifestPath "$old/erikbra.grate.installer.yaml" -Policy Bridge
         & "$PSScriptRoot/Test-InstallerCorrelation.ps1" @argsForValidator -ManifestPath "$new/grate-devs.grate.installer.yaml" -Policy NewIdentity -Publisher grate-devs
     }
-    Assert-True ([regex]::Matches($bridge,'(?m)^  Scope: user$').Count -eq 3 -and [regex]::Matches($candidate,'(?m)^  Scope: user$').Count -eq 3) 'Only ZIP nodes must explicitly use user scope.'
+    Assert-True ($bridge -notmatch '(?m)^\s*(?:- )?Scope:' -and $candidate -notmatch '(?m)^\s*(?:- )?Scope:') 'Migration manifests must omit unsupported portable/MSI Scope.'
+    Assert-True ([regex]::Matches($bridge,'(?m)^  NestedInstallerType: portable$').Count -eq 3 -and [regex]::Matches($candidate,'(?m)^  NestedInstallerType: portable$').Count -eq 3) 'Portable ZIP installer shape was lost.'
     $wingetTest.testCount++
     Assert-Rejected @{version='2.1.7';outputDirectory="$state/migration";PrepareMigration=$true} '*Refusing to overwrite*'
     foreach ($defect in @('Publisher','LegacyProduct','WrongProduct','UpgradeCode','Platform','Version','Digest','MachineScope','DualScope','PerUserFlag','AllUsersZero')) {

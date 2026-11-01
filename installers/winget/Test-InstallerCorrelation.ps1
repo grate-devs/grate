@@ -35,9 +35,9 @@ if ($Policy -eq 'Bridge') {
     }
 }
 if ($Policy -ne 'Historical') {
-    # The migration manifests deliberately omit MSI Scope until pinned WinGet
-    # handles this per-user MSI's installed scope consistently (#3011).
-    if ($nodes[0] -match '(?m)^  Scope:' -or $yaml -match '(?m)^Scope:') { throw 'Migration MSI Scope must be omitted.' }
+    # MSI Scope is omitted for pinned-client correlation (#3011). Portable
+    # Scope is unsupported manifest authoring; settings/--scope select it.
+    if ($yaml -match '(?m)^(?:  )?Scope:') { throw 'Migration installer Scope must be omitted.' }
     if ($Policy -eq 'NewIdentity') {
         if (!$Publisher) { $Publisher = 'grate-devs' }
         $productPattern = "(?m)^  ProductCode: ['`"]?$([regex]::Escape($ProductCode))['`"]?\r?$"

@@ -19,7 +19,8 @@ function Package([string]$Id, [object[]]$Versions) {
             InstallerSha256=$(if ($type -eq 'zip') { $version.ZipHash } else { $version.MsiHash })
         }
         if ($type -eq 'zip') {
-            $installer.Scope='user'
+            # WinGet controls portable scope from the install command. The
+            # schema rejects an authored Scope for portable installers.
             $installer.NestedInstallerType='portable'
             $installer.NestedInstallerFiles=@(@{RelativeFilePath='grate.exe'; PortableCommandAlias='grate'})
         } else {

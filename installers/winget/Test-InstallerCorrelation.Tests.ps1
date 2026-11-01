@@ -48,12 +48,13 @@ try {
     $bridge = [regex]::Replace($new, '(?m)^\s*(?:- )?(?:ProductCode|UpgradeCode): [^\r\n]*\r?\n', '').Replace('Publisher: grate-devs','Publisher: erikbra')
     $bridge | Set-Content $fixture
     & $validator @parameters -Policy Bridge
-    foreach ($defect in @('publisher','rootScope','nodeScope','missingEntryCode','bridgeCode','bridgePublisher')) {
+    foreach ($defect in @('publisher','rootScope','nodeScope','portableScope','missingEntryCode','bridgeCode','bridgePublisher')) {
         $policy = if ($defect -like 'bridge*') {'Bridge'} else {'NewIdentity'}
         $faulty = switch ($defect) {
             publisher {$new.Replace('Publisher: grate-devs','Publisher: erikbra')}
             rootScope {"Scope: user`n"+$new}
             nodeScope {$new.Replace('- Architecture: x64',"- Architecture: x64`n  Scope: user")}
+            portableScope {$new.Replace("Installers:`n", "Installers:`n- Architecture: x64`n  InstallerType: zip`n  NestedInstallerType: portable`n  Scope: user`n  InstallerUrl: https://example.org/portable.zip`n")}
             missingEntryCode {$new.Replace("    ProductCode: '{11111111-1111-1111-1111-111111111111}'`n",'')}
             bridgeCode {$bridge.Replace('ManifestType: installer',"ProductCode: '{11111111-1111-1111-1111-111111111111}'`nManifestType: installer")}
             bridgePublisher {$bridge.Replace('Publisher: erikbra','Publisher: grate-devs')}
@@ -63,7 +64,7 @@ try {
         catch {
             $expected = switch ($defect) {
                 {$_ -in @('publisher','bridgePublisher')} {'*incorrect Publisher*'}
-                {$_ -in @('rootScope','nodeScope')} {'*Scope must be omitted*'}
+                {$_ -in @('rootScope','nodeScope','portableScope')} {'*Scope must be omitted*'}
                 missingEntryCode {'*installer and AppsAndFeaturesEntries levels*'}
                 bridgeCode {'*must not contain strong MSI reference codes*'}
             }
@@ -73,4 +74,4 @@ try {
         throw "Correlation validator accepted $defect defect."
     }
 } finally { Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue }
-Write-Host 'PASS: historical/new/bridge MSI correlation contracts; 10 rejected mutations including misplaced UpgradeCode, code aliases, scope and publisher.'
+Write-Host 'PASS: historical/new/bridge MSI correlation contracts; 11 rejected mutations including misplaced UpgradeCode, code aliases, MSI/portable scope and publisher.'

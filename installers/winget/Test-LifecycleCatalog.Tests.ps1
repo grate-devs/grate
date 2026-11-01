@@ -35,7 +35,7 @@ foreach ($type in @('wix','zip')) {
                 Require ($installer.ProductCode -eq "{PRODUCT-$arch-$($node.PackageVersion)}") 'New listing must carry the actual version-specific product code.'
                 Require ($installer.AppsAndFeaturesEntries[0].UpgradeCode -eq "{NEW-FAMILY-$arch}" -and $installer.AppsAndFeaturesEntries[0].Publisher -eq 'grate-devs') 'New listing must carry only its corrected stable family and actual publisher.'
             } else {
-                Require ($installer.Scope -eq 'user' -and $bridge.Scope -eq 'user' -and $installer.NestedInstallerType -eq 'portable') 'Portable scope and installer behavior must be preserved.'
+                Require (!$installer.Contains('Scope') -and !$bridge.Contains('Scope') -and $installer.NestedInstallerType -eq 'portable') 'Portable scope must be controlled by WinGet and omitted from the manifest.'
                 Require (!$installer.Contains('ProductCode') -and !$installer.Contains('AppsAndFeaturesEntries')) 'Portable nodes must not inherit MSI correlation codes.'
             }
         }

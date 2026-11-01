@@ -31,7 +31,7 @@ foreach ($candidate in $candidates) {
     }
     # An inherited Scope plus stale upstream AFE data exercises the same bounded
     # policy production uses after wingetcreate updates the published assets.
-    $inputYaml = @"
+    $inputYaml = '# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json' + "`n" + @"
 PackageIdentifier: erikbra.grate
 PackageVersion: $version
 Scope: user
@@ -64,9 +64,9 @@ ManifestVersion: 1.12.0
         $publisher = if ($identity -eq 'erikbra.grate') {'erikbra'} else {'grate-devs'}
         $installer = if ($identity -eq 'erikbra.grate') {$policy.BridgeInstallerYaml} else {$policy.NewInstallerYaml}
         $installer | Set-Content -LiteralPath "$directory/$identity.installer.yaml" -Encoding utf8NoBOM
-        "PackageIdentifier: $identity`nPackageVersion: $version`nDefaultLocale: en-US`nManifestType: version`nManifestVersion: 1.12.0" |
+        ('# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json' + "`nPackageIdentifier: $identity`nPackageVersion: $version`nDefaultLocale: en-US`nManifestType: version`nManifestVersion: 1.12.0") |
             Set-Content -LiteralPath "$directory/$identity.yaml" -Encoding utf8NoBOM
-        "PackageIdentifier: $identity`nPackageVersion: $version`nPackageLocale: en-US`nPublisher: $publisher`nPackageName: grate`nLicense: MIT`nShortDescription: SQL migration runner`nManifestType: defaultLocale`nManifestVersion: 1.12.0" |
+        ('# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json' + "`nPackageIdentifier: $identity`nPackageVersion: $version`nPackageLocale: en-US`nPublisher: $publisher`nPackageName: grate`nLicense: MIT`nShortDescription: SQL migration runner`nManifestType: defaultLocale`nManifestVersion: 1.12.0") |
             Set-Content -LiteralPath "$directory/$identity.locale.en-US.yaml" -Encoding utf8NoBOM
         $mode = if ($identity -eq 'erikbra.grate') {'Bridge'} else {'NewIdentity'}
         & "$PSScriptRoot/Test-InstallerCorrelation.ps1" -ManifestPath "$directory/$identity.installer.yaml" `

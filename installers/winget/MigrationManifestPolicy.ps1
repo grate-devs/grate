@@ -105,7 +105,9 @@ function ConvertTo-WinGetMigrationManifests {
             $nestedType = Get-WinGetScalar $node NestedInstallerType
             if (!$nestedType) { $nestedType = Get-WinGetScalar $document.Header NestedInstallerType -Root -Required }
             if ($nestedType -ne 'portable') { throw 'Expected ZIP portable installers in migration manifests.' }
-            $clean = $clean.TrimEnd() + "`n  Scope: user`n"
+            # Portable scope is selected by WinGet settings/--scope, not by the
+            # manifest. Emitting it produces a validation warning and nonzero exit.
+            $clean = $clean.TrimEnd() + "`n"
             $bridgeNodes += $clean; $newNodes += $clean
             continue
         }
