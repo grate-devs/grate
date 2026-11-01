@@ -20,8 +20,15 @@ Assert-Rejected { Ordinary 0 '2.1.7' 'old' } '*unexpected exit code/state*'
 Assert-Rejected { Ordinary 1638 '2.1.7' 'new' } '*unexpected exit code/state*'
 Assert-Rejected { Ordinary 1603 '2.1.6' 'old' } '*unexpected exit code/state*'
 
-$arp = [pscustomobject]@{ DisplayName = 'grate'; Publisher = 'erikbra'; DisplayVersion = '2.1.7' }
+# The real native per-user install has no conventional HKCU uninstall GUID key.
+# ProductInfo supplies installed ARP metadata; absence of that particular key
+# must not suppress verification of the actual registration or its context.
+$registered = @{ InstalledProductName = 'grate'; Publisher = 'erikbra'; VersionString = '2.1.7' }
+$arp = Get-WinGetMsiRegisteredProduct -ReadProductInfo { param($name) $registered[$name] }
 Assert-WinGetMsiRegistration -State 5 -Version '2.1.7' -AssignmentType 0 -Arp $arp -ExpectedVersion '2.1.7'
+if ((ConvertTo-WinGetMsiProductRegistryKey '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}') -cne 'A899182E2A8D6294AA3A60E6AFB4E247') {
+    throw 'Diagnostic MSI product key does not match the observed native installer log.'
+}
 Assert-Rejected { Assert-WinGetMsiRegistration -State 5 -Version '2.1.7' -AssignmentType 1 -Arp $arp -ExpectedVersion '2.1.7' } '*per-user MSI registration*'
 $arp.DisplayVersion = '2.1.6'
 Assert-Rejected { Assert-WinGetMsiRegistration -State 5 -Version '2.1.7' -AssignmentType 0 -Arp $arp -ExpectedVersion '2.1.7' } '*ARP entry*'

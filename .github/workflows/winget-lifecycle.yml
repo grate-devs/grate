@@ -2,18 +2,18 @@ name: WinGet Windows lifecycle
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/800-winget-migration]
-    paths:
-      - 'installers/winget/**'
-      - 'installers/msi/**'
-      - '.github/workflows/winget-lifecycle.yml'
+    inputs:
+      candidate_run_id:
+        description: 'Optional prior run whose immutable test candidates should be reused (record this provenance in the evidence)'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   candidate:
+    if: ${{ !inputs.candidate_run_id }}
     name: Build test candidate (${{ matrix.arch }})
     runs-on: windows-latest
     timeout-minutes: 20
@@ -51,7 +51,11 @@ jobs:
 
   lifecycle:
     name: Install and upgrade (${{ matrix.type }}, ${{ matrix.arch }})
+    permissions:
+      contents: read
+      actions: read
     needs: candidate
+    if: ${{ !cancelled() && (needs.candidate.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.candidate.result == 'skipped' && inputs.candidate_run_id)) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -76,9 +80,18 @@ jobs:
         with:
           name: winget-lifecycle-candidate-${{ matrix.arch }}
           path: candidate/
+          run-id: ${{ inputs.candidate_run_id || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Download and verify historical payloads
         id: assets
         run: ./installers/winget/Get-LifecycleAssets.ps1 -Architecture $env:TEST_ARCH -InstallerType $env:TEST_TYPE -CandidateDirectory ./candidate -OutputDirectory "$env:RUNNER_TEMP/lifecycle"
+      - name: Record test-candidate provenance
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id || github.run_id }}
+        run: |
+          $headers = @{Authorization="Bearer $env:GH_TOKEN"; Accept='application/vnd.github+json'}
+          $run = Invoke-RestMethod "https://api.github.com/repos/grate-devs/grate/actions/runs/$env:CANDIDATE_RUN_ID" -Headers $headers
+          @{ CandidateRunId=$run.id; CandidateSourceCommit=$run.head_sha; ScriptCommit=$env:GITHUB_SHA; Architecture=$env:TEST_ARCH } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/lifecycle/candidate-provenance.json"
       - name: Actual MSI upgrade and reinstall with current-source candidate
         if: matrix.type == 'wix'
         run: |

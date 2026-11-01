@@ -23,6 +23,36 @@ function Assert-WinGetMsiRegistration {
     }
 }
 
+function Get-WinGetMsiRegisteredProduct {
+    param([Parameter(Mandatory)][scriptblock]$ReadProductInfo)
+    # Read installed registration using Windows Installer's supported API. A
+    # per-user MSI can be registered in Installer's per-SID UserData inventory
+    # without a conventional HKCU\...\Uninstall\{ProductCode} registry key.
+    # https://learn.microsoft.com/windows/win32/api/msi/nf-msi-msigetproductinfow
+    [pscustomobject]@{
+        DisplayName = & $ReadProductInfo 'InstalledProductName'
+        DisplayVersion = & $ReadProductInfo 'VersionString'
+        Publisher = & $ReadProductInfo 'Publisher'
+    }
+}
+
+function ConvertTo-WinGetMsiProductRegistryKey {
+    param([Parameter(Mandatory)][Guid]$ProductCode)
+    # Diagnostic path only: supported product/context assertions use Installer
+    # APIs, rather than treating this private registry layout as the contract.
+    $compact = $ProductCode.ToString('N').ToUpperInvariant()
+    $builder = [Text.StringBuilder]::new()
+    foreach ($range in @(@(0, 8), @(8, 4), @(12, 4))) {
+        $characters = $compact.Substring($range[0], $range[1]).ToCharArray()
+        [array]::Reverse($characters)
+        [void]$builder.Append((-join $characters))
+    }
+    for ($offset = 16; $offset -lt 32; $offset += 2) {
+        [void]$builder.Append($compact[$offset + 1]).Append($compact[$offset])
+    }
+    $builder.ToString()
+}
+
 function Get-WinGetMsiOrdinaryUpdateOutcome {
     param([int]$ExitCode, [string]$RegisteredVersion, [string]$OldVersion, [string]$NewVersion, [string]$InstalledHash, [string]$OldHash, [string]$NewHash)
     if ($ExitCode -in @(0, 3010) -and $RegisteredVersion -eq $NewVersion -and $InstalledHash -eq $NewHash) {

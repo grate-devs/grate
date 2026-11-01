@@ -19,8 +19,14 @@ foreach ($item in $downloads) {
 Expand-Archive "$OutputDirectory/DesktopAppInstaller_Dependencies.zip" "$OutputDirectory/dependencies" -Force
 # Appx's Windows PowerShell module also works from pwsh via compatibility import.
 Import-Module Appx -UseWindowsPowerShell
-$dependencyPaths = @(Get-ChildItem "$OutputDirectory/dependencies/$arch" -Filter '*.appx' | ForEach-Object FullName)
-Add-AppxPackage -Path "$OutputDirectory/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -DependencyPath $dependencyPaths -ForceUpdateFromAnyVersion
+# Install dependencies individually: the Windows PowerShell compatibility proxy
+# otherwise serializes the DependencyPath array as one newline-separated path.
+foreach ($pattern in @('*VCLibs.140.00_*', '*UWPDesktop*', '*WindowsAppRuntime*')) {
+    foreach ($dependency in @(Get-ChildItem "$OutputDirectory/dependencies/$arch" -Filter $pattern)) {
+        Add-AppxPackage -Path $dependency.FullName -ForceUpdateFromAnyVersion
+    }
+}
+Add-AppxPackage -Path "$OutputDirectory/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -ForceUpdateFromAnyVersion
 $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller
 $winget = Join-Path $package.InstallLocation 'winget.exe'
 $actual = & $winget --version

@@ -58,6 +58,9 @@ $installedExe = Join-Path $installDirectory 'grate.exe'
 $companyDirectory = Split-Path $installDirectory
 $marker = 'HKCU:\Software\Microsoft\erikbra\grate'
 $arpKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$productCode"
+$currentUserSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$packedProductCode = ConvertTo-WinGetMsiProductRegistryKey $productCode
+$userDataKey = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\$currentUserSid\Products\$packedProductCode\InstallProperties"
 $installer = New-Object -ComObject WindowsInstaller.Installer
 function Invoke-InstallerMember([string]$Name, [Reflection.BindingFlags]$Flags, [object[]]$Arguments) {
     $installer.GetType().InvokeMember($Name, $Flags, $null, $installer, $Arguments)
@@ -115,17 +118,20 @@ function Run-Msi([string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes =
 function Protect-File([string]$Path) { $protectedFiles[$Path] = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash }
 function Check-Protected { Assert-WinGetMsiProtectedFiles $protectedFiles }
 function Check-Installed($Metadata, [string]$Payload, [string]$Name) {
-    $arp = Get-ItemProperty -LiteralPath $arpKey -ErrorAction Stop
     $state = Product-State
     $version = Product-Info 'VersionString'
     $assignment = [int](Product-Info 'AssignmentType')
+    $arp = Get-WinGetMsiRegisteredProduct -ReadProductInfo { param($property) Product-Info $property }
     Assert-WinGetMsiRegistration -State $state -Version $version -AssignmentType $assignment -Arp $arp -ExpectedVersion $Metadata.ProductVersion
     Assert-WinGetMsiPayload -InstalledExecutable $installedExe -ExpectedExecutable $Payload -ExpectedVersion $Metadata.ProductVersion
     if ((Get-ItemPropertyValue -LiteralPath $marker -Name installed) -ne 1) { throw 'The per-user installed marker is missing or incorrect.' }
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     if ($installDirectory.TrimEnd('\') -notin @($userPath.Split(';') | ForEach-Object { $_.TrimEnd('\') })) { throw 'The per-user PATH entry is missing.' }
-    @{ ProductCode = $productCode; ProductState = $state; AssignmentType = $assignment; DisplayName = $arp.DisplayName; Publisher = $arp.Publisher; DisplayVersion = $arp.DisplayVersion; PayloadSha256 = (Get-FileHash $installedExe -Algorithm SHA256).Hash; FileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).FileVersion } |
-        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.installed.json")
+    $userData = if (Test-Path -LiteralPath $userDataKey) {
+        Get-ItemProperty -LiteralPath $userDataKey | Select-Object DisplayName, DisplayVersion, Publisher, WindowsInstaller, LocalPackage, InstallSource
+    } else { $null }
+    @{ ProductCode = $productCode; ProductState = $state; AssignmentType = $assignment; InventorySource = 'WindowsInstaller.ProductInfo'; CurrentUserSid = $currentUserSid; DisplayName = $arp.DisplayName; Publisher = $arp.Publisher; DisplayVersion = $arp.DisplayVersion; ConventionalHkcuUninstallKeyPresent = (Test-Path -LiteralPath $arpKey); DiagnosticUserDataKey = $userDataKey; DiagnosticUserData = $userData; PayloadSha256 = (Get-FileHash $installedExe -Algorithm SHA256).Hash; FileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).FileVersion } |
+        ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $caseDirectory "$Name.installed.json")
     Check-Protected
     $versionResult = Run-Process $installedExe @('--version') "$Name-version"
     if ($versionResult.StandardOutput -notmatch ('(?<!\d)' + [regex]::Escape($Metadata.ProductVersion) + '(?:\D|$)')) {

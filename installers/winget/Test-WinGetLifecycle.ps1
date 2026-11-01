@@ -53,7 +53,14 @@ function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$
     } finally { $process.Dispose() }
 }
 function W([string[]]$Arguments, [string]$Name, [switch]$Observe) {
-    Run $Winget ($Arguments + @('--disable-interactivity', '--verbose-logs')) $Name -Observe:$Observe
+    $dataHash=$null
+    if ($Arguments[0] -in @('install','upgrade','uninstall') -and (Test-Path $database)) { $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash }
+    try { Run $Winget ($Arguments + @('--disable-interactivity', '--verbose-logs')) $Name -Observe:$Observe }
+    finally {
+        if ($dataHash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash)) {
+            throw "$Name removed or modified migration data outside the installation directory."
+        }
+    }
 }
 function Registrations {
     # Read both registry views, deduplicating shared HKCU keys by name.
@@ -71,6 +78,23 @@ function Registrations {
                 } finally { $entry.Dispose() }
             }
         } finally { if ($uninstall) { $uninstall.Dispose() }; $hive.Dispose() }
+    }
+    if ($type -eq 'wix') {
+        # Per-user MSI inventory is registered through Windows Installer; it need
+        # not author a conventional HKCU Uninstall key. Read the supported API.
+        $msiEngine=New-Object -ComObject WindowsInstaller.Installer
+        $code='{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'
+        try {
+            $productState=[int]$msiEngine.GetType().InvokeMember('ProductState',[Reflection.BindingFlags]::GetProperty,$null,$msiEngine,@($code))
+            if ($productState -eq 5) {
+                $values=@{}
+                foreach ($property in @('InstalledProductName','Publisher','VersionString','AssignmentType')) {
+                    $values[$property]=$msiEngine.GetType().InvokeMember('ProductInfo',[Reflection.BindingFlags]::GetProperty,$null,$msiEngine,@($code,$property))
+                }
+                if ([int]$values.AssignmentType -ne 0) { throw 'Expected a per-user MSI registration.' }
+                $rows=@($rows)+[pscustomobject]@{KeyName=$code; DisplayName=$values.InstalledProductName; DisplayVersion=$values.VersionString; Publisher=$values.Publisher; InstallLocation="$env:LOCALAPPDATA/erikbra/grate"; WinGetPackageIdentifier=$null; WinGetSourceIdentifier=$null; Context='WindowsInstaller per-user'}
+            } elseif ($productState -ne -1) { throw "Unexpected pre-existing MSI state $productState." }
+        } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($msiEngine) }
     }
     @($rows | Group-Object KeyName | ForEach-Object { $_.Group[0] })
 }
@@ -196,6 +220,7 @@ try {
     if ($transition.ExitCode -eq 0) {
         Assert-Installed '2.1.7' $newId
         $summary.NewIdPayloadUpgrade='Passed'
+        Snapshot 'after-direct-transition'
         $summary.ResetUninstall=Uninstall $newId 'reset-new-id'
         Write-Catalog
         $null=W (@('install','--id',$oldId,'--version','2.1.6')+$common) 'reset-old-id'
@@ -204,8 +229,8 @@ try {
         Assert-KnownRejection $transition
         Assert-Installed '2.1.6' $oldId
         $summary.NewIdPayloadUpgrade='Rejected; old payload and registration preserved'
+        Snapshot 'after-direct-transition'
     }
-    Snapshot 'after-direct-transition'
     $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
     $summary.FallbackOldUninstall=Uninstall $oldId 'fallback-old-uninstall'
     if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Uninstall modified migration data outside the installation directory.' }
@@ -233,8 +258,21 @@ try {
         } finally {
             try { if ($state) { & "$PSScriptRoot/test-source/Stop-TestSource.ps1" -State $state } }
             finally {
-                [Environment]::SetEnvironmentVariable('Path',$originalUserPath,'User')
-                $env:Path=$originalProcessPath
+                try {
+                    foreach ($logs in @(
+                        "$env:LOCALAPPDATA/Packages/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe/LocalState/DiagOutputDir",
+                        "$env:LOCALAPPDATA/Microsoft/WinGet/DiagOutputDir"
+                    )) {
+                        if (Test-Path $logs) {
+                            New-Item -ItemType Directory -Force (Join-Path $OutputDirectory 'native-winget-logs') | Out-Null
+                            $destination=Join-Path $OutputDirectory ('native-winget-logs/' + [guid]::NewGuid().ToString('N'))
+                            Copy-Item -LiteralPath $logs -Destination $destination -Recurse -Force
+                        }
+                    }
+                } finally {
+                    [Environment]::SetEnvironmentVariable('Path',$originalUserPath,'User')
+                    $env:Path=$originalProcessPath
+                }
             }
         }
     }
