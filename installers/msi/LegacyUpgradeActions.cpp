@@ -147,7 +147,7 @@ namespace
             MSIINSTALLCONTEXT context = MSIINSTALLCONTEXT_NONE;
             const UINT status = MsiEnumProductsExW(code, userSid.c_str(), MSIINSTALLCONTEXT_USERMANAGED | MSIINSTALLCONTEXT_USERUNMANAGED,
                 index, installedCode, &context, owner, &ownerLength);
-            if (status == ERROR_NO_MORE_ITEMS) { break; }
+            if (status == ERROR_NO_MORE_ITEMS || status == ERROR_UNKNOWN_PRODUCT) { break; }
             Check(status, "MsiEnumProductsEx");
             const auto state = ProductProperty(installedCode, owner, context, INSTALLPROPERTY_PRODUCTSTATE);
             if (state != L"5") { throw std::runtime_error("Related grate MSI is advertised or incompletely installed"); }

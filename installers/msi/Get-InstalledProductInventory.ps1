@@ -72,7 +72,9 @@ namespace Grate.Installers
                     uint sidLength = (uint)sid.Capacity;
                     uint installedContext;
                     uint status = MsiEnumProductsExW(productCode, requestedSid, context, index, code, out installedContext, sid, ref sidLength);
-                    if (status == 259) { break; } // ERROR_NO_MORE_ITEMS
+                    // An exact ProductCode/context filter can also return
+                    // ERROR_UNKNOWN_PRODUCT when no such instance exists.
+                    if (status == 259 || status == 1605) { break; }
                     if (status == 234)
                     {
                         sid = new StringBuilder(checked((int)sidLength + 1));

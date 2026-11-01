@@ -33,7 +33,7 @@ $batch = Join-Path $OutputDirectory 'build-upgrade-actions.cmd'
 @echo off
 call "$vcvars" $toolArchitecture
 if errorlevel 1 exit /b %errorlevel%
-cl.exe /nologo /std:c++17 /LD /MT /O2 /W4 /WX /DUNICODE /D_UNICODE /D_WIN32_MSI=500 /D_WIN32_WINNT=0x0A00 /I"$OutputDirectory" /Fo"$OutputDirectory\LegacyUpgradeActions.obj" /Fe"$dll" "$source" /link /NOLOGO /MACHINE:$machine /IMPLIB:"$OutputDirectory\GrateUpgradeActions.lib" msi.lib advapi32.lib
+cl.exe /nologo /std:c++17 /EHsc /LD /MT /O2 /W4 /WX /DUNICODE /D_UNICODE /D_WIN32_MSI=500 /D_WIN32_WINNT=0x0A00 /I"$OutputDirectory" /Fo"$OutputDirectory\LegacyUpgradeActions.obj" /Fe"$dll" "$source" /link /NOLOGO /MACHINE:$machine /IMPLIB:"$OutputDirectory\GrateUpgradeActions.lib" msi.lib advapi32.lib
 exit /b %errorlevel%
 "@ | Set-Content -LiteralPath $batch
 & $env:ComSpec /d /c $batch
