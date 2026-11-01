@@ -61,21 +61,35 @@ $arpKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$productCod
 $currentUserSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $packedProductCode = ConvertTo-WinGetMsiProductRegistryKey $productCode
 $userDataKey = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\$currentUserSid\Products\$packedProductCode\InstallProperties"
-$installer = New-Object -ComObject WindowsInstaller.Installer
 function Invoke-InstallerMember([string]$Name, [Reflection.BindingFlags]$Flags, [object[]]$Arguments) {
-    $installer.GetType().InvokeMember($Name, $Flags, $null, $installer, $Arguments)
+    # Do not retain an apartment-bound Windows Installer object while blocking
+    # on msiexec. Windows message broadcasts and COM can require STA dispatch.
+    # This bounds COM ownership to an inventory query; it does not establish the
+    # cause of a particular runner hang. Keep entry/exit evidence for diagnosis.
+    # https://learn.microsoft.com/windows/win32/sync/wait-functions
+    $installer = $null
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    if (Test-Path -LiteralPath $OutputDirectory) {
+        @{ phase = 'InventoryQueryStart'; member = $Name; arguments = $Arguments; utc = [DateTime]::UtcNow.ToString('o'); apartment = [Threading.Thread]::CurrentThread.GetApartmentState().ToString() } |
+            ConvertTo-Json -Depth 4 -Compress | Add-Content -LiteralPath (Join-Path $OutputDirectory 'inventory-calls.log')
+    }
+    try {
+        $installer = New-Object -ComObject WindowsInstaller.Installer
+        $installer.GetType().InvokeMember($Name, $Flags, $null, $installer, $Arguments)
+    } finally {
+        if ($null -ne $installer) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
+        if (Test-Path -LiteralPath $OutputDirectory) {
+            @{ phase = 'InventoryQueryReleased'; member = $Name; utc = [DateTime]::UtcNow.ToString('o'); elapsedMilliseconds = $watch.ElapsedMilliseconds } |
+                ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $OutputDirectory 'inventory-calls.log')
+        }
+    }
 }
 function Product-State { [int](Invoke-InstallerMember 'ProductState' GetProperty @($productCode)) }
 function Product-Info([string]$Name) { Invoke-InstallerMember 'ProductInfo' GetProperty @($productCode, $Name) }
 
-try {
-    if ((Product-State) -ne -1 -or (Test-Path -LiteralPath $installDirectory) -or
-        (Test-Path -LiteralPath $marker) -or (Test-Path -LiteralPath $arpKey)) {
-        throw 'Refusing to replace a pre-existing grate product, directory, marker or ARP entry.'
-    }
-} catch {
-    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
-    throw
+if ((Product-State) -ne -1 -or (Test-Path -LiteralPath $installDirectory) -or
+    (Test-Path -LiteralPath $marker) -or (Test-Path -LiteralPath $arpKey)) {
+    throw 'Refusing to replace a pre-existing grate product, directory, marker or ARP entry.'
 }
 
 $originalUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -267,10 +281,9 @@ finally {
             if ($unrelatedFile -and (Test-Path -LiteralPath $unrelatedFile)) { Remove-Item -LiteralPath $unrelatedFile -Force }
             if (!$companyAlreadyExisted -and (Test-Path -LiteralPath $companyDirectory) -and @(Get-ChildItem -LiteralPath $companyDirectory -Force).Count -eq 0) { Remove-Item -LiteralPath $companyDirectory }
         } catch { $failures.Add($_.Exception) }
-        [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
     }
     if (Test-Path -LiteralPath $OutputDirectory) {
-        @{ Architecture = $Architecture; Cases = $results.ToArray(); Failures = @($failures | ForEach-Object Message); Succeeded = ($failures.Count -eq 0 -and $results.Count -eq $history.Count); OrdinaryUpgradeSupported = ($results.Count -eq $history.Count -and @($results | Where-Object { $_.OrdinaryUpdate -ne 'Upgraded' }).Count -eq 0); WinGetIdentityTransitionTested = $false } |
+        @{ Architecture = $Architecture; PowerShellApartmentState = [Threading.Thread]::CurrentThread.GetApartmentState().ToString(); Cases = $results.ToArray(); Failures = @($failures | ForEach-Object Message); Succeeded = ($failures.Count -eq 0 -and $results.Count -eq $history.Count); OrdinaryUpgradeSupported = ($results.Count -eq $history.Count -and @($results | Where-Object { $_.OrdinaryUpdate -ne 'Upgraded' }).Count -eq 0); WinGetIdentityTransitionTested = $false } |
             ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'summary.json')
     }
 }

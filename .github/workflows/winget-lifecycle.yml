@@ -70,7 +70,9 @@ jobs:
         include: ${{ fromJSON(inputs.cases == 'msi' && '[{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]' || '[{"type":"zip","arch":"x86","runner":"windows-latest"},{"type":"zip","arch":"x64","runner":"windows-latest"},{"type":"zip","arch":"arm64","runner":"windows-11-arm"},{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]') }}
     defaults:
       run:
-        shell: pwsh
+        # MSI inventory uses COM. Keep the waiting test thread out of STA so
+        # installer window/COM messages can be serviced on their own apartment.
+        shell: pwsh -NoLogo -NoProfile -NonInteractive -MTA -Command ". '{0}'"
     env:
       TEST_ARCH: ${{ matrix.arch }}
       TEST_TYPE: ${{ matrix.type }}
