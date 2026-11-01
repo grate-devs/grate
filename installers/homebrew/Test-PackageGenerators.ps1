@@ -13,12 +13,17 @@ function Assert-Contains([string]$Actual, [string]$Expected) {
     if (!$Actual.Contains($Expected)) { throw "Missing expected output: $Expected" }
 }
 
-function Assert-Rejected([scriptblock]$Action) {
+function Assert-Rejected([scriptblock]$Action, [string]$Output = $formulaOutput, [string]$Expected = $script:publishedFormula, [string]$ExpectedErrorId = '') {
     $rejected = $false
-    try { & $Action } catch { $rejected = $true }
+    try { & $Action } catch {
+        if ($ExpectedErrorId -and $_.FullyQualifiedErrorId -notlike $ExpectedErrorId) {
+            throw "Expected $ExpectedErrorId, got $($_.FullyQualifiedErrorId)."
+        }
+        $rejected = $true
+    }
     if (!$rejected) { throw 'Expected invalid input to be rejected.' }
-    if ((Get-Content -LiteralPath $formulaOutput -Raw) -cne $script:publishedFormula) {
-        throw 'Rejected input changed the existing formula.'
+    if ((Get-Content -LiteralPath $Output -Raw) -cne $Expected) {
+        throw 'Rejected input changed the existing output.'
     }
 }
 
@@ -49,8 +54,8 @@ try {
     & $generator -version '2.2.0' -sourceArchive $sourceArchive -releaseTag 'v2.2.0' -outputPath $prefixedOutput
     Assert-Contains (Get-Content -LiteralPath $prefixedOutput -Raw) '/tags/v2.2.0.tar.gz'
 
-    Assert-Rejected { & $generator -version '2.2.0-rc.1' -sourceArchive $sourceArchive }
-    Assert-Rejected { & $generator -version "2.2.0`n" -sourceArchive $sourceArchive }
+    Assert-Rejected { & $generator -version '2.2.0-rc.1' -sourceArchive $sourceArchive } -ExpectedErrorId 'ParameterArgumentValidationError*'
+    Assert-Rejected { & $generator -version "2.2.0`n" -sourceArchive $sourceArchive } -ExpectedErrorId 'ParameterArgumentValidationError*'
     Assert-Rejected { & $generator -version '2.2.0' -sourceArchive (Join-Path $fixtureRoot 'missing.tar.gz') }
     Assert-Rejected { & $generator -version '2.2.0' -sourceArchive $sourceArchive -releaseTag 'v2.3.0' }
     Assert-Rejected { & $generator -version '2.2.0' -sourceArchive $sourceArchive -releaseTag '2.2.0"; puts "bad' }
@@ -63,10 +68,18 @@ try {
     & $caskGenerator -version '2.2.0' -artifactDirectory $fixtureRoot
     $cask = Get-Content -LiteralPath $caskOutput -Raw
     Assert-Contains $cask 'cask "grate" do'
+    Assert-Contains $cask 'depends_on :macos'
     Assert-Contains $cask "sha256 `"$abcHash`""
     Assert-Contains $cask "sha256 `"$helloHash`""
     Assert-Contains $cask '/releases/download/2.2.0/grate-osx-arm64-self-contained-#{version}.zip'
     Assert-Contains $cask '/releases/download/2.2.0/grate-osx-x64-self-contained-#{version}.zip'
+    $prefixedCask = Join-Path $fixtureRoot 'custom-cask/grate.rb'
+    & $caskGenerator -version '2.2.0' -artifactDirectory $fixtureRoot -releaseTag 'v2.2.0' -outputPath $prefixedCask
+    Assert-Contains (Get-Content -LiteralPath $prefixedCask -Raw) '/releases/download/v2.2.0/grate-osx-arm64-self-contained-#{version}.zip'
+    Assert-Rejected { & $caskGenerator -version '2.2.0-rc.1' -artifactDirectory $fixtureRoot } -Output $caskOutput -Expected $cask -ExpectedErrorId 'ParameterArgumentValidationError*'
+    Assert-Rejected { & $caskGenerator -version "2.2.0`n" -artifactDirectory $fixtureRoot } -Output $caskOutput -Expected $cask -ExpectedErrorId 'ParameterArgumentValidationError*'
+    Assert-Rejected { & $caskGenerator -version '2.2.0' -releaseTag 'v2.3.0' -artifactDirectory $fixtureRoot } -Output $caskOutput -Expected $cask
+    Assert-Rejected { & $caskGenerator -version '2.2.0' -releaseTag '2.2.0"; puts "bad' -artifactDirectory $fixtureRoot } -Output $caskOutput -Expected $cask
     if ((Get-Content -LiteralPath $formulaOutput -Raw) -cne $publishedFormula) {
         throw 'Cask generation overwrote the source-built formula.'
     }
