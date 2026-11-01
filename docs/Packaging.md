@@ -39,6 +39,30 @@ the applicable native platform. A successful cross-build alone is not execution
 evidence for that platform. Keep the runtime version and any build-only platforms
 in the PR/release verification record.
 
+## Package lifecycle checks in CI
+
+The existing native packaging jobs also exercise the distribution boundaries:
+
+- **MSI, Windows x64 and Arm64:** install the candidate MSI per user, run the
+  installed executable against disposable SQLite data, apply an explicit Windows
+  Installer minor update with a newer executable, then uninstall. The check
+  verifies installed payloads, product registration and cleanup while preserving
+  unrelated user data. This tests the existing fixed-ProductCode update contract;
+  it does not introduce automatic major-upgrade behavior.
+- **Debian, Linux amd64 and Arm64:** install test package `0.0.1-1` in a disposable
+  Ubuntu container, migrate and rerun through `/usr/bin/grate`, upgrade to
+  `0.0.2-1`, then purge. Both packages wrap the same candidate executable, so this
+  verifies the package-version transition and data preservation rather than a
+  change to the application binary.
+- **Docker, Alpine amd64 and Arm64:** run the image with its default entrypoint,
+  environment configuration and documented mounts. Check argument forwarding,
+  dry runs, migration/rerun effects and failure exit codes in addition to the
+  existing direct-executable, globalization and bundled-skill checks.
+
+These checks use local test artifacts and disposable state. Installer logs and
+verification diagnostics are uploaded even when a job fails. They do not publish
+packages or replace the final release-asset checks below.
+
 ## Package-manager updates after a release
 
 These channels wrap the release binaries. They do not retarget or rebuild grate.
