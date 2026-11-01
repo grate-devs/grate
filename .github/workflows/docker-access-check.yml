@@ -1,105 +1,49 @@
-name: Check Docker publishing permissions (no publication)
+name: Check Docker OIDC and compatibility permissions (no publication)
 
 on:
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   check-access:
-    name: Check CI push grants without uploading
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
+    name: Verify independent identity grants without uploading
+    runs-on: ubuntu-24.04
+    environment: docker-hub
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 5
     steps:
-      - name: Request repository access grants
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test access-check behavior
+        run: python3 -m unittest discover -s eng -p 'test_check_docker_access.py' -v
+      - name: Require configured organization connection
+        env:
+          CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        run: |
+          test -n "$CONNECTION_ID" || { echo '::error::DOCKERHUB_OIDC_CONNECTIONID is missing.'; exit 1; }
+          mkdir -p "$RUNNER_TEMP/grate-oidc-docker"
+          chmod 700 "$RUNNER_TEMP/grate-oidc-docker"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/grate-oidc-docker" >> "$GITHUB_ENV"
+      - name: Authenticate canonical organization using GitHub OIDC
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        with:
+          username: gratedevs
+      - name: Request only repository grants; never upload registry content
         env:
           DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-        shell: python
-        run: |
-          import base64
-          import json
-          import os
-          import sys
-          import time
-          import urllib.error
-          import urllib.parse
-          import urllib.request
-
-          REPOSITORIES = ("erikbra/grate", "gratedevs/grate")
-
-          class NoRedirects(urllib.request.HTTPRedirectHandler):
-              def redirect_request(self, req, fp, code, msg, headers, newurl):
-                  return None
-
-          def check_access(repository, authorization, opener):
-              query = urllib.parse.urlencode({
-                  "service": "registry.docker.io",
-                  "scope": f"repository:{repository}:pull,push",
-              })
-              request = urllib.request.Request(
-                  "https://auth.docker.io/token?" + query,
-                  headers={"Authorization": authorization},
-                  method="GET",
-              )
-              try:
-                  with opener.open(request, timeout=30) as response:
-                      data = json.load(response)
-                  token = data.get("token") or data.get("access_token")
-                  # Inspect only claims returned directly by Docker over HTTPS.
-                  # Do not print credentials, the token, or its complete payload.
-                  parts = token.split(".")
-                  if len(parts) != 3:
-                      raise ValueError("Unexpected token format")
-                  payload = parts[1] + "=" * (-len(parts[1]) % 4)
-                  claims = json.loads(base64.urlsafe_b64decode(payload))
-                  if claims.get("aud") != "registry.docker.io":
-                      raise ValueError("Unexpected token audience")
-                  if claims.get("exp", 0) <= time.time():
-                      raise ValueError("Expired token")
-                  actions = set()
-                  for grant in claims.get("access", []):
-                      if grant.get("type") == "repository" and grant.get("name") == repository:
-                          actions.update(grant.get("actions", []))
-                  allowed = "push" in actions
-                  return {
-                      "repository": repository,
-                      "pull": "pull" in actions,
-                      "push": allowed,
-                      "status": "push granted" if allowed else "push not granted",
-                  }
-              except urllib.error.HTTPError as error:
-                  return {"repository": repository, "push": False,
-                          "status": f"token endpoint HTTP {error.code}"}
-              except Exception:
-                  # Exception text or response bodies could contain credentials.
-                  return {"repository": repository, "push": False,
-                          "status": "token request or response validation failed"}
-
-          def main():
-              user = os.environ.get("DOCKER_HUB_USER", "")
-              secret = os.environ.get("DOCKER_HUB_TOKEN", "")
-              if not user or not secret:
-                  print("::error::DOCKER_HUB_USER and DOCKER_HUB_TOKEN must both be configured.")
-                  return 2
-              credentials = base64.b64encode((user + ":" + secret).encode()).decode()
-              opener = urllib.request.build_opener(NoRedirects())
-              results = [check_access(repo, "Basic " + credentials, opener)
-                         for repo in REPOSITORIES]
-              for result in results:
-                  print(json.dumps(result, sort_keys=True))
-              summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-              if summary_path:
-                  with open(summary_path, "a", encoding="utf-8") as summary:
-                      summary.write("## Docker CI access grants\n\n")
-                      summary.write("| Repository | Result |\n| --- | --- |\n")
-                      for result in results:
-                          summary.write(f"| `{result['repository']}` | {result['status']} |\n")
-                      summary.write("\nUsed the repository's DOCKER_HUB_USER and DOCKER_HUB_TOKEN secrets. "
-                                    "Only GET requests to auth.docker.io were made. "
-                                    "No image build, pull, upload, tag change, or publication occurred. "
-                                    "This checks Docker-issued access grants, not an end-to-end push.\n")
-              return 0 if all(result["push"] for result in results) else 1
-
-          if __name__ == "__main__":
-              sys.exit(main())
+        run: python3 eng/check_docker_access.py --canonical-authfile "$DOCKER_CONFIG/config.json" --report docker-access.json
+      - name: Retain sanitized grant evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: docker-oidc-access-${{ github.run_id }}-${{ github.run_attempt }}
+          path: docker-access.json
+          if-no-files-found: warn

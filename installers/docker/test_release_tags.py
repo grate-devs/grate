@@ -56,9 +56,22 @@ class ReleaseTagsTests(unittest.TestCase):
             self.assertEqual(tags, result.stdout)
             self.assertEqual(
                 "existing=retained\nversion=2.3.4\nis-prerelease=true\n"
-                f"tags<<GRATE_DOCKER_TAGS\n{tags}GRATE_DOCKER_TAGS\n",
+                f"tags<<GRATE_DOCKER_TAGS\n{tags}GRATE_DOCKER_TAGS\n"
+                "canonical-tags<<GRATE_DOCKER_TAGS\ngratedevs/grate:2.3.4\nGRATE_DOCKER_TAGS\n"
+                "compatibility-tags<<GRATE_DOCKER_TAGS\nerikbra/grate:2.3.4\nGRATE_DOCKER_TAGS\n",
                 output.read_text(encoding="utf-8"),
             )
+
+    def test_stable_cli_separates_both_identities_without_losing_latest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "github-output"
+            result = self.run_cli("2.3.4", "--github-output", str(output))
+            self.assertEqual(0, result.returncode, result.stderr)
+            contents = output.read_text(encoding="utf-8")
+            self.assertIn("canonical-tags<<GRATE_DOCKER_TAGS\ngratedevs/grate:2.3.4\n"
+                          "gratedevs/grate:latest\nGRATE_DOCKER_TAGS\n", contents)
+            self.assertIn("compatibility-tags<<GRATE_DOCKER_TAGS\nerikbra/grate:2.3.4\n"
+                          "erikbra/grate:latest\nGRATE_DOCKER_TAGS\n", contents)
 
     def test_cli_rejects_invalid_version_before_writing_outputs(self):
         with tempfile.TemporaryDirectory() as directory:

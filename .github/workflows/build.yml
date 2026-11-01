@@ -276,11 +276,41 @@ jobs:
 
 
   build-docker-image:
-    name: Build and push Docker image
+    name: Build Docker image without publishing
     needs: set-version-number
+    if: ${{ needs.set-version-number.outputs.is-release != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+    - name: Build current source without registry credentials
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+      with:
+        file: ./installers/docker/Dockerfile
+        context: .
+        platforms: linux/amd64,linux/arm64
+        pull: true
+        push: false
+        build-args: |
+          VERSION=${{ needs.set-version-number.outputs.semVer }}
+
+  publish-docker:
+    name: Publish canonical Docker image and compatibility digest
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
+    environment: docker-hub
+    needs: set-version-number
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
     # Serialize version/latest publication across release runs.
     concurrency:
       group: docker-publication
@@ -291,10 +321,17 @@ jobs:
       with:
         persist-credentials: false
 
+    - name: Configure isolated canonical Docker credentials
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/grate-oidc-docker"
+        chmod 700 "$RUNNER_TEMP/grate-oidc-docker"
+        echo "DOCKER_CONFIG=$RUNNER_TEMP/grate-oidc-docker" >> "$GITHUB_ENV"
+
     - name: Check Docker release policy
       run: |
         python3 -m unittest discover -s installers/docker -p 'test_*.py'
-        python3 -m unittest discover -s eng -p 'test_verify_docker_release.py'
+        python3 -m unittest discover -s eng -p 'test_*docker*.py'
 
     - name: Select identical tags for canonical and compatibility names
       id: tags
@@ -318,25 +355,45 @@ jobs:
       with:
         driver: docker-container
 
-    - name: Log in to Docker Hub
+    - name: Prepare canonical OIDC login and digest-preserving copy tool
+      env:
+        CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -n "$CONNECTION_ID" || { echo '::error::DOCKERHUB_OIDC_CONNECTIONID must be configured in docker-hub.'; exit 1; }
+        mkdir -p "$DOCKER_CONFIG"
+        chmod 700 "$DOCKER_CONFIG"
+        sudo apt-get update -qq
+        sudo apt-get install --yes --no-install-recommends skopeo
+        skopeo --version >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Log in to canonical Docker Hub repository using OIDC
       uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
+      env:
+        DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        # Cover the bounded 45-minute build/copy job, including an uncached build.
+        DOCKERHUB_OIDC_EXPIREIN: '3600'
       with:
-        username: ${{ secrets.DOCKER_HUB_USER }}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+        username: gratedevs
+
+    - name: Verify separate publishing identities without registry writes
+      env:
+        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      run: python3 eng/check_docker_access.py --canonical-authfile "$DOCKER_CONFIG/config.json" --report docker-access.json
 
     - name: Retain OCI image labels
       id: meta
       if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
       with:
-        images: |
-          gratedevs/grate
-          erikbra/grate
+        images: gratedevs/grate
         flavor: latest=false
         tags: type=raw,value=${{ steps.tags.outputs.version }}
 
-    # One build/export sends the same manifest graph to both repositories.
+    # The organization identity can publish only the canonical name.
+    # Compatibility is an immutable digest copy, never a second application build.
     - name: Build and push Docker image
       id: image
       uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
@@ -346,10 +403,19 @@ jobs:
         platforms: linux/amd64,linux/arm64
         pull: true
         push: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-        tags: ${{ steps.tags.outputs.tags }}
+        tags: ${{ steps.tags.outputs.canonical-tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
           VERSION=${{ steps.tags.outputs.version || needs.set-version-number.outputs.semVer }}
+
+    - name: Copy the built digest to the compatibility repository
+      id: compatibility
+      env:
+        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
+        EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
+        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      run: python3 eng/copy_docker_release.py --source-authfile "$DOCKER_CONFIG/config.json" --report docker-compatibility.json
 
     - name: Verify every published tag against the built digest
       if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' && steps.tags.outputs.tags != '' }}
@@ -357,18 +423,18 @@ jobs:
         DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
         EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
         BUILD_OUTCOME: ${{ steps.image.outcome }}
-        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
-        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      # Public read-back deliberately does not use the legacy credential for canonical access.
       run: python3 eng/verify_docker_release.py --report docker-publication.json
 
     - name: Retain publication results, including partial failures
       if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' }}
       env:
         BUILD_OUTCOME: ${{ steps.image.outcome }}
+        COPY_OUTCOME: ${{ steps.compatibility.outcome }}
         EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
       shell: bash
       run: |
-        echo "Build/push outcome: $BUILD_OUTCOME; built digest: $EXPECTED_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+        echo "Canonical build/push: $BUILD_OUTCOME; compatibility copy: $COPY_OUTCOME; built digest: $EXPECTED_DIGEST" >> "$GITHUB_STEP_SUMMARY"
         if [[ ! -f docker-publication.json ]]; then
           echo 'Publication did not reach verification. Some registry tags may already have changed; inspect both repositories before retrying.' >> "$GITHUB_STEP_SUMMARY"
         fi
@@ -378,7 +444,7 @@ jobs:
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
         name: docker-publication-${{ github.run_id }}-${{ github.run_attempt }}
-        path: docker-publication.json
+        path: docker-*.json
         if-no-files-found: warn
 
   build-deb:

@@ -48,6 +48,10 @@ def main() -> None:
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"version={version}\nis-prerelease={str(prerelease).lower()}\n")
             output.write(f"tags<<GRATE_DOCKER_TAGS\n{tags}\nGRATE_DOCKER_TAGS\n")
+            for name, repository in (("canonical-tags", REPOSITORIES[0]),
+                                     ("compatibility-tags", REPOSITORIES[1])):
+                selected = "\n".join(tag for tag in tags.splitlines() if tag.startswith(repository + ":"))
+                output.write(f"{name}<<GRATE_DOCKER_TAGS\n{selected}\nGRATE_DOCKER_TAGS\n")
     print(tags)
 
 
