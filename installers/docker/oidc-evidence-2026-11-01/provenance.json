@@ -1,0 +1,28 @@
+{
+  "branch": "verify/799-docker-oidc-20261101-527d9c",
+  "commit": "164b874424baca2dd42a3e31fbabcd25eec8f7b6",
+  "tree_paths": [
+    ".github/workflows/build.yml",
+    "eng/check_docker_access.py",
+    "eng/test_check_docker_access.py"
+  ],
+  "workflow_sha256": "add48dd39c2cc1fcede5aa4842e24013e25122a21634efd0ace9e1e2900ae788",
+  "connection_id": "4ef78952-1444-428f-bbfc-61624a97b196",
+  "workflow_path": ".github/workflows/build.yml",
+  "registry_publication": false,
+  "temporary_environment_policy_id": 65156638,
+  "run_id": 41355646304,
+  "run_url": "https://github.com/grate-devs/grate/actions/runs/41355646304",
+  "temporary_environment_policy_removed": true,
+  "temporary_branch_removed": true,
+  "restored_environment_refs": [
+    {
+      "name": "main",
+      "type": "branch"
+    },
+    {
+      "name": "*",
+      "type": "tag"
+    }
+  ]
+}

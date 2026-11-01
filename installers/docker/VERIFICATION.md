@@ -94,8 +94,8 @@ were not modified, and no further history-copy operation was run.
 No release or Docker Hub publication workflow was run. After the maintainer
 selected the environment policy, `docker-hub` was created without reviewers or a
 wait timer, permitting branch `main` and tag pattern `*`; API read-back confirmed
-the exact settings. Credential lifecycle, the pending organization-identity
-migration, Hub description edits and the transition end condition remain as
+the exact settings. Legacy credential lifecycle, Hub description edits and the transition end
+condition remain as
 listed in [RELEASE.md](RELEASE.md). The build.yml part still requires
 integration with the common release-event workflow; it is not a separate release
 mechanism. Product image execution here covers linux/arm64. Multi-platform
@@ -122,3 +122,70 @@ including `grate`. Returning to the overview still showed no connections. No
 Docker authentication or billing settings were saved. The initial in-app-browser
 session had been signed out; that limitation was resolved by using the window
 provided by the maintainer.
+
+## Organization OIDC implementation and no-publication check
+
+The maintainer subsequently authorized creating organization OIDC, retaining the
+personal token for compatibility, and testing without image publication.
+Connection `grate-github-release` was created after the requested action-time
+confirmation, then re-opened to verify its saved exact environment subject,
+repository `grate` and `scope-image-push` (includes pull). The connection ID is
+`4ef78952-1444-428f-bbfc-61624a97b196` and is stored in the `docker-hub`
+environment's `DOCKERHUB_OIDC_CONNECTIONID` variable. The legacy secrets' update
+timestamps were checked and remain unchanged.
+
+The new workflow separates credential-free nonrelease builds from a release-only
+OIDC publishing job. Only canonical tags are passed to Buildx. Compatibility uses
+Skopeo `--all --preserve-digests` from the built immutable canonical digest, with
+separate source OIDC and temporary legacy destination credentials. Existing legacy
+version conflicts fail before compatibility writes; legacy latest is copied only
+after successful version graph/blob verification. Final read-back is public.
+
+Local checks for this update:
+
+- `python3 -W error::ResourceWarning -m unittest discover -s eng -p 'test_*docker*.py'`:
+  34 passed, including 14 new copy-path tests and 6 new identity-check tests.
+- `python3 -m unittest discover -s installers/docker -p 'test_*.py'`:
+  14 passed, including separated canonical/compatibility outputs.
+- Actionlint passed for the access and policy workflows, and for `build.yml` with
+  only the unchanged Debian `set-output` deprecation ignored. Diff checks passed.
+- An independent review confirmed the separate identity boundaries; an isolated
+  mutation reusing the legacy authfile for source access failed the intended
+  assertion. A token expiry finding was corrected: the release login requests
+  3600 seconds, exceeding the publishing job's 45-minute limit. The reviewer
+  rechecked the correction with no remaining substantiated findings.
+- Real Skopeo 1.13.3 copied synthetic OCI layouts entirely between local files,
+  preserving amd64, arm64, an attestation, every blob, and root digest
+  `sha256:87a03172faffe11619c03924662174ee7c5b8e0089eb34312a510af8553a9df2`.
+  It ran in a disposable container from the existing pinned Ubuntu 24.04 image,
+  installing Skopeo/Python from Ubuntu's signed package repositories. It did not
+  build an image, contact a registry for the copy, or publish any image. The
+  [offline result](oidc-evidence-2026-11-01/offline-copy.json) is retained.
+
+The real [GitHub run 41355646304](https://github.com/grate-devs/grate/actions/runs/41355646304)
+passed at isolated commit `164b874424baca2dd42a3e31fbabcd25eec8f7b6`:
+
+| Identity / repository boundary | Observed result |
+| --- | --- |
+| Organization OIDC → gratedevs/grate | Pull and push granted |
+| Organization OIDC → erikbra/grate | Authorization denied, satisfying the negative push boundary |
+| Retained erikbra credential → erikbra/grate | Pull and push granted |
+
+The diagnostic tree contained only a manual workflow, the access helper and its
+six tests. It did not contain or execute application builds, registry upload/copy
+steps, or release jobs. The short-lived OIDC exchange used Docker's login action;
+repository-grant probes made only GET requests to Docker's auth endpoint.
+No JWT, password, authfile or secret value is included in retained evidence.
+The [sanitized report](oidc-evidence-2026-11-01/docker-oidc-access-41355646304-1/docker-access.json),
+[run metadata](oidc-evidence-2026-11-01/run.json) and
+[provenance](oidc-evidence-2026-11-01/provenance.json) are checked in.
+
+A temporary exact environment branch allowance permitted the reviewed diagnostic.
+It was removed afterward, and the temporary branch was deleted only after checking
+its head still matched the diagnostic commit. API read-back confirmed the original
+allowed refs (`main` branch, `*` tags) were restored. The production workflow was
+not dispatched and no images were published to any registry for this update.
+A live end-to-end image push/copy remains intentionally untested; the common
+release workflow integration described in RELEASE.md remains required. Product
+code and Dockerfile were unchanged, so earlier application test results were not
+rerun or represented as new OIDC test results.
