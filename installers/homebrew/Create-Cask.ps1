@@ -4,7 +4,7 @@ param (
     [Parameter(Mandatory=$true)] [string]$version,
     [Parameter(Mandatory=$true)] [string]$artifactDirectory,
     [string]$releaseTag = $version,
-    [string]$outputPath = (Join-Path $PSScriptRoot 'grate.rb')
+    [string]$outputPath = (Join-Path $PSScriptRoot '../../artifacts/homebrew/cask/grate.rb')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +12,8 @@ $armArchive = Join-Path $artifactDirectory "grate-osx-arm64-self-contained-$vers
 $intelArchive = Join-Path $artifactDirectory "grate-osx-x64-self-contained-$version.zip"
 $armHash = (Get-FileHash -LiteralPath $armArchive -Algorithm SHA256).Hash.ToLowerInvariant()
 $intelHash = (Get-FileHash -LiteralPath $intelArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+$outputPath = [System.IO.Path]::GetFullPath($outputPath)
+$null = New-Item -ItemType Directory -Path ([System.IO.Path]::GetDirectoryName($outputPath)) -Force
 
 # Use the final release archives; never guess checksums before they exist.
 @"

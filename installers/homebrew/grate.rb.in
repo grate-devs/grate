@@ -1,8 +1,8 @@
 class Grate < Formula
   desc "SQL migration tool using plain SQL scripts"
   homepage "https://grate-devs.github.io/grate/"
-  url "https://github.com/grate-devs/grate/archive/refs/tags/2.1.6.tar.gz"
-  sha256 "456d83d3ce605720241fd32b386c2a2f9f1adefaa11af77bfcbcb0bd5e1090b5"
+  url "https://github.com/grate-devs/grate/archive/refs/tags/@RELEASE_TAG@.tar.gz"
+  sha256 "@SOURCE_SHA256@"
   license "MIT"
   head "https://github.com/grate-devs/grate.git", branch: "main"
 
