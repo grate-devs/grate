@@ -163,6 +163,20 @@ function Assert-Absent {
 function Assert-KnownRejection($Result) {
     $known = @('0x8A150014','0x8A150016','0x8A15002B','0x8A150061','0x8A15010D')
     if ($Result.ExitHex -in $known) { return }
+    if ($type -eq 'wix' -and $Result.ExitHex -eq '0x8A150010') {
+        $files=foreach ($directory in @(
+            "$env:LOCALAPPDATA/Packages/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe/LocalState/DiagOutputDir",
+            "$env:LOCALAPPDATA/Microsoft/WinGet/DiagOutputDir"
+        )) {
+            if (Test-Path $directory) { Get-ChildItem $directory -Filter 'WinGet-*.log' -File }
+        }
+        $latest=@($files | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1)
+        if ($latest.Count -eq 1 -and (Get-Content $latest[0].FullName -Raw).Contains('Installer scope does not match currently installed scope: User != Machine')) {
+            $summary.WinGetMsiScopeMismatchObserved=$true
+            return
+        }
+        throw 'No applicable installer is only an expected MSI observation when the current native log proves the User/Machine mismatch.'
+    }
     if ($Result.ExitHex -in @('0x8A150006','0x8A150049') -and $Result.Output -match '1638') { return }
     throw "Unexpected failure must not be counted as a migration result: $($Result.ExitHex) $($Result.Output)"
 }
@@ -235,11 +249,12 @@ try {
         $previous=W (@('upgrade','--id',$oldId,'--version','2.1.6','--uninstall-previous')+$upgradeOptions) 'same-id-uninstall-previous' -Observe
         $summary.SameIdUninstallPrevious=$previous.ExitHex
         if ($previous.ExitCode -ne 0) {
-            if ($previous.ExitHex -ne '0x8A150014') { throw 'Uninstall-previous failed unexpectedly.' }
+            if ($previous.ExitHex -notin @('0x8A150014','0x8A150010')) { throw 'Uninstall-previous failed unexpectedly.' }
+            Assert-KnownRejection $previous
             Assert-Installed '2.0.0' $oldId
             $target=$inventory.Versions | Where-Object Version -eq '2.1.6'
             Native-Msi @('/i',$target.MsiPath,'REINSTALL=ALL','REINSTALLMODE=vomus') 'same-id-native-minor-update-fallback'
-            $summary.SameIdNativeMsiUpdateFallback='Passed; WinGet could not find the installed MSI'
+            $summary.SameIdNativeMsiUpdateFallback='Passed; WinGet rejected the upgrade (see HRESULT and native diagnostics)'
         }
     }
     Assert-Installed '2.1.6' $oldId
@@ -272,6 +287,7 @@ try {
     Snapshot 'new-id-installed'
     $summary.NewIdListExit=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'new-id-correlation' -Observe).ExitHex
     $summary.WinGetNewIdCorrelationVerified=$summary.NewIdListExit -eq '0x00000000'
+    $summary.AutomaticWinGetMigrationVerified=$transition.ExitCode -eq 0 -and $summary.WinGetNewIdCorrelationVerified
     $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
     $summary.FinalUninstall=Uninstall $newId 'final-new-uninstall'
     if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Final uninstall modified migration data.' }
