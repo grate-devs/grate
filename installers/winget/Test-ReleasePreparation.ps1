@@ -51,7 +51,7 @@ foreach ($arch in @('x64', 'arm64')) {
     # Release 2.1.6 compiled both MSI wrappers with candle -arch x64. Characterize
     # that historical defect explicitly, without mistaking the asset name or URL
     # override for proof of a native ARM64 installer. Current main fixed authoring.
-    & "$msiDirectory/Test-InstallerMetadata.Tests.ps1" -MsiPath $msi -ExpectedVersion $version -ExpectedArchitecture x64
+    & "$msiDirectory/Test-InstallerMetadata.Tests.ps1" -MsiPath $msi -ExpectedVersion $version -ExpectedArchitecture x64 -Historical
     if ($arch -eq 'arm64') {
         Write-Warning 'Historical 2.1.6 arm64-named MSI has x64 installer platform. Native ARM64 compatibility remains unverified.'
     }

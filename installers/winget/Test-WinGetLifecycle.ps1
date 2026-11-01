@@ -137,6 +137,11 @@ function Assert-Installed([string]$Version, [string]$Id) {
         $nativeInventory=& "$PSScriptRoot/../msi/Get-InstalledProductInventory.ps1" -ProductCode $expected.MsiMetadata.ProductCode
         Assert-WinGetMsiNativeContext -Inventory $nativeInventory -ExpectedVersion $Version -ExpectedPublisher $expected.MsiMetadata.Manufacturer
         if ($rows[0].Publisher -ne $expected.MsiMetadata.Manufacturer -or $rows[0].KeyName -ne $expected.MsiMetadata.ProductCode) { throw 'The installed MSI identity does not match the requested version.' }
+        $directory=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'erikbra/grate')).TrimEnd('\','/')
+        $pathEntries=@([Environment]::GetEnvironmentVariable('Path','User').Split(';') | Where-Object {
+            $_.Trim() -and [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($_.Trim())).TrimEnd('\','/') -ieq $directory
+        })
+        if ($pathEntries.Count -ne 1) { throw 'The MSI installation directory must appear exactly once on the user PATH.' }
     }
     $exe = Installed-Executable
     if (!(Test-Path $exe) -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne (Get-FileHash $expected.Executable -Algorithm SHA256).Hash) { throw "Installed payload is not $Version." }
@@ -182,21 +187,9 @@ function Native-Msi([string[]]$Arguments,[string]$Name) {
     if ($hash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $hash)) { throw 'Native MSI fallback modified migration data.' }
 }
 function Uninstall([string]$Id,[string]$Name) {
-    $attempt = W @('uninstall','--id',$Id,'--exact','--source',$sourceName,'--silent','--accept-source-agreements') $Name -Observe
-    if ($attempt.ExitCode -ne 0) {
-        Assert-KnownRejection $attempt
-        $rows=@(Registrations)
-        if ($rows.Count -ne 1) { throw 'Cannot select an unambiguous installed product for fallback uninstall.' }
-        $byProduct=W @('uninstall','--product-code',$rows[0].KeyName,'--silent','--accept-source-agreements') "$Name-by-product-code" -Observe
-        if ($byProduct.ExitCode -ne 0) {
-            # A real per-user MSI can be registered with Windows Installer while
-            # remaining absent from WinGet's installed-package inventory. This
-            # is a blocker, not a successful package-ID migration.
-            if ($type -ne 'wix' -or $byProduct.ExitHex -ne '0x8A150014') { throw 'Product-code uninstall failed unexpectedly.' }
-            Native-Msi @('/x',$rows[0].KeyName) "$Name-native-msi-fallback"
-            $summary.NativeMsiUninstallRequired=$true
-        }
-    }
+    # Acceptance requires the correlated package to uninstall by its exact ID.
+    # Product-code/native recovery is reserved for finally cleanup on failures.
+    $attempt = W @('uninstall','--id',$Id,'--exact','--source',$sourceName,'--silent','--accept-source-agreements') $Name
     Assert-Absent
     $attempt.ExitHex
 }

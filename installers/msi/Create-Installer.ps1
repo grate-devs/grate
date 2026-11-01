@@ -27,7 +27,7 @@ function Recreate {
 
 $wixDir = Recreate 'wix'
 $tmpDir = Recreate 'tmp'
-$actionOutput = & (Join-Path $PSScriptRoot 'Build-UpgradeActions.ps1') -Architecture $arch -OutputDirectory (Join-Path $tmpDir 'upgrade-actions')
+& (Join-Path $PSScriptRoot 'Build-UpgradeActions.ps1') -Architecture $arch -OutputDirectory (Join-Path $tmpDir 'upgrade-actions') | ForEach-Object { Write-Host $_ }
 $upgradeActions = Join-Path $tmpDir 'upgrade-actions/GrateUpgradeActions.dll'
 if (!(Test-Path -LiteralPath $upgradeActions)) { throw 'The native MSI upgrade action was not built.' }
 
@@ -47,7 +47,8 @@ $msi = Join-Path $tmpDir "grate-$version.msi"
 $template = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'grate.wxs') -Raw
 if ($TestFailBeforeFinalize) {
     # A separate local test MSI only. The release template has no failure hook.
-    $template = $template.Replace('</Product>', "<CustomAction Id='FailRollbackVerification' Error='Injected rollback verification failure.' /><InstallExecuteSequence><Custom Action='FailRollbackVerification' Before='InstallFinalize'>1</Custom></InstallExecuteSequence></Product>")
+    $template = $template.Replace('</InstallExecuteSequence>', "<Custom Action='FailRollbackVerification' Before='InstallFinalize'>1</Custom></InstallExecuteSequence>").
+        Replace('</Product>', "<CustomAction Id='FailRollbackVerification' Error='Injected rollback verification failure.' /></Product>")
 }
 $template.Replace('%%%VERSION%%%', $version).
     Replace('%%%PRODUCTCODE%%%', $identity.ProductCode).

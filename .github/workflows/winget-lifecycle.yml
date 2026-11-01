@@ -56,6 +56,10 @@ jobs:
               Copy-Item "./installers/msi/tmp/grate-$version.msi" "./candidate/$name.msi"
             }
           }
+          if ($env:TEST_ARCH -ne 'x86') {
+            ./installers/msi/Create-Installer.ps1 -grateExe ./test-publish-2.1.7/grate.exe -version 2.1.7 -arch $env:TEST_ARCH -TestFailBeforeFinalize
+            Copy-Item ./installers/msi/tmp/grate-2.1.7.msi ./candidate/grate-rollback.msi
+          }
           Get-FileHash ./candidate/* -Algorithm SHA256 | Format-Table
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -121,7 +125,7 @@ jobs:
           $old = @($inventory.Versions | Where-Object Version -in @('2.0.0','2.1.6'))
           $candidate = $inventory.Versions | Where-Object Version -eq '2.1.7'
           $next = $inventory.Versions | Where-Object Version -eq '2.1.8'
-          ./installers/msi/Test-WinGetMsiLifecycle.ps1 -HistoricalMsiPaths @($old.MsiPath) -HistoricalExecutablePaths @($old.Executable) -CandidateMsiPath $candidate.MsiPath -CandidateExecutable $candidate.Executable -NextMsiPath $next.MsiPath -NextExecutable $next.Executable -OtherArchitectureMsiPath ./other-candidate/grate.msi -Architecture $env:TEST_ARCH -OutputDirectory "$env:RUNNER_TEMP/lifecycle/direct-msi"
+          ./installers/msi/Test-WinGetMsiLifecycle.ps1 -HistoricalMsiPaths @($old.MsiPath) -HistoricalExecutablePaths @($old.Executable) -CandidateMsiPath $candidate.MsiPath -CandidateExecutable $candidate.Executable -NextMsiPath $next.MsiPath -NextExecutable $next.Executable -OtherArchitectureMsiPath ./other-candidate/grate.msi -RollbackMsiPath ./candidate/grate-rollback.msi -Architecture $env:TEST_ARCH -OutputDirectory "$env:RUNNER_TEMP/lifecycle/direct-msi"
       - name: Install pinned WinGet on disposable runner
         id: winget
         if: ${{ !cancelled() && steps.assets.outcome == 'success' }}

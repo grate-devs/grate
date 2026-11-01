@@ -24,6 +24,7 @@ function Set-Release([string]$Version='2.1.7', [switch]$Corrected) {
             UpgradeCode=$(if ($Corrected) {$identity.UpgradeCode} else {'{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'})
             Manufacturer=$(if ($Corrected) {'grate-devs'} else {'erikbra'})
             ProductName='grate'; ProductVersion=$Version; Platform=$arch
+            AllUsers=$null; MsiInstallPerUser=''
         }
     }
 }
@@ -67,7 +68,7 @@ function Invoke-TestWingetCreate {
 function Read-TestCandidateMetadata([string]$MsiPath) {
     if ($MsiPath -notmatch 'candidate-(?<version>2\.1\.[78])\.msi$') { throw 'Unexpected candidate MSI fixture path.' }
     $identity=& "$PSScriptRoot/../msi/Get-InstallerIdentity.ps1" -Version $Matches.version -Architecture x64
-    [pscustomobject]@{ProductCode=$identity.ProductCode; UpgradeCode=$identity.UpgradeCode; Manufacturer=$identity.Manufacturer; ProductName=$identity.ProductName; ProductVersion=$identity.Version; Platform='x64'}
+    [pscustomobject]@{ProductCode=$identity.ProductCode; UpgradeCode=$identity.UpgradeCode; Manufacturer=$identity.Manufacturer; ProductName=$identity.ProductName; ProductVersion=$identity.Version; Platform='x64'; AllUsers=''; MsiInstallPerUser=$null}
 }
 function Invoke-TestWingetValidate {
     if ($args[0] -ne 'validate' -or $args[1] -ne '--manifest' -or !(Test-Path $args[2])) { throw 'Schema command was not forwarded with its manifest directory.' }
@@ -125,7 +126,7 @@ try {
     Assert-True ([regex]::Matches($bridge,'(?m)^  Scope: user$').Count -eq 3 -and [regex]::Matches($candidate,'(?m)^  Scope: user$').Count -eq 3) 'Only ZIP nodes must explicitly use user scope.'
     $wingetTest.testCount++
     Assert-Rejected @{version='2.1.7';outputDirectory="$state/migration";PrepareMigration=$true} '*Refusing to overwrite*'
-    foreach ($defect in @('Publisher','LegacyProduct','WrongProduct','UpgradeCode','Platform','Version','Digest')) {
+    foreach ($defect in @('Publisher','LegacyProduct','WrongProduct','UpgradeCode','Platform','Version','Digest','MachineScope','DualScope','PerUserFlag','AllUsersZero')) {
         Set-Release -Corrected
         switch ($defect) {
             Publisher {$wingetTest.metadata.x64.Manufacturer='erikbra'}
@@ -135,8 +136,14 @@ try {
             Platform {$wingetTest.metadata.arm64.Platform='x64'}
             Version {$wingetTest.metadata.arm64.ProductVersion='2.1.6'}
             Digest {$wingetTest.release.assets[3].digest='sha256:'+('0'*64)}
+            # These fixtures retain the correct new identity. Scope must be
+            # checked independently of ProductCode and Manufacturer.
+            MachineScope {$wingetTest.metadata.x64.AllUsers='1'}
+            DualScope {$wingetTest.metadata.arm64.AllUsers='2';$wingetTest.metadata.arm64.MsiInstallPerUser='1'}
+            PerUserFlag {$wingetTest.metadata.x64.MsiInstallPerUser='1'}
+            AllUsersZero {$wingetTest.metadata.x64.AllUsers='0'}
         }
-        $expected=switch($defect) {LegacyProduct {'*legacy fixed ProductCode*'} WrongProduct {'*version-specific*ProductCode*'} UpgradeCode {'*stable*UpgradeCode*'} Digest {'*release digest*'} default {'*corrected*MSI*'}}
+        $expected=switch($defect) {LegacyProduct {'*legacy fixed ProductCode*'} WrongProduct {'*version-specific*ProductCode*'} UpgradeCode {'*stable*UpgradeCode*'} Digest {'*release digest*'} {$_ -in @('MachineScope','DualScope','PerUserFlag','AllUsersZero')} {'*per-user-only MSI authoring*empty ALLUSERS and MSIINSTALLPERUSER*'} default {'*corrected*MSI*'}}
         Assert-Rejected @{version='2.1.7';PrepareMigration=$true} $expected
     }
     $before=$wingetTest.apiCalls

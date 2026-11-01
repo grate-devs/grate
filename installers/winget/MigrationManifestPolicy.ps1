@@ -54,6 +54,12 @@ function Assert-WinGetMigrationMetadata([object[]]$MsiMetadata, [string]$Version
             $item.ProductVersion -cne $Version -or $item.Platform -cne $architecture) {
             throw "Migration requires the corrected $architecture MSI with actual grate-devs publisher, version and platform."
         }
+        # Omitting Scope in WinGet YAML works around client correlation behavior;
+        # it must not conceal an actual change in the MSI installation context.
+        if (![string]::IsNullOrEmpty([string]$item.AllUsers) -or
+            ![string]::IsNullOrEmpty([string]$item.MsiInstallPerUser)) {
+            throw 'Migration requires per-user-only MSI authoring with empty ALLUSERS and MSIINSTALLPERUSER.'
+        }
         $parsed = [guid]::Empty
         if (![guid]::TryParse($item.ProductCode, [ref]$parsed) -or $parsed -eq [guid]::Empty -or
             $item.ProductCode -ieq $contract.LegacyProductCode) {

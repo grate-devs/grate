@@ -3,7 +3,8 @@
 param (
     [Parameter(Mandatory=$true)] [string]$MsiPath,
     [Parameter(Mandatory=$true)] [string]$ExpectedVersion,
-    [Parameter(Mandatory=$true)] [ValidateSet('x64', 'arm64')] [string]$ExpectedArchitecture
+    [Parameter(Mandatory=$true)] [ValidateSet('x64', 'arm64')] [string]$ExpectedArchitecture,
+    [switch]$Historical
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,14 +13,22 @@ $reader = Join-Path $PSScriptRoot 'Get-InstallerMetadata.ps1'
 $hash = (Get-FileHash -LiteralPath $MsiPath -Algorithm SHA256).Hash
 $metadata = & $reader -MsiPath $MsiPath
 $identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $ExpectedVersion -Architecture $ExpectedArchitecture
-foreach ($expected in @{
+$expectations = @{
     ProductCode = $identity.ProductCode
     UpgradeCode = $identity.UpgradeCode
     ProductName = 'grate'
     Manufacturer = $identity.Manufacturer
     ProductVersion = $ExpectedVersion
     Platform = $ExpectedArchitecture
-}.GetEnumerator()) {
+}
+if ($Historical) {
+    $expectations.ProductCode = $identity.LegacyProductCode
+    $expectations.Manufacturer = 'erikbra'
+    # Published legacy Arm64 payloads were also wrapped in x64 MSI databases.
+    $expectations.Platform = 'x64'
+    $expectations.Remove('UpgradeCode')
+}
+foreach ($expected in $expectations.GetEnumerator()) {
     if ($metadata.($expected.Key) -cne $expected.Value) {
         throw "Unexpected $($expected.Key): $($metadata.($expected.Key)); expected $($expected.Value)."
     }

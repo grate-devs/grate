@@ -27,6 +27,7 @@ foreach ($candidate in $candidates) {
         Architecture=$architecture; InstallerUrl=$url; Sha256=$hash; ProductCode=$actual.ProductCode
         UpgradeCode=$actual.UpgradeCode; ProductVersion=$actual.ProductVersion; ProductName=$actual.ProductName
         Manufacturer=$actual.Manufacturer; Platform=$actual.Platform
+        AllUsers=$actual.AllUsers; MsiInstallPerUser=$actual.MsiInstallPerUser
     }
     # An inherited Scope plus stale upstream AFE data exercises the same bounded
     # policy production uses after wingetcreate updates the published assets.
@@ -75,7 +76,7 @@ ManifestVersion: 1.12.0
             & $Winget validate --manifest $directory --disable-interactivity *>&1 | Tee-Object -FilePath "$directory/schema.log"
             if ($LASTEXITCODE -ne 0) { throw "WinGet schema validation failed for $identity $version." }
         }
-        $summary += @{Identity=$identity; Version=$version; Architecture=$architecture; SchemaValidated=[bool]$Winget; ProductCode=$actual.ProductCode; UpgradeCode=$actual.UpgradeCode; Manufacturer=$actual.Manufacturer}
+        $summary += @{Identity=$identity; Version=$version; Architecture=$architecture; SchemaValidated=[bool]$Winget; ProductCode=$actual.ProductCode; UpgradeCode=$actual.UpgradeCode; Manufacturer=$actual.Manufacturer; AllUsers=$actual.AllUsers; MsiInstallPerUser=$actual.MsiInstallPerUser}
     }
 }
 $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'summary.json')

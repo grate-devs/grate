@@ -74,6 +74,7 @@ try {
                 Architecture=$asset.Architecture; InstallerUrl=$published.browser_download_url; Sha256=$hash
                 ProductCode=$actual.ProductCode; UpgradeCode=$actual.UpgradeCode; Manufacturer=$actual.Manufacturer
                 ProductName=$actual.ProductName; ProductVersion=$actual.ProductVersion; Platform=$actual.Platform
+                AllUsers=$actual.AllUsers; MsiInstallPerUser=$actual.MsiInstallPerUser
             }
         }
         # Reject legacy releases before generating a new identity. Successful
