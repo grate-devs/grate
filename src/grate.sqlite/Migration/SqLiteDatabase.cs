@@ -23,7 +23,20 @@ public record SqliteDatabase : AnsiSqlDatabase
 
     public override bool SupportsDdlTransactions => false;
     public override bool SupportsSchemas => false;
-    protected override DbConnection GetSqlConnection(string? connectionString) => new SqliteConnection(connectionString);
+    protected override DbConnection GetSqlConnection(string? connectionString)
+    {
+        if (Config?.DryRun == true)
+        {
+            // SQLite's default ReadWriteCreate mode creates a file even when only querying migration history.
+            var builder = new SqliteConnectionStringBuilder(connectionString);
+            if (builder.Mode != SqliteOpenMode.Memory)
+            {
+                builder.Mode = SqliteOpenMode.ReadOnly;
+            }
+            connectionString = builder.ConnectionString;
+        }
+        return new SqliteConnection(connectionString);
+    }
 
     protected override string ExistsSql(string tableSchema, string fullTableName) =>
         $@"

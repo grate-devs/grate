@@ -6,6 +6,7 @@
     <IsPackable>false</IsPackable>
     <IsPublishable>true</IsPublishable>
     <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <NoWarn>IL2072;IL2075;IL2026</NoWarn>
   </PropertyGroup>
   

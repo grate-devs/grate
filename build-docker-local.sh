@@ -67,6 +67,7 @@ fi
 
 # Build arguments
 BUILD_ARGS=(
+    --pull
     --file ./installers/docker/Dockerfile
     --platform "$PLATFORM"
     --build-arg VERSION="$VERSION"

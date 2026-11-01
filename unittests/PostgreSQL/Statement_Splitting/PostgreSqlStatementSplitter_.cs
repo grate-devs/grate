@@ -1,18 +1,17 @@
 ﻿using grate.Infrastructure;
-using grate.Migration;
 using grate.PostgreSql.Infrastructure;
 
 namespace Basic_tests.Infrastructure.PostgreSQL.Statement_Splitting;
 
 
 // ReSharper disable once InconsistentNaming
-public class StatementSplitter_
+public class PostgreSqlStatementSplitter_
 {
-    private readonly StatementSplitter _statementSplitter;
+    private readonly PostgreSqlStatementSplitter _statementSplitter;
 
-    public StatementSplitter_()
+    public PostgreSqlStatementSplitter_()
     {
-        _statementSplitter =  new StatementSplitter(new PostgreSqlSyntax());
+        _statementSplitter =  new PostgreSqlStatementSplitter();
     }
 
     [Fact]

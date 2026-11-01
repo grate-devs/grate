@@ -22,13 +22,15 @@ public abstract class Startup<
     
     protected override void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context)
     {
-        services.AddSingleton<IGrateMigrator>(provider => 
-            new DockerGrateMigrator(
+        services.AddSingleton<IGrateMigrator>(provider =>
+        {
+            var configuration = provider.GetRequiredService<GrateTestConfig>();
+            return new DockerGrateMigrator(
                 DatabaseType, 
                 provider.GetRequiredService<ILogger<DockerGrateMigrator>>(),
-                provider.GetRequiredService<INetwork>()
-           )
-        );
+                provider.GetRequiredService<INetwork>(),
+                configuration.ApplicationDockerImage ?? configuration.DefaultApplicationDockerImage);
+        });
     }
     
     protected override GrateTestConfig ExtraConfiguration(GrateTestConfig config) 

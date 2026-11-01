@@ -5,7 +5,7 @@
 /// </summary>
 public interface ISyntax
 {
-    string StatementSeparatorRegex { get; }
+    IStatementSplitter StatementSplitter { get; }
     string CurrentDatabase { get; }
     string ListDatabases { get; }
     string CreateDatabase(string databaseName, string? password);

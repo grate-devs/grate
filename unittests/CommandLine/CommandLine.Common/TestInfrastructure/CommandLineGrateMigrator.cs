@@ -77,7 +77,7 @@ public record CommandLineGrateMigrator(DatabaseType DatabaseType) : IGrateMigrat
 
         var properties = configuration.GetType().GetProperties();
 
-        var cmd = new MigrateCommand(this);
+        var cmd = new MigrateCommand((_, _) => Task.FromResult(0));
 
         foreach (var prop in properties)
         {

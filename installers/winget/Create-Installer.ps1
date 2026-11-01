@@ -1,45 +1,24 @@
-#/bin/env pwsh
+#!/usr/bin/env pwsh
 
 param (
-    [string]$grateExe, # Not necessary, but try to keep a common interface for all Create-Installer.ps1 scripts
-    [Parameter(Mandatory=$true)] [string]$version 
+    [string]$grateExe, # Kept for the common Create-Installer.ps1 interface.
+    [Parameter(Mandatory=$true)] [string]$version,
+    [string]$releaseTag = $version,
+    [string]$wingetCreate = 'wingetcreate'
 )
 
-$Root = Resolve-Path "$($PSScriptRoot)";
+$ErrorActionPreference = 'Stop'
 
-$packageUrl="https://github.com/grate-devs/grate/releases/download/$version/grate-$version.msi"
-
-# Download and extract winget
-$wingetExe="https://aka.ms/wingetcreate/latest/self-contained"
-$localExe="wingetcreate.exe"
-
-function Recreate {
-	param ($dirName)
-
-	$dir = Join-Path $Root $dirName;
-
-	If (Test-Path($dir)) {
-	   $null = Remove-Item -Recurse $dir
-	}
-	mkdir $dir;
-}
-
-$wingetDir = Recreate "winget"
-
-$client = New-Object System.Net.WebClient;
-$localFile = (Join-Path $wingetDir $localExe);
-
-try {
-    $client.DownloadFile($wingetExe, $localFile);
-} catch {
-   Write-Error "Error: " + $_
-   $error[0].Exception.ToString()
-}
-
-$winget = $localFile
-
-# Update the winget release
-
-& $winget update erikbra.grate -u $packageUrl -v $version -o $(Join-Path $Root grate)
-
-
+# Match the current community manifest's three portable ZIPs and two MSIs.
+# Run after release assets are published: wingetcreate downloads the real files
+# and calculates their checksums. Generate locally; submission is separate.
+$releaseUrl = "https://github.com/grate-devs/grate/releases/download/$releaseTag"
+$urls = @(
+    "$releaseUrl/grate-win-x86-self-contained-$version.zip|x86",
+    "$releaseUrl/grate-win-x64-self-contained-$version.zip|x64",
+    "$releaseUrl/grate-win-arm64-self-contained-$version.zip|arm64",
+    "$releaseUrl/grate-msi-win-x64-$version.msi|x64",
+    "$releaseUrl/grate-msi-win-arm64-$version.msi|arm64"
+)
+& $wingetCreate update erikbra.grate -u $urls -v $version -o (Join-Path $PSScriptRoot 'grate')
+if ($LASTEXITCODE -ne 0) { throw "wingetcreate failed with exit code $LASTEXITCODE." }

@@ -9,14 +9,33 @@ internal class HashGenerator : IHashGenerator
     private const string UnixLineEnding = "\n";
     private const string MacLineEnding = "\r";
 
-    public string Hash(string text)
+    public string Hash(string text) => HashWithoutNormalizingLineEndings(NormalizeLineEndings(text));
+
+    public bool Matches(string text, string? storedHash)
+    {
+        if (string.IsNullOrEmpty(storedHash))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeLineEndings(text);
+
+        // Older RoundhousE records predate LF normalization. Preserve the original
+        // text for unchanged mixed endings, then try historical CRLF and CR forms.
+        // Expand from LF so a CRLF pair cannot accidentally become two line breaks.
+        return HashWithoutNormalizingLineEndings(normalized) == storedHash ||
+               HashWithoutNormalizingLineEndings(text) == storedHash ||
+               HashWithoutNormalizingLineEndings(normalized.Replace(UnixLineEnding, WindowsLineEnding)) == storedHash ||
+               HashWithoutNormalizingLineEndings(normalized.Replace(UnixLineEnding, MacLineEnding)) == storedHash;
+    }
+
+    private static string NormalizeLineEndings(string text) => text
+        .Replace(WindowsLineEnding, UnixLineEnding)
+        .Replace(MacLineEnding, UnixLineEnding);
+
+    private static string HashWithoutNormalizingLineEndings(string text)
     {
         var input = text.Replace(@"'", @"''");
-
-        input = input
-            .Replace(WindowsLineEnding, UnixLineEnding)
-            .Replace(MacLineEnding, UnixLineEnding);
-
         var messageBytes = Encoding.UTF8.GetBytes(input);
         var hash = ComputeHash(messageBytes);
 

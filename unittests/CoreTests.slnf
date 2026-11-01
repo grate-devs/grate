@@ -1,0 +1,14 @@
+{
+  "solution": {
+    "path": "..\\grate.sln",
+    "projects": [
+      "unittests\\Basic_tests\\Basic_tests.csproj",
+      "unittests\\MariaDB\\MariaDB.csproj",
+      "unittests\\Oracle\\Oracle.csproj",
+      "unittests\\PostgreSQL\\PostgreSQL.csproj",
+      "unittests\\Sqlite\\Sqlite.csproj",
+      "unittests\\SqlServer\\SqlServer.csproj",
+      "unittests\\SqlServerCaseSensitive\\SqlServerCaseSensitive.csproj"
+    ]
+  }
+}

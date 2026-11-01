@@ -36,7 +36,7 @@ public abstract record GrateTestContext(IGrateMigrator Migrator, ITestDatabase T
     public async Task DropDatabase(string databaseName)
     {
         var sql = Syntax.DropDatabase(databaseName);
-        using var conn = GetDbConnection(AdminConnectionString);
+        using var conn = External.CreateAdminDbConnection();
         await conn.ExecuteAsync(sql);
     }
 

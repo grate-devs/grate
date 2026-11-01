@@ -3,19 +3,8 @@ namespace grate.PostgreSql.Infrastructure;
 
 public readonly struct PostgreSqlSyntax : ISyntax
 {
-    public string StatementSeparatorRegex
-    {
-        get
-        {
-            const string strings = @"(?<KEEP1>'([^']|\'\')*')";
-            const string backslashEscapedStrings = @"(?<KEEP1>E(?<!\\)('[\S\s]*?(?<!\\)'))";
-            const string dollarQuotedStrings = @"(?<KEEP1>\$(?'tag'\w*)\$[\S\s]*?\$\k'tag'\$)";
-            const string dashComments = "(?<KEEP1>--.*$)";
-            const string starComments = @"(?<KEEP1>/\*[\S\s]*?\*/)";
-            const string separator = "(?<KEEP1>.*)(?<BATCHSPLITTER>(;)(?=(?:[^']|'[^']*')*$))(?<KEEP2>.*)";
-            return strings + "|" + backslashEscapedStrings + "|" + dollarQuotedStrings + "|" + dashComments + "|" + starComments + "|" + separator;
-        }
-    }
+    private static readonly IStatementSplitter _statementSplitter = new PostgreSqlStatementSplitter();
+    public IStatementSplitter StatementSplitter => _statementSplitter;
 
     public string CurrentDatabase => "SELECT current_database()";
     public string ListDatabases => "SELECT datname FROM pg_database";

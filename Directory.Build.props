@@ -22,7 +22,13 @@
 
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <!-- Keep every net11.0 distribution on the RC3 go-live runtime, including
+       self-contained publishes that restore runtime packs independently of the SDK. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <RuntimeFrameworkVersion>11.0.0-rc.3.26522.148</RuntimeFrameworkVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -34,7 +40,7 @@
 grate - sql for the 20s
     
 grate is a no-code, low-fi database migration tool, inspired heavily by RoundhousE. It's written from the ground
-up using modern .NET 8/9/10. </Description>
+up using modern .NET 8/9/10/11. </Description>
     <Copyright>© Erik A. Brandstadmoen. All rights reserved.</Copyright>
     <PackageProjectUrl>https://grate-devs.github.io/grate/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/grate-devs/grate</RepositoryUrl>
