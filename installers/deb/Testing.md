@@ -9,18 +9,19 @@ to the executable's embedded application version.
 
 Run on a matching native Docker engine:
 
-```sh
-bash installers/deb/Test-PackageLifecycle.sh \
-  /absolute/path/grate_0.0.1-1_arm64.deb \
-  /absolute/path/grate_0.0.2-1_arm64.deb \
-  arm64 0.0.1-1 0.0.2-1 /absolute/path/diagnostics
+```powershell
+./installers/deb/Test-PackageLifecycle.ps1 `
+  -InitialPackage /absolute/path/grate_0.0.1-1_arm64.deb `
+  -UpgradePackage /absolute/path/grate_0.0.2-1_arm64.deb `
+  -Architecture arm64 -InitialVersion 0.0.1-1 -UpgradeVersion 0.0.2-1 `
+  -OutputDirectory /absolute/path/diagnostics
 ```
 
-Use `amd64` on the x64 CI runner. The wrapper rejects a different Docker engine
-architecture, runs an isolated Ubuntu container with an eight-minute execution
-limit, and removes only its own container. Package installation never runs on
-the host. `Verify-PackageLifecycle.sh` is container-side implementation and
-refuses direct execution on the host.
+Use PowerShell 7 and `amd64` on the x64 CI runner. The host-side PowerShell wrapper
+rejects a different Docker engine architecture, runs an isolated Ubuntu container
+with an eight-minute execution limit, and removes only its own container. Package
+installation never runs on the host. `Verify-PackageLifecycle.sh` is container-side
+implementation and refuses direct execution on the host.
 
 The test installs package dependencies, checks dpkg registration, architecture,
 version and payload, runs help and bundled-skill installation, and inspects real

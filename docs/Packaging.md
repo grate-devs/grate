@@ -59,6 +59,11 @@ The existing native packaging jobs also exercise the distribution boundaries:
   dry runs, migration/rerun effects and failure exit codes in addition to the
   existing direct-executable, globalization and bundled-skill checks.
 
+The lifecycle test entry points run in PowerShell on the host. Debian's package
+operations and assertions run in shell inside its disposable Ubuntu container.
+Docker entrypoint verification uses the host's SQLite CLI for independent,
+read-only database assertions; CI ensures that client is available.
+
 These checks use local test artifacts and disposable state. Installer logs and
 verification diagnostics are uploaded even when a job fails. They do not publish
 packages or replace the final release-asset checks below.

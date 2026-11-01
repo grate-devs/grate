@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Container-side assertions. Test-PackageLifecycle.sh is the public entry point.
+# Container-side assertions. Test-PackageLifecycle.ps1 is the public entry point.
 set -euo pipefail
 [[ -f /.dockerenv && "${GRATE_DEB_LIFECYCLE_CONTAINER:-}" == 1 && -f /packages/initial.deb && -f /packages/upgrade.deb && -d /diagnostics ]] || {
-  echo 'This verifier runs only in the disposable container created by Test-PackageLifecycle.sh.' >&2
+  echo 'This verifier runs only in the disposable container created by Test-PackageLifecycle.ps1.' >&2
   exit 2
 }
 architecture=$1

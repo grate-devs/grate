@@ -305,16 +305,14 @@ jobs:
           }
       - name: Verify Debian installation, package upgrade and purge
         if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          architecture="${{ matrix.rid }}"
-          architecture="${architecture#linux-}"
-          architecture="${architecture/x64/amd64}"
-          bash installers/deb/Test-PackageLifecycle.sh \
-            "installers/deb/grate_0.0.1-1_${architecture}.deb" \
-            "installers/deb/grate_0.0.2-1_${architecture}.deb" \
-            "$architecture" 0.0.1-1 0.0.2-1 "${{ runner.temp }}/grate-debian-lifecycle"
+          $architecture = '${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64'
+          ./installers/deb/Test-PackageLifecycle.ps1 `
+            -InitialPackage "installers/deb/grate_0.0.1-1_${architecture}.deb" `
+            -UpgradePackage "installers/deb/grate_0.0.2-1_${architecture}.deb" `
+            -Architecture $architecture -InitialVersion '0.0.1-1' -UpgradeVersion '0.0.2-1' `
+            -OutputDirectory "${{ runner.temp }}/grate-debian-lifecycle"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -359,8 +357,19 @@ jobs:
           test "$(find "$work/output" -path '*/itemsRan/up/001_create.sql' | wc -l)" -eq 1
           docker run --rm -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local skills install --local --path /smoke/skill
           test -s "$work/skill/.agents/skills/use-grate/SKILL.md"
+      - name: Ensure SQLite client for entrypoint verification
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (!(Get-Command sqlite3 -ErrorAction SilentlyContinue)) {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends sqlite3
+          }
+          sqlite3 --version
       - name: Verify default image entrypoint
-        run: python3 installers/docker/Test-Entrypoint.py --image grate-package-test:local --output-directory "${{ runner.temp }}/grate-entrypoint-results"
+        shell: pwsh
+        run: ./installers/docker/Test-Entrypoint.ps1 -Image grate-package-test:local -OutputDirectory "${{ runner.temp }}/grate-entrypoint-results"
       - name: Upload entrypoint diagnostics
         if: always()
         uses: actions/upload-artifact@v7
