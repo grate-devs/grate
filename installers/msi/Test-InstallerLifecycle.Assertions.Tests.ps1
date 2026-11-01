@@ -46,7 +46,27 @@ try {
 
     if ((Get-MsiUpgradeVersion -PackageVersion '0.0.1' -PayloadVersion '2.1.7.0') -ne '2.1.8') { throw 'Payload-relative upgrade version is wrong.' }
     if ((Get-MsiUpgradeVersion -PackageVersion '3.0.4' -PayloadVersion '2.1.7.0') -ne '3.0.5') { throw 'Package-relative upgrade version is wrong.' }
+
+    # The package builder recreates its tmp directory. Installing from there
+    # caused native MSI error 1316 during update source resolution (#880).
+    $builder = Join-Path $root 'builder-tmp'
+    New-Item -ItemType Directory $builder | Out-Null
+    $original = Join-Path $builder 'grate-0.0.1.msi'
+    Set-Content $original 'baseline package'
+    $baselineHash = (Get-FileHash $original).Hash
+    $baseline = Copy-MsiLifecycleSource $original (Join-Path $root 'baseline-source')
+    Remove-Item $builder -Recurse -Force
+    New-Item -ItemType Directory $builder | Out-Null
+    $updated = Join-Path $builder 'grate-0.0.2.msi'
+    Set-Content $updated 'updated package'
+    $upgradeHash = (Get-FileHash $updated).Hash
+    $upgrade = Copy-MsiLifecycleSource $updated (Join-Path $root 'upgrade-source')
+    Assert-MsiDataPreserved $baseline $baselineHash
+    Assert-MsiDataPreserved $upgrade $upgradeHash
+    if ($baseline -eq $upgrade -or (Split-Path $baseline -Leaf) -ne (Split-Path $upgrade -Leaf)) {
+        throw 'Minor-update sources must be distinct retained files with the same basename.'
+    }
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force
 }
-Write-Host 'PASS: MSI assertions reject wrong registration/version/scope, stale payload, incomplete uninstall and damaged user data.'
+Write-Host 'PASS: MSI assertions reject wrong registration/version/scope, stale payload, incomplete uninstall and damaged user data; install sources survive builder cleanup.'

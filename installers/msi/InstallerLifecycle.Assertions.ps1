@@ -38,3 +38,14 @@ function Get-MsiUpgradeVersion {
     }
     return "$($baseline.Major).$($baseline.Minor).$($baseline.Build + 1)"
 }
+
+function Copy-MsiLifecycleSource {
+    param([string]$MsiPath, [string]$Directory)
+    New-Item -ItemType Directory -Force $Directory | Out-Null
+    # Install from retained sources, not Create-Installer's disposable tmp tree.
+    # Both minor-update sources use the same package basename while retaining
+    # separate immutable files for Windows Installer's source resolution.
+    $staged = Join-Path $Directory 'grate.msi'
+    Copy-Item -LiteralPath $MsiPath -Destination $staged
+    return $staged
+}

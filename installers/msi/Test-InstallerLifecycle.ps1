@@ -34,7 +34,7 @@ function Read-MsiMetadata([string]$Path) {
             $view = Invoke-ComMember $database 'OpenView' InvokeMethod @("SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = '$name'")
             $record = $null
             try {
-                $view.Execute()
+                [void]$view.Execute()
                 $record = $view.Fetch()
                 if ($null -eq $record) { throw "The MSI has no $name property." }
                 $values[$name] = Invoke-ComMember $record 'StringData' GetProperty @(1)
@@ -135,8 +135,10 @@ $uninstalled = $false
 $failure = $null
 $cleanupFailures = [Collections.Generic.List[Exception]]::new()
 try {
+    $baselineSource = Copy-MsiLifecycleSource $MsiPath (Join-Path $OutputDirectory 'baseline-source')
+    $baselineSourceHash = (Get-FileHash $baselineSource -Algorithm SHA256).Hash
     $installationAttempted = $true
-    Run-Msi @('/i', $MsiPath) 'install'
+    Run-Msi @('/i', $baselineSource) 'install'
     Check-Installed $metadata.ProductVersion $PublishedExecutable
     Run-Migrations 'installed'
     $skill = Join-Path $state 'skill'
@@ -156,19 +158,20 @@ try {
     $upgradeExe = Join-Path $upgradePayload 'grate.exe'
     if ((Get-FileHash $upgradeExe).Hash -eq (Get-FileHash $PublishedExecutable).Hash) { throw 'Upgrade verification requires a genuinely different published executable.' }
 
-    # Create-Installer recreates its tmp directory; preserve the baseline MSI before calling it.
-    Copy-Item $MsiPath (Join-Path $OutputDirectory 'baseline.msi')
+    # The initial installation's source must remain available while the builder
+    # recreates tmp and Windows Installer resolves the subsequent update source.
     & (Join-Path $PSScriptRoot 'Create-Installer.ps1') -grateExe $upgradeExe -version $upgradeVersion -arch $Architecture -upgradeCode $metadata.UpgradeCode
+    Assert-MsiDataPreserved $baselineSource $baselineSourceHash
     $upgradeMsi = Join-Path $PSScriptRoot "tmp/grate-$upgradeVersion.msi"
     $updated = Read-MsiMetadata $upgradeMsi
     if ($updated.ProductCode -ne $metadata.ProductCode -or $updated.UpgradeCode -ne $metadata.UpgradeCode -or $updated.Platform -ne $Architecture -or $updated.ProductVersion -ne $upgradeVersion) {
         throw 'The update MSI changed product identity/platform or has the wrong version.'
     }
     $updated | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'upgrade-package.json')
-    Copy-Item $upgradeMsi (Join-Path $OutputDirectory 'upgrade.msi')
+    $upgradeSource = Copy-MsiLifecycleSource $upgradeMsi (Join-Path $OutputDirectory 'upgrade-source')
     # This package keeps its ProductCode. Windows Installer requires explicit minor-update flags:
     # https://learn.microsoft.com/windows/win32/msi/applying-small-updates-by-reinstalling-the-product
-    Run-Msi @('/i', $upgradeMsi, 'REINSTALL=ALL', 'REINSTALLMODE=vomus') 'upgrade'
+    Run-Msi @('/i', $upgradeSource, 'REINSTALL=ALL', 'REINSTALLMODE=vomus') 'upgrade'
     Check-Installed $upgradeVersion $upgradeExe
     Assert-MsiDataPreserved $databasePath $dataHash
     'ALTER TABLE package_smoke ADD COLUMN upgraded INTEGER; UPDATE package_smoke SET upgraded = 7;' | Set-Content "$sql/up/002_upgrade.sql"
