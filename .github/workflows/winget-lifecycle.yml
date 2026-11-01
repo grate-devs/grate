@@ -7,6 +7,12 @@ on:
         description: 'Optional prior run whose immutable test candidates should be reused (record this provenance in the evidence)'
         required: false
         type: string
+      cases:
+        description: 'Select the complete matrix or MSI cases only'
+        required: true
+        default: all
+        type: choice
+        options: [all, msi]
 
 permissions:
   contents: read
@@ -57,16 +63,11 @@ jobs:
     needs: candidate
     if: ${{ !cancelled() && (needs.candidate.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.candidate.result == 'skipped' && inputs.candidate_run_id)) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { type: zip, arch: x86, runner: windows-latest }
-          - { type: zip, arch: x64, runner: windows-latest }
-          - { type: zip, arch: arm64, runner: windows-11-arm }
-          - { type: wix, arch: x64, runner: windows-latest }
-          - { type: wix, arch: arm64, runner: windows-11-arm }
+        include: ${{ fromJSON(inputs.cases == 'msi' && '[{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]' || '[{"type":"zip","arch":"x86","runner":"windows-latest"},{"type":"zip","arch":"x64","runner":"windows-latest"},{"type":"zip","arch":"arm64","runner":"windows-11-arm"},{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]') }}
     defaults:
       run:
         shell: pwsh
@@ -94,6 +95,7 @@ jobs:
           @{ CandidateRunId=$run.id; CandidateSourceCommit=$run.head_sha; ScriptCommit=$env:GITHUB_SHA; Architecture=$env:TEST_ARCH } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/lifecycle/candidate-provenance.json"
       - name: Actual MSI upgrade and reinstall with current-source candidate
         if: matrix.type == 'wix'
+        timeout-minutes: 5
         run: |
           ./installers/msi/Test-WinGetMsiLifecycle.Assertions.Tests.ps1
           $inventory = Get-Content "$env:RUNNER_TEMP/lifecycle/inventory.json" -Raw | ConvertFrom-Json
@@ -108,6 +110,7 @@ jobs:
           "TEST_WINGET=$winget" | Out-File $env:GITHUB_ENV -Append
       - name: Actual WinGet package-ID transition in isolated HTTPS source
         if: ${{ !cancelled() && steps.winget.outcome == 'success' }}
+        timeout-minutes: 10
         run: ./installers/winget/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests"
       - name: Retain raw lifecycle evidence
         if: always()

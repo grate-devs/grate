@@ -166,13 +166,28 @@ function Assert-KnownRejection($Result) {
     if ($Result.ExitHex -in @('0x8A150006','0x8A150049') -and $Result.Output -match '1638') { return }
     throw "Unexpected failure must not be counted as a migration result: $($Result.ExitHex) $($Result.Output)"
 }
+function Native-Msi([string[]]$Arguments,[string]$Name) {
+    $hash=$null
+    if (Test-Path $database) { $hash=(Get-FileHash $database -Algorithm SHA256).Hash }
+    $result=Run "$env:SystemRoot/System32/msiexec.exe" ($Arguments+@('/qn','/norestart','/l*v',"$OutputDirectory/$Name.msi.log")) $Name -Observe
+    if ($result.ExitCode -notin @(0,3010)) { throw "$Name failed with MSI code $($result.ExitCode)." }
+    if ($hash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $hash)) { throw 'Native MSI fallback modified migration data.' }
+}
 function Uninstall([string]$Id,[string]$Name) {
     $attempt = W @('uninstall','--id',$Id,'--exact','--source',$sourceName,'--silent','--accept-source-agreements') $Name -Observe
     if ($attempt.ExitCode -ne 0) {
         Assert-KnownRejection $attempt
         $rows=@(Registrations)
         if ($rows.Count -ne 1) { throw 'Cannot select an unambiguous installed product for fallback uninstall.' }
-        $null = W @('uninstall','--product-code',$rows[0].KeyName,'--silent','--accept-source-agreements') "$Name-by-product-code"
+        $byProduct=W @('uninstall','--product-code',$rows[0].KeyName,'--silent','--accept-source-agreements') "$Name-by-product-code" -Observe
+        if ($byProduct.ExitCode -ne 0) {
+            # A real per-user MSI can be registered with Windows Installer while
+            # remaining absent from WinGet's installed-package inventory. This
+            # is a blocker, not a successful package-ID migration.
+            if ($type -ne 'wix' -or $byProduct.ExitHex -ne '0x8A150014') { throw 'Product-code uninstall failed unexpectedly.' }
+            Native-Msi @('/x',$rows[0].KeyName) "$Name-native-msi-fallback"
+            $summary.NativeMsiUninstallRequired=$true
+        }
     }
     Assert-Absent
     $attempt.ExitHex
@@ -213,8 +228,15 @@ try {
         Assert-KnownRejection $upgrade
         if ($type -eq 'zip') { throw 'Same-ID portable upgrade must succeed.' }
         Assert-Installed '2.0.0' $oldId
-        $null=W (@('upgrade','--id',$oldId,'--version','2.1.6','--uninstall-previous')+$common) 'same-id-uninstall-previous'
-        $summary.SameIdUninstallPrevious='Passed'
+        $previous=W (@('upgrade','--id',$oldId,'--version','2.1.6','--uninstall-previous')+$common) 'same-id-uninstall-previous' -Observe
+        $summary.SameIdUninstallPrevious=$previous.ExitHex
+        if ($previous.ExitCode -ne 0) {
+            if ($previous.ExitHex -ne '0x8A150014') { throw 'Uninstall-previous failed unexpectedly.' }
+            Assert-Installed '2.0.0' $oldId
+            $target=$inventory.Versions | Where-Object Version -eq '2.1.6'
+            Native-Msi @('/i',$target.MsiPath,'REINSTALL=ALL','REINSTALLMODE=vomus') 'same-id-native-minor-update-fallback'
+            $summary.SameIdNativeMsiUpdateFallback='Passed; WinGet could not find the installed MSI'
+        }
     }
     Assert-Installed '2.1.6' $oldId
     Migrate 'same-id-upgraded'
@@ -245,6 +267,7 @@ try {
     Migrate 'fallback-new-id'
     Snapshot 'new-id-installed'
     $summary.NewIdListExit=(W @('list','--id',$newId,'--exact','--source',$sourceName,'--accept-source-agreements') 'new-id-correlation' -Observe).ExitHex
+    $summary.WinGetNewIdCorrelationVerified=$summary.NewIdListExit -eq '0x00000000'
     $dataHash=(Get-FileHash $database -Algorithm SHA256).Hash
     $summary.FinalUninstall=Uninstall $newId 'final-new-uninstall'
     if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash) { throw 'Final uninstall modified migration data.' }
@@ -254,7 +277,13 @@ try {
 } finally {
     try {
         if ($testOwnsInstallation) {
-            foreach ($row in @(Registrations)) { $null=W @('uninstall','--product-code',$row.KeyName,'--silent','--accept-source-agreements') 'cleanup-uninstall' }
+            foreach ($row in @(Registrations)) {
+                $cleanup=W @('uninstall','--product-code',$row.KeyName,'--silent','--accept-source-agreements') 'cleanup-uninstall' -Observe
+                if ($cleanup.ExitCode -ne 0) {
+                    if ($type -ne 'wix' -or $cleanup.ExitHex -ne '0x8A150014') { throw 'Cleanup uninstall failed unexpectedly.' }
+                    Native-Msi @('/x',$row.KeyName) 'cleanup-native-msi-uninstall'
+                }
+            }
             Assert-Absent
         }
     } finally {
