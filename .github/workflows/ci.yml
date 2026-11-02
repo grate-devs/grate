@@ -239,6 +239,9 @@ jobs:
             8.0.x
             9.0.x
             10.0.x
+      - name: Check standalone verification command contract
+        shell: pwsh
+        run: ./scripts/Test-VerifyPackages.Tests.ps1
       - name: Verify packages across supported frameworks
         shell: pwsh
         run: ./scripts/verify-packages.ps1 -Kind Packages -OutputDirectory "${{ runner.temp }}/grate-packages"
@@ -253,6 +256,9 @@ jobs:
 
   standalone:
     name: CLI ${{ matrix.rid }}
+    env:
+      # Publish and package the same fixture identity; MSI rejects mismatched payloads.
+      STANDALONE_VERSION: '0.0.1'
     strategy:
       fail-fast: false
       matrix:
@@ -277,7 +283,7 @@ jobs:
         shell: pwsh
         env:
           RUN_SMOKE_TEST: ${{ matrix.smoke }}
-        run: ./scripts/verify-packages.ps1 -Kind Standalone -RuntimeIdentifier '${{ matrix.rid }}' -OutputDirectory "${{ runner.temp }}/grate-cli" -RunSmokeTest:($env:RUN_SMOKE_TEST -eq 'true')
+        run: ./scripts/verify-packages.ps1 -Kind Standalone -RuntimeIdentifier '${{ matrix.rid }}' -StandaloneVersion $env:STANDALONE_VERSION -OutputDirectory "${{ runner.temp }}/grate-cli" -RunSmokeTest:($env:RUN_SMOKE_TEST -eq 'true')
       - name: Check per-user MSI authoring regressions
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
@@ -285,11 +291,15 @@ jobs:
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
-        run: ./installers/msi/Create-Installer.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate.exe" -Version '0.0.1' -arch ('${{ matrix.rid }}' -replace 'win-', '')
+        run: ./installers/msi/Create-Installer.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate.exe" -Version $env:STANDALONE_VERSION -arch ('${{ matrix.rid }}' -replace 'win-', '')
+      - name: Check verified Windows MSI metadata
+        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: ./installers/msi/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -ExpectedArchitecture ('${{ matrix.rid }}' -replace 'win-', '')
       - name: Build Debian package from verified Linux binary
         if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
         shell: pwsh
-        run: ./installers/deb/Create-Package.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate" -Version '0.0.1' -arch ('${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64')
+        run: ./installers/deb/Create-Package.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate" -Version $env:STANDALONE_VERSION -arch ('${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64')
       - uses: actions/upload-artifact@v7
         if: always()
         with:
