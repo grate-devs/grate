@@ -32,6 +32,7 @@ jobs:
           ./installers/winget/Test-InstallerCorrelation.Tests.ps1
           ./installers/winget/Test-LifecycleCatalog.Tests.ps1
           ./installers/winget/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
+          ./installers/winget/test-source/preindexed/Test-SingletonManifests.Tests.ps1
           ./installers/msi/Test-InstallerAuthoring.Tests.ps1
           ./installers/msi/Test-InstallerIdentity.Tests.ps1
       - name: Prepare manifests from a real stable release and inspect MSI metadata

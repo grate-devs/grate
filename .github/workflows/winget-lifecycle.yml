@@ -163,6 +163,7 @@ jobs:
             ./installers/winget/Test-MigrationManifestPreparation.ps1 -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/manifest-policy" -Winget $env:TEST_WINGET
           }
           ./installers/winget/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
+          if ($env:TEST_SOURCE_TYPE -eq 'PreIndexed') { ./installers/winget/test-source/preindexed/Test-SingletonManifests.Tests.ps1 }
           ./installers/winget/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests" -SourceType $env:TEST_SOURCE_TYPE -PublicBaseline:($env:TEST_PUBLIC_BASELINE -eq 'true')
       - name: Retain raw lifecycle evidence
         if: always()
@@ -174,5 +175,6 @@ jobs:
             ${{ runner.temp }}/lifecycle/**/*.log
             ${{ runner.temp }}/lifecycle/**/*.yaml
             ${{ runner.temp }}/lifecycle/**/*.txt
+            ${{ runner.temp }}/lifecycle/source-tests/server/source/**
           if-no-files-found: warn
           retention-days: 7

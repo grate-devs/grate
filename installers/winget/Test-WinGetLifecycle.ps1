@@ -447,7 +447,12 @@ try {
         try {
             if ($sourceAdded) { $null=W @('source','remove','--name',$sourceName) 'remove-test-source' }
         } finally {
-            try { if ($state) { & "$PSScriptRoot/test-source/Stop-TestSource.ps1" -State $state } }
+            try {
+                if ($state) {
+                    $stopScript=if ($SourceType -eq 'PreIndexed') { 'Stop-PreIndexedSource.ps1' } else { 'Stop-TestSource.ps1' }
+                    & "$PSScriptRoot/test-source/$stopScript" -State $state
+                }
+            }
             finally {
                 try {
                     foreach ($logs in @(
