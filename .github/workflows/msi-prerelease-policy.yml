@@ -2,6 +2,9 @@ name: MSI prerelease policy
 
 on:
   workflow_dispatch:
+  push:
+    branches: [feat/800-winget-migration]
+    paths: ['.github/workflows/msi-prerelease-policy.yml']
 
 permissions:
   contents: read
