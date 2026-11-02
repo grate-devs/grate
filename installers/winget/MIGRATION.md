@@ -133,6 +133,23 @@ MSI in `installers/msi/tmp`. Probe fixtures are never release artifacts. The
 manual `msi-prerelease-policy.yml` workflow runs this check on x64 and ARM64;
 this is separate from full application and WinGet lifecycle matrices.
 
+[Native prerelease policy run 41411152047](https://github.com/grate-devs/grate/actions/runs/41411152047)
+passed both architectures at test commit
+`20ca2dd97b8fb5f41dd440d8df9c30235bdda759`, using production policy commit
+`c83a2754b24e6bd3057c43283cf0cf4a2e9ae484`. Each job built and inspected five
+actual probe MSIs, required three refusals to return 1603 with the native
+same-core message, and completed six successful install/upgrade/uninstall
+operations. Ten inventory snapshots per architecture show one current-user
+context-2 product at a time, the original registration after each refusal,
+and no product after final uninstall. Payload hashes and external data are
+checked throughout. The first run failed before installation because the probe
+passed a mixed-separator MSI path; the test-only path normalization fix did not
+change production code. Pure C++ policy cases also reject equal-core legacy
+replacement; that additional legacy boundary was not separately runtime-tested.
+The earlier full WinGet/native rollback matrices remain historical evidence for
+the stable paths described below, rather than a claim that this small probe
+repeated all application, rollback and source checks.
+
 ## WinGet scope workaround
 
 WinGet 1.29.380 can report this per-user MSI as Machine because its ARP inventory
