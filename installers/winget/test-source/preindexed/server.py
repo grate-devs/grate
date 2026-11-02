@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Loopback-only HTTPS file server for a native preindexed WinGet source."""
 import argparse
-import functools
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import ssl
 import sys
 from urllib.parse import unquote, urlsplit
@@ -11,15 +10,18 @@ from urllib.parse import unquote, urlsplit
 
 class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
-        parsed = Path(unquote(urlsplit(path).path).lstrip('/'))
-        if parsed.is_absolute() or '..' in parsed.parts:
+        decoded = unquote(urlsplit(path).path)
+        parsed = PurePosixPath(decoded.lstrip('/'))
+        if '..' in parsed.parts or '\\' in decoded or ':' in decoded or '\x00' in decoded:
             return str(self.server.root / '__invalid__')
         if parsed.parts and parsed.parts[0] == 'assets':
             # Payloads are never copied or re-signed by source construction.
             if len(parsed.parts) != 2:
                 return str(self.server.root / '__invalid__')
-            return str(self.server.assets / parsed.parts[1])
-        return str(self.server.root / parsed)
+            candidate = (self.server.assets / parsed.parts[1]).resolve()
+            return str(candidate if candidate.parent == self.server.assets else self.server.root / '__invalid__')
+        candidate = self.server.root.joinpath(*parsed.parts).resolve()
+        return str(candidate if candidate.is_relative_to(self.server.root) else self.server.root / '__invalid__')
 
     def list_directory(self, path):
         self.send_error(404)

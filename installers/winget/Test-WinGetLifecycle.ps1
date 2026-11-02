@@ -268,6 +268,8 @@ try {
         Assert-Installed '2.0.0' $oldId $publicSource.Identifier
         Migrate 'public-baseline'
         $null=W @('export','--output',"$OutputDirectory/public-baseline-before-candidate.export.json",'--accept-source-agreements') 'public-baseline-before-candidate-export'
+        $beforeCandidate=Get-Content "$OutputDirectory/public-baseline-before-candidate.export.json" -Raw | ConvertFrom-Json
+        Assert-WinGetExportIdentity -Export $beforeCandidate -ExpectedId $oldId -ExpectedSourceIdentifier $publicSource.Identifier
     }
     Write-Catalog
     $startScript=if ($SourceType -eq 'PreIndexed') { 'Start-PreIndexedSource.ps1' } else { 'Start-TestSource.ps1' }
@@ -278,6 +280,9 @@ try {
     $null=W @('source','add','--name',$sourceName,'--arg',$state.Url,'--type',$nativeSourceType,'--accept-source-agreements') 'add-source'
     $sourceAdded=$true
     $null=W @('source','list','--name',$sourceName) 'source-details'
+    $candidateSource=(W @('source','export','--name',$sourceName) 'candidate-source-export').Output.Trim() | ConvertFrom-Json
+    if ($candidateSource.Type -ne $nativeSourceType -or $candidateSource.Identifier -ne $sourceIdentifier -or $candidateSource.Arg.TrimEnd('/') -ne $state.Url.TrimEnd('/')) { throw 'Registered candidate source type, identifier or URL did not match the actual test source.' }
+    $summary.CandidateSource=$candidateSource
     $testOwnsInstallation=$true
     $upgradeOptions=@('--source',$sourceName,'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
     $installOptions=$upgradeOptions+@('--scope','user','--architecture',$arch,'--installer-type',$type)

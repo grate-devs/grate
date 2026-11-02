@@ -119,6 +119,9 @@ try {
     if ($registered.Count -ne 1) { throw 'Expected exactly one registered CI source package.' }
     $state.SourceIdentifier=$registered[0].PackageFamilyName
     $state.PackageFullName=$registered[0].PackageFullName
+    # Identification is the only reason for this temporary registration. Remove
+    # it so WinGet must fetch and register the source over the tested protocol.
+    Remove-AppxPackage -Package $state.PackageFullName
     @{NuGetPackage='Microsoft.WindowsPackageManager.Utils'; Version=$version; Url=$url; Sha256=$hash; NativeDllSha256=(Get-FileHash $dll).Hash; NativeDllVersion=(Get-Item $dll).VersionInfo.FileVersion; WindowsSdk=$sdk[0].Name; SourceIdentifier=$state.SourceIdentifier; SourceType=$state.SourceType; Manifests=@($manifests | ForEach-Object { @{Name=[IO.Path]::GetFileName($_); Sha256=(Get-FileHash $_).Hash} }); Indexes=$indexes} |
         ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $logs 'preindexed-provenance.json')
     $arguments=@('-u',"$PSScriptRoot/preindexed/server.py",'--root',$root,'--assets',(Resolve-Path -LiteralPath $Assets).Path,'--certificate',$certificateFile,'--private-key',$privateKeyFile,'--port',"$Port")
