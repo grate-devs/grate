@@ -51,8 +51,8 @@ $urls = foreach ($asset in $releaseAssets) {
 # explicitly start with erikbra.grate, then convert a private copy. Never submit
 # from this helper; neither generation nor schema validation proves migration.
 $sourceId = 'erikbra.grate'
-$destinations = @((Join-Path $outputDirectory "manifests/e/erikbra/grate/$version"))
-if ($PrepareMigration) { $destinations += Join-Path $outputDirectory "manifests/g/grate-devs/grate/$version" }
+$destinationPath = if ($PrepareMigration) { "manifests/g/grate-devs/grate/$version" } else { "manifests/e/erikbra/grate/$version" }
+$destinations = @((Join-Path $outputDirectory $destinationPath))
 foreach ($destination in $destinations) {
     if (Test-Path -LiteralPath $destination) { throw "Refusing to overwrite manifests: $destination" }
 }
@@ -111,17 +111,18 @@ try {
     $sets = @(@{ Id=$sourceId; Destination=$destinations[0]; Contents=$contents })
     if ($PrepareMigration) {
         $policy = ConvertTo-WinGetMigrationManifests -InstallerYaml $contents["$sourceId.installer.yaml"] -Version $version -MsiMetadata $msiMetadata
-        $contents["$sourceId.installer.yaml"] = $policy.BridgeInstallerYaml
         $locale = $contents["$sourceId.locale.en-US.yaml"]
         if ($locale -cnotmatch '(?m)^Publisher: (?:erikbra|grate-devs)\r?$') { throw 'Review the changed upstream publisher before preparing migration.' }
-        $contents["$sourceId.locale.en-US.yaml"] = $locale -creplace '(?m)^Publisher: (?:erikbra|grate-devs)\r?$', 'Publisher: erikbra'
         $newContents = @{}
         foreach ($name in $files) {
             $newContents[$name] = $contents[$name] -creplace '(?m)^PackageIdentifier: erikbra\.grate\r?$', 'PackageIdentifier: grate-devs.grate'
         }
         $newContents["$sourceId.installer.yaml"] = $policy.NewInstallerYaml
-        $newContents["$sourceId.locale.en-US.yaml"] = $newContents["$sourceId.locale.en-US.yaml"] -creplace '(?m)^Publisher: erikbra\r?$', 'Publisher: grate-devs'
-        $sets += @{ Id='grate-devs.grate'; Destination=$destinations[1]; Contents=$newContents }
+        $newContents["$sourceId.locale.en-US.yaml"] = $newContents["$sourceId.locale.en-US.yaml"] -creplace '(?m)^Publisher: (?:erikbra|grate-devs)\r?$', 'Publisher: grate-devs'
+        # A corrected MSI installed under the old ID enriches its WinGet
+        # tracking record with the new MSI family, even without manifest codes.
+        # Keep historical old-ID manifests untouched; emit only the new ID.
+        $sets = @(@{ Id='grate-devs.grate'; Destination=$destinations[0]; Contents=$newContents })
     }
     foreach ($set in $sets) {
         New-Item -ItemType Directory -Path $set.Destination -Force | Out-Null

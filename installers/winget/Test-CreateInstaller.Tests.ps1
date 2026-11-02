@@ -3,7 +3,10 @@
 # Windows/schema and actual install/upgrade checks remain separate.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$previousNativeExitCode = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+$previousNativeExitCodeValue = if ($previousNativeExitCode) { $previousNativeExitCode.Value } else { $null }
 $helper = Join-Path $PSScriptRoot 'Create-Installer.ps1'
+. (Join-Path $PSScriptRoot 'MigrationManifestPolicy.ps1')
 $state = Join-Path ([IO.Path]::GetTempPath()) ('grate-winget-tests-' + [Guid]::NewGuid().ToString('N'))
 $wingetTest = @{ apiCalls=0; toolCalls=0; downloadCalls=0; metadataCalls=0; schemaCalls=0; schemaExitCode=0; toolExitCode=0; wrongOutput=$false; arguments=@(); testCount=0; release=$null; metadata=@{} }
 function Test-Hash([string]$Architecture) {
@@ -120,26 +123,36 @@ try {
     Assert-Rejected @{version='2.1.7';outputDirectory="$state/default-corrected"} '*requires -PrepareMigration*'
     Assert-True (!(Test-Path "$state/default-corrected")) 'Default mode promoted corrected MSI identities under the old package ID.'
     Set-Release -Corrected
+    $historicalDirectory = "$state/migration/manifests/e/erikbra/grate/2.1.6"
+    New-Item -ItemType Directory -Path $historicalDirectory -Force | Out-Null
+    $historical | Set-Content "$historicalDirectory/erikbra.grate.installer.yaml" -NoNewline
     Prepare "$state/migration" -Migration
     $old = "$state/migration/manifests/e/erikbra/grate/2.1.7"
     $new = "$state/migration/manifests/g/grate-devs/grate/2.1.7"
-    foreach ($item in @(@{Path=$old;Id='erikbra.grate'}, @{Path=$new;Id='grate-devs.grate'})) {
+    Assert-True (!(Test-Path $old)) 'Migration preparation promoted a corrected MSI under the old ID.'
+    Assert-True ((Get-Content "$historicalDirectory/erikbra.grate.installer.yaml" -Raw) -ceq $historical) 'Migration preparation changed historical old-ID metadata.'
+    foreach ($item in @(@{Path=$new;Id='grate-devs.grate'})) {
         Assert-True (@(Get-ChildItem $item.Path).Count -eq 3) 'Each identity requires exactly three manifests.'
         foreach ($file in Get-ChildItem $item.Path) { Assert-True ((Get-Content $file.FullName -Raw).Contains("PackageIdentifier: $($item.Id)")) 'Package identity was not converted.' }
     }
-    $bridge = Get-Content "$old/erikbra.grate.installer.yaml" -Raw
     $candidate = Get-Content "$new/grate-devs.grate.installer.yaml" -Raw
-    Assert-True ($bridge -notmatch '(?m)^\s*(?:- )?(?:ProductCode|UpgradeCode):') 'Bridge introduced strong reference aliases.'
-    Assert-True ((Get-Content "$old/erikbra.grate.locale.en-US.yaml" -Raw).Contains('Publisher: erikbra')) 'Bridge locale publisher changed.'
     Assert-True ((Get-Content "$new/grate-devs.grate.locale.en-US.yaml" -Raw).Contains('Publisher: grate-devs')) 'New locale publisher missing.'
+    # Preserve the rejected bridge design as a pure diagnostic regression, never
+    # as a production output: absent codes cannot prevent tracking enrichment.
+    $diagnosticMetadata = foreach ($arch in @('x64','arm64')) {
+        $wingetTest.metadata[$arch] | Select-Object *, @{Name='Architecture';Expression={$arch}},
+            @{Name='InstallerUrl';Expression={"https://github.com/grate-devs/grate/releases/download/2.1.7/grate-msi-win-$arch-2.1.7.msi"}},
+            @{Name='Sha256';Expression={Test-Hash $arch}}
+    }
+    $diagnostic = ConvertTo-WinGetMigrationManifests -InstallerYaml ($candidate -creplace 'PackageIdentifier: grate-devs.grate', 'PackageIdentifier: erikbra.grate') -Version '2.1.7' -MsiMetadata @($diagnosticMetadata)
+    Assert-True ($diagnostic.BridgeInstallerYaml -notmatch '(?m)^\s*(?:- )?(?:ProductCode|UpgradeCode):' -and $diagnostic.BridgeInstallerYaml.Contains('Publisher: erikbra')) 'Diagnostic bridge contract changed.'
     foreach ($arch in @('x64','arm64')) {
         $metadata=$wingetTest.metadata[$arch]
         $argsForValidator=@{InstallerUrl="https://github.com/grate-devs/grate/releases/download/2.1.7/grate-msi-win-$arch-2.1.7.msi";Architecture=$arch;ProductCode=$metadata.ProductCode;UpgradeCode=$metadata.UpgradeCode;Sha256=(Test-Hash $arch)}
-        & "$PSScriptRoot/Test-InstallerCorrelation.ps1" @argsForValidator -ManifestPath "$old/erikbra.grate.installer.yaml" -Policy Bridge
         & "$PSScriptRoot/Test-InstallerCorrelation.ps1" @argsForValidator -ManifestPath "$new/grate-devs.grate.installer.yaml" -Policy NewIdentity -Publisher grate-devs
     }
-    Assert-True ($bridge -notmatch '(?m)^\s*(?:- )?Scope:' -and $candidate -notmatch '(?m)^\s*(?:- )?Scope:') 'Migration manifests must omit unsupported portable/MSI Scope.'
-    Assert-True ([regex]::Matches($bridge,'(?m)^  NestedInstallerType: portable$').Count -eq 3 -and [regex]::Matches($candidate,'(?m)^  NestedInstallerType: portable$').Count -eq 3) 'Portable ZIP installer shape was lost.'
+    Assert-True ($candidate -notmatch '(?m)^\s*(?:- )?Scope:') 'Migration manifests must omit unsupported portable/MSI Scope.'
+    Assert-True ([regex]::Matches($candidate,'(?m)^  NestedInstallerType: portable$').Count -eq 3) 'Portable ZIP installer shape was lost.'
     $wingetTest.testCount++
     Assert-Rejected @{version='2.1.7';outputDirectory="$state/migration";PrepareMigration=$true} '*Refusing to overwrite*'
     foreach ($defect in @('Publisher','LegacyProduct','WrongProduct','UpgradeCode','Platform','Version','Digest','MachineScope','DualScope','PerUserFlag','AllUsersZero')) {
@@ -202,7 +215,9 @@ try {
     $before=$wingetTest.apiCalls
     & "$PSScriptRoot/Test-MigrationManifestPreparation.ps1" -InventoryPath "$state/inventory.json" -OutputDirectory "$state/candidate-policy" -MsiMetadataReader Read-TestCandidateMetadata -Winget Invoke-TestWingetValidate
     $summary=@(Get-Content "$state/candidate-policy/summary.json" -Raw | ConvertFrom-Json)
-    Assert-True ($summary.Count -eq 4 -and $wingetTest.schemaCalls -eq 4 -and $wingetTest.apiCalls -eq $before) 'Local entrypoint omitted a candidate/identity validation or queried the release API.'
+    Assert-True ($summary.Count -eq 2 -and $wingetTest.schemaCalls -eq 2 -and $wingetTest.apiCalls -eq $before) 'Local entrypoint omitted a candidate validation or queried the release API.'
+    Assert-True (@($summary | Where-Object Identity -NE 'grate-devs.grate').Count -eq 0) 'Local entrypoint promoted a diagnostic old-ID bridge.'
+    Assert-True (@(Get-ChildItem "$state/candidate-policy" -Recurse -Filter '*erikbra*').Count -eq 0) 'Local entrypoint emitted old-ID bridge manifests.'
     $wingetTest.testCount++
     $wingetTest.schemaExitCode=1
     $schemaRejected=$false
@@ -214,5 +229,10 @@ try {
     }
     Assert-True ($schemaRejected -and !(Test-Path "$state/candidate-schema-warning/summary.json")) 'A nonzero schema-warning result was promoted as successful candidate verification.'
     $wingetTest.testCount++
-} finally {Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction SilentlyContinue}
+} finally {
+    Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction SilentlyContinue
+    # Recording native-tool failures must not leak into the caller's shell exit.
+    if ($previousNativeExitCode) { $global:LASTEXITCODE = $previousNativeExitCodeValue }
+    else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+}
 Write-Host "PASS: $($wingetTest.testCount) WinGet preparation contract cases."

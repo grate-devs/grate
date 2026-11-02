@@ -120,8 +120,9 @@ function ConvertTo-WinGetMigrationManifests {
         $clean = Remove-WinGetInstallerField $clean UpgradeCode
         $clean = Remove-WinGetAppsAndFeatures $clean
         $clean = $clean.TrimEnd() + "`n"
-        # The bridge deliberately keeps the old publisher per winget-pkgs FAQ.
-        # It must not introduce new strong reference aliases under the old ID.
+        # Retain the old-publisher bridge only for diagnostic regression tests.
+        # Actual installs enrich old-ID tracking even when these codes are absent;
+        # production preparation must emit only NewInstallerYaml.
         $bridgeNodes += $clean + "  AppsAndFeaturesEntries:`n  - DisplayName: grate`n    Publisher: erikbra`n"
         $newNodes += $clean + "  ProductCode: '$($metadata.ProductCode)'`n  AppsAndFeaturesEntries:`n  - DisplayName: grate`n    Publisher: grate-devs`n    ProductCode: '$($metadata.ProductCode)'`n    UpgradeCode: '$($metadata.UpgradeCode)'`n"
     }

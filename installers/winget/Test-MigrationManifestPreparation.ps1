@@ -57,21 +57,20 @@ ManifestType: installer
 ManifestVersion: 1.12.0
 "@ + "`n"
     $policy = ConvertTo-WinGetMigrationManifests -InstallerYaml $inputYaml -Version $version -MsiMetadata @($metadata)
-    foreach ($identity in @('erikbra.grate','grate-devs.grate')) {
+    foreach ($identity in @('grate-devs.grate')) {
         $directory = Join-Path $OutputDirectory "$version/$identity"
         if (Test-Path -LiteralPath $directory) { throw "Refusing to overwrite candidate manifest set: $directory" }
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
-        $publisher = if ($identity -eq 'erikbra.grate') {'erikbra'} else {'grate-devs'}
-        $installer = if ($identity -eq 'erikbra.grate') {$policy.BridgeInstallerYaml} else {$policy.NewInstallerYaml}
+        $publisher = 'grate-devs'
+        $installer = $policy.NewInstallerYaml
         $installer | Set-Content -LiteralPath "$directory/$identity.installer.yaml" -Encoding utf8NoBOM
         ('# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json' + "`nPackageIdentifier: $identity`nPackageVersion: $version`nDefaultLocale: en-US`nManifestType: version`nManifestVersion: 1.12.0") |
             Set-Content -LiteralPath "$directory/$identity.yaml" -Encoding utf8NoBOM
         ('# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json' + "`nPackageIdentifier: $identity`nPackageVersion: $version`nPackageLocale: en-US`nPublisher: $publisher`nPackageName: grate`nLicense: MIT`nShortDescription: SQL migration runner`nManifestType: defaultLocale`nManifestVersion: 1.12.0") |
             Set-Content -LiteralPath "$directory/$identity.locale.en-US.yaml" -Encoding utf8NoBOM
-        $mode = if ($identity -eq 'erikbra.grate') {'Bridge'} else {'NewIdentity'}
         & "$PSScriptRoot/Test-InstallerCorrelation.ps1" -ManifestPath "$directory/$identity.installer.yaml" `
             -InstallerUrl $url -Architecture $architecture -ProductCode $actual.ProductCode -UpgradeCode $actual.UpgradeCode `
-            -Sha256 $hash -Policy $mode -Publisher $publisher
+            -Sha256 $hash -Policy NewIdentity -Publisher $publisher
         if ($Winget) {
             & $Winget validate --manifest $directory --disable-interactivity *>&1 | Tee-Object -FilePath "$directory/schema.log"
             if ($LASTEXITCODE -ne 0) { throw "WinGet schema validation failed for $identity $version." }
@@ -80,4 +79,4 @@ ManifestVersion: 1.12.0
     }
 }
 $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'summary.json')
-Write-Host 'PASS: local corrected MSI candidates produced both migration manifest sets with the production policy. See summary.json for schema validation status. No release or submission was performed.'
+Write-Host 'PASS: local corrected MSI candidates produced new-ID manifests with the production policy. See summary.json for schema validation status. No release or submission was performed.'
