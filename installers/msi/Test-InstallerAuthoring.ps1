@@ -37,6 +37,7 @@ $identityAttributes = @(
     @('/w:Wix/w:Product', 'Manufacturer', 'grate-devs'),
     @('/w:Wix/w:Product', 'UpgradeCode', '%%%UPGRADECODE%%%'),
     @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'grate-devs'),
+    @("//w:Property[@Id='GRATE_RELEASE_VERSION']", 'Value', '%%%RELEASEVERSION%%%'),
     @("//w:Directory[@Id='ROOTDIRECTORY']", 'Name', 'erikbra'),
     @("//w:Directory[@Id='INSTALLFOLDER']", 'Name', 'grate'),
     @("//w:Component[@Id='MainExecutable']", 'Guid', 'C544280E-4F9B-443D-BE6D-4A82CFEE3723'),

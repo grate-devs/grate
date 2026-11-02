@@ -41,6 +41,7 @@ try {
         ProductCode = $properties.ProductCode
         UpgradeCode = $properties.UpgradeCode
         ProductVersion = $properties.ProductVersion
+        ReleaseVersion = $properties['GRATE_RELEASE_VERSION']
         ProductName = $properties.ProductName
         Manufacturer = $properties.Manufacturer
         Platform = $template.Split(';')[0].ToLowerInvariant()

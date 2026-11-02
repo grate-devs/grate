@@ -7,6 +7,8 @@
       InstallerVersion='500' Languages='1033' InstallScope="perUser" InstallPrivileges="limited" Compressed='yes' SummaryCodepage='1252' />
     <Media Id='1' Cabinet='grate.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1' />
     <Property Id='DiskPrompt' Value="grate Installation [1]" />
+    <!-- Full SemVer is recorded, but MSI compares only numeric ProductVersion. -->
+    <Property Id='GRATE_RELEASE_VERSION' Value='%%%RELEASEVERSION%%%' />
     <!-- Keep removal inside the installation transaction so failure restores the
          previous product. Stable families handle future releases normally. -->
     <MajorUpgrade Schedule='afterInstallInitialize' DowngradeErrorMessage='A newer version of grate is already installed.' />

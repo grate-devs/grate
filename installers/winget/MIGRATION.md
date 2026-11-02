@@ -104,6 +104,35 @@ MSI generation requires Visual Studio C++ x64/ARM64 tools and the Windows SDK in
 addition to pinned WiX 3.14.1. The custom action uses `/MT`, so the installed
 application does not need a separately installed Visual C++ runtime.
 
+### Prerelease MSI policy for release integration
+
+The builder accepts numeric `-Version` and full SemVer `-ReleaseVersion` (defaulting
+to the numeric version for stable callers). The actual executable's ProductVersion,
+excluding informational `+build` metadata, must equal ReleaseVersion; passing only
+the numeric core for a prerelease executable is rejected. The full release string
+is recorded in MSI property `GRATE_RELEASE_VERSION` and determines ProductCode.
+Stable ProductCodes and both architecture UpgradeCodes remain unchanged.
+
+Windows Installer's ProductVersion remains a numeric triplet. Different products
+with the same numeric version require explicit uninstall/reinstall, including
+rc-to-rc, rc-to-final and final-to-rc. The native action enumerates the installed
+family independently of FindRelatedProducts and refuses a different ProductCode
+with equal ProductVersion before removal can run. This same-core rule also covers
+the legacy fixed-code product; it does not authorize republishing/replacing an
+existing stable version. The current ProductCode is excluded to preserve ordinary
+repair. Upgrades to a higher numeric version retain transactional MajorUpgrade;
+the existing downgrade guard remains active. The installer does not compare
+SemVer prerelease labels.
+
+`Test-PrereleaseMsiPolicy.ps1` is a small Windows policy check using isolated,
+framework-dependent probe apphosts. It checks actual MSI metadata, rejection of
+core-only authoring, three same-core refusals with original registration/payload
+preserved, explicit uninstall/reinstall, higher-core upgrades and external data.
+It copies authoring into its evidence directory so it cannot overwrite a release
+MSI in `installers/msi/tmp`. Probe fixtures are never release artifacts. The
+manual `msi-prerelease-policy.yml` workflow runs this check on x64 and ARM64;
+this is separate from full application and WinGet lifecycle matrices.
+
 ## WinGet scope workaround
 
 WinGet 1.29.380 can report this per-user MSI as Machine because its ARP inventory
