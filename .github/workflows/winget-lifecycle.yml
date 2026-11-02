@@ -1,0 +1,180 @@
+name: WinGet Windows lifecycle
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: 'Optional prior run whose immutable test candidates should be reused (record this provenance in the evidence)'
+        required: false
+        type: string
+      cases:
+        description: 'Select the complete matrix or MSI cases only'
+        required: true
+        default: all
+        type: choice
+        options: [all, msi, x64]
+      source_type:
+        description: 'Private candidate source implementation'
+        required: true
+        default: Rest
+        type: choice
+        options: [Rest, PreIndexed]
+      public_baseline:
+        description: 'Install legacy 2.0.0 from the genuine public winget source and preserve its tracking'
+        required: true
+        default: false
+        type: boolean
+      direct_msi:
+        description: 'Also run direct msiexec lifecycle (disable only when reusing separately verified direct-MSI evidence)'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    if: ${{ !inputs.candidate_run_id }}
+    name: Build test candidate (${{ matrix.arch }})
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86, x64, arm64]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1, repository SDK/security pin
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - name: Build current-source payloads and MSIs (test-only versions 2.1.7 and 2.1.8)
+        env:
+          TEST_ARCH: ${{ matrix.arch }}
+        run: |
+          New-Item -ItemType Directory -Force candidate | Out-Null
+          foreach ($version in @('2.1.7','2.1.8')) {
+            $name = if ($version -eq '2.1.7') { 'grate' } else { 'grate-next' }
+            dotnet publish ./src/grate/grate.csproj -c Release -f net11.0 -r "win-$env:TEST_ARCH" --self-contained true "-p:Version=$version" -o "./test-publish-$version"
+            if ($LASTEXITCODE -ne 0) { throw 'Candidate publish failed.' }
+            Compress-Archive -Path "./test-publish-$version/*" -DestinationPath "./candidate/$name.zip"
+            if ($env:TEST_ARCH -ne 'x86') {
+              ./installers/msi/Create-Installer.ps1 -grateExe "./test-publish-$version/grate.exe" -version $version -arch $env:TEST_ARCH
+              Copy-Item "./installers/msi/tmp/grate-$version.msi" "./candidate/$name.msi"
+            }
+          }
+          if ($env:TEST_ARCH -ne 'x86') {
+            ./installers/msi/Create-Installer.ps1 -grateExe ./test-publish-2.1.7/grate.exe -version 2.1.7 -arch $env:TEST_ARCH -TestFailBeforeFinalize
+            Copy-Item ./installers/msi/tmp/grate-2.1.7.msi ./candidate/grate-rollback.msi
+          }
+          Get-FileHash ./candidate/* -Algorithm SHA256 | Format-Table
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: winget-lifecycle-candidate-${{ matrix.arch }}
+          path: candidate/
+          retention-days: 7
+
+  lifecycle:
+    name: Install and upgrade (${{ matrix.type }}, ${{ matrix.arch }})
+    permissions:
+      contents: read
+      actions: read
+    needs: candidate
+    if: ${{ !cancelled() && (needs.candidate.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.candidate.result == 'skipped' && inputs.candidate_run_id)) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.cases == 'x64' && '[{"type":"zip","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"x64","runner":"windows-2022"}]' || inputs.cases == 'msi' && '[{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]' || '[{"type":"zip","arch":"x86","runner":"windows-latest"},{"type":"zip","arch":"x64","runner":"windows-latest"},{"type":"zip","arch":"arm64","runner":"windows-11-arm"},{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]') }}
+    defaults:
+      run:
+        # MSI inventory uses COM. Keep the waiting test thread out of STA so
+        # installer window/COM messages can be serviced on their own apartment.
+        shell: pwsh -NoLogo -NoProfile -NonInteractive -MTA -Command ". '{0}'"
+    env:
+      TEST_ARCH: ${{ matrix.arch }}
+      TEST_TYPE: ${{ matrix.type }}
+      TEST_SOURCE_TYPE: ${{ inputs.source_type || 'Rest' }}
+      TEST_PUBLIC_BASELINE: ${{ inputs.public_baseline }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: winget-lifecycle-candidate-${{ matrix.arch }}
+          path: candidate/
+          run-id: ${{ inputs.candidate_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Download other architecture for MSI coexistence guard
+        if: matrix.type == 'wix' && inputs.direct_msi
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: winget-lifecycle-candidate-${{ matrix.arch == 'arm64' && 'x64' || 'arm64' }}
+          path: other-candidate/
+          run-id: ${{ inputs.candidate_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Download and verify historical payloads
+        id: assets
+        run: ./installers/winget/Get-LifecycleAssets.ps1 -Architecture $env:TEST_ARCH -InstallerType $env:TEST_TYPE -CandidateDirectory ./candidate -OutputDirectory "$env:RUNNER_TEMP/lifecycle"
+      - name: Record test-candidate provenance
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id || github.run_id }}
+          DIRECT_MSI_REQUESTED: ${{ inputs.direct_msi }}
+        run: |
+          $headers = @{Authorization="Bearer $env:GH_TOKEN"; Accept='application/vnd.github+json'}
+          $run = Invoke-RestMethod "https://api.github.com/repos/grate-devs/grate/actions/runs/$env:CANDIDATE_RUN_ID" -Headers $headers
+          @{ CandidateRunId=$run.id; CandidateSourceCommit=$run.head_sha; ScriptCommit=$env:GITHUB_SHA; Architecture=$env:TEST_ARCH; DirectMsiRequested=$env:DIRECT_MSI_REQUESTED } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/lifecycle/candidate-provenance.json"
+      - name: Actual MSI major upgrade and rollback
+        id: native_msi
+        if: matrix.type == 'wix' && inputs.direct_msi
+        timeout-minutes: 8
+        run: |
+          ./installers/msi/Test-WinGetMsiLifecycle.Assertions.Tests.ps1
+          ./installers/msi/Test-MsiLifecycleSupervisor.Tests.ps1
+          $inventory = Get-Content "$env:RUNNER_TEMP/lifecycle/inventory.json" -Raw | ConvertFrom-Json
+          $old = @($inventory.Versions | Where-Object Version -in @('2.0.0','2.1.6'))
+          $candidate = $inventory.Versions | Where-Object Version -eq '2.1.7'
+          $next = $inventory.Versions | Where-Object Version -eq '2.1.8'
+          ./installers/msi/Invoke-MsiLifecycle.ps1 -Parameters @{
+            HistoricalMsiPaths=@($old.MsiPath); HistoricalExecutablePaths=@($old.Executable)
+            CandidateMsiPath=$candidate.MsiPath; CandidateExecutable=$candidate.Executable
+            NextMsiPath=$next.MsiPath; NextExecutable=$next.Executable
+            OtherArchitectureMsiPath='./other-candidate/grate.msi'; RollbackMsiPath='./candidate/grate-rollback.msi'
+            Architecture=$env:TEST_ARCH; OutputDirectory="$env:RUNNER_TEMP/lifecycle/direct-msi"
+          }
+      - name: Install pinned WinGet on disposable runner
+        id: winget
+        # A failed/timed-out native installer can leave a transaction running.
+        # Retain its diagnostics before querying that MSI service again.
+        if: ${{ !cancelled() && steps.assets.outcome == 'success' && (steps.native_msi.outcome == 'success' || steps.native_msi.outcome == 'skipped') }}
+        run: |
+          $winget = ./installers/winget/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+          "TEST_WINGET=$winget" | Out-File $env:GITHUB_ENV -Append
+      - name: Actual WinGet package-ID transition with selected source and baseline
+        if: ${{ !cancelled() && steps.winget.outcome == 'success' }}
+        timeout-minutes: 10
+        run: |
+          if ($env:TEST_TYPE -eq 'wix') {
+            ./installers/winget/Test-MigrationManifestPreparation.ps1 -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/manifest-policy" -Winget $env:TEST_WINGET
+          }
+          ./installers/winget/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
+          if ($env:TEST_SOURCE_TYPE -eq 'PreIndexed') { ./installers/winget/test-source/preindexed/Test-SingletonManifests.Tests.ps1 }
+          ./installers/winget/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests" -SourceType $env:TEST_SOURCE_TYPE -PublicBaseline:($env:TEST_PUBLIC_BASELINE -eq 'true')
+      - name: Retain raw lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: winget-lifecycle-${{ matrix.type }}-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/lifecycle/**/*.json
+            ${{ runner.temp }}/lifecycle/**/*.log
+            ${{ runner.temp }}/lifecycle/**/*.yaml
+            ${{ runner.temp }}/lifecycle/**/*.txt
+            ${{ runner.temp }}/lifecycle/source-tests/server/source/**
+          if-no-files-found: warn
+          retention-days: 7

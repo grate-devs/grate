@@ -103,6 +103,7 @@ jobs:
       with:
         ref: ${{ needs.set-version-number.outputs.checkout-ref }}
         persist-credentials: false
+    - run: python3 -m pip install -r eng/requirements-workflow-tests.txt
     - run: python3 -m unittest discover -s eng -p 'test_*.py' -v
     - run: python3 -m unittest discover -s installers/docker -p 'test_*.py' -v
 
@@ -386,6 +387,14 @@ jobs:
         name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
         path: ${{ matrix.arch }}/
 
+    - name: Test WinGet preparation and MSI identity contracts
+      shell: pwsh
+      run: |
+        ./installers/winget/Test-CreateInstaller.Tests.ps1
+        ./installers/winget/Test-InstallerCorrelation.Tests.ps1
+        ./installers/msi/Test-InstallerAuthoring.Tests.ps1
+        ./installers/msi/Test-InstallerIdentity.Tests.ps1
+
     - name: Create msi
       run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -arch ("${{ matrix.arch }}" -replace "win-", "")
       env:
@@ -397,6 +406,7 @@ jobs:
         $name = "grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi"
         $msiFile = Get-ChildItem -Path ./installers/msi/tmp -Filter *.msi | Select-Object -First 1
         Copy-Item $msiFile.FullName -Destination $name
+        ./installers/msi/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
 
     - name: Upload MSI release asset ${{ matrix.arch }}
       uses: actions/upload-artifact@v7
@@ -770,65 +780,73 @@ jobs:
         path: docker-*.json
         if-no-files-found: warn
 
-  publish-winget:
-    name: Submit WinGet update (erikbra.grate)
+  prepare-winget:
+    name: Prepare WinGet migration candidate (no submission)
     needs:
       - set-version-number
       - release-ready
       - publish-github-release
     if: ${{ needs.set-version-number.outputs.is-release == 'true' && needs.set-version-number.outputs.is-prerelease != 'true' }}
     runs-on: windows-latest
-    environment: winget
+    timeout-minutes: 15
     permissions:
       contents: read
 
     steps:
-    - name: Validate WinGet publishing identity
-      shell: pwsh
-      env:
-        WINGET_GH_PAT: ${{ secrets.WINGET_GH_PAT }}
-      run: |
-        if ([string]::IsNullOrWhiteSpace($env:WINGET_GH_PAT)) {
-          throw "WINGET_GH_PAT is required to submit to microsoft/winget-pkgs."
-        }
-
-    - name: Submit WinGet manifest update
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        persist-credentials: false
+    - name: Prepare new-ID manifests from the final published assets
       shell: pwsh
       env:
         GH_TOKEN: ${{ github.token }}
-        WINGET_GH_PAT: ${{ secrets.WINGET_GH_PAT }}
+        WINGET_CREATE_GITHUB_TOKEN: ${{ github.token }}
         RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
       run: |
-        $ErrorActionPreference = "Stop"
-
-        gh api "repos/microsoft/winget-pkgs/contents/manifests/e/erikbra/grate/$env:VERSION" --silent 2>$null
-        if ($LASTEXITCODE -eq 0) {
-          "WinGet already contains erikbra.grate $env:VERSION; skipping submission." |
-            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          exit 0
+        $ErrorActionPreference = 'Stop'
+        $tool = Join-Path $env:RUNNER_TEMP 'wingetcreate.exe'
+        Invoke-WebRequest 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $tool
+        if ((Get-FileHash $tool -Algorithm SHA256).Hash -ne '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA') {
+          throw 'wingetcreate checksum does not match the pinned release.'
         }
+        ./installers/winget/Create-Installer.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -wingetCreate $tool -PrepareMigration -outputDirectory "$env:RUNNER_TEMP/winget-candidate"
+        @'
+        ## WinGet migration candidate
 
-        Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-
-        $baseUrl = "https://github.com/grate-devs/grate/releases/download/$env:RELEASE_TAG"
-        $urls = @(
-          "$baseUrl/grate-win-x86-self-contained-$env:VERSION.zip",
-          "$baseUrl/grate-win-x64-self-contained-$env:VERSION.zip",
-          "$baseUrl/grate-win-arm64-self-contained-$env:VERSION.zip",
-          "$baseUrl/grate-msi-win-x64-$env:VERSION.msi",
-          "$baseUrl/grate-msi-win-arm64-$env:VERSION.msi"
-        )
-        $arguments = @("update", "erikbra.grate", "-u") + $urls + @(
-          "-v", $env:VERSION,
-          "-t", $env:WINGET_GH_PAT,
-          "--submit"
-        )
-
-        & ./wingetcreate.exe @arguments
-        if ($LASTEXITCODE -ne 0) {
-          throw "wingetcreate failed with exit code $LASTEXITCODE."
-        }
+        Prepared only grate-devs.grate from the published stable release assets.
+        No manifest was submitted. Historical erikbra.grate versions stay unchanged.
+        Schema validation follows in this job. Installation of the final files, upstream acceptance,
+        and verification through the public winget source remain separate #800 steps.
+        See installers/winget/MIGRATION.md for the supported MSI and portable transitions.
+        '@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+    - name: Schema-validate the complete new-ID candidate
+      shell: pwsh
+      env:
+        VERSION: ${{ needs.set-version-number.outputs.semVer }}
+        SOURCE_COMMIT: ${{ needs.set-version-number.outputs.checkout-ref }}
+        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $winget = ./installers/winget/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+        $candidate = "$env:RUNNER_TEMP/winget-candidate"
+        & $winget validate --manifest "$candidate/manifests/g/grate-devs/grate/$env:VERSION" --disable-interactivity *>&1 | Tee-Object -FilePath "$candidate/schema.log"
+        if ($LASTEXITCODE -ne 0) { throw 'Final WinGet migration candidate failed schema validation.' }
+        @{
+          SourceCommit=$env:SOURCE_COMMIT; Version=$env:VERSION; ReleaseTag=$env:RELEASE_TAG
+          RunId=$env:GITHUB_RUN_ID; RunAttempt=$env:GITHUB_RUN_ATTEMPT
+          PackageIdentifier='grate-devs.grate'; Submitted=$false; SchemaValidated=$true
+          WingetVersion='1.29.380'; WingetCreateVersion='1.12.13.0'
+          WingetCreateSha256=(Get-FileHash "$env:RUNNER_TEMP/wingetcreate.exe" -Algorithm SHA256).Hash
+        } | ConvertTo-Json | Set-Content "$candidate/provenance.json"
+    - name: Retain WinGet candidate for review
+      if: ${{ always() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      with:
+        name: winget-migration-candidate-${{ needs.set-version-number.outputs.semVer }}
+        path: ${{ runner.temp }}/winget-candidate/
+        if-no-files-found: error
 
   publish-homebrew:
     name: Update Homebrew cask (erikbra/cask/grate)

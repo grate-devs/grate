@@ -40,7 +40,46 @@ try {
         $null = $faulty.Wix.Product.AppendChild($property)
         Assert-Rejected $faulty '*must not author ALLUSERS or MSIINSTALLPERUSER*'
     }
+
+    # New identity is intentional; persisted component/path identities and the
+    # explicit legacy bridge must survive future authoring edits.
+    $identityChanges = @(
+        @('/w:Wix/w:Product', 'Id', '*'),
+        @('/w:Wix/w:Product', 'Name', 'grate-devs.grate'),
+        @('/w:Wix/w:Product', 'Manufacturer', 'erikbra'),
+        @('/w:Wix/w:Product', 'UpgradeCode', '00000000-0000-0000-0000-000000000001'),
+        @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'erikbra'),
+        @("//w:Directory[@Id='ROOTDIRECTORY']", 'Name', 'grate-devs'),
+        @("//w:Directory[@Id='INSTALLFOLDER']", 'Name', 'grate-devs.grate'),
+        @("//w:Component[@Id='MainExecutable']", 'Guid', '*'),
+        @("//w:Component[@Id='PathVariable']", 'Guid', '*'),
+        @("//w:Component[@Id='MainExecutable']/w:RegistryValue", 'Root', 'HKLM'),
+        @("//w:Component[@Id='MainExecutable']/w:RegistryValue", 'Key', 'Software\Microsoft\grate-devs\grate')
+    )
+    foreach ($change in $identityChanges) {
+        [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+        $namespaces = [System.Xml.XmlNamespaceManager]::new($faulty.NameTable)
+        $namespaces.AddNamespace('w', 'http://schemas.microsoft.com/wix/2006/wi')
+        $faulty.SelectSingleNode($change[0], $namespaces).SetAttribute($change[1], $change[2])
+        Assert-Rejected $faulty '*must preserve the MSI identity*'
+    }
+    [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+    $faulty.Wix.Product.Directory.Directory.SetAttribute('Id', 'ProgramFilesFolder')
+    Assert-Rejected $faulty '*must preserve the per-user MSI installation path*'
+
+    foreach ($upgradeElement in @('MajorUpgrade', 'Upgrade')) {
+        [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+        $element = $faulty.CreateElement($upgradeElement, $faulty.DocumentElement.NamespaceURI)
+        $null = $faulty.Wix.Product.AppendChild($element)
+        Assert-Rejected $faulty '*transactional MajorUpgrade*'
+    }
+    [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+    $faulty.Wix.Product.MajorUpgrade.SetAttribute('Schedule', 'afterInstallValidate')
+    Assert-Rejected $faulty '*transactional MajorUpgrade*'
+    [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+    $faulty.Wix.Product.InstallExecuteSequence.Custom.SetAttribute('After', 'InstallValidate')
+    Assert-Rejected $faulty '*transactional MajorUpgrade*'
 } finally {
     Remove-Item -LiteralPath $fixture -ErrorAction SilentlyContinue
 }
-Write-Host 'PASS: MSI directory cleanup and per-user-only ICE91 advisory contract.'
+Write-Host 'PASS: MSI directory cleanup, per-user-only ICE91 advisory, persistent components and transactional legacy upgrade authoring.'

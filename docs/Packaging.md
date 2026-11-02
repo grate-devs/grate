@@ -57,13 +57,17 @@ files/packages; submission to the external repositories/feeds is separate.
   on a machine with Chocolatey installed. It embeds the executable and records
   its SHA256 in `tools/VERIFICATION.txt`. Check the generated `.nupkg` and install
   it from a local source before submitting it to the Chocolatey feed.
-- **winget:** install Microsoft's [wingetcreate](https://github.com/microsoft/winget-create),
-  then run `./installers/winget/Create-Installer.ps1 -version <version>`.
-  It downloads and hashes the three Windows ZIPs and two MSIs to match the
-  [community manifest](https://github.com/microsoft/winget-pkgs/tree/master/manifests/e/erikbra/grate).
-  Review the generated URLs, SHA256 values, architectures and MSI metadata;
-  run `winget validate <manifest-directory>` and test local installation before
-  submitting an update to `microsoft/winget-pkgs`.
+- **WinGet:** for a stable release with corrected MSI identity, run
+  `./installers/winget/Create-Installer.ps1 -version <version> -PrepareMigration`.
+  The release workflow prepares the same new-ID candidate after uploading the
+  final assets. It verifies asset URLs and actual MSI hashes/identity; submission
+  remains separate. Default mode is reserved for historical old-identity MSIs
+  and rejects corrected payloads. Do not submit those payloads under `erikbra.grate`.
+  Review the generated `grate-devs.grate` manifests, run
+  `winget validate --manifest <manifest-directory>` and verify installation and
+  migration with the final files before submitting to `microsoft/winget-pkgs`.
+  See the [migration contract and Windows evidence](../installers/winget/MIGRATION.md)
+  for the different MSI and portable transition commands and pending public acceptance.
 
 Use `-releaseTag <tag>` with the Homebrew/winget generators if the release tag
 differs from the numeric grate version. External channel publication and native
