@@ -5,6 +5,8 @@ $verify = Join-Path $PSScriptRoot 'verify-packages.ps1'
 $root = Join-Path ([IO.Path]::GetTempPath()) ('grate-package-contract-' + [Guid]::NewGuid().ToString('N'))
 $oldPath = $env:PATH
 $oldExit = $env:GRATE_MOCK_PUBLISH_EXIT
+$hadNativeExitCode = $null -ne (Get-Variable LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue)
+$oldNativeExitCode = $global:LASTEXITCODE
 try {
     New-Item -ItemType Directory -Path "$root/bin" -Force | Out-Null
     # A real child process preserves native exit handling, unlike a function mock.
@@ -67,5 +69,9 @@ New-Item -ItemType Directory -Path $output, $build -Force | Out-Null
     $env:PATH = $oldPath
     $env:GRATE_MOCK_PUBLISH_EXIT = $oldExit
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+    # The expected exit-42 case must not become the result of GitHub's pwsh
+    # wrapper, which exits with LASTEXITCODE after dot-sourcing the step script.
+    if ($hadNativeExitCode) { $global:LASTEXITCODE = $oldNativeExitCode }
+    else { Remove-Variable LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
 }
 Write-Host 'PASS: explicit standalone fixture versions reach publish; native publish failures stop verification.'
