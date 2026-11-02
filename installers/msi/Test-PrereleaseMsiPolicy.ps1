@@ -57,16 +57,21 @@ function Inventory {
 function Assert-Current([string]$Release) {
     $expected=$fixtures[$Release]
     $inventories=@(Inventory)
+    $current=@($inventories | Where-Object ProductCode -IEQ $expected.Identity.ProductCode)
+    if ($current.Count -ne 1) { throw 'Inventory did not return exactly the expected product.' }
+    Assert-WinGetMsiNativeContext -Inventory $current[0].Inventory -ExpectedVersion $expected.Core -ExpectedPublisher 'grate-devs'
     foreach ($item in $inventories) {
-        if ($item.ProductCode -ieq $expected.Identity.ProductCode) {
-            Assert-WinGetMsiNativeContext -Inventory $item.Inventory -ExpectedVersion $expected.Core -ExpectedPublisher 'grate-devs'
-        } elseif (@($item.Inventory.Contexts).Count -ne 0) { throw 'An unexpected fixture product is still installed.' }
+        if ($item.ProductCode -ine $expected.Identity.ProductCode -and @($item.Inventory.Contexts).Count -ne 0) { throw 'An unexpected fixture product is still installed.' }
     }
     if (!(Test-Path $installed) -or (Get-FileHash $installed).Hash -ne $expected.PayloadHash) { throw "Installed payload is not exactly $Release." }
     if ((Get-FileHash $data).Hash -ne $dataHash) { throw 'MSI operation changed external data.' }
 }
 function Msi([string]$Operation,[string]$Release,[string]$Name,[int]$ExpectedExit=0) {
-    $result=Run "$env:SystemRoot/System32/msiexec.exe" @($Operation,$fixtures[$Release].Msi,'/qn','/norestart','/l*v',"$OutputDirectory/$Name.msi.log") $Name
+    # Windows Installer rejects forward slashes inside a local package path
+    # (1324/1619), even though COM metadata reads accept the same path.
+    $package=(Resolve-Path -LiteralPath $fixtures[$Release].Msi).ProviderPath
+    $log=Join-Path $OutputDirectory "$Name.msi.log"
+    $result=Run "$env:SystemRoot/System32/msiexec.exe" @($Operation,$package,'/qn','/norestart','/l*v',$log) $Name
     if ($result -ne $ExpectedExit) { throw "$Name returned $result; expected $ExpectedExit." }
     if ((Get-FileHash $data).Hash -ne $dataHash) { throw "$Name changed external data." }
     if ($ExpectedExit -eq 1603 -and (Get-Content "$OutputDirectory/$Name.msi.log" -Raw) -notmatch 'A different grate MSI has the same numeric version') { throw 'Refusal did not come from the same-core policy guard.' }
