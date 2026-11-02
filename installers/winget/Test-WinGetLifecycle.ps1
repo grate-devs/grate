@@ -110,8 +110,8 @@ function Snapshot([string]$Name) {
     @(Get-Command grate -All -ErrorAction SilentlyContinue | Select-Object Source,CommandType) | ConvertTo-Json | Set-Content "$OutputDirectory/$Name.commands.json"
     $null = Run 'where.exe' @('grate') "$Name-where" -Observe
 }
-function Write-Catalog([switch]$Both) {
-    & "$PSScriptRoot/New-LifecycleCatalog.ps1" -Inventory $inventory -Both:$Both |
+function Write-Catalog([switch]$Both,[switch]$IncludeBridge) {
+    & "$PSScriptRoot/New-LifecycleCatalog.ps1" -Inventory $inventory -Both:$Both -IncludeBridge:$IncludeBridge |
         ConvertTo-Json -Depth 15 | Set-Content "$catalogPath.tmp"
     [IO.File]::Move("$catalogPath.tmp", $catalogPath, $true)
 }
@@ -234,31 +234,19 @@ try {
             $direct=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) "$name-new-id-direct" -Observe
             if ($direct.ExitHex -ne '0x8A150014') { throw "New ID unexpectedly matched a legacy MSI: $($direct.ExitHex)." }
             Assert-Installed $legacy $oldId
-            $null=W (@('upgrade','--id',$oldId,'--version','2.1.7')+$upgradeOptions) "$name-bridge-upgrade"
+            # Install the new identity directly. Its MSI transaction detects
+            # and upgrades the legacy product; WinGet records the new ARP codes
+            # under the new ID, so it never contaminates the old tracking record.
+            $null=W (@('install','--id',$newId,'--version','2.1.7')+$upgradeOptions+@('--architecture',$arch,'--installer-type',$type)) "$name-new-id-replacement-install"
             Assert-Installed '2.1.7' $newId
-            Snapshot "$name-after-bridge"
-            $afterNew=Get-Content "$OutputDirectory/$name-after-bridge-list-$newId.command.json" -Raw | ConvertFrom-Json
-            $afterOld=Get-Content "$OutputDirectory/$name-after-bridge-list-$oldId.command.json" -Raw | ConvertFrom-Json
-            if ($afterNew.ExitCode -ne 0 -or $afterOld.ExitHex -notin @('0x00000000','0x8A150014')) { throw 'Unexpected package correlation after the bridge payload upgrade.' }
-            $trackingAlias=$afterOld.ExitCode -eq 0
-            Migrate "$name-after-bridge"
-            # A WinGet upgrade records detected new product/family codes under
-            # the ID used for the command, even when the bridge omits them.
-            # Remove that record through the supported uninstall command. The
-            # resolved ID transition must then be exclusive without editing
-            # WinGet's private tracking database or accepting a fallback.
-            $uninstallId=if ($trackingAlias) {$oldId} else {$newId}
-            $null=Uninstall $uninstallId "$name-transition-uninstall"
-            $null=W (@('install','--id',$newId,'--version','2.1.7')+$upgradeOptions+@('--architecture',$arch,'--installer-type',$type)) "$name-transition-new-install"
-            Assert-Installed '2.1.7' $newId
-            Assert-NewIdCorrelation "$name-after-explicit-transition"
-            Migrate "$name-after-explicit-transition"
+            Assert-NewIdCorrelation "$name-after-replacement"
+            Migrate "$name-after-replacement"
             $null=W (@('upgrade','--id',$newId,'--version','2.1.8')+$upgradeOptions) "$name-next-upgrade"
             Assert-Installed '2.1.8' $newId
             Assert-NewIdCorrelation "$name-after-next"
             Migrate "$name-after-next"
             $null=Uninstall $newId "$name-uninstall"
-            $summary.LegacyUpgrades+=@{From=$legacy; Bridge='2.1.7'; Next='2.1.8'; WinGetUpgrade='Passed'; OldIdTrackingAliasAfterBridge=$trackingAlias; AutomaticBridgeCorrelationVerified=(!$trackingAlias); ExplicitNewIdTransitionVerified=$true; ExclusiveNewId=$true; DataPreserved=$true}
+            $summary.LegacyUpgrades+=@{From=$legacy; NewIdentityVersion='2.1.7'; Next='2.1.8'; WinGetReplacementInstall='Passed'; PreviousProductRemoved=$true; ExplicitNewIdTransitionVerified=$true; ExclusiveNewId=$true; DataPreserved=$true}
         }
         # Probe the explicit scope selector separately. Some clients reject
         # unspecified manifest scope; either outcome must preserve actual
@@ -277,11 +265,24 @@ try {
         Migrate 'fresh-new-id'
         $null=Uninstall $newId 'fresh-new-id-uninstall'
         $summary.ExclusiveWinGetNewIdCorrelationVerified=$true
-        $summary.LegacyWinGetMsiUpgradeVerified=$true
-        $summary.AutomaticBridgeCorrelationVerified=@($summary.LegacyUpgrades | Where-Object { !$_.AutomaticBridgeCorrelationVerified }).Count -eq 0
+        $summary.LegacyWinGetMsiReplacementVerified=$true
+        # Characterize the rejected publisher-bridge strategy only AFTER every
+        # acceptance test, since this command poisons the old ID tracking with
+        # the new stable family. This manifest is never a publishing output.
+        Write-Catalog -Both -IncludeBridge
+        $null=W (@('install','--id',$oldId,'--version','2.1.6')+$installOptions) 'diagnostic-bridge-legacy-install'
+        Assert-Installed '2.1.6' $oldId
+        $null=W (@('upgrade','--id',$oldId,'--version','2.1.7')+$upgradeOptions) 'diagnostic-bridge-upgrade'
+        Assert-Installed '2.1.7' $newId
+        Snapshot 'diagnostic-bridge-after-upgrade'
+        $oldBridge=Get-Content "$OutputDirectory/diagnostic-bridge-after-upgrade-list-$oldId.command.json" -Raw | ConvertFrom-Json
+        $summary.RejectedBridgeStrategyOldIdStillMatches=$oldBridge.ExitCode -eq 0
+        $summary.AutomaticBridgeCorrelationVerified=$false
+        Migrate 'diagnostic-bridge'
+        $null=Uninstall $oldId 'diagnostic-bridge-final-uninstall'
         $summary.ExplicitNewIdTransitionVerified=$true
         $summary.Completed=$true
-        Write-Host "PASS: $type $arch per-user MSI, both legacy upgrades, explicit exclusive ID transition, next-version upgrade, fresh install and data preservation. Automatic tracking behavior is recorded separately."
+        Write-Host "PASS: $type $arch per-user MSI, both legacy MSI replacement installs, exclusive ID transition, next-version upgrade, fresh install and data preservation. Automatic tracking behavior is recorded separately."
     } else {
         $null=W (@('install','--id',$oldId,'--version','2.0.0')+$installOptions) 'old-install'
         Assert-Installed '2.0.0' $oldId

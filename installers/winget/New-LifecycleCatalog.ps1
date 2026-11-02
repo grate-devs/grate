@@ -2,7 +2,8 @@
 # Native REST manifest data only: no installation, network or filesystem writes.
 param(
     [Parameter(Mandatory)]$Inventory,
-    [switch]$Both
+    [switch]$Both,
+    [switch]$IncludeBridge
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
@@ -43,7 +44,8 @@ function Package([string]$Id, [object[]]$Versions) {
     }
     @{PackageIdentifier=$Id; Versions=@($entries)}
 }
-$lastOld=if ($Both) {'2.1.7'} else {'2.1.6'}
+if ($IncludeBridge -and !$Both) { throw 'A diagnostic bridge requires both listings.' }
+$lastOld=if ($IncludeBridge) {'2.1.7'} else {'2.1.6'}
 $packages = @(Package $oldId @($Inventory.Versions | Where-Object { [version]$_.Version -le [version]$lastOld }))
 if ($Both) { $packages += Package $newId @($Inventory.Versions | Where-Object { [version]$_.Version -ge [version]'2.1.7' }) }
 @{SourceIdentifier='grate-migration-ci'; Packages=$packages}

@@ -22,9 +22,11 @@ foreach ($type in @('wix','zip')) {
         Require ($both.SourceIdentifier -eq $before.SourceIdentifier -and $both.Packages.Count -eq 2) 'Both listings must use the unchanged source identity.'
         $old=$both.Packages | Where-Object PackageIdentifier -eq 'erikbra.grate'
         $new=$both.Packages | Where-Object PackageIdentifier -eq 'grate-devs.grate'
-        Require (($old.Versions.PackageVersion -join ',') -eq '2.0.0,2.1.6,2.1.7') 'The old listing must stop at its bridge version.'
+        Require (($old.Versions.PackageVersion -join ',') -eq '2.0.0,2.1.6') 'The old listing must retain only historical identities.'
         Require (($new.Versions.PackageVersion -join ',') -eq '2.1.7,2.1.8') 'The new listing must not alias any historical version.'
-        $bridge=($old.Versions | Where-Object PackageVersion -eq '2.1.7').Installers[0]
+        $diagnostic=& "$PSScriptRoot/New-LifecycleCatalog.ps1" -Inventory $inventory -Both -IncludeBridge
+        $diagnosticOld=$diagnostic.Packages | Where-Object PackageIdentifier -eq 'erikbra.grate'
+        $bridge=($diagnosticOld.Versions | Where-Object PackageVersion -eq '2.1.7').Installers[0]
         foreach ($node in $new.Versions) {
             Require ($node.DefaultLocale.Publisher -eq 'grate-devs') 'New listing publisher mismatch.'
             $installer=$node.Installers[0]
