@@ -139,3 +139,20 @@ legacy upgrade. Portable ZIP users explicitly uninstall the old ID and install
 the new one. Keep public installation instructions on the accepted identity
 until that handoff is complete. Full commands and evidence limits are in the
 [WinGet migration guide](../installers/winget/MIGRATION.md).
+
+### Prerelease MSI identity
+
+Windows Installer stores a numeric three-part ProductVersion. The full SemVer
+release version is also passed to the MSI builder so prereleases receive distinct
+ProductCodes; stable ProductCodes and architecture UpgradeCodes stay unchanged.
+Different releases with the same numeric core (for example `2.2.0-rc.1`,
+`2.2.0-rc.2` and `2.2.0`) require explicit uninstall/reinstall. The installer
+refuses that switch before changing an existing installation. Normal upgrades
+to a higher numeric version retain the tested stable major-upgrade path.
+WinGet preparation remains stable-only.
+
+For local workflow-policy checks, install the pinned YAML parser in a temporary
+virtual environment with `python -m pip install -r eng/requirements-workflow-tests.txt`,
+then run `python -m unittest discover -s eng -p 'test_*.py'`. The MSI build jobs
+run the PowerShell contract tests on Windows and verify the actual built files;
+local checks on another OS do not establish native installer behavior.

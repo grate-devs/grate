@@ -396,7 +396,7 @@ jobs:
         ./installers/msi/Test-InstallerIdentity.Tests.ps1
 
     - name: Create msi
-      run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -arch ("${{ matrix.arch }}" -replace "win-", "")
+      run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -ReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -arch ("${{ matrix.arch }}" -replace "win-", "")
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
@@ -406,7 +406,7 @@ jobs:
         $name = "grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi"
         $msiFile = Get-ChildItem -Path ./installers/msi/tmp -Filter *.msi | Select-Object -First 1
         Copy-Item $msiFile.FullName -Destination $name
-        ./installers/msi/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
+        ./installers/msi/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
 
     - name: Upload MSI release asset ${{ matrix.arch }}
       uses: actions/upload-artifact@v7

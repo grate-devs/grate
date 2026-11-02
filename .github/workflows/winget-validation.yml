@@ -3,12 +3,14 @@ name: WinGet manifest preparation
 on:
   pull_request:
     paths:
+      - '.github/workflows/build.yml'
       - 'installers/winget/**'
       - 'installers/msi/**'
       - '.github/workflows/winget-validation.yml'
   push:
-    branches: [main, feat/800-winget-migration]
+    branches: [main, feat/800-winget-migration, feat/796-automate-releases]
     paths:
+      - '.github/workflows/build.yml'
       - 'installers/winget/**'
       - 'installers/msi/**'
       - '.github/workflows/winget-validation.yml'

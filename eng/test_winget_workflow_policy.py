@@ -52,8 +52,10 @@ class WinGetWorkflowPolicyTests(unittest.TestCase):
         self.assertLess(check, upload)
         self.assertIn('-MsiPath $name', steps[check]['run'])
         self.assertIn('-ExpectedVersion', steps[check]['run'])
+        self.assertIn('-ExpectedReleaseVersion "${{ needs.set-version-number.outputs.semVer }}"', steps[check]['run'])
         self.assertIn('-ExpectedArchitecture', steps[check]['run'])
         commands = '\n'.join(step.get('run', '') for step in steps)
+        self.assertIn('-ReleaseVersion "${{ needs.set-version-number.outputs.semVer }}"', commands)
         for contract in ('Test-CreateInstaller.Tests.ps1', 'Test-InstallerCorrelation.Tests.ps1',
                          'Test-InstallerAuthoring.Tests.ps1', 'Test-InstallerIdentity.Tests.ps1'):
             self.assertIn(contract, commands)
