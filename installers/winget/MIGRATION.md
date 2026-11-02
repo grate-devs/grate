@@ -144,12 +144,65 @@ architecture, digest and stable family, then emits only `grate-devs.grate`.
 
 The opt-in Windows lifecycle workflow builds test-only 2.1.7/2.1.8 artifacts from
 source. It pins WinGet 1.29.380, preserves candidate run/source/script provenance
-and serves both IDs simultaneously through an isolated HTTPS REST source.
+and supports isolated HTTPS REST and preindexed SQLite sources.
 Candidates may be reused without rebuilding the MSI when only test scripts change.
-The source returns every matching strong identity. It advertises normalized
+The REST source returns every matching strong identity. It advertises normalized
 name/publisher pair search as unsupported, rather than approximating it with a
 misleading name-only match. This is an explicit REST fixture capability, not a
 claim of equivalence with the community source's SQLite implementation.
+
+### Preindexed source and public-origin checks
+
+Select `source_type=PreIndexed` to exercise `Microsoft.PreIndexed.Package`.
+The harness downloads checksum-pinned `Microsoft.WindowsPackageManager.Utils`
+1.29.380 and calls its native index APIs. Microsoft code performs index creation,
+normalization, consistency checks, manifest stream hashing and packaging
+preparation; the fixture does not manufacture SQLite rows or correlation results.
+Each version becomes one complete singleton YAML stream, avoiding the V2
+index's multi-file manifest stream-hash ambiguity. Both IDs and all four versions
+are present from the beginning in the private-origin case. The index is immutable
+throughout that run; the rejected bridge diagnostic remains REST-only.
+
+Windows SDK tools package and sign V2 (`source2.msix`, SQLite 2.0) and fallback
+V1 (`source.msix`, SQLite 1.7) sources with a disposable certificate. A temporary
+registration determines the actual source package family and is removed before
+WinGet adds the source. WinGet must then fetch/register the source itself over
+HTTPS. The server also serves the native V2 compressed version-data files and
+unchanged installer assets. Evidence includes source exports, native index logs,
+source packages, indexes, manifests, hashes, utility/SDK provenance and HTTP logs.
+Certificate private keys remain outside uploaded evidence and trust is removed
+during cleanup.
+
+Select `public_baseline=true` to install historical 2.0.0 with the genuine
+`--source winget` before adding the candidate source. This is the historical
+version currently present in the public catalog; 2.1.6 is tested separately through
+the private catalog. The test preserves the public source and WinGet tracking,
+asserts the old ID's public origin in export before candidate addition, and checks
+that the public source's URL/type/identifier remain unchanged. The private
+candidate catalog contains only the new ID in this scenario, avoiding a duplicate
+old package in a second source.
+
+After the rejected direct new-ID upgrade, the supported transition, and the next
+new-ID upgrade, assertions inspect both source-filtered and unfiltered exact-ID
+queries plus global export. This catches an old public tracking alias that would
+be invisible when looking only at the candidate source. MSI still upgrades
+transactionally; portable ZIP explicitly uninstalls the public old ID first.
+Actual payload, native context, command, user data and strict uninstall checks
+remain active.
+
+For example, reuse the verified candidate artifacts without rebuilding them:
+
+```powershell
+gh workflow run winget-lifecycle.yml --ref feat/800-winget-migration -f candidate_run_id=41363831167 -f cases=all -f direct_msi=false -f source_type=PreIndexed -f public_baseline=false
+gh workflow run winget-lifecycle.yml --ref feat/800-winget-migration -f candidate_run_id=41363831167 -f cases=all -f direct_msi=false -f source_type=PreIndexed -f public_baseline=true
+```
+
+`direct_msi=false` reuses the independent major-upgrade/rollback evidence below;
+it does not skip the actual MSI installations performed through WinGet. `cases=x64`
+provides a two-job ZIP/MSI bootstrap check; `all` retains all five architectures/
+installer combinations. Public origin is reported separately from public
+destination: the new package still comes from a private source with its own
+identity, even when its source implementation is the same as the public catalog.
 
 Native tests isolate read-only MSI inventory/metadata from the process that
 waits for installation. A supervised child has an outer deadline, and diagnostic
@@ -164,6 +217,36 @@ probe. Artifacts retain raw MSI/WinGet logs, native inventories, commands,
 manifests, exports and results for seven days.
 
 ## Evidence and limits
+
+The additional checks passed at script commit
+`27458d4065010cfd7f8e520c1d8bb615205dd514`, using the same immutable candidates and
+unchanged MSI/application inputs as the earlier lifecycle run:
+
+| Source and baseline | Verified result |
+| --- | --- |
+| [Private SQLite, run 41402119958](https://github.com/grate-devs/grate/actions/runs/41402119958) | ZIP x86/x64/ARM64 and MSI x64/ARM64: both IDs in one native SQLite 2.0 catalog, historical installs, supported ID transition, exclusive new-ID correlation/export, subsequent upgrade, data preservation and strict uninstall |
+| [Public origin to private SQLite, run 41402122968](https://github.com/grate-devs/grate/actions/runs/41402122968) | All five combinations: actual public 2.0.0 install, public source/tracking preserved, new-ID transition, all-source and individual-source correlation, global export, next upgrade, data preservation and strict uninstall |
+
+Both matrices require the actual registered candidate source type, family and
+URL to match the prepared source. All five public-origin jobs fetched
+`source2.msix` over HTTPS and opened a native SQLite 2.0 index; the public source
+kept its original Microsoft identity. Independent review checked the 120 exact
+query results, 20 stage exports, five pre-candidate exports, source package/index
+and manifest hashes, native registrations and 30 successful migration invocations
+in the public-origin matrix.
+The private-origin matrix was independently checked for both indexed IDs/all
+four manifest streams, real V2 requests, exclusive exports, both historical MSI
+replacement routes on x64/ARM64 and 52 successful migration invocations.
+
+[Preparation run 41402119754](https://github.com/grate-devs/grate/actions/runs/41402119754)
+passed at the same script commit, including the existing preparation/native
+compilation checks, 20 correlation/export checks (including deliberately wrong
+queries, aliases and source identities), five singleton conversion cases and the
+static-source path suite. The five static-source cases also passed locally.
+The earlier x64 public-origin REST and private SQLite bootstrap runs
+[41401625759](https://github.com/grate-devs/grate/actions/runs/41401625759) and
+[41401780301](https://github.com/grate-devs/grate/actions/runs/41401780301) passed;
+the full matrices above are the final source-test evidence.
 
 [Final Windows lifecycle run 41365480749](https://github.com/grate-devs/grate/actions/runs/41365480749)
 passed all five jobs with script commit
@@ -196,9 +279,10 @@ The local HTTPS protocol suite passed 14 cases. Independent review checked the
 actual x64/ARM64 registration, command, rollback, payload and data evidence.
 
 Artifacts retain raw MSI/WinGet logs, native inventories, manifests, commands,
-exports, provenance and result JSON for seven days. Tests use a private source
-and unpublished fixture versions. Community acceptance and repetition with
-actual published artifacts and `--source winget` remain external requirements.
+exports, provenance and result JSON for seven days. Candidate versions remain
+unpublished fixtures. Community acceptance and repetition with actual published
+candidate artifacts and the new ID from `--source winget` remain external
+requirements; these are distinct from the public-origin checks described above.
 Historical 1.2.0 and enterprise managed-user/machine installations have not been
 runtime-tested. A tracker already contaminated by a corrected old-ID bridge is
 an unresolved client limitation, outside the supported migration route.
