@@ -37,7 +37,12 @@ try {
     $stderr=$process.StandardError.ReadToEndAsync()
     if (!$process.WaitForExit($TimeoutSeconds*1000)) {
         $result.TimedOut=$true
-        $process.Kill($true)
+        # Avoid unbounded process-tree enumeration across native/emulated ARM64
+        # processes. Stop the owned worker directly; this VM is discarded and a
+        # failed native step never proceeds to further installer queries.
+        $result.KillRequestedUtc=[DateTime]::UtcNow.ToString('o')
+        $result | ConvertTo-Json | Set-Content "$directory/process.json"
+        $process.Kill()
         if (!$process.WaitForExit(10000)) { throw 'MSI worker could not be terminated within ten seconds.' }
     }
     $result.ExitCode=$process.ExitCode

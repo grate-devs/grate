@@ -28,9 +28,11 @@ $originalProcessPath = $env:Path
 $state = $null
 $sourceAdded = $false
 $testOwnsInstallation = $false
+$script:nativeInventoryCache=$null
+$script:nativeInventoryGeneration=0
 $summary = [ordered]@{ InstallerType=$type; Architecture=$arch; SourceIdentifier=$sourceIdentifier; CommunitySourceMigrationTested=$false; GrateVersionOptionRole='database migration version, not CLI version display' }
 
-function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$Observe) {
+function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$Observe, [int]$TimeoutSeconds=300) {
     $info = [Diagnostics.ProcessStartInfo]::new($Executable)
     $info.UseShellExecute = $false
     $info.RedirectStandardOutput = $true
@@ -42,8 +44,12 @@ function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$
         [void]$process.Start()
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
-        $timeout = !$process.WaitForExit(300000)
-        if ($timeout) { $process.Kill($true); $process.WaitForExit() }
+        @{Executable=$Executable; Arguments=$Arguments; ProcessId=$process.Id; State='Running'; StartedUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json -Depth 8 | Set-Content "$OutputDirectory/$Name.command.json"
+        $timeout = !$process.WaitForExit($TimeoutSeconds*1000)
+        if ($timeout) {
+            $process.Kill()
+            if (!$process.WaitForExit(5000)) { throw "$Name did not terminate after its deadline." }
+        }
         $output = $stdout.WaitAsync([TimeSpan]::FromSeconds(5)).GetAwaiter().GetResult() + $stderr.WaitAsync([TimeSpan]::FromSeconds(5)).GetAwaiter().GetResult()
         $result = [pscustomobject]@{ Executable=$Executable; Arguments=$Arguments; ExitCode=$process.ExitCode; ExitHex=('0x{0:X8}' -f ($process.ExitCode -band [long]4294967295)); TimedOut=$timeout; Output=$output }
         $output | Set-Content "$OutputDirectory/$Name.log"
@@ -60,10 +66,23 @@ function W([string[]]$Arguments, [string]$Name, [switch]$Observe) {
     if ($Arguments[0] -in @('install','upgrade','uninstall','show','list') -or ($Arguments[0] -eq 'source' -and $Arguments[1] -eq 'add')) { $options+='--no-proxy' }
     try { Run $Winget ($Arguments + $options) $Name -Observe:$Observe }
     finally {
+        if ($Arguments[0] -in @('install','upgrade','uninstall')) { $script:nativeInventoryCache=$null }
         if ($dataHash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $dataHash)) {
             throw "$Name removed or modified migration data outside the installation directory."
         }
     }
+}
+function Native-Inventories {
+    if ($null -eq $script:nativeInventoryCache) {
+        $script:nativeInventoryGeneration++
+        $name='native-inventory-'+$script:nativeInventoryGeneration.ToString('D4')
+        $request="$OutputDirectory/$name.request.json"
+        $snapshot="$OutputDirectory/$name.snapshot.json"
+        @($inventory.Versions.MsiMetadata.ProductCode | Select-Object -Unique) | ConvertTo-Json | Set-Content $request
+        $null=Run (Join-Path $PSHOME 'pwsh.exe') @('-NoLogo','-NoProfile','-NonInteractive','-MTA','-File',"$PSScriptRoot/../msi/Get-InstalledProductInventoryBatch.ps1",'-RequestPath',$request,'-OutputPath',$snapshot) "$name-worker" -TimeoutSeconds 30
+        $script:nativeInventoryCache=@(Get-Content $snapshot -Raw | ConvertFrom-Json -AsHashtable)
+    }
+    $script:nativeInventoryCache
 }
 function Registrations {
     # Read both registry views, deduplicating shared HKCU keys by name.
@@ -85,9 +104,9 @@ function Registrations {
     if ($type -eq 'wix') {
         # Per-user MSI inventory is registered through Windows Installer; it need
         # not author a conventional HKCU Uninstall key. Read the supported API.
-        $codes=@($inventory.Versions.MsiMetadata.ProductCode | Select-Object -Unique)
-        foreach ($code in $codes) {
-            $nativeInventory=& "$PSScriptRoot/../msi/Get-InstalledProductInventory.ps1" -ProductCode $code
+        foreach ($row in @(Native-Inventories)) {
+            $code=$row.ProductCode
+            $nativeInventory=$row.Inventory
             foreach ($instance in @($nativeInventory.Contexts)) {
                 if ($instance.Context -notin @(1,2) -or $instance.UserSid -ne $nativeInventory.CurrentUserSid) { throw 'Unexpected machine or foreign-user MSI installation.' }
                 $values=$instance.Properties
@@ -100,9 +119,7 @@ function Registrations {
 function Snapshot([string]$Name) {
     @(Registrations) | ConvertTo-Json -Depth 6 | Set-Content "$OutputDirectory/$Name.arp.json"
     if ($type -eq 'wix') {
-        @($inventory.Versions.MsiMetadata.ProductCode | Select-Object -Unique | ForEach-Object {
-            & "$PSScriptRoot/../msi/Get-InstalledProductInventory.ps1" -ProductCode $_
-        }) | ConvertTo-Json -Depth 12 | Set-Content "$OutputDirectory/$Name.native-msi.json"
+        @(Native-Inventories | ForEach-Object { $_.Inventory }) | ConvertTo-Json -Depth 12 | Set-Content "$OutputDirectory/$Name.native-msi.json"
     }
     foreach ($id in @($oldId,$newId)) { $null = W @('list','--id',$id,'--exact','--source',$sourceName,'--accept-source-agreements') "$Name-list-$id" -Observe }
     $null = W @('export','--output',"$OutputDirectory/$Name.export.json",'--source',$sourceName,'--accept-source-agreements') "$Name-export" -Observe
@@ -134,7 +151,7 @@ function Assert-Installed([string]$Version, [string]$Id) {
     if ($type -eq 'zip' -and ($rows[0].WinGetPackageIdentifier -ne $Id -or $rows[0].WinGetSourceIdentifier -ne $sourceIdentifier)) { throw 'Portable ID/source registration did not match the requested source package.' }
     $expected = $inventory.Versions | Where-Object Version -eq $Version
     if ($type -eq 'wix') {
-        $nativeInventory=& "$PSScriptRoot/../msi/Get-InstalledProductInventory.ps1" -ProductCode $expected.MsiMetadata.ProductCode
+        $nativeInventory=@(Native-Inventories | Where-Object ProductCode -eq $expected.MsiMetadata.ProductCode)[0].Inventory
         Assert-WinGetMsiNativeContext -Inventory $nativeInventory -ExpectedVersion $Version -ExpectedPublisher $expected.MsiMetadata.Manufacturer
         if ($rows[0].Publisher -ne $expected.MsiMetadata.Manufacturer -or $rows[0].KeyName -ne $expected.MsiMetadata.ProductCode) { throw 'The installed MSI identity does not match the requested version.' }
         $directory=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'erikbra/grate')).TrimEnd('\','/')
@@ -182,7 +199,8 @@ function Assert-KnownRejection($Result) {
 function Native-Msi([string[]]$Arguments,[string]$Name) {
     $hash=$null
     if (Test-Path $database) { $hash=(Get-FileHash $database -Algorithm SHA256).Hash }
-    $result=Run "$env:SystemRoot/System32/msiexec.exe" ($Arguments+@('/qn','/norestart','/l*v',"$OutputDirectory/$Name.msi.log")) $Name -Observe
+    try { $result=Run "$env:SystemRoot/System32/msiexec.exe" ($Arguments+@('/qn','/norestart','/l*v',"$OutputDirectory/$Name.msi.log")) $Name -Observe }
+    finally { $script:nativeInventoryCache=$null }
     if ($result.ExitCode -notin @(0,3010)) { throw "$Name failed with MSI code $($result.ExitCode)." }
     if ($hash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $hash)) { throw 'Native MSI fallback modified migration data.' }
 }

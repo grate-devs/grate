@@ -37,7 +37,7 @@ function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
         $timedOut = !$process.WaitForExit($TimeoutMilliseconds)
-        if ($timedOut) { $process.Kill($true); [void]$process.WaitForExit(5000) }
+        if ($timedOut) { $process.Kill(); [void]$process.WaitForExit(5000) }
         # A child/WER process can retain inherited pipe handles after the parent
         # exits. Bound the combined stream drain rather than waiting forever.
         $drainFailure = $null
@@ -57,7 +57,11 @@ function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [
     } finally { $process.Dispose() }
 }
 function Run-Msi([string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0, 3010)) {
-    Run-Process (Join-Path $env:SystemRoot 'System32/msiexec.exe') ($Arguments + @('/qn', '/norestart', '/l*v', (Join-Path $caseDirectory "$Name.msi.log"))) $Name $AllowedExitCodes
+    # No inventory snapshot may survive an installer mutation, including a
+    # failed install/rollback. Read one fresh batch after each operation.
+    $script:inventoryCache = $null
+    try { Run-Process (Join-Path $env:SystemRoot 'System32/msiexec.exe') ($Arguments + @('/qn', '/norestart', '/l*v', (Join-Path $caseDirectory "$Name.msi.log"))) $Name $AllowedExitCodes }
+    finally { $script:inventoryCache = $null }
 }
 
 $metadataPaths = @($HistoricalMsiPaths) + @($CandidateMsiPath)
@@ -74,7 +78,6 @@ function Read-Metadata([string]$Path) {
     if (!$metadataLookup.ContainsKey($resolved)) { throw "No isolated metadata snapshot for $resolved." }
     $metadataLookup[$resolved]
 }
-$inventoryReader = Join-Path $PSScriptRoot 'Get-InstalledProductInventory.ps1'
 $contract = Get-Content (Join-Path $PSScriptRoot 'identity-contract.json') -Raw | ConvertFrom-Json
 $legacyCode = $contract.LegacyProductCode
 $CandidateMsiPath = (Resolve-Path $CandidateMsiPath).Path
@@ -133,11 +136,26 @@ $installationAttempted = $false
 $unrelatedFile = $null
 $originalUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 $companyAlreadyExisted = Test-Path $companyDirectory
+$script:inventoryCache = $null
+$script:inventoryGeneration = 0
 function Read-ProductInventory([string]$Code) {
-    $watch = [Diagnostics.Stopwatch]::StartNew()
-    @{ phase = 'NativeInventoryStart'; productCode = $Code; utc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress | Add-Content "$OutputDirectory/inventory-calls.log"
-    try { & $inventoryReader -ProductCode $Code }
-    finally { @{ phase = 'NativeInventoryEnd'; productCode = $Code; elapsedMilliseconds = $watch.ElapsedMilliseconds; utc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress | Add-Content "$OutputDirectory/inventory-calls.log" }
+    if ($null -eq $script:inventoryCache) {
+        $script:inventoryGeneration++
+        $stem = 'inventory-' + $script:inventoryGeneration.ToString('D4')
+        $request = Join-Path $OutputDirectory "$stem.request.json"
+        $snapshot = Join-Path $OutputDirectory "$stem.snapshot.json"
+        $knownCodes | ConvertTo-Json | Set-Content -LiteralPath $request
+        $watch = [Diagnostics.Stopwatch]::StartNew()
+        @{ Phase = 'NativeInventoryBatchStart'; Generation = $script:inventoryGeneration; Utc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress | Add-Content "$OutputDirectory/inventory-calls.log"
+        $null = Run-Process (Join-Path $PSHOME 'pwsh.exe') @('-NoLogo', '-NoProfile', '-NonInteractive', '-MTA', '-File', (Join-Path $PSScriptRoot 'Get-InstalledProductInventoryBatch.ps1'), '-RequestPath', $request, '-OutputPath', $snapshot) "$stem-worker" -TimeoutMilliseconds 30000
+        $cache = @{}
+        foreach ($row in @(Get-Content -LiteralPath $snapshot -Raw | ConvertFrom-Json -AsHashtable)) { $cache[$row.ProductCode] = $row.Inventory }
+        foreach ($expectedCode in $knownCodes) { if (!$cache.ContainsKey($expectedCode)) { throw "Inventory worker did not inspect expected MSI product $expectedCode." } }
+        $script:inventoryCache = $cache
+        @{ Phase = 'NativeInventoryBatchEnd'; Generation = $script:inventoryGeneration; ElapsedMilliseconds = $watch.ElapsedMilliseconds; Utc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress | Add-Content "$OutputDirectory/inventory-calls.log"
+    }
+    if (!$script:inventoryCache.ContainsKey($Code)) { throw "MSI product is outside the owned inventory set: $Code" }
+    $script:inventoryCache[$Code]
 }
 function Product-State([string]$Code) {
     $native = Read-ProductInventory $Code

@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 $ErrorActionPreference='Stop'
-$directory=Join-Path $env:RUNNER_TEMP ('msi-supervision-'+[guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $directory | Out-Null
+$directory=Join-Path $env:RUNNER_TEMP ('lifecycle/supervisor-contract/'+[guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $directory -Force | Out-Null
+$result=@{Succeeded=$false}
 try {
     $script=Join-Path $directory 'worker-test.ps1'
     @'
@@ -20,5 +21,6 @@ if ($Block) { [Threading.Thread]::Sleep(60000) }
     catch { if ($_.Exception.Message -notlike '*exceeded 5 seconds*') { throw }; $rejected=$true }
     $blocked=Get-Content "$directory/blocked-supervisor/process.json" -Raw | ConvertFrom-Json
     if (!$rejected -or !$blocked.TimedOut -or !(Test-Path "$directory/blocked/entered.txt") -or $watch.Elapsed.TotalSeconds -gt 25) { throw 'Blocked worker was not terminated with its partial evidence retained.' }
+    $result.Succeeded=$true
     Write-Host 'PASS: child process completion, bounded termination and retained partial evidence.'
-} finally { Remove-Item -LiteralPath $directory -Recurse -Force }
+} finally { $result | ConvertTo-Json | Set-Content "$directory/result.json" }
