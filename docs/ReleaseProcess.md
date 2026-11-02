@@ -26,7 +26,7 @@ This document describes the release process introduced for
 5. Mark versions with a prerelease suffix as prereleases.
 6. Publish the release.
 
-Publishing the release triggers the release workflow. The workflow validates the tag, checks out that tag, builds the release contract, and publishes the appropriate channels. No separate workflow dispatch should be needed for a normal release.
+Publishing the release triggers the release workflow. The workflow validates that the tag identifies the event commit, checks out that immutable commit, builds the release contract, and publishes the appropriate channels. No separate workflow dispatch should be needed for a normal release.
 
 ## Release contract
 
@@ -75,7 +75,21 @@ The workflow split is:
 - `ci.yml`: fast build, tests, and analysis for branches and pull requests;
 - `build.yml`: the release-artifact build, triggered without publishing for relevant pull requests and pushes to `main`, and with publishing by `release: types: [published]`.
 
-The release event is suitable for stable and prerelease publication. It provides the tagged commit as the event SHA and the release tag as the event ref. A manual dispatch accepting an existing release tag is available for validation and guarded recovery. Publishing is disabled by default. Draft releases cannot enable publishing. For a partially published Docker version, rerun the failed publishing jobs in the original run so they reuse its verified archive; a fresh publishing run rejects a conflicting existing version before any GitHub asset replacement.
+The release event is suitable for stable and prerelease publication. It provides the tagged commit as the event SHA and the release tag as the event ref. A manual dispatch accepting an existing release tag is available for validation and guarded recovery. Select that same tag as the workflow ref: the event ref must be `refs/tags/TAG`, and the tag must resolve to the event SHA. Every source checkout uses the event SHA, so a dispatch on `main` cannot select and execute another tag in the default branch cache context. Publishing is disabled by default. Draft releases cannot enable publishing. For a partially published Docker version, rerun the failed publishing jobs in the original tagged release run so they reuse its verified archive; a fresh publishing run rejects a conflicting existing version before any GitHub asset replacement.
+
+For validation only, dispatch on a release tag that contains this workflow:
+
+```sh
+gh workflow run build.yml --repo grate-devs/grate --ref 2.3.4 -f release_tag=2.3.4 -f publish=false
+```
+
+For guarded recovery against an existing published release, use the same command
+with `-f publish=true`. A dispatch without `release_tag` and with `publish=false`
+builds its selected workflow commit using GitVersion. Old tags use the workflow
+stored at those tags; they cannot borrow current `main` tooling under this policy.
+Do not move a historical tag to introduce newer tooling. Rerunning a historical
+manual run on `main` also retains its old workflow and source context; it does
+not apply this source-isolation fix.
 
 ## External publication and credentials
 
@@ -111,7 +125,7 @@ Before external publication, the workflow should reject:
 - missing or duplicate release artifacts;
 - an artifact whose embedded/package version differs from the release tag.
 
-All artifact jobs use one resolved source commit. Docker publication downloads the already verified OCI archive, without rebuilding; existing version tags with a conflicting digest are rejected in the build preflight before the release gate can permit GitHub uploads. The release-ready gate certifies packaging and policy checks; the separate test job and required CI checks provide application-test evidence. Do not rebuild or blindly retry a partially published Docker version; retain and reuse its original verified artifact/digest.
+All artifact jobs use the immutable workflow event SHA, after verifying any release tag resolves to that commit. Docker publication downloads the already verified OCI archive, without rebuilding; existing version tags with a conflicting digest are rejected in the build preflight before the release gate can permit GitHub uploads. The release-ready gate certifies packaging and policy checks; the separate test job and required CI checks provide application-test evidence. Do not rebuild or blindly retry a partially published Docker version; retain and reuse its original verified artifact/digest.
 
 Publication steps should be idempotent where the destination permits it. GitHub asset uploads use replacement semantics, NuGet uses `--skip-duplicate`, and recovery runs use the existing release tag rather than creating another release.
 

@@ -17,7 +17,7 @@ class WinGetWorkflowPolicyTests(unittest.TestCase):
         self.assertTrue({'set-version-number', 'release-ready', 'publish-github-release'} <= set(job['needs']))
         self.assertEqual("${{ needs.set-version-number.outputs.is-release == 'true' && needs.set-version-number.outputs.is-prerelease != 'true' }}", job['if'])
         checkout = next(step for step in job['steps'] if step.get('uses', '').startswith('actions/checkout@'))
-        self.assertEqual('${{ needs.set-version-number.outputs.checkout-ref }}', checkout['with']['ref'])
+        self.assertEqual('${{ github.sha }}', checkout['with']['ref'])
         self.assertIs(False, checkout['with']['persist-credentials'])
         run_step = next(step for step in job['steps'] if 'Create-Installer.ps1' in step.get('run', ''))
         self.assertEqual('${{ needs.set-version-number.outputs.semVer }}', run_step['env']['VERSION'])

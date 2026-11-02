@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing GitHub release tag to rebuild or publish"
+        description: "Existing release tag; also select this tag as the workflow ref"
         required: false
         type: string
       publish:
@@ -43,7 +43,6 @@ jobs:
     name: Resolve release context
     runs-on: ubuntu-latest
     outputs:
-      checkout-ref: ${{ steps.source.outputs.commit }}
       nuGetVersion: ${{ steps.release-context.outputs.core_version }}
       semVer: ${{ steps.release-context.outputs.version }}
       is-release: ${{ steps.release-context.outputs.publish }}
@@ -82,17 +81,20 @@ jobs:
         GITVERSION_SEMVER: ${{ steps.gitversion.outputs.semVer }}
         GH_TOKEN: ${{ github.token }}
       run: python3 eng/resolve_release_context.py
-    - name: Pin all artifact builds to one source commit
-      id: source
+    # Keep the event ref/cache scope and executed source together. Inputs never select a checkout.
+    - name: Verify release tag identifies the event commit
       env:
         RELEASE_TAG: ${{ steps.release-context.outputs.release_tag }}
       shell: bash
       run: |
         set -euo pipefail
-        ref="$GITHUB_SHA"
-        if [[ -n "$RELEASE_TAG" ]]; then ref="refs/tags/$RELEASE_TAG"; fi
-        commit=$(git rev-parse --verify "$ref^{commit}")
-        echo "commit=$commit" >> "$GITHUB_OUTPUT"
+        if [[ -n "$RELEASE_TAG" ]]; then
+          commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          if [[ "$commit" != "$GITHUB_SHA" ]]; then
+            echo "::error::Release tag must identify the workflow event commit."
+            exit 1
+          fi
+        fi
 
   validate-release-policy:
     name: Test release policy without publishing
@@ -101,7 +103,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
         persist-credentials: false
     - run: python3 -m pip install -r eng/requirements-workflow-tests.txt
     - run: python3 -m unittest discover -s eng -p 'test_*.py' -v
@@ -116,7 +118,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
     - name: Setup .NET 11 RC3 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
       with:
@@ -152,7 +154,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
 
     - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
@@ -193,7 +195,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
         persist-credentials: false
     - name: Setup .NET CLI from the selected source
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830
@@ -282,7 +284,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
     - name: Setup .NET 11 RC3 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
       with:
@@ -335,7 +337,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
     - name: Setup .NET 11 RC3 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
       with:
@@ -381,7 +383,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
     - uses: actions/download-artifact@v8
       with:
         name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
@@ -426,7 +428,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
         persist-credentials: false
     - name: Set up QEMU
       uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
@@ -445,7 +447,7 @@ jobs:
         tags: gratedevs/grate:${{ needs.set-version-number.outputs.semVer }}
         labels: |
           org.opencontainers.image.source=https://github.com/grate-devs/grate
-          org.opencontainers.image.revision=${{ needs.set-version-number.outputs.checkout-ref }}
+          org.opencontainers.image.revision=${{ github.sha }}
           org.opencontainers.image.version=${{ needs.set-version-number.outputs.semVer }}
         build-args: |
           VERSION=${{ needs.set-version-number.outputs.semVer }}
@@ -491,7 +493,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
     - uses: actions/download-artifact@v8
       with:
         name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
@@ -673,7 +675,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
         persist-credentials: false
 
     - name: Configure isolated canonical Docker credentials
@@ -795,7 +797,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
         persist-credentials: false
     - name: Prepare new-ID manifests from the final published assets
       shell: pwsh
@@ -825,7 +827,7 @@ jobs:
       shell: pwsh
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        SOURCE_COMMIT: ${{ needs.set-version-number.outputs.checkout-ref }}
+        SOURCE_COMMIT: ${{ github.sha }}
         RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
       run: |
         $ErrorActionPreference = 'Stop'
@@ -875,7 +877,7 @@ jobs:
     - name: Checkout grate release tooling
       uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
 
     - name: Checkout Homebrew tap
       uses: actions/checkout@v7
@@ -949,7 +951,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        ref: ${{ needs.set-version-number.outputs.checkout-ref }}
+        ref: ${{ github.sha }}
     - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
       with:

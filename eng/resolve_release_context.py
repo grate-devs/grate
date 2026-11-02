@@ -68,6 +68,14 @@ def resolve_context(env, release_reader=read_release):
         raise ContextError("Version must be SemVer without a v prefix, build metadata, or numeric leading zeroes.")
     prerelease = "-" in version
 
+    # The event SHA is the only executable source. Selecting another tag through
+    # an input would execute it in the dispatch ref's cache/security context.
+    checkout_ref = env.get("GITHUB_SHA", "")
+    if not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", checkout_ref):
+        raise ContextError("GITHUB_SHA must identify the commit being built.")
+    if release_tag and env.get("GITHUB_REF", "") != f"refs/tags/{release_tag}":
+        raise ContextError("Release tag must match the workflow ref; dispatch with --ref TAG.")
+
     if publish and event == "workflow_dispatch":
         repository = env.get("GITHUB_REPOSITORY", "")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+", repository):
@@ -85,9 +93,6 @@ def resolve_context(env, release_reader=read_release):
 
     if publish and declared_prerelease != prerelease:
         raise ContextError("Tag prerelease suffix and GitHub release prerelease setting disagree.")
-    checkout_ref = release_tag or env.get("GITHUB_SHA", "")
-    if not release_tag and not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", checkout_ref):
-        raise ContextError("GITHUB_SHA must identify the commit being built.")
     return {
         "checkout_ref": checkout_ref,
         "core_version": version.partition("-")[0],

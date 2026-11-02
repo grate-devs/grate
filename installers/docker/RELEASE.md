@@ -16,8 +16,9 @@ for metadata-free `SemVer`, falls back to `1.0.0-local`, and never pushes.
 ## Integrated release workflow
 
 The Docker changes are integrated with #804's release-event contract and current
-main's .NET 11/security settings. All artifact jobs use one resolved source
-commit. `resolve_release_context.py` accepts only strict metadata-free SemVer;
+main's .NET 11/security settings. All artifact jobs use the immutable workflow
+event SHA, and selected release tags must match the event ref and commit.
+`resolve_release_context.py` accepts only strict metadata-free SemVer;
 publishing requires a published non-draft release event, or explicit manual
 publishing against an existing non-draft GitHub release. Ordinary push/PR events
 and the default manual `publish=false` cannot enable publication.
@@ -47,7 +48,7 @@ validated `is-prerelease` output for both release events and manual recovery.
 Per-tag verification, publication serialization (`cancel-in-progress: false`),
 credential isolation, and redacted partial-outcome reports remain in place.
 
-For partial publication, rerun failed publishing jobs in the **original run** so
+For partial publication, rerun failed publishing jobs in the **original tagged release run** so
 its verified artifact and digest are reused. A fresh build may have different
 provenance even at the same source commit; preflight blocks a conflicting
 published version before GitHub assets can be replaced. Never rebuild blindly.
@@ -113,9 +114,12 @@ The common workflow's release-only `publish-docker` job references
 `environment: docker-hub`; ordinary build/test jobs do not. The manual access
 check explicitly uses the same environment to verify that identity without
 publishing. It is not part of ordinary CI. GitHub environment ref
-policies do not allowlist job IDs. The environment permits `main` for manual
-recovery using the current workflow plus a validated existing release tag, and
-permits tag refs for normal release events. Other branches are not allowed.
+policies do not allowlist job IDs. The environment permits `main` and tag refs;
+other branches are not allowed.
+The release workflow requires tagged recovery to be dispatched on the selected
+tag (`--ref TAG -f release_tag=TAG`), so the executed source and cache/ref context
+match. A dispatch on `main` cannot select another release tag. See the
+[release recovery commands](../../docs/ReleaseProcess.md#workflow-layout).
 The common release resolver and `release-ready` dependency must still enforce
 published-release eligibility; an environment tag pattern is not SemVer or
 release validation. See the

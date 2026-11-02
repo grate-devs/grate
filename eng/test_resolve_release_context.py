@@ -22,8 +22,9 @@ class ReleaseContextTests(unittest.TestCase):
         return release.resolve_context(self.env | values, release_reader=self.reader)
 
     def release_event(self, **values):
+        tag = values.pop("RELEASE_TAG", "2.3.4")
         return self.resolve(EVENT_NAME="release", RELEASE_ACTION="published", RELEASE_DRAFT="false",
-                            RELEASE_TAG=values.pop("RELEASE_TAG", "2.3.4"),
+                            GITHUB_REF=values.pop("GITHUB_REF", f"refs/tags/{tag}"), RELEASE_TAG=tag,
                             RELEASE_PRERELEASE=values.pop("RELEASE_PRERELEASE", "false"), **values)
 
     def test_commit_build_uses_metadata_free_gitversion_and_exact_commit(self):
@@ -44,9 +45,9 @@ class ReleaseContextTests(unittest.TestCase):
                 self.assertEqual("", context["release_tag"])
         self.reader.assert_not_called()
 
-    def test_published_stable_release_enables_publishing_with_tag_checkout(self):
+    def test_published_stable_release_enables_publishing_at_event_commit(self):
         context = self.release_event()
-        self.assertEqual({"checkout_ref": "2.3.4", "core_version": "2.3.4", "version": "2.3.4",
+        self.assertEqual({"checkout_ref": SHA, "core_version": "2.3.4", "version": "2.3.4",
                           "publish": "true", "prerelease": "false", "release_tag": "2.3.4"}, context)
         self.reader.assert_not_called()
 
@@ -91,12 +92,34 @@ class ReleaseContextTests(unittest.TestCase):
     def test_manual_tag_dry_run_derives_prerelease_without_reading_release_metadata(self):
         for version, flag in (("2.3.4", "false"), ("2.3.4-rc.1", "true")):
             with self.subTest(version=version):
-                context = self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="false", MANUAL_TAG=version)
-                self.assertEqual(version, context["checkout_ref"])
+                context = self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="false", MANUAL_TAG=version, GITHUB_REF=f"refs/tags/{version}")
+                self.assertEqual(SHA, context["checkout_ref"])
                 self.assertEqual(version, context["release_tag"])
                 self.assertEqual("false", context["publish"])
                 self.assertEqual(flag, context["prerelease"])
         self.reader.assert_not_called()
+
+    def test_tagged_runs_require_matching_event_tag_before_release_lookup(self):
+        for event in ("release", "workflow_dispatch"):
+            for ref in ("", "refs/heads/main", "refs/heads/2.3.4", "refs/tags/9.9.9"):
+                with self.subTest(event=event, ref=ref), self.assertRaisesRegex(release.ContextError, "workflow ref"):
+                    if event == "release":
+                        self.release_event(GITHUB_REF=ref)
+                    else:
+                        self.resolve(EVENT_NAME=event, MANUAL_TAG="2.3.4", MANUAL_PUBLISH="true", GITHUB_REF=ref)
+                if event == "workflow_dispatch":
+                    with self.subTest(ref=ref, publish=False), self.assertRaisesRegex(release.ContextError, "workflow ref"):
+                        self.resolve(EVENT_NAME=event, MANUAL_TAG="2.3.4", MANUAL_PUBLISH="false", GITHUB_REF=ref)
+        self.reader.assert_not_called()
+
+    def test_tagged_runs_require_valid_event_commit(self):
+        for event in ("release", "workflow_dispatch"):
+            with self.subTest(event=event), self.assertRaisesRegex(release.ContextError, "GITHUB_SHA"):
+                if event == "release":
+                    self.release_event(GITHUB_SHA="")
+                else:
+                    self.resolve(EVENT_NAME=event, MANUAL_TAG="2.3.4", MANUAL_PUBLISH="false",
+                                 GITHUB_REF="refs/tags/2.3.4", GITHUB_SHA="")
 
     def test_manual_publish_requires_tag(self):
         with self.assertRaisesRegex(release.ContextError, "MANUAL_TAG"):
@@ -107,7 +130,7 @@ class ReleaseContextTests(unittest.TestCase):
         for version, prerelease in (("2.3.4", False), ("2.3.4-rc.1", True)):
             with self.subTest(version=version):
                 self.reader.return_value = {"isDraft": False, "isPrerelease": prerelease}
-                context = self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG=version)
+                context = self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG=version, GITHUB_REF=f"refs/tags/{version}")
                 self.assertEqual("true", context["publish"])
                 self.assertEqual(str(prerelease).lower(), context["prerelease"])
                 self.reader.assert_called_with(version, "grate-devs/grate")
@@ -119,26 +142,26 @@ class ReleaseContextTests(unittest.TestCase):
                          {"isDraft": False, "isPrerelease": 0}):
             with self.subTest(metadata=metadata), self.assertRaises(release.ContextError):
                 self.reader.return_value = metadata
-                self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG="2.3.4")
+                self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG="2.3.4", GITHUB_REF="refs/tags/2.3.4")
 
     def test_manual_publish_hides_release_lookup_failure_details(self):
         self.reader.side_effect = RuntimeError("SECRET_RESPONSE")
         with self.assertRaises(release.ContextError) as error:
-            self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG="2.3.4")
+            self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG="2.3.4", GITHUB_REF="refs/tags/2.3.4")
         self.assertNotIn("SECRET_RESPONSE", str(error.exception))
 
     def test_manual_publish_prerelease_setting_must_match_version(self):
         for version, flag in (("2.3.4", True), ("2.3.4-rc.1", False)):
             self.reader.return_value = {"isDraft": False, "isPrerelease": flag}
             with self.subTest(version=version), self.assertRaisesRegex(release.ContextError, "disagree"):
-                self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG=version)
+                self.resolve(EVENT_NAME="workflow_dispatch", MANUAL_PUBLISH="true", MANUAL_TAG=version, GITHUB_REF=f"refs/tags/{version}")
 
     def test_manual_publish_rejects_invalid_boolean_and_repository_before_lookup(self):
         for values in ({"MANUAL_PUBLISH": "True"}, {"MANUAL_PUBLISH": "1"},
                        {"GITHUB_REPOSITORY": ""}, {"GITHUB_REPOSITORY": "bad\nrepository"}):
             with self.subTest(values=values), self.assertRaises(release.ContextError):
                 release.resolve_context(self.env | {"EVENT_NAME": "workflow_dispatch", "MANUAL_PUBLISH": "true",
-                                                   "MANUAL_TAG": "2.3.4"} | values, release_reader=self.reader)
+                                                   "MANUAL_TAG": "2.3.4", "GITHUB_REF": "refs/tags/2.3.4"} | values, release_reader=self.reader)
         self.reader.assert_not_called()
 
     def test_missing_invalid_or_injected_versions_are_rejected_before_metadata_lookup(self):
