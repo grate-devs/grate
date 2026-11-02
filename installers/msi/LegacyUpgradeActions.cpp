@@ -34,6 +34,15 @@ namespace
         return value;
     }
 
+    void RejectSameVersionProduct(const std::wstring& installedCode, const std::wstring& installedVersion,
+        const std::wstring& candidateCode, const Version& candidateVersion)
+    {
+        if (Upper(installedCode) != Upper(candidateCode) && ParseVersion(installedVersion) == candidateVersion)
+        {
+            throw std::runtime_error("A different grate MSI has the same numeric version. Uninstall the installed package explicitly before switching between prerelease or stable packages with that version.");
+        }
+    }
+
     struct Instance
     {
         unsigned context;
@@ -201,8 +210,18 @@ extern "C" __declspec(dllexport) UINT __stdcall DetectLegacyGrate(MSIHANDLE sess
         if (family != GRATE_CURRENT_UPGRADE_CODE) { throw std::runtime_error("Unexpected grate upgrade family for this installer architecture"); }
         if (!CurrentUserFamily(other, sid).empty()) { throw std::runtime_error("The other architecture of grate is already installed for this user; uninstall it before changing architecture"); }
         const auto allowed = CurrentUserFamily(family.c_str(), sid);
+        const auto candidateCode = Property(session, L"ProductCode");
+        for (const auto& code : allowed)
+        {
+            const auto instances = CurrentUserInstances(code.c_str(), sid);
+            for (const auto& instance : instances)
+            {
+                RejectSameVersionProduct(code, instance.version, candidateCode, version);
+            }
+        }
         const auto legacy = CurrentUserInstances(GRATE_LEGACY_PRODUCT_CODE, sid);
         const bool migrate = AcceptLegacy(legacy, sid, version);
+        if (migrate) { RejectSameVersionProduct(GRATE_LEGACY_PRODUCT_CODE, legacy.front().version, candidateCode, version); }
         // MajorUpgrade authors a Secure WIX_UPGRADE_DETECTED action property in
         // the Upgrade table. Add only the API-verified current-user legacy code
         // after FindRelatedProducts; standard RemoveExistingProducts consumes it.
@@ -242,6 +261,12 @@ int main()
     rejects([] { ParseVersion(L"2.1.7.1"); }); rejects([] { ParseVersion(L"2.1.-1"); }); rejects([] { ParseVersion(L"256.1.0"); });
     assert(MergeUpgradeCodes(L"{NEW};{new}", { L"{NEW}" }, L"{OLD}") == L"{NEW};{OLD}");
     rejects([] { MergeUpgradeCodes(L"{FOREIGN}", { L"{NEW}" }, L"{OLD}"); });
+    RejectSameVersionProduct(L"{SAME}", L"2.2.0", L"{same}", ParseVersion(L"2.2.0"));
+    RejectSameVersionProduct(L"{PREVIOUS}", L"2.1.9", L"{RC}", ParseVersion(L"2.2.0"));
+    rejects([] { RejectSameVersionProduct(L"{RC1}", L"2.2.0", L"{RC2}", ParseVersion(L"2.2.0")); });
+    rejects([] { RejectSameVersionProduct(L"{RC1}", L"2.2.0", L"{STABLE}", ParseVersion(L"2.2.0")); });
+    rejects([] { RejectSameVersionProduct(L"{STABLE}", L"2.2.0", L"{RC1}", ParseVersion(L"2.2.0")); });
+    rejects([] { RejectSameVersionProduct(L"{LEGACY}", L"2.1.6", L"{CORRECTED}", ParseVersion(L"2.1.6")); });
     std::cout << "PASS: legacy versions, ownership/context/state, identity, ambiguity and upgrade-list policy.\n";
 }
 #endif

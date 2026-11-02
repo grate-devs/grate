@@ -3,6 +3,7 @@
 param (
     [Parameter(Mandatory=$true)] [string]$grateExe,
     [Parameter(Mandatory=$true)] [string]$version,
+    [string]$ReleaseVersion = $version,
     [ValidateSet('x64', 'arm64')] [string]$arch = 'x64',
     [string]$upgradeCode,
     [switch]$TestFailBeforeFinalize
@@ -11,10 +12,16 @@ param (
 $ErrorActionPreference = 'Stop'
 if (!$IsWindows) { throw 'MSI generation requires Windows, WiX and Visual Studio C++ build tools.' }
 & (Join-Path $PSScriptRoot 'Test-InstallerAuthoring.ps1')
-$identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $version -Architecture $arch
+$identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $version -Architecture $arch -ReleaseVersion $ReleaseVersion
 if ($upgradeCode -and $upgradeCode -ne $identity.UpgradeCode) { throw 'The MSI UpgradeCode must match the stable architecture family in identity-contract.json.' }
 $upgradeCode = $identity.UpgradeCode
 $grateExe = (Resolve-Path -LiteralPath $grateExe).Path
+$payloadVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($grateExe).ProductVersion
+# Informational +commit metadata does not distinguish published releases. Refuse
+# dropping a prerelease suffix merely because Windows Installer needs a number.
+if (!$payloadVersion -or $payloadVersion.Split('+')[0] -cne $ReleaseVersion) {
+    throw 'The executable ProductVersion must match ReleaseVersion (excluding +build metadata). Pass the full prerelease version explicitly; never package it as its stable core.'
+}
 
 function Recreate {
     param ([string]$dirName)
@@ -51,6 +58,7 @@ if ($TestFailBeforeFinalize) {
         Replace('</Product>', "<CustomAction Id='FailRollbackVerification' Error='Injected rollback verification failure.' /></Product>")
 }
 $template.Replace('%%%VERSION%%%', $version).
+    Replace('%%%RELEASEVERSION%%%', $ReleaseVersion).
     Replace('%%%PRODUCTCODE%%%', $identity.ProductCode).
     Replace('%%%UPGRADECODE%%%', $upgradeCode).
     Replace('%%%UPGRADEACTIONS%%%', [System.Security.SecurityElement]::Escape($upgradeActions)).

@@ -26,3 +26,27 @@ foreach ($version in @('2.1.7-beta', '2.1.7.0', '02.1.7', '256.0.0', '1.256.0', 
     if (!$rejected) { throw "Invalid MSI identity version accepted: $version" }
 }
 Write-Host 'PASS: deterministic MSI ProductCodes, stable independent architecture families and invalid version rejection.'
+
+# Independently computed Python uuid5 vectors. Stable identity remains byte-for-
+# byte compatible; rc1/rc2/final differ without pretending MSI orders SemVer.
+$releases=@(
+    @('x64','2.2.0','{15A28EBE-4095-578B-91C9-C01751DE3E40}'),
+    @('x64','2.2.0-rc.1','{81B73976-9216-5FAF-ADC7-30D18AAAEE40}'),
+    @('x64','2.2.0-rc.2','{4698E8D2-0DCF-5FB8-B85D-5D99E6638B7B}'),
+    @('arm64','2.2.0','{D978F3F9-84B7-5595-BCEB-79013DA47062}'),
+    @('arm64','2.2.0-rc.1','{E510F501-1C96-5554-9801-4C5AC1930494}'),
+    @('arm64','2.2.0-rc.2','{DB4B4F22-D170-5BE5-9AED-9EFF9F3CF1AB}')
+)
+foreach ($release in $releases) {
+    $actual=& $helper -Version '2.2.0' -ReleaseVersion $release[1] -Architecture $release[0]
+    $stable=& $helper -Version '2.2.0' -Architecture $release[0]
+    if ($actual.ProductCode -cne $release[2] -or $actual.ReleaseVersion -cne $release[1] -or
+        $actual.Version -cne '2.2.0' -or $actual.UpgradeCode -cne $stable.UpgradeCode -or
+        $actual.IsPrerelease -ne ($release[1] -ne '2.2.0')) { throw 'Prerelease identity violated the full-version or unchanged stable-family contract.' }
+}
+foreach ($release in @('2.2.1-rc.1','2.2.0-01','2.2.0-rc..1','2.2.0+sha','2.2.0-rc.1+sha','2.2.0-')) {
+    $rejected=$false
+    try { & $helper -Version '2.2.0' -ReleaseVersion $release -Architecture x64 | Out-Null } catch { $rejected=$_.Exception.Message -like 'ReleaseVersion must*' }
+    if (!$rejected) { throw "Invalid or mismatched release identity accepted: $release" }
+}
+Write-Host 'PASS: six independent full-version ProductCodes, unchanged stable identities/families and six invalid release identities.'

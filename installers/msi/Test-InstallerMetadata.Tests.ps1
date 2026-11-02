@@ -4,6 +4,7 @@ param (
     [Parameter(Mandatory=$true)] [string]$MsiPath,
     [Parameter(Mandatory=$true)] [string]$ExpectedVersion,
     [Parameter(Mandatory=$true)] [ValidateSet('x64', 'arm64')] [string]$ExpectedArchitecture,
+    [string]$ExpectedReleaseVersion = $ExpectedVersion,
     [switch]$Historical
 )
 
@@ -12,13 +13,14 @@ Set-StrictMode -Version Latest
 $reader = Join-Path $PSScriptRoot 'Get-InstallerMetadata.ps1'
 $hash = (Get-FileHash -LiteralPath $MsiPath -Algorithm SHA256).Hash
 $metadata = & $reader -MsiPath $MsiPath
-$identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $ExpectedVersion -Architecture $ExpectedArchitecture
+$identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $ExpectedVersion -Architecture $ExpectedArchitecture -ReleaseVersion $ExpectedReleaseVersion
 $expectations = @{
     ProductCode = $identity.ProductCode
     UpgradeCode = $identity.UpgradeCode
     ProductName = 'grate'
     Manufacturer = $identity.Manufacturer
     ProductVersion = $ExpectedVersion
+    ReleaseVersion = $ExpectedReleaseVersion
     Platform = $ExpectedArchitecture
 }
 if ($Historical) {
@@ -27,6 +29,7 @@ if ($Historical) {
     # Published legacy Arm64 payloads were also wrapped in x64 MSI databases.
     $expectations.Platform = 'x64'
     $expectations.Remove('UpgradeCode')
+    $expectations.Remove('ReleaseVersion')
 }
 foreach ($expected in $expectations.GetEnumerator()) {
     if ($metadata.($expected.Key) -cne $expected.Value) {
