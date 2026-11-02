@@ -2,7 +2,9 @@
 param (
     [Parameter(Mandatory)][string]$Winget,
     [Parameter(Mandatory)][string]$InventoryPath,
-    [Parameter(Mandatory)][string]$OutputDirectory
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [ValidateSet('Rest','PreIndexed')][string]$SourceType='Rest',
+    [switch]$PublicBaseline
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -11,6 +13,7 @@ if (!$IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -
 }
 $inventory = Get-Content $InventoryPath -Raw | ConvertFrom-Json
 . "$PSScriptRoot/../msi/WinGetMsiLifecycle.Assertions.ps1"
+. "$PSScriptRoot/WinGetSourceCorrelation.Assertions.ps1"
 $type = $inventory.InstallerType
 $arch = $inventory.Architecture
 $native = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
@@ -30,7 +33,7 @@ $sourceAdded = $false
 $testOwnsInstallation = $false
 $script:nativeInventoryCache=$null
 $script:nativeInventoryGeneration=0
-$summary = [ordered]@{ InstallerType=$type; Architecture=$arch; SourceIdentifier=$sourceIdentifier; CommunitySourceMigrationTested=$false; GrateVersionOptionRole='database migration version, not CLI version display' }
+$summary = [ordered]@{ InstallerType=$type; Architecture=$arch; SourceType=$SourceType; SourceIdentifier=$sourceIdentifier; CommunityOriginMigrationTested=$false; CommunityDestinationMigrationTested=$false; CommunitySourceMigrationTested=$false; GrateVersionOptionRole='database migration version, not CLI version display' }
 
 function Run([string]$Executable, [string[]]$Arguments, [string]$Name, [switch]$Observe, [int]$TimeoutSeconds=300) {
     $info = [Diagnostics.ProcessStartInfo]::new($Executable)
@@ -128,8 +131,11 @@ function Snapshot([string]$Name) {
     $null = Run 'where.exe' @('grate') "$Name-where" -Observe
 }
 function Write-Catalog([switch]$Both,[switch]$IncludeBridge) {
-    & "$PSScriptRoot/New-LifecycleCatalog.ps1" -Inventory $inventory -Both:$Both -IncludeBridge:$IncludeBridge |
-        ConvertTo-Json -Depth 15 | Set-Content "$catalogPath.tmp"
+    # A preindexed source is immutable for this run. Both IDs are present from
+    # the start; source updates must never silently depend on REST hot reload.
+    $catalog=& "$PSScriptRoot/New-LifecycleCatalog.ps1" -Inventory $inventory -Both:($Both -or $SourceType -eq 'PreIndexed' -or $PublicBaseline) -IncludeBridge:$IncludeBridge
+    if ($PublicBaseline) { $catalog.Packages=@($catalog.Packages | Where-Object PackageIdentifier -eq $newId) }
+    $catalog | ConvertTo-Json -Depth 15 | Set-Content "$catalogPath.tmp"
     [IO.File]::Move("$catalogPath.tmp", $catalogPath, $true)
 }
 function Assert-NewIdCorrelation([string]$Name) {
@@ -145,10 +151,10 @@ function Installed-Executable {
     if ($type -eq 'wix') { return (Join-Path $env:LOCALAPPDATA 'erikbra/grate/grate.exe') }
     return (Join-Path $env:LOCALAPPDATA 'Microsoft/WinGet/Links/grate.exe')
 }
-function Assert-Installed([string]$Version, [string]$Id) {
+function Assert-Installed([string]$Version, [string]$Id, [string]$ExpectedSourceIdentifier=$sourceIdentifier) {
     $rows = @(Registrations)
     if ($rows.Count -ne 1 -or $rows[0].DisplayVersion -ne $Version) { throw "Expected one $Version ARP registration: $($rows | ConvertTo-Json -Compress)" }
-    if ($type -eq 'zip' -and ($rows[0].WinGetPackageIdentifier -ne $Id -or $rows[0].WinGetSourceIdentifier -ne $sourceIdentifier)) { throw 'Portable ID/source registration did not match the requested source package.' }
+    if ($type -eq 'zip' -and ($rows[0].WinGetPackageIdentifier -ne $Id -or $rows[0].WinGetSourceIdentifier -ne $ExpectedSourceIdentifier)) { throw 'Portable ID/source registration did not match the requested source package.' }
     $expected = $inventory.Versions | Where-Object Version -eq $Version
     if ($type -eq 'wix') {
         $nativeInventory=@(Native-Inventories | Where-Object ProductCode -eq $expected.MsiMetadata.ProductCode)[0].Inventory
@@ -204,10 +210,10 @@ function Native-Msi([string[]]$Arguments,[string]$Name) {
     if ($result.ExitCode -notin @(0,3010)) { throw "$Name failed with MSI code $($result.ExitCode)." }
     if ($hash -and (!(Test-Path $database) -or (Get-FileHash $database -Algorithm SHA256).Hash -ne $hash)) { throw 'Native MSI fallback modified migration data.' }
 }
-function Uninstall([string]$Id,[string]$Name) {
+function Uninstall([string]$Id,[string]$Name,[string]$Source=$sourceName) {
     # Acceptance requires the correlated package to uninstall by its exact ID.
     # Product-code/native recovery is reserved for finally cleanup on failures.
-    $attempt = W @('uninstall','--id',$Id,'--exact','--source',$sourceName,'--silent','--accept-source-agreements') $Name
+    $attempt = W @('uninstall','--id',$Id,'--exact','--source',$Source,'--silent','--accept-source-agreements') $Name
     Assert-Absent
     $attempt.ExitHex
 }
@@ -216,6 +222,27 @@ function Migrate([string]$Name) {
     foreach ($attempt in 1..2) {
         $null=Run $exe @('--databasetype','sqlite','--connectionstring',"Data Source=$database",'--files',$sql,'--output',"$OutputDirectory/migration-output",'--silent') "$Name-migrate-$attempt"
     }
+}
+function Assert-PublicCorrelation([string]$Name,[switch]$Legacy) {
+    $queries=@{}
+    foreach ($source in @('global','winget',$sourceName)) {
+        foreach ($id in @($oldId,$newId)) {
+            $arguments=@('list','--id',$id,'--exact','--accept-source-agreements')
+            if ($source -ne 'global') { $arguments+=@('--source',$source) }
+            $result=W $arguments "$Name-$source-$id" -Observe
+            $queries["$source/$id"]=$result.ExitHex
+        }
+    }
+    $exportPath="$OutputDirectory/$Name.global-export.json"
+    $null=W @('export','--output',$exportPath,'--accept-source-agreements') "$Name-global-export"
+    $export=Get-Content $exportPath -Raw | ConvertFrom-Json
+    Assert-WinGetSourceCorrelation -Queries $queries -Export $export -Legacy:$Legacy -PublicSourceIdentifier $publicSource.Identifier -CandidateSourceIdentifier $sourceIdentifier -CandidateSourceName $sourceName
+    $sourceExport=W @('source','export','--name','winget') "$Name-public-source"
+    $current=$sourceExport.Output.Trim() | ConvertFrom-Json
+    foreach ($field in @('Arg','Type','Identifier','Data')) {
+        if ($current.$field -cne $publicSource.$field) { throw "Public source $field changed during migration." }
+    }
+    Snapshot $Name
 }
 
 if (@(Registrations).Count -ne 0 -or (Get-Command grate -ErrorAction SilentlyContinue) -or (Test-Path "$env:LOCALAPPDATA/erikbra/grate")) { throw 'Refusing to replace a pre-existing grate installation.' }
@@ -226,19 +253,60 @@ New-Item -ItemType Directory -Force "$sql/up","$sql/afterMigration" | Out-Null
 "CREATE TEMP TABLE lifecycle_assert(value INTEGER CHECK(value=1)); INSERT INTO lifecycle_assert SELECT CASE WHEN COUNT(*)=1 AND MIN(id)=42 THEN 1 ELSE 0 END FROM lifecycle_data; INSERT INTO lifecycle_assert SELECT CASE WHEN COUNT(*)=1 THEN 1 ELSE 0 END FROM grate_ScriptsRun WHERE script_name='001_create.sql'; INSERT INTO lifecycle_assert SELECT CASE WHEN COUNT(*)=0 THEN 1 ELSE 0 END FROM grate_ScriptsRunErrors;" | Set-Content "$sql/afterMigration/900_assert.sql"
 try {
     $summary.WinGetVersion=(Run $Winget @('--version') 'winget-version').Output.Trim()
-    # Remove unrelated catalogs only inside the disposable VM. Source identity
-    # stays constant throughout the single-ID and simultaneous-ID phases below.
+    # The public-origin case preserves its source and tracking without resets.
     $null=W @('source','export') 'original-sources'
-    foreach ($name in @('msstore','winget','winget-font')) { $null=W @('source','remove','--name',$name) "remove-source-$name" -Observe }
+    $removeSources=if ($PublicBaseline) { @('msstore','winget-font') } else { @('msstore','winget','winget-font') }
+    foreach ($name in $removeSources) { $null=W @('source','remove','--name',$name) "remove-source-$name" -Observe }
+    if ($PublicBaseline) {
+        $publicSource=(W @('source','export','--name','winget') 'public-source-before').Output.Trim() | ConvertFrom-Json
+        if ($publicSource.Name -ne 'winget' -or $publicSource.Type -ne 'Microsoft.PreIndexed.Package' -or $publicSource.Arg -ne 'https://cdn.winget.microsoft.com/cache' -or !$publicSource.Identifier) { throw 'Public baseline requires the genuine default winget source.' }
+        $summary.PublicSource=$publicSource
+        $null=W @('source','update','--name','winget') 'public-source-update'
+        $null=W @('show','--id',$oldId,'--exact','--version','2.0.0','--source','winget','--architecture',$arch,'--installer-type',$type,'--accept-source-agreements') 'public-baseline-manifest'
+        $testOwnsInstallation=$true
+        $null=W @('install','--id',$oldId,'--exact','--version','2.0.0','--source','winget','--architecture',$arch,'--installer-type',$type,'--scope','user','--silent','--accept-source-agreements','--accept-package-agreements') 'public-baseline-install'
+        Assert-Installed '2.0.0' $oldId $publicSource.Identifier
+        Migrate 'public-baseline'
+        $null=W @('export','--output',"$OutputDirectory/public-baseline-before-candidate.export.json",'--accept-source-agreements') 'public-baseline-before-candidate-export'
+    }
     Write-Catalog
-    $state=& "$PSScriptRoot/test-source/Start-TestSource.ps1" -Catalog $catalogPath -Assets $assetDirectory -LogDirectory "$OutputDirectory/server"
-    $null=W @('source','add','--name',$sourceName,'--arg',$state.Url,'--type','Microsoft.Rest','--accept-source-agreements') 'add-source'
+    $startScript=if ($SourceType -eq 'PreIndexed') { 'Start-PreIndexedSource.ps1' } else { 'Start-TestSource.ps1' }
+    $state=& "$PSScriptRoot/test-source/$startScript" -Catalog $catalogPath -Assets $assetDirectory -LogDirectory "$OutputDirectory/server"
+    $sourceIdentifier=$state.SourceIdentifier
+    $summary.SourceIdentifier=$sourceIdentifier
+    $nativeSourceType=if ($SourceType -eq 'PreIndexed') { 'Microsoft.PreIndexed.Package' } else { 'Microsoft.Rest' }
+    $null=W @('source','add','--name',$sourceName,'--arg',$state.Url,'--type',$nativeSourceType,'--accept-source-agreements') 'add-source'
     $sourceAdded=$true
     $null=W @('source','list','--name',$sourceName) 'source-details'
     $testOwnsInstallation=$true
     $upgradeOptions=@('--source',$sourceName,'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
     $installOptions=$upgradeOptions+@('--scope','user','--architecture',$arch,'--installer-type',$type)
-    if ($type -eq 'wix') {
+    if ($PublicBaseline) {
+        Assert-PublicCorrelation 'public-baseline-tracking' -Legacy
+        $summary.PublicBaselineVersion='2.0.0'
+        $direct=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) 'public-new-id-direct-upgrade' -Observe
+        if ($direct.ExitHex -ne '0x8A150014') { throw "New ID unexpectedly matched the public legacy installation: $($direct.ExitHex)." }
+        Assert-Installed '2.0.0' $oldId $publicSource.Identifier
+        Assert-PublicCorrelation 'public-after-rejected-upgrade' -Legacy
+        if ($type -eq 'zip') { $null=Uninstall $oldId 'public-old-uninstall' 'winget' }
+        $replacementOptions=$upgradeOptions+@('--architecture',$arch,'--installer-type',$type)
+        if ($type -eq 'zip') { $replacementOptions+=@('--scope','user') }
+        $null=W (@('install','--id',$newId,'--version','2.1.7')+$replacementOptions) 'public-new-id-replacement-install'
+        Assert-Installed '2.1.7' $newId
+        Assert-PublicCorrelation 'public-after-replacement'
+        Migrate 'public-after-replacement'
+        $null=W (@('upgrade','--id',$newId,'--version','2.1.8')+$upgradeOptions) 'public-new-id-next-upgrade'
+        Assert-Installed '2.1.8' $newId
+        Assert-PublicCorrelation 'public-after-next'
+        Migrate 'public-after-next'
+        $null=Uninstall $newId 'public-final-new-uninstall'
+        $summary.CommunityOriginMigrationTested=$true
+        $summary.ExclusiveWinGetNewIdCorrelationVerified=$true
+        $summary.PublicTrackingPreserved=$true
+        $summary.NewIdNextVersionUpgrade='Passed'
+        $summary.Completed=$true
+        Write-Host "PASS: actual public-source $type $arch baseline, preserved tracking, private-$SourceType transition, exclusive multi-source correlation, next upgrade and strict uninstall."
+    } elseif ($type -eq 'wix') {
         Write-Catalog -Both
         $summary.LegacyUpgrades=@()
         foreach ($legacy in @('2.0.0','2.1.6')) {
@@ -287,6 +355,7 @@ try {
         # Characterize the rejected publisher-bridge strategy only AFTER every
         # acceptance test, since this command poisons the old ID tracking with
         # the new stable family. This manifest is never a publishing output.
+        if ($SourceType -eq 'Rest') {
         Write-Catalog -Both -IncludeBridge
         $null=W (@('install','--id',$oldId,'--version','2.1.6')+$installOptions) 'diagnostic-bridge-legacy-install'
         Assert-Installed '2.1.6' $oldId
@@ -298,6 +367,7 @@ try {
         $summary.AutomaticBridgeCorrelationVerified=$false
         Migrate 'diagnostic-bridge'
         $null=Uninstall $oldId 'diagnostic-bridge-final-uninstall'
+        }
         $summary.ExplicitNewIdTransitionVerified=$true
         $summary.Completed=$true
         Write-Host "PASS: $type $arch per-user MSI, both legacy MSI replacement installs, exclusive ID transition, next-version upgrade, fresh install and data preservation. Automatic tracking behavior is recorded separately."

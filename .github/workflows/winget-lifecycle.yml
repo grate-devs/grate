@@ -12,7 +12,18 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, msi]
+        options: [all, msi, x64]
+      source_type:
+        description: 'Private candidate source implementation'
+        required: true
+        default: Rest
+        type: choice
+        options: [Rest, PreIndexed]
+      public_baseline:
+        description: 'Install legacy 2.0.0 from the genuine public winget source and preserve its tracking'
+        required: true
+        default: false
+        type: boolean
       direct_msi:
         description: 'Also run direct msiexec lifecycle (disable only when reusing separately verified direct-MSI evidence)'
         required: true
@@ -79,7 +90,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.cases == 'msi' && '[{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]' || '[{"type":"zip","arch":"x86","runner":"windows-latest"},{"type":"zip","arch":"x64","runner":"windows-latest"},{"type":"zip","arch":"arm64","runner":"windows-11-arm"},{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]') }}
+        include: ${{ fromJSON(inputs.cases == 'x64' && '[{"type":"zip","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"x64","runner":"windows-2022"}]' || inputs.cases == 'msi' && '[{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]' || '[{"type":"zip","arch":"x86","runner":"windows-latest"},{"type":"zip","arch":"x64","runner":"windows-latest"},{"type":"zip","arch":"arm64","runner":"windows-11-arm"},{"type":"wix","arch":"x64","runner":"windows-2022"},{"type":"wix","arch":"arm64","runner":"windows-11-arm"}]') }}
     defaults:
       run:
         # MSI inventory uses COM. Keep the waiting test thread out of STA so
@@ -88,6 +99,8 @@ jobs:
     env:
       TEST_ARCH: ${{ matrix.arch }}
       TEST_TYPE: ${{ matrix.type }}
+      TEST_SOURCE_TYPE: ${{ inputs.source_type || 'Rest' }}
+      TEST_PUBLIC_BASELINE: ${{ inputs.public_baseline }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -142,14 +155,15 @@ jobs:
         run: |
           $winget = ./installers/winget/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
           "TEST_WINGET=$winget" | Out-File $env:GITHUB_ENV -Append
-      - name: Actual WinGet package-ID transition in isolated HTTPS source
+      - name: Actual WinGet package-ID transition with selected source and baseline
         if: ${{ !cancelled() && steps.winget.outcome == 'success' }}
         timeout-minutes: 10
         run: |
           if ($env:TEST_TYPE -eq 'wix') {
             ./installers/winget/Test-MigrationManifestPreparation.ps1 -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/manifest-policy" -Winget $env:TEST_WINGET
           }
-          ./installers/winget/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests"
+          ./installers/winget/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
+          ./installers/winget/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests" -SourceType $env:TEST_SOURCE_TYPE -PublicBaseline:($env:TEST_PUBLIC_BASELINE -eq 'true')
       - name: Retain raw lifecycle evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
