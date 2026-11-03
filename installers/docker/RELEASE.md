@@ -129,7 +129,7 @@ other branches are not allowed.
 The release workflow requires tagged recovery to be dispatched on the selected
 tag (`--ref TAG -f release_tag=TAG`), so the executed source and cache/ref context
 match. A dispatch on `main` cannot select another release tag. See the
-[release recovery commands](../../docs/ReleaseProcess.md#workflow-layout).
+[release recovery commands](../../docs/ReleaseProcess.md#6-recover-a-failed-or-partial-release).
 The common release resolver and `release-ready` dependency must still enforce
 published-release eligibility; an environment tag pattern is not SemVer or
 release validation. See the

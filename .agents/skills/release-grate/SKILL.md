@@ -85,7 +85,8 @@ does not establish availability through every package manager.
 
 Inventory completed publication before retrying: GitHub assets, NuGet packages,
 Docker version/latest tags, compatibility copies and cask changes. Some writes
-are irreversible or non-atomic. GitHub asset replacement and NuGet duplicate
+are irreversible or non-atomic. Preserve a newer Homebrew cask as well:
+replaying an older stable `publish-homebrew` job can replace its current version. GitHub asset replacement and NuGet duplicate
 skipping do not make the entire workflow idempotent.
 
 Before a Docker retry, compare the original version/digest with the current
