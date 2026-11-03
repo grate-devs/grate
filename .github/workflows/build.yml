@@ -505,6 +505,10 @@ jobs:
         arch=$(echo ${{ matrix.arch }} | cut -d- -f2 | sed 's/x64/amd64/')
         echo "arch=$arch" >> "$GITHUB_OUTPUT"
 
+    - name: Verify Debian prerelease package ordering
+      shell: pwsh
+      run: ./installers/deb/Test-PackageVersion.Tests.ps1 -Architecture ${{ steps.get-arch.outputs.arch }}
+
     - name: Create dpkg # Linux with powershell script? really? YES! :D
       run: ./installers/deb/Create-Package.ps1 -grateExe ./${{ matrix.arch }}/grate -Version "${{ needs.set-version-number.outputs.semVer }}" -arch ${{ steps.get-arch.outputs.arch}}
       env:

@@ -34,6 +34,10 @@ The Build and Publish workflow produces the existing distribution formats:
 | Debian | Linux amd64 and Arm64, built from the corresponding self-contained binaries |
 | Docker | Linux amd64 and Arm64 on Alpine 3.24, including ICU |
 
+Debian package metadata maps a SemVer prerelease such as `2.2.0-rc.1` to
+`2.2.0~rc.1-1`, so Debian orders it before the final `2.2.0-1` package.
+Release asset filenames retain the original SemVer version.
+
 MSI generation uses checksum-pinned WiX 3.14.1, whose compiler supports Arm64.
 Pass `-arch x64` or `-arch arm64` to `installers/msi/Create-Installer.ps1` to
 match the input executable. Windows Installer 5.0 is required by the Arm64 MSI.
