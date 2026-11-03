@@ -8,6 +8,11 @@ nav_exclude: true
 This document describes the release process introduced for
 [issue #796](https://github.com/grate-devs/grate/issues/796).
 
+For agent-assisted release work, invoke `$release-grate` from a repository
+checkout. Its instructions live in `.agents/skills/release-grate/SKILL.md` and
+follow this guide and the workflows at the selected commit. The skill supports
+preparation, publication, verification and recovery using the existing automation.
+
 ## Goals
 
 - Use a published GitHub release and its tag as the source of truth for the version.
@@ -75,7 +80,7 @@ The workflow split is:
 - `ci.yml`: fast build, tests, and analysis for branches and pull requests;
 - `build.yml`: the release-artifact build, triggered without publishing for relevant pull requests and pushes to `main`, and with publishing by `release: types: [published]`.
 
-The release event is suitable for stable and prerelease publication. It provides the tagged commit as the event SHA and the release tag as the event ref. A manual dispatch accepting an existing release tag is available for validation and guarded recovery. Select that same tag as the workflow ref: the event ref must be `refs/tags/TAG`, and the tag must resolve to the event SHA. Every source checkout uses the event SHA, so a dispatch on `main` cannot select and execute another tag in the default branch cache context. Publishing is disabled by default. Draft releases cannot enable publishing. For a partially published Docker version, rerun the failed publishing jobs in the original tagged release run so they reuse its verified archive; a fresh publishing run rejects a conflicting existing version before any GitHub asset replacement.
+The release event is suitable for stable and prerelease publication. It provides the tagged commit as the event SHA and the release tag as the event ref. A manual dispatch accepting an existing release tag is available for validation and guarded recovery. Select that same tag as the workflow ref: the event ref must be `refs/tags/TAG`, and the tag must resolve to the event SHA. Every source checkout uses the event SHA, so a dispatch on `main` cannot select and execute another tag in the default branch cache context. Publishing is disabled by default. Draft releases cannot enable publishing. For a partially published Docker version, check current tag ownership as described under recovery before rerunning failed publishing jobs in the original tagged release run to reuse its verified archive; a fresh publishing run rejects a conflicting existing version before any GitHub asset replacement.
 
 For validation only, dispatch on a release tag that contains this workflow:
 
@@ -128,6 +133,12 @@ Before external publication, the workflow should reject:
 All artifact jobs use the immutable workflow event SHA, after verifying any release tag resolves to that commit. Docker publication downloads the already verified OCI archive, without rebuilding; existing version tags with a conflicting digest are rejected in the build preflight before the release gate can permit GitHub uploads. The release-ready gate certifies packaging and policy checks; the separate test job and required CI checks provide application-test evidence. Do not rebuild or blindly retry a partially published Docker version; retain and reuse its original verified artifact/digest.
 
 Publication steps should be idempotent where the destination permits it. GitHub asset uploads use replacement semantics, NuGet uses `--skip-duplicate`, and recovery runs use the existing release tag rather than creating another release.
+
+Before retrying an older stable Docker publication, compare its version/digest
+with the current version tags and `latest` on both repositories. A newer stable
+release may now own `latest`; rerunning the older publishing job would overwrite
+it. Preserve the newer `latest` and prepare a version-only repair within the
+authorized recovery scope. See the [Docker recovery details](../installers/docker/RELEASE.md#verification-and-partial-publication).
 
 ## WinGet migration handoff
 

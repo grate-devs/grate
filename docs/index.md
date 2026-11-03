@@ -56,4 +56,7 @@ RoundhousE with grate in a 5-year-in-development folder of SQL scripts, without 
 
 ## Contributing
 
+Maintainers can follow the [release process](ReleaseProcess.md) to prepare,
+publish, verify, and recover a release.
+
 Head over to the [github page]({{ site.github.repository_url }}), and please see [CONTRIBUTING.md]({{ site.github.repository_url }}/blob/main/CONTRIBUTING.md)

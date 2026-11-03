@@ -48,8 +48,9 @@ validated `is-prerelease` output for both release events and manual recovery.
 Per-tag verification, publication serialization (`cancel-in-progress: false`),
 credential isolation, and redacted partial-outcome reports remain in place.
 
-For partial publication, rerun failed publishing jobs in the **original tagged release run** so
-its verified artifact and digest are reused. A fresh build may have different
+For partial publication, check current tag ownership as described below, then
+rerun failed publishing jobs in the **original tagged release run** when
+appropriate so its verified artifact and digest are reused. A fresh build may have different
 provenance even at the same source commit; preflight blocks a conflicting
 published version before GitHub assets can be replaced. Never rebuild blindly.
 
@@ -60,6 +61,15 @@ back for every selected tag, using the checked-in read-only Registry client.
 Equality of an index digest binds its platform and attestation descriptors.
 `docker-publication.json` and the job summary record each result. Verification
 continues across inaccessible or mismatched tags and fails overall.
+
+Before retrying an older stable publication, inspect version tags and `latest`
+on both repositories against the original run's version/digest. A newer stable
+release may already own `latest`. Both stable publishing helpers can overwrite
+that mutable tag, so an original-job rerun is appropriate only while the original
+release should still own it. Otherwise preserve the newer `latest` and prepare a
+version-only repair from the retained verified digest within the authorized
+recovery scope. A conflict-free immutable version does not make an older stable
+job safe to replay against `latest`.
 
 Canonical publication and compatibility copying are not atomic. The copy helper
 preflights canonical references against the built digest and rejects an existing
