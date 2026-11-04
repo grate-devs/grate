@@ -35,10 +35,10 @@ public abstract class Startup
                     .SetMinimumLevel(TestConfig.GetLogLevel())
             );
         
-        var network = new NetworkBuilder()
+        // SQLite and isolated provider tests do not need Docker.
+        services.AddSingleton(_ => new NetworkBuilder()
             .WithName(Guid.NewGuid().ToString("D"))
-            .Build();
-        services.AddSingleton(network);
+            .Build());
         
         ConfigureExtraServices(services, context);
         
