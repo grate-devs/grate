@@ -3,13 +3,25 @@
 param (
     [Parameter(Mandatory=$true)] [string]$grateExe,
     [Parameter(Mandatory=$true)] [string]$version,
+    [string]$ReleaseVersion = $version,
     [ValidateSet('x64', 'arm64')] [string]$arch = 'x64',
-    [string]$upgradeCode = [Guid]::NewGuid()
+    [string]$upgradeCode,
+    [switch]$TestFailBeforeFinalize
 )
 
 $ErrorActionPreference = 'Stop'
-& (Join-Path $PSScriptRoot 'Test-InstallerAuthoring.ps1')
+if (!$IsWindows) { throw 'MSI generation requires Windows, WiX and Visual Studio C++ build tools.' }
+& (Join-Path $PSScriptRoot 'helpers/Test-InstallerAuthoring.ps1')
+$identity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $version -Architecture $arch -ReleaseVersion $ReleaseVersion
+if ($upgradeCode -and $upgradeCode -ne $identity.UpgradeCode) { throw 'The MSI UpgradeCode must match the stable architecture family in identity-contract.json.' }
+$upgradeCode = $identity.UpgradeCode
 $grateExe = (Resolve-Path -LiteralPath $grateExe).Path
+$payloadVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($grateExe).ProductVersion
+# Informational +commit metadata does not distinguish published releases. Refuse
+# dropping a prerelease suffix merely because Windows Installer needs a number.
+if (!$payloadVersion -or $payloadVersion.Split('+')[0] -cne $ReleaseVersion) {
+    throw 'The executable ProductVersion must match ReleaseVersion (excluding +build metadata). Pass the full prerelease version explicitly; never package it as its stable core.'
+}
 
 function Recreate {
     param ([string]$dirName)
@@ -22,6 +34,9 @@ function Recreate {
 
 $wixDir = Recreate 'wix'
 $tmpDir = Recreate 'tmp'
+& (Join-Path $PSScriptRoot 'native/Build-UpgradeActions.ps1') -Architecture $arch -OutputDirectory (Join-Path $tmpDir 'upgrade-actions') | ForEach-Object { Write-Host $_ }
+$upgradeActions = Join-Path $tmpDir 'upgrade-actions/GrateUpgradeActions.dll'
+if (!(Test-Path -LiteralPath $upgradeActions)) { throw 'The native MSI upgrade action was not built.' }
 
 # WiX 3.14 supports ARM64 MSI packages; 3.11's candle only supports ARM32.
 $wixZip = 'https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip'
@@ -37,8 +52,16 @@ $wxs = Join-Path $tmpDir "grate-$version.wxs"
 $wixobj = Join-Path $tmpDir "grate-$version.wixobj"
 $msi = Join-Path $tmpDir "grate-$version.msi"
 $template = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'grate.wxs') -Raw
+if ($TestFailBeforeFinalize) {
+    # A separate local test MSI only. The release template has no failure hook.
+    $template = $template.Replace('</InstallExecuteSequence>', "<Custom Action='FailRollbackVerification' Before='InstallFinalize'>1</Custom></InstallExecuteSequence>").
+        Replace('</Product>', "<CustomAction Id='FailRollbackVerification' Error='Injected rollback verification failure.' /></Product>")
+}
 $template.Replace('%%%VERSION%%%', $version).
+    Replace('%%%RELEASEVERSION%%%', $ReleaseVersion).
+    Replace('%%%PRODUCTCODE%%%', $identity.ProductCode).
     Replace('%%%UPGRADECODE%%%', $upgradeCode).
+    Replace('%%%UPGRADEACTIONS%%%', [System.Security.SecurityElement]::Escape($upgradeActions)).
     Replace('%%%GRATEEXE%%%', [System.Security.SecurityElement]::Escape($grateExe)) |
     Set-Content -LiteralPath $wxs
 
