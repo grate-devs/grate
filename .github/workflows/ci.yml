@@ -332,6 +332,7 @@ jobs:
 
   standalone:
     name: CLI ${{ matrix.rid }}
+    timeout-minutes: 30
     env:
       # Publish and package the same fixture identity; MSI rejects mismatched payloads.
       STANDALONE_VERSION: '0.0.1'
@@ -363,7 +364,9 @@ jobs:
       - name: Check per-user MSI authoring regressions
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
-        run: ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
+        run: |
+          ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
+          ./installers/msi/Test-InstallerLifecycle.Assertions.Tests.ps1
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
@@ -372,10 +375,30 @@ jobs:
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
         run: ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -ExpectedArchitecture ('${{ matrix.rid }}' -replace 'win-', '')
-      - name: Build Debian package from verified Linux binary
+      - name: Verify installed MSI, major upgrade and uninstall
+        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: ./installers/msi/Test-InstallerLifecycle.ps1 -MsiPath "./installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -PublishedExecutable "${{ runner.temp }}/grate-cli/published/grate.exe" -Architecture ('${{ matrix.rid }}' -replace 'win-', '') -OutputDirectory "${{ runner.temp }}/grate-msi-lifecycle"
+      - name: Build Debian packages from verified Linux binary
         if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
         shell: pwsh
-        run: ./installers/deb/Create-Package.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate" -Version $env:STANDALONE_VERSION -arch ('${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64')
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $architecture = '${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64'
+          foreach ($version in @('0.0.1', '0.0.2')) {
+            ./installers/deb/Create-Package.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate" -Version $version -arch $architecture
+          }
+      - name: Verify Debian installation, package upgrade and purge
+        if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
+        shell: pwsh
+        run: |
+          $architecture = '${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64'
+          ./installers/deb/Test-PackageLifecycle.ps1 `
+            -InitialPackage "installers/deb/grate_0.0.1-1_${architecture}.deb" `
+            -UpgradePackage "installers/deb/grate_0.0.2-1_${architecture}.deb" `
+            -Architecture $architecture -InitialVersion '0.0.1-1' -UpgradeVersion '0.0.2-1' `
+            -OutputDirectory "${{ runner.temp }}/grate-debian-lifecycle"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -386,9 +409,13 @@ jobs:
             ${{ runner.temp }}/grate-cli/*.json
             installers/msi/tmp/*.msi
             installers/deb/*.deb
+            ${{ runner.temp }}/grate-msi-lifecycle/
+            ${{ runner.temp }}/grate-debian-lifecycle/
+            !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/
 
   docker:
     name: Alpine ${{ matrix.arch }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -416,3 +443,23 @@ jobs:
           test "$(find "$work/output" -path '*/itemsRan/up/001_create.sql' | wc -l)" -eq 1
           docker run --rm -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local skills install --local --path /smoke/skill
           test -s "$work/skill/.agents/skills/use-grate/SKILL.md"
+      - name: Ensure SQLite client for entrypoint verification
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (!(Get-Command sqlite3 -ErrorAction SilentlyContinue)) {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends sqlite3
+          }
+          sqlite3 --version
+      - name: Verify default image entrypoint
+        shell: pwsh
+        run: ./installers/docker/Test-Entrypoint.ps1 -Image grate-package-test:local -OutputDirectory "${{ runner.temp }}/grate-entrypoint-results"
+      - name: Upload entrypoint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: grate-entrypoint-${{ matrix.arch }}
+          retention-days: 3
+          path: ${{ runner.temp }}/grate-entrypoint-results/
