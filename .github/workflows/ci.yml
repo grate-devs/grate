@@ -116,16 +116,16 @@ jobs:
             test_filter: ''
           - os: windows-latest
             category: SqlServer
-            test_filter: FullyQualifiedName~SqlServer.Basic_tests
+            test_filter: SqlServer.Basic_tests.*
           - os: windows-latest
             category: SqlServerCaseSensitive
-            test_filter: FullyQualifiedName~SqlServerCaseSensitive.Basic_tests
+            test_filter: SqlServerCaseSensitive.Basic_tests.*
           - os: windows-latest
             category: MariaDB
-            test_filter: FullyQualifiedName~MariaDB.Basic_tests
+            test_filter: MariaDB.Basic_tests.*
           - os: windows-latest
             category: Oracle
-            test_filter: FullyQualifiedName~Oracle.Basic_tests
+            test_filter: Oracle.Basic_tests.*
         #category: [ "Basic_tests", "Sqlite"  ]
 
     steps:
@@ -186,17 +186,19 @@ jobs:
         $testArgs = @(
           "--project", "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj",
           "--max-parallel-test-modules", "1",
+          "--minimum-expected-tests", "1",
           "--stop-on-fail", "on",
           "--long-running", "60",
           "--timeout", "20m",
           "--results-directory", $outDir,
           "--report-xunit-trx",
+          "--xunit-info",
           "--coverage",
           "--coverage-output-format", "xml"
         )
 
         if ("${{ matrix.test_filter }}") {
-          $testArgs += @("--filter", "${{ matrix.test_filter }}")
+          $testArgs += @("--filter-class", "${{ matrix.test_filter }}")
         }
 
         dotnet test @testArgs
