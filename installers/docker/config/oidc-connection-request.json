@@ -1,0 +1,18 @@
+{
+  "organization": "gratedevs",
+  "connection_name": "grate-github-release",
+  "description": "GitHub Actions docker-hub environment; canonical grate release publishing.",
+  "rulesets": [
+    {
+      "name": "grate-release-docker-hub",
+      "subject": "repo:grate-devs/grate:environment:docker-hub",
+      "resources": [
+        {
+          "repository": "gratedevs/grate",
+          "scope": "scope-image-push",
+          "includes": ["image-pull"]
+        }
+      ]
+    }
+  ]
+}

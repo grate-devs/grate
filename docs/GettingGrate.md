@@ -16,7 +16,10 @@ Binaries are available for Windows, Linux (glibc and musl), and macOS across mul
 
 ## Docker
 
-There's a `{{ site.github.repository_nwo }}` docker image published to [dockerhub](https://hub.docker.com/r/{{ site.github.repository_nwo }}) on every release.  See the [examples](https://github.com/grate-devs/grate/tree/main/examples) folder for a demo using this to a migration.
+There's a `gratedevs/grate` Docker image published to [Docker Hub](https://hub.docker.com/r/gratedevs/grate) on every release. See the [examples](https://github.com/grate-devs/grate/tree/main/examples) folder for a demo using this for a migration.
+
+`gratedevs/grate` is the canonical Docker image. The compatibility name
+`erikbra/grate` remains available during the transition.
 
 The Docker image is built on Alpine Linux, making it lightweight and suitable for containerized environments. For more information about Alpine Linux support, see [Alpine Linux Support](AlpineLinuxSupport.md).
 
@@ -26,9 +29,9 @@ docker network create grate_network && docker run -e SA_PASSWORD=gs8j4AS7h87jHg 
 ```
 Run grate migration
 ```sh
-docker run -v ./examples/docker/db:/db  -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network grate-devs/grate
+docker run -v ./examples/docker/db:/db  -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network gratedevs/grate
 # run with database type, accept: sqlserver, postgresql, mariadb, sqlite, oracle
-# docker run -v ./examples/docker/db:/db -e DATABASE_TYPE=sqlserver -e CREATE_DATABASE=true -e ENVIRONMENT=Dev -e TRANSACTION=true -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network grate-devs/grate  
+# docker run -v ./examples/docker/db:/db -e DATABASE_TYPE=sqlserver -e CREATE_DATABASE=true -e ENVIRONMENT=Dev -e TRANSACTION=true -e APP_CONNSTRING="Server=db;Database=grate_test_db;User Id=sa;Password=gs8j4AS7h87jHg;TrustServerCertificate=True" --network grate_network gratedevs/grate
 ```
 
 Cleanup resources
@@ -64,11 +67,17 @@ to a supported runtime. The current packages retain both targets.
 ## Runtime and platform requirements
 
 New self-contained CLI archives, MSI and Debian packages, Chocolatey packages,
-and Docker images bundle .NET runtime `11.0.0-rc.3.26522.148`. Homebrew and
-winget install those same release binaries or installers. These distributions
+and Docker images bundle .NET runtime `11.0.0-rc.3.26522.148`. These distributions
 need no separately installed .NET runtime; native OS dependencies still apply.
 The Docker images use Alpine 3.24 and include the .NET native dependencies and ICU
 for globalization.
+
+Homebrew casks and winget packages use the runtime bundled in the release version
+they install. A package-manager channel can lag behind the latest grate release;
+the existing personal Homebrew tap is still at 1.8.0, as described below.
+
+The proposed [Homebrew/core formula](#homebrew) instead builds from source and
+uses Homebrew's shared .NET installation. Homebrew installs that dependency automatically.
 
 .NET 11 RC3 has a go-live license and is supported by Microsoft in production
 until November 10, 2026 ([support policy](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)).
@@ -89,7 +98,28 @@ grate is available on [winget](https://docs.microsoft.com/en-us/windows/package-
 
 ## Homebrew
 
-grate is available as a Homebrew cask. Simply `brew install --cask erikbra/cask/grate` for awesomeness!
+The existing Homebrew cask is installed from the personal tap:
+
+```sh
+brew install --cask erikbra/cask/grate
+```
+
+That legacy tap currently declares grate 1.8.0; this command does not yet install
+2.2.0. Use the [release binaries](https://github.com/grate-devs/grate/releases/latest)
+or the [.NET tool](#dotnet-tool) for newer published releases while the Homebrew
+channels are being updated.
+
+A source-built formula is being prepared for `homebrew/core` alongside grate 2.2.0.
+It is not available in core yet. Once the formula has been accepted, the command will be:
+
+```sh
+brew install grate
+```
+
+The formula will automatically install the required .NET dependency. You will not
+need to install or configure .NET separately. The existing cask uses the self-contained
+release binary instead. See [Building and releasing packages](Packaging.md#homebrewcore-formula)
+for the formula submission steps after the release.
 
 ## Agent skill
 

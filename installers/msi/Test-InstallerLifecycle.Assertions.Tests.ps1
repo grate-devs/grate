@@ -64,7 +64,7 @@ try {
     Assert-MsiDataPreserved $baseline $baselineHash
     Assert-MsiDataPreserved $upgrade $upgradeHash
     if ($baseline -eq $upgrade -or (Split-Path $baseline -Leaf) -ne (Split-Path $upgrade -Leaf)) {
-        throw 'Minor-update sources must be distinct retained files with the same basename.'
+        throw 'Upgrade sources must be distinct retained files with the same basename.'
     }
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force

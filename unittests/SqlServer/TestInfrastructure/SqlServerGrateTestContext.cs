@@ -14,7 +14,7 @@ public class SqlServerTestCollection : ICollectionFixture<SqlServerGrateTestCont
 
 public record SqlServerGrateTestContext : GrateTestContext
 {
-    public SqlServerGrateTestContext(
+    private SqlServerGrateTestContext(
         IGrateMigrator migrator,
         string serverCollation, 
         ITestDatabase testDatabase) : base(migrator, testDatabase)

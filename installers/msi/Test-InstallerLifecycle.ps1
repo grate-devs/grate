@@ -50,7 +50,7 @@ function Read-MsiMetadata([string]$Path) {
     return $values
 }
 
-function Product-State { [int](Invoke-ComMember $installer 'ProductState' GetProperty @($metadata.ProductCode)) }
+function Product-State([string]$ProductCode = $metadata.ProductCode) { [int](Invoke-ComMember $installer 'ProductState' GetProperty @($ProductCode)) }
 function Product-Info([string]$Name) { Invoke-ComMember $installer 'ProductInfo' GetProperty @($metadata.ProductCode, $Name) }
 function Marker-Present { $null -ne (Get-ItemProperty -LiteralPath $marker -Name installed -ErrorAction SilentlyContinue) }
 
@@ -105,9 +105,8 @@ function Run-Migrations([string]$Name) {
 }
 
 $metadata = Read-MsiMetadata $MsiPath
-[xml]$template = Get-Content (Join-Path $PSScriptRoot 'grate.wxs') -Raw
-$expectedProduct = '{' + $template.Wix.Product.Id.Trim('{}') + '}'
-if ($metadata.ProductCode -ne $expectedProduct -or $metadata.ProductName -ne 'grate' -or $metadata.Platform -ne $Architecture) {
+$expectedIdentity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $metadata.ProductVersion -Architecture $Architecture
+if ($metadata.ProductCode -ne $expectedIdentity.ProductCode -or $metadata.UpgradeCode -ne $expectedIdentity.UpgradeCode -or $metadata.ProductName -ne $expectedIdentity.ProductName -or $metadata.Platform -ne $Architecture) {
     throw "Unexpected candidate MSI identity/platform: $($metadata | ConvertTo-Json -Compress)"
 }
 $metadata | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'baseline-package.json')
@@ -130,14 +129,14 @@ $unrelatedHash = (Get-FileHash $unrelatedFile -Algorithm SHA256).Hash
 'CREATE TABLE package_smoke(id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES(42);' | Set-Content "$sql/up/001_create.sql"
 $assertData = 'CREATE TEMP TABLE package_assert(value INTEGER CHECK(value = 1)); INSERT INTO package_assert SELECT CASE WHEN COUNT(*) = 1 AND MIN(id) = 42 THEN 1 ELSE 0 END FROM package_smoke; INSERT INTO package_assert SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END FROM grate_ScriptsRun WHERE script_name = ''001_create.sql''; INSERT INTO package_assert SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM grate_ScriptsRunErrors;'
 $assertData | Set-Content "$sql/afterMigration/900_assert.sql"
-$installationAttempted = $false
+$attemptedProducts = [Collections.Generic.List[string]]::new()
 $uninstalled = $false
 $failure = $null
 $cleanupFailures = [Collections.Generic.List[Exception]]::new()
 try {
     $baselineSource = Copy-MsiLifecycleSource $MsiPath (Join-Path $OutputDirectory 'baseline-source')
     $baselineSourceHash = (Get-FileHash $baselineSource -Algorithm SHA256).Hash
-    $installationAttempted = $true
+    $attemptedProducts.Add($metadata.ProductCode)
     Run-Msi @('/i', $baselineSource) 'install'
     Check-Installed $metadata.ProductVersion $PublishedExecutable
     Run-Migrations 'installed'
@@ -164,14 +163,20 @@ try {
     Assert-MsiDataPreserved $baselineSource $baselineSourceHash
     $upgradeMsi = Join-Path $PSScriptRoot "tmp/grate-$upgradeVersion.msi"
     $updated = Read-MsiMetadata $upgradeMsi
-    if ($updated.ProductCode -ne $metadata.ProductCode -or $updated.UpgradeCode -ne $metadata.UpgradeCode -or $updated.Platform -ne $Architecture -or $updated.ProductVersion -ne $upgradeVersion) {
-        throw 'The update MSI changed product identity/platform or has the wrong version.'
+    $expectedUpgrade = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $upgradeVersion -Architecture $Architecture
+    if ($updated.ProductCode -ne $expectedUpgrade.ProductCode -or $updated.ProductCode -eq $metadata.ProductCode -or $updated.UpgradeCode -ne $metadata.UpgradeCode -or $updated.Platform -ne $Architecture -or $updated.ProductVersion -ne $upgradeVersion) {
+        throw 'The upgrade MSI must have its per-release ProductCode, the same architecture family and the expected version.'
     }
+    if ((Product-State $updated.ProductCode) -ne -1) { throw 'Refusing to replace a pre-existing upgrade product.' }
     $updated | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'upgrade-package.json')
     $upgradeSource = Copy-MsiLifecycleSource $upgradeMsi (Join-Path $OutputDirectory 'upgrade-source')
-    # This package keeps its ProductCode. Windows Installer requires explicit minor-update flags:
-    # https://learn.microsoft.com/windows/win32/msi/applying-small-updates-by-reinstalling-the-product
-    Run-Msi @('/i', $upgradeSource, 'REINSTALL=ALL', 'REINSTALLMODE=vomus') 'upgrade'
+    # A new release has its own ProductCode in the same UpgradeCode family.
+    # MajorUpgrade must remove the baseline product within the install transaction.
+    $baselineProductCode = $metadata.ProductCode
+    $attemptedProducts.Add($updated.ProductCode)
+    Run-Msi @('/i', $upgradeSource) 'upgrade'
+    if ((Product-State $baselineProductCode) -ne -1) { throw 'The major upgrade left the baseline product registered.' }
+    $metadata = $updated
     Check-Installed $upgradeVersion $upgradeExe
     Assert-MsiDataPreserved $databasePath $dataHash
     'ALTER TABLE package_smoke ADD COLUMN upgraded INTEGER; UPDATE package_smoke SET upgraded = 7;' | Set-Content "$sql/up/002_upgrade.sql"
@@ -184,14 +189,18 @@ try {
     Assert-MsiUninstalled -State (Product-State) -InstallDirectory $installDirectory -MarkerPresent (Marker-Present)
     Assert-MsiDataPreserved $databasePath $dataHash
     Assert-MsiDataPreserved $unrelatedFile $unrelatedHash
-    Write-Host "PASS: native $Architecture per-user MSI install, explicit minor update, installed migrations/skill and uninstall."
+    Write-Host "PASS: native $Architecture per-user MSI install, major upgrade, installed migrations/skill and uninstall."
 } catch {
     $failure = $_
 } finally {
     try {
-        if ($installationAttempted -and !$uninstalled -and (Product-State) -ne -1) { Run-Msi @('/x', $metadata.ProductCode) 'cleanup-uninstall' }
-    } catch {
-        $cleanupFailures.Add($_.Exception)
+        if (!$uninstalled) {
+            foreach ($productCode in $attemptedProducts) {
+                try {
+                    if ((Product-State $productCode) -ne -1) { Run-Msi @('/x', $productCode) ('cleanup-uninstall-' + $productCode.Trim('{}')) }
+                } catch { $cleanupFailures.Add($_.Exception) }
+            }
+        }
     } finally {
         # The package deliberately authors a permanent user PATH entry. Restore the
         # disposable runner's original value instead of claiming MSI removes it.

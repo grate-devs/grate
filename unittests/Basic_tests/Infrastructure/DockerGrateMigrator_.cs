@@ -17,6 +17,8 @@ public sealed class DockerGrateMigrator_
     [Theory]
     [InlineData(null, null, "gratedevs/grate")]
     [InlineData(null, "grate-local:tests", "grate-local:tests")]
+    [InlineData("gratedevs/grate:2.1.6", null, "gratedevs/grate:2.1.6")]
+    [InlineData("erikbra/grate:2.1.6", null, "erikbra/grate:2.1.6")]
     [InlineData("custom:tests", null, "custom:tests")]
     [InlineData("custom:tests", "grate-local:tests", "custom:tests")]
     public async Task Application_image_configuration_does_not_replace_the_database_image(
