@@ -1,7 +1,7 @@
 using grate.Configuration;
 using MariaDB.TestInfrastructure;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
 
 namespace Docker.MariaDB;
 

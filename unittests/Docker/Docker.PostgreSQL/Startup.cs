@@ -2,7 +2,7 @@ using grate.Configuration;
 using PostgreSQL.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
 
 namespace Docker.PostgreSQL;
 
