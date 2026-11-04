@@ -20,6 +20,8 @@ mono_crash.*
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
+# Release automation is source, not a build-output directory.
+!/scripts/release/
 [Rr]eleases/
 x64/
 x86/
@@ -360,3 +362,8 @@ MigrationBackup/
 .envrc
 .mono
 *.tfstate
+
+# Point-in-time release output belongs in CI artifacts or PR/release records.
+/docs/release-evidence/
+/installers/docker/*-evidence-*/
+/installers/docker/*-observed.json

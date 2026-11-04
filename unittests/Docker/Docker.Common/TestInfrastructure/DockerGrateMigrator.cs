@@ -45,9 +45,9 @@ public record DockerGrateMigrator(
         // both from the host and the container.
         if (DatabaseType == DatabaseType.SQLite)
         {
-            foreach (var connectionString in new[] { Configuration.ConnectionString, Configuration.AdminConnectionString })
+            foreach (var connectionString in new[] { Configuration.ConnectionString, Configuration.AdminConnectionString }.OfType<string>())
             {
-                var dbFile = connectionString?.Split("=", 2)[1];
+                var dbFile = connectionString.Split("=", 2)[1];
                 var folder = Path.GetDirectoryName(dbFile)!;
                 bindMounts[folder] = folder;
             }

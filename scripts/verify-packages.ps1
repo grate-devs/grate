@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory)][ValidateSet('Packages', 'Standalone')][string]$Kind,
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$RuntimeIdentifier,
+    [string]$StandaloneVersion = '0.0.1',
     [switch]$RunSmokeTest
 )
 
@@ -44,7 +45,7 @@ function Test-Migration([string]$Executable, [string]$Directory) {
 if ($Kind -eq 'Standalone') {
     if (!$RuntimeIdentifier) { throw '-RuntimeIdentifier is required for Standalone verification.' }
     $published = "$OutputDirectory/published"
-    dotnet publish src/grate/grate.csproj -c Release -f $targetFramework -r $RuntimeIdentifier --self-contained -p:SelfContained=true "-p:TargetFrameworks=$targetFramework" -o $published
+    dotnet publish src/grate/grate.csproj -c Release -f $targetFramework -r $RuntimeIdentifier --self-contained -p:SelfContained=true "-p:TargetFrameworks=$targetFramework" "-p:Version=$StandaloneVersion" -o $published
     # These files are the inputs embedded by the single-file bundler. Inspecting
     # them proves the runtime version even when the final archive contains one file.
     $buildDirectory = "src/grate/bin/Release/$targetFramework/$RuntimeIdentifier"
