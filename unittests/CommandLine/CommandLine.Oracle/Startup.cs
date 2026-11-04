@@ -3,7 +3,7 @@ using Oraclde.TestInfrastructure;
 using Oracle.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
 
 namespace CommandLine.Oracle;
 

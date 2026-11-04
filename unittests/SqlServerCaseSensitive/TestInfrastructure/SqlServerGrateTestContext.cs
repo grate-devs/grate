@@ -14,7 +14,7 @@ public class SqlServerCaseSensitiveTestCollection : ICollectionFixture<SqlServer
 public record SqlServerCaseSensitiveGrateTestContext
     : GrateTestContext
 {
-    public SqlServerCaseSensitiveGrateTestContext(
+    private SqlServerCaseSensitiveGrateTestContext(
         IGrateMigrator migrator,
         string serverCollation,
         ITestDatabase testDatabase) : base(migrator, testDatabase)
