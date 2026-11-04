@@ -78,7 +78,7 @@ jobs:
   test:
     name: Run tests
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
     timeout-minutes: ${{ matrix.category == 'Oracle' && 45 || 30 }}
     #needs: build-code
@@ -86,7 +86,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        category: [ "Basic_tests", "SqlServer", "SqlServerCaseSensitive", "PostgreSQL", "MariaDB", "Sqlite", "Oracle"  ]
+        include:
+          - os: ubuntu-latest
+            category: Basic_tests
+            test_filter: ''
+          - os: ubuntu-latest
+            category: SqlServer
+            test_filter: ''
+          - os: ubuntu-latest
+            category: SqlServerCaseSensitive
+            test_filter: ''
+          - os: ubuntu-latest
+            category: PostgreSQL
+            test_filter: ''
+          - os: ubuntu-latest
+            category: MariaDB
+            test_filter: ''
+          - os: ubuntu-latest
+            category: Sqlite
+            test_filter: ''
+          - os: ubuntu-latest
+            category: Oracle
+            test_filter: ''
+          - os: windows-latest
+            category: Basic_tests
+            test_filter: ''
+          - os: windows-latest
+            category: Sqlite
+            test_filter: ''
+          - os: windows-latest
+            category: SqlServer
+            test_filter: SqlServer.Basic_tests.*
+          - os: windows-latest
+            category: SqlServerCaseSensitive
+            test_filter: SqlServerCaseSensitive.Basic_tests.*
+          - os: windows-latest
+            category: MariaDB
+            test_filter: MariaDB.Basic_tests.*
+          - os: windows-latest
+            category: Oracle
+            test_filter: Oracle.Basic_tests.*
         #category: [ "Basic_tests", "Sqlite"  ]
 
     steps:
@@ -99,7 +138,9 @@ jobs:
           8.0.x
           9.0.x
           10.0.x
-    - name: Test
+    - name: Test on Linux
+      if: runner.os == 'Linux'
+      shell: bash
       # SDK 11 multi-TFM discovery requires an absolute project-file path.
       # The Sqlite lane also executes the SQL examples shipped with the skill.
       # Avoid starting a database container for each TFM concurrently on the same runner.
@@ -135,13 +176,43 @@ jobs:
         TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
         MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
 
+    - name: Test on Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $outDir = Join-Path "${{ runner.temp }}" "test-results/${{ matrix.category }}"
+        New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+
+        $testArgs = @(
+          "--project", "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj",
+          "--max-parallel-test-modules", "1",
+          "--minimum-expected-tests", "1",
+          "--stop-on-fail", "on",
+          "--long-running", "60",
+          "--timeout", "20m",
+          "--results-directory", $outDir,
+          "--report-xunit-trx",
+          "--xunit-info",
+          "--coverage",
+          "--coverage-output-format", "xml"
+        )
+
+        if ("${{ matrix.test_filter }}") {
+          $testArgs += @("--filter-class", "${{ matrix.test_filter }}")
+        }
+
+        dotnet test @testArgs
+      env:
+        LogLevel: Warning
+        TZ: UTC
+
     - name: Upload Unit Test Results
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: "${{ matrix.category }} XML test results"
+        name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
         path: |
-          /tmp/test-results/${{ matrix.category }}/
+          ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}/
         retention-days: 1
 
 

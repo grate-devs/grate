@@ -8,6 +8,9 @@ has_children: true
 
 # Grate Configuration Options
 
+For the purpose and location of `ScriptsRun`, `Version`, and the internal
+`Grate*` tables, see [Migration tables](../MigrationTables.md).
+
 ## Barebone
 The only required argument to pass to grate is a connection string to tell it where to find your database. It will deploy to that database, looking for sql scripts in the current directory.
 

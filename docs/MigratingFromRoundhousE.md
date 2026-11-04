@@ -18,6 +18,7 @@ grate is built using the new [`System.CommandLine`](https://github.com/dotnet/co
 - We have gained support for [Response (`.rsp`) files](ConfigurationOptions/ResponseFiles.md)
 
 - By default grate stores version information in the `grate` database schema.  To continue using your existing version information pass `--schema=RoundhousE`
+- grate adds `GrateScriptsRun`, `GrateScriptsRunErrors`, and `GrateVersion` to track upgrades to the migration tables themselves. Your existing migration history remains in `ScriptsRun`, `ScriptsRunErrors`, and `Version`. See [Migration tables](MigrationTables.md) for details.
 - grate has a single mandatory `-cs`/`--connstring` argument for simplicity.  RH's `--database`, `--server` etc arguments are no longer allowed.
 
 - Not all previously supported tokens are available yet.  For more information see the [Token Replacement docs](TokenReplacement.md).
