@@ -42,7 +42,7 @@ jobs:
 
   analyze:
     name: Analyze Code Security
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       actions: read
       contents: read
@@ -66,6 +66,11 @@ jobs:
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v4.39.1
+
+    # Autobuild selects C#; trace the Windows-only MSI action explicitly too.
+    - name: Build native MSI upgrade action for CodeQL
+      shell: pwsh
+      run: ./installers/msi/native/Build-UpgradeActions.ps1 -Architecture x64 -OutputDirectory "$env:RUNNER_TEMP/codeql-msi-upgrade-actions"
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4.39.1
