@@ -41,7 +41,7 @@
     <PackageVersion Include="Testcontainers.MariaDb" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.Oracle" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
-    <PackageVersion Include="Xunit.DependencyInjection.Logging" Version="11.0.0" />
+    <PackageVersion Include="Xunit.DependencyInjection.Logging" Version="12.0.0" />
     <PackageVersion Include="MartinCostello.Logging.XUnit.v3" Version="0.7.1" />
   </ItemGroup>
 </Project>
