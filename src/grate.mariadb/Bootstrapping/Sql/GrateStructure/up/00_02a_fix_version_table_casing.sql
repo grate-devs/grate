@@ -1,7 +1,10 @@
+-- Replace helpers left by an interrupted bootstrap or changed internal script.
+DROP PROCEDURE IF EXISTS create_{{SchemaName}}_fix_version_table_casing;
 CREATE PROCEDURE create_{{SchemaName}}_fix_version_table_casing()
 BEGIN
     DECLARE CONTINUE HANDLER FOR 1060 BEGIN END;
-    IF EXISTS (SELECT 1 
+    -- A case-only rename refers to the same table when names are case-insensitive.
+    IF @@lower_case_table_names = 0 AND EXISTS (SELECT 1
       FROM INFORMATION_SCHEMA.TABLES
       WHERE table_schema = DATABASE()
             AND BINARY `table_name` = BINARY '{{SchemaName}}_{{VersionTableLowerCase}}' -- exists in db
