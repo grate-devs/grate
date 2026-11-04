@@ -1,8 +1,9 @@
-# Docker distribution handoff for #799
+# Docker release and distribution
 
 The canonical Docker Hub image is `gratedevs/grate`. GitHub remains
 `grate-devs/grate`. Buildx produces one OCI archive; the organization OIDC
-identity publishes that verified archive to `gratedevs/grate`. During the transition, `erikbra/grate` receives the exact same
+identity publishes that verified archive to `gratedevs/grate`. During the
+transition, `erikbra/grate` receives the exact same
 immutable digest through a Skopeo copy using the retained personal credential.
 There is no second application build. Login identity does not choose the repository.
 
@@ -15,9 +16,8 @@ for metadata-free `SemVer`, falls back to `1.0.0-local`, and never pushes.
 
 ## Integrated release workflow
 
-The Docker changes are integrated with #804's release-event contract and current
-main's .NET 11/security settings. All artifact jobs use the immutable workflow
-event SHA, and selected release tags must match the event ref and commit.
+All artifact jobs use the immutable workflow event SHA, and selected release
+tags must match the event ref and commit.
 `resolve_release_context.py` accepts only strict metadata-free SemVer;
 publishing requires a published non-draft release event, or explicit manual
 publishing against an existing non-draft GitHub release. Ordinary push/PR events
@@ -93,129 +93,88 @@ is explicitly reported in the summary. Never rebuild or blindly retry a partiall
 published version: inspect both repositories and the original build record, then
 repair from the original immutable digest under the release recovery procedure.
 
-The frozen history plan remains unchanged, SHA-256
-`044b46912aaa90f3fe352e80639b1feff6682ae36eb1eb59d7ed046fbf3f4c1e`.
-All 37 historical tags were already copied and verified by
-[run 41350802278](https://github.com/grate-devs/grate/actions/runs/41350802278).
-Do not run another history copy for this change. `docker-migrate-tags.yml` is a
-manual recovery tool, separate from release publication.
+## Publication configuration
 
-## Operations inventory and outstanding decisions
+The release jobs need two separate identities:
 
-GitHub inventory and maintainer decisions recorded on 1 November 2026:
+| Destination | Configuration | Required access |
+| --- | --- | --- |
+| Canonical `gratedevs/grate` | `docker-hub` environment and `DOCKERHUB_OIDC_CONNECTIONID` variable | Organization OIDC pull/push for this repository only |
+| Compatibility `erikbra/grate` | `DOCKER_HUB_USER` and `DOCKER_HUB_TOKEN` repository secrets | Pull/push to the compatibility repository |
 
-| Item | Evidence / remaining action |
-| --- | --- |
-| `DOCKER_HUB_USER` | Repository secret updated `2026-11-01T20:51:05Z`; value intentionally unreadable through the secrets API. The maintainer confirmed the current credential owner is Docker ID `erikbra`. |
-| `DOCKER_HUB_TOKEN` | Repository secret updated `2026-11-01T20:50:49Z`; maintainer confirmed owner `erikbra`. Token type, expiration, renewal owner and recovery owner remain unrecorded. Record metadata only, never the token. |
-| Repository grants | [OIDC diagnostic 41355646304](https://github.com/grate-devs/grate/actions/runs/41355646304) verified OIDC canonical pull/push, denied OIDC legacy push, and verified retained-token legacy pull/push without image publication. The earlier history copy separately exercised writes with the old shared identity. |
-| `docker-hub` environment | Created and read back through the GitHub API after the maintainer selected release-job-only use without manual approval. No reviewer or wait timer; allowed refs are branch `main` and tags matching `*`. See the configuration below. |
-| Long-term identity | Maintainer selected a move to organization-managed access under Docker organization `gratedevs` (GitHub organization remains `grate-devs`). The personal repository still needs a compatibility credential. Preserve working credentials during the transition. |
+Record credential ownership, expiry, renewal and recovery responsibility in the
+maintainer's operational records. Keep secret values out of logs and reports.
+Recheck access when releasing; a saved template does not establish live grants.
 
-### Configured GitHub environment
+### GitHub environment
 
-The requested environment body is in [github-environment.json](github-environment.json)
-and the allowed-ref rules are in
-[github-environment-policies.json](github-environment-policies.json).
-[github-environment-observed.json](github-environment-observed.json) records the
-actual API read-back. No secret was created, moved, read or rotated.
+[github-environment.json](github-environment.json) and
+[github-environment-policies.json](github-environment-policies.json) are reusable
+setup templates for the `docker-hub` environment: no wait timer or required
+reviewer, with allowed refs `main` and tags matching `*`. Inspect the actual
+repository policy before changing it; these files are desired configuration,
+not observations of the live environment.
 
-The common workflow's release-only `publish-docker` job references
-`environment: docker-hub`; ordinary build/test jobs do not. The manual access
-check explicitly uses the same environment to verify that identity without
-publishing. It is not part of ordinary CI. GitHub environment ref
-policies do not allowlist job IDs. The environment permits `main` and tag refs;
-other branches are not allowed.
-The release workflow requires tagged recovery to be dispatched on the selected
-tag (`--ref TAG -f release_tag=TAG`), so the executed source and cache/ref context
-match. A dispatch on `main` cannot select another release tag. See the
-[release recovery commands](../../docs/ReleaseProcess.md#6-recover-a-failed-or-partial-release).
-The common release resolver and `release-ready` dependency must still enforce
-published-release eligibility; an environment tag pattern is not SemVer or
-release validation. See the
+The release-only `publish-docker` job references `environment: docker-hub`;
+ordinary build/test jobs do not. The manual access check uses the same environment
+to verify the identity without publishing. Environment ref policies do not
+allowlist job IDs, and an environment association does not restrict access to
+existing repository-scoped secrets by itself.
+
+Tagged recovery must use the selected tag as the workflow ref
+(`--ref TAG -f release_tag=TAG`), so executed source and cache/ref context match.
+The release resolver and `release-ready` dependency enforce published-release
+eligibility; a tag pattern is not SemVer or release validation. See the
+[release recovery commands](../../docs/ReleaseProcess.md#6-recover-a-failed-or-partial-release),
 [GitHub environment API](https://docs.github.com/en/rest/deployments/environments)
 and [ref-policy API](https://docs.github.com/en/rest/deployments/branch-policies).
-The repository-scoped Docker secrets still exist; this environment alone does
-not restrict which jobs can read those existing repository secrets.
 
-### Configured organization identity
+### Organization OIDC identity
 
-The maintainer authorized organization OIDC while retaining the personal token
-for compatibility. Docker-Sponsored Open Source with all Team features and renewal
-on 1 January 2027 was confirmed in the authenticated organization window.
+[oidc-connection-request.json](oidc-connection-request.json) is the reusable
+organization connection template. Its contract is:
 
-[Connection grate-github-release](https://app.docker.com/accounts/gratedevs/admin/oidc-connections/4ef78952-1444-428f-bbfc-61624a97b196)
-was created and its saved rule re-opened and checked:
+- Organization `gratedevs`, connection name `grate-github-release`.
+- Subject `repo:grate-devs/grate:environment:docker-hub`.
+- Resource `gratedevs/grate`, scope `scope-image-push`, including pull.
+- No delete, broad repository or Build Cloud grant.
 
-- Connection ID: `4ef78952-1444-428f-bbfc-61624a97b196`.
-- Subject: `repo:grate-devs/grate:environment:docker-hub`.
-- Resource: only `gratedevs/grate`, scope `scope-image-push`, which includes pull.
-  No delete, broad repository or Build Cloud grant was selected.
-- GitHub environment variable `DOCKERHUB_OIDC_CONNECTIONID` in `docker-hub`
-  stores the connection ID. It is not a secret.
-- Existing repository secrets `DOCKER_HUB_USER` and `DOCKER_HUB_TOKEN` remain
-  unchanged and are used only for legacy grants and destination copying.
-  Their API update timestamps remain 20:51:05Z and 20:50:49Z on 1 November 2026.
-
-The GitHub OIDC customization API reports `use_default: true`,
-`use_immutable_subject: false`, and prefix `repo:grate-devs/grate`, confirming the
-subject format for this repository. See the checked-in
-[connection request](oidc-connection-request.json) and
-[observed configuration](oidc-connection-observed.json), plus
-[Docker's OIDC setup](https://docs.docker.com/security/authentication/oidc-connections/create-manage/)
+Store the created connection ID in the `docker-hub` environment variable
+`DOCKERHUB_OIDC_CONNECTIONID`. Keep the personal credential separate for
+compatibility publication. See [Docker's OIDC setup](https://docs.docker.com/security/authentication/oidc-connections/create-manage/)
 and [scope reference](https://docs.docker.com/security/access-tokens/reference/).
 
-The real [Actions access check](https://github.com/grate-devs/grate/actions/runs/41355646304)
-passed at isolated commit `164b874424baca2dd42a3e31fbabcd25eec8f7b6`.
-Its tree contained only the manual diagnostic at the registered `build.yml` path,
-the grant-check helper and its six unit tests; there were no product build,
-release or image publication steps. A temporary exact branch allowance let this
-reviewed diagnostic use `docker-hub`; both that allowance and the temporary branch
-were removed afterward. The final environment allows only branch `main` and tag
-pattern `*`, as before. Sanitized grants and provenance are retained under
-[oidc-evidence-2026-11-01](oidc-evidence-2026-11-01/).
+Use the manual access diagnostic to establish canonical OIDC pull/push,
+legacy-token pull/push and identity separation without uploading images. Keep
+sanitized reports in Actions artifacts or linked maintenance records, not git.
 
-No images or releases were published during OIDC setup. The common release-event
-workflow integration is now implemented; its no-publication validation is recorded
-in [VERIFICATION.md](VERIFICATION.md). The personal
-token's expiration and renewal/recovery ownership remain unrecorded operational
-metadata; retaining it does not authorize extending or changing its permissions.
+## Compatibility transition
 
 Before ending dual publication, maintainers must agree a date or release-count
-window, notification period, and evidence that supported consumers have migrated.
-No end date has been selected. Proposed exit criteria: the documented window has
-elapsed; canonical stable/prerelease publishing and representative migrations are
-verified; public docs/examples and known supported consumers use `gratedevs/grate`;
-and maintainers explicitly approve ending updates to the old name. Retain old
-version tags for historical reproducibility; ending dual publication does not
-authorize deleting them.
+window, notification period and criteria for consumer migration. Verify canonical
+stable/prerelease publication and representative migrations, update public
+examples and known supported consumers to `gratedevs/grate`, and record the
+transition-end decision. Retain old version tags for reproducibility; ending
+updates does not authorize deleting them.
 
-Docker Hub description changes remain a maintainer decision and are not applied:
+Docker Hub descriptions should identify `gratedevs/grate` as canonical and link
+the project and installation guide. The compatibility repository should link the
+canonical name and describe the agreed support window. After the transition,
+record its last supported release and retain the migration link.
 
-- `gratedevs/grate`: identify it as the canonical image, link the GitHub project
-  and installation guide, and describe version tags and stable-only `latest`.
-- `erikbra/grate`: mark it moved to `gratedevs/grate`, link the new repository,
-  and state that compatible updates continue during the agreed transition.
-- After the transition: state the last compatible version/date and that new
-  releases are available only from the canonical name. Keep the migration link.
+## Historical tag migrations
 
-## Checks for this change
+A normal release does not copy registry history. For a separately authorized
+history migration, first generate a read-only snapshot with
+`scripts/release/migrate_docker_tags.py`, review its immutable digests and plan
+hash, then copy only that plan with `--copy`. Keep plans and reports outside git
+in CI artifacts or linked maintenance records. Preserve platform/attestation
+manifests and referenced blobs, reject conflicting tags and verify the result
+independently. Inspect current destinations before retrying any partial copy.
 
-```sh
-python3 -m unittest discover -s installers/docker -p 'test_*.py' -v
-python3 -m unittest discover -s eng -p 'test_*docker*.py' -v
-bash -n build-docker-local.sh
-shellcheck build-docker-local.sh
-python3 eng/check_docker_oci_copy.py # requires skopeo; local files only
-```
+## Verification
 
-Recorded local outcomes and evidence limits are in [VERIFICATION.md](VERIFICATION.md).
-
-The last command copies a tiny synthetic OCI layout with amd64, arm64 and an
-attestation between local directories with real Skopeo. It verifies the exact
-root digest and every blob without contacting a registry or publishing images.
-The separate `check_local_registry.py` remains available for explicitly authorized
-loopback-registry checks; it was not run for the no-publication OIDC setup.
-Application behavior requires the Docker integration suites against a matching
-locally built application image separately; application sources did not change
-for this authentication update.
+Follow [the Docker verification guide](VERIFICATION.md) for repeatable policy,
+archive, registry and application checks. Store run-specific output in Actions
+artifacts or external PR/release records. The source tree keeps the checks and
+configuration needed to repeat them.

@@ -16,6 +16,8 @@ The SDK is pinned in `global.json` to `11.0.100-rc.3.26522.148`. Library and
 Self-contained binaries and the Docker image bundle runtime
 `11.0.0-rc.3.26522.148`. RC3 has [go-live production support](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)
 until November 10, 2026, so a grate release need not wait for .NET 11 GA.
+We will update the SDK and bundled runtime to stable .NET 11 as soon as it is
+released, following the [GA update procedure](#moving-to-net-11-ga) below.
 
 The pinned SDK is used for normal repository builds. Developers who only need
 to work on `net10.0` can use the stable .NET 10 SDK with the
@@ -75,7 +77,7 @@ files/packages; submission to the external repositories/feeds is separate.
   Review the generated `grate-devs.grate` manifests, run
   `winget validate --manifest <manifest-directory>` and verify installation and
   migration with the final files before submitting to `microsoft/winget-pkgs`.
-  See the [migration contract and Windows evidence](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md)
+  See the [migration contract and Windows verification](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md)
   for the different MSI and portable transition commands and pending public acceptance.
 
 Use `-releaseTag <tag>` with the Homebrew/winget generators if the release tag

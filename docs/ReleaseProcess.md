@@ -346,7 +346,9 @@ Stop repeating a failed action without new evidence.
 
 ## 7. Leave a release record
 
-Keep a short record with the release notes or linked maintenance work:
+Keep a short record with the release notes or linked maintenance work. Store
+run-specific reports and logs in CI artifacts or those external records, outside
+the source repository:
 
 ```text
 Version/tag and stable/prerelease flag:
@@ -372,7 +374,6 @@ and public installation are different milestones.
 - [Build outputs, SDK requirements and manual packaging](Packaging.md)
 - [Docker release and recovery details](https://github.com/grate-devs/grate/blob/main/installers/docker/RELEASE.md)
 - [WinGet migration contract](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md)
-- [Historical workflow verification](release-evidence/release-workflow-2026-11-02.md)
 
 For optional agent assistance, the repository-local `release-grate` skill follows
 this runbook. Its entrypoint is `.agents/skills/release-grate/SKILL.md`; invoke

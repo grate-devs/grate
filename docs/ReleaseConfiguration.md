@@ -68,10 +68,11 @@ is insufficient. The diagnostic requests grants and retains a sanitized report;
 it does not upload an image. Do not weaken environment protections or run the
 release publisher as an access probe.
 
-The historical tag migration workflow performs real registry writes. It is not
-an access diagnostic and is not part of an ordinary release. Existing history
-has already been copied; use a new frozen migration plan only for an explicitly
-requested migration, preserving digests/platforms and independent verification.
+`scripts/release/migrate_docker_tags.py --copy` performs real registry writes. It
+is not an access diagnostic or part of an ordinary release. For an explicitly
+requested history migration, first generate and review a fresh frozen plan,
+preserving digests/platforms and independent verification. Store the plan and
+reports outside git in CI artifacts or linked maintenance records.
 
 ## Operational decisions to keep current
 

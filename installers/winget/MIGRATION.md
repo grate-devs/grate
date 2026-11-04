@@ -1,8 +1,9 @@
 # WinGet identity migration (#800)
 
-The correction passes the disposable Windows CI matrix described below. Nothing has been
-submitted to winget-pkgs, released or merged. `grate-devs.grate` is a proposed new
-package, not an alias. Historical `erikbra.grate` manifests remain unchanged.
+`grate-devs.grate` is the proposed new package identity, not an alias.
+Historical `erikbra.grate` manifests remain unchanged. Public availability requires
+a corrected stable release and separate acceptance into `microsoft/winget-pkgs`;
+check that acceptance before using the public-source commands below.
 
 ## Supported transition
 
@@ -128,27 +129,10 @@ SemVer prerelease labels.
 framework-dependent probe apphosts. It checks actual MSI metadata, rejection of
 core-only authoring, three same-core refusals with original registration/payload
 preserved, explicit uninstall/reinstall, higher-core upgrades and external data.
-It copies authoring into its evidence directory so it cannot overwrite a release
+It copies authoring into its temporary output directory so it cannot overwrite a release
 MSI in `installers/msi/tmp`. Probe fixtures are never release artifacts. The
 manual `msi-prerelease-policy.yml` workflow runs this check on x64 and ARM64;
 this is separate from full application and WinGet lifecycle matrices.
-
-[Native prerelease policy run 41411152047](https://github.com/grate-devs/grate/actions/runs/41411152047)
-passed both architectures at test commit
-`20ca2dd97b8fb5f41dd440d8df9c30235bdda759`, using production policy commit
-`c83a2754b24e6bd3057c43283cf0cf4a2e9ae484`. Each job built and inspected five
-actual probe MSIs, required three refusals to return 1603 with the native
-same-core message, and completed six successful install/upgrade/uninstall
-operations. Ten inventory snapshots per architecture show one current-user
-context-2 product at a time, the original registration after each refusal,
-and no product after final uninstall. Payload hashes and external data are
-checked throughout. The first run failed before installation because the probe
-passed a mixed-separator MSI path; the test-only path normalization fix did not
-change production code. Pure C++ policy cases also reject equal-core legacy
-replacement; that additional legacy boundary was not separately runtime-tested.
-The earlier full WinGet/native rollback matrices remain historical evidence for
-the stable paths described below, rather than a claim that this small probe
-repeated all application, rollback and source checks.
 
 ## WinGet scope workaround
 
@@ -220,9 +204,10 @@ Certificate private keys remain outside uploaded evidence and trust is removed
 during cleanup.
 
 Select `public_baseline=true` to install historical 2.0.0 with the genuine
-`--source winget` before adding the candidate source. This is the historical
-version currently present in the public catalog; 2.1.6 is tested separately through
-the private catalog. The test preserves the public source and WinGet tracking,
+`--source winget` before adding the candidate source. The harness uses 2.0.0 as
+its public-origin fixture; confirm the
+required version remains available before running it. Version 2.1.6 is a separate
+private-catalog fixture. The test preserves the public source and WinGet tracking,
 asserts the old ID's public origin in export before candidate addition, and checks
 that the public source's URL/type/identifier remain unchanged. The private
 candidate catalog contains only the new ID in this scenario, avoiding a duplicate
@@ -236,16 +221,19 @@ transactionally; portable ZIP explicitly uninstalls the public old ID first.
 Actual payload, native context, command, user data and strict uninstall checks
 remain active.
 
-For example, reuse the verified candidate artifacts without rebuilding them:
+To reuse candidate artifacts, select their build run and a reviewed workflow ref.
+Set `direct_msi=true` for the full native upgrade/rollback checks:
 
 ```powershell
-gh workflow run winget-lifecycle.yml --ref feat/800-winget-migration -f candidate_run_id=41363831167 -f cases=all -f direct_msi=false -f source_type=PreIndexed -f public_baseline=false
-gh workflow run winget-lifecycle.yml --ref feat/800-winget-migration -f candidate_run_id=41363831167 -f cases=all -f direct_msi=false -f source_type=PreIndexed -f public_baseline=true
+$workflowRef = '<reviewed-ref>'
+$candidateRunId = '<candidate-build-run-id>'
+gh workflow run winget-lifecycle.yml --ref $workflowRef -f candidate_run_id=$candidateRunId -f cases=all -f direct_msi=true -f source_type=PreIndexed -f public_baseline=false
+gh workflow run winget-lifecycle.yml --ref $workflowRef -f candidate_run_id=$candidateRunId -f cases=all -f direct_msi=true -f source_type=PreIndexed -f public_baseline=true
 ```
 
-`direct_msi=false` reuses the independent major-upgrade/rollback evidence below;
-it does not skip the actual MSI installations performed through WinGet. `cases=x64`
-provides a two-job ZIP/MSI bootstrap check; `all` retains all five architectures/
+Use `direct_msi=false` only when separate applicable native major-upgrade/rollback
+results are recorded for those candidates. It still runs actual MSI installations
+through WinGet. `cases=x64` provides a two-job ZIP/MSI bootstrap check; `all` retains all five architectures/
 installer combinations. Public origin is reported separately from public
 destination: the new package still comes from a private source with its own
 identity, even when its source implementation is the same as the public catalog.
@@ -262,74 +250,23 @@ external data preservation, strict exact-ID uninstall and cleanup. `grate
 probe. Artifacts retain raw MSI/WinGet logs, native inventories, commands,
 manifests, exports and results for seven days.
 
-## Evidence and limits
+## Acceptance and coverage
 
-The additional checks passed at script commit
-`27458d4065010cfd7f8e520c1d8bb615205dd514`, using the same immutable candidates and
-unchanged MSI/application inputs as the earlier lifecycle run:
+Require successful results for all selected ZIP/MSI architectures and source
+scenarios. Inspect actual registration, payload hashes, source identity, exact-ID
+queries and exports, subsequent upgrades, data preservation and strict uninstall.
+For native MSI checks, also inspect rollback restoration, same-core refusal and
+cross-architecture guards. A green fixture/source check does not establish public
+new-ID availability.
 
-| Source and baseline | Verified result |
-| --- | --- |
-| [Private SQLite, run 41402119958](https://github.com/grate-devs/grate/actions/runs/41402119958) | ZIP x86/x64/ARM64 and MSI x64/ARM64: both IDs in one native SQLite 2.0 catalog, historical installs, supported ID transition, exclusive new-ID correlation/export, subsequent upgrade, data preservation and strict uninstall |
-| [Public origin to private SQLite, run 41402122968](https://github.com/grate-devs/grate/actions/runs/41402122968) | All five combinations: actual public 2.0.0 install, public source/tracking preserved, new-ID transition, all-source and individual-source correlation, global export, next upgrade, data preservation and strict uninstall |
+Before public acceptance, repeat the final candidate's schema and native
+installation checks using the actual published release assets. After acceptance,
+verify installation and correlation through the public `--source winget` catalog.
+Private candidate catalogs and public-origin checks exercise different boundaries.
+Enterprise managed-user/machine installations and historical versions outside the
+selected fixtures require separate coverage if they are being claimed. Track any
+unsupported client-tracking state explicitly.
 
-Both matrices require the actual registered candidate source type, family and
-URL to match the prepared source. All five public-origin jobs fetched
-`source2.msix` over HTTPS and opened a native SQLite 2.0 index; the public source
-kept its original Microsoft identity. Independent review checked the 120 exact
-query results, 20 stage exports, five pre-candidate exports, source package/index
-and manifest hashes, native registrations and 30 successful migration invocations
-in the public-origin matrix.
-The private-origin matrix was independently checked for both indexed IDs/all
-four manifest streams, real V2 requests, exclusive exports, both historical MSI
-replacement routes on x64/ARM64 and 52 successful migration invocations.
-
-[Preparation run 41402119754](https://github.com/grate-devs/grate/actions/runs/41402119754)
-passed at the same script commit, including the existing preparation/native
-compilation checks, 20 correlation/export checks (including deliberately wrong
-queries, aliases and source identities), five singleton conversion cases and the
-static-source path suite. The five static-source cases also passed locally.
-The earlier x64 public-origin REST and private SQLite bootstrap runs
-[41401625759](https://github.com/grate-devs/grate/actions/runs/41401625759) and
-[41401780301](https://github.com/grate-devs/grate/actions/runs/41401780301) passed;
-the full matrices above are the final source-test evidence.
-
-[Final Windows lifecycle run 41365480749](https://github.com/grate-devs/grate/actions/runs/41365480749)
-passed all five jobs with script commit
-`324de4951ca4f556afc0f048b8f690a0862563bd`. It reused immutable test candidates from
-[build run 41363831167](https://github.com/grate-devs/grate/actions/runs/41363831167),
-source `315bf65fb191c4db40ccd47e4f48e1bccda195e4`. All three candidate build jobs
-succeeded before that superseded run was cancelled. MSI authoring, native action,
-identity contract and application/build inputs are unchanged between those
-commits; later changes concern verification and proposal preparation.
-
-| Job | Verified result |
-| --- | --- |
-| [ZIP x86](https://github.com/grate-devs/grate/actions/runs/41365480749/job/125024628236) | Same-ID upgrade, explicit ID transition, exclusive query/export, subsequent new-ID upgrade, data preservation and strict uninstall |
-| [ZIP x64](https://github.com/grate-devs/grate/actions/runs/41365480749/job/125024628275) | Same assertions, executing the x64 payload |
-| [ZIP ARM64](https://github.com/grate-devs/grate/actions/runs/41365480749/job/125024628062) | Same assertions, executing the native ARM64 payload |
-| [MSI x64](https://github.com/grate-devs/grate/actions/runs/41365480749/job/125024628318) | Both historical versions: native major upgrade, rollback restoration, next family upgrade and downgrade refusal; direct new-ID install, exclusive query/export, next WinGet upgrade, fresh install and strict uninstall |
-| [MSI ARM64](https://github.com/grate-devs/grate/actions/runs/41365480749/job/125024628336) | Same native/source assertions; additionally rejects the other architecture family with its original payload/context/data preserved |
-
-Both MSI jobs schema-validated the two new-ID manifest sets and passed the
-supervisor's real successful/blocked-process contract tests. Native inventories
-show current-user context 2, installed state 5 and assignment type 0, without a
-machine instance. Both diagnostic old-ID bridge upgrades retained an old-ID
-tracking alias, so the final proposal does not emit that bridge.
-
-[Preparation run 41365481067](https://github.com/grate-devs/grate/actions/runs/41365481067)
-passed 32 helper contract cases, 22 changed-and-rejected LF/CRLF correlation
-mutations, four lifecycle catalog cases, MSI authoring/identity checks, actual
-historical stable-release inspection/refusal and MSVC compilation for x64/ARM64.
-The local HTTPS protocol suite passed 14 cases. Independent review checked the
-actual x64/ARM64 registration, command, rollback, payload and data evidence.
-
-Artifacts retain raw MSI/WinGet logs, native inventories, manifests, commands,
-exports, provenance and result JSON for seven days. Candidate versions remain
-unpublished fixtures. Community acceptance and repetition with actual published
-candidate artifacts and the new ID from `--source winget` remain external
-requirements; these are distinct from the public-origin checks described above.
-Historical 1.2.0 and enterprise managed-user/machine installations have not been
-runtime-tested. A tracker already contaminated by a corrected old-ID bridge is
-an unresolved client limitation, outside the supported migration route.
-No upstream submission, public release or merge was performed.
+Keep run IDs, source/candidate provenance, raw logs, inventories, manifests,
+exports and result JSON in CI artifacts or external PR/release records. Retain
+only reusable test code, configuration and migration instructions in git.

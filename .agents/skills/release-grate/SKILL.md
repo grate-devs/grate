@@ -6,7 +6,7 @@ description: "Prepare, publish, verify, or recover grate project releases using 
 # Release grate
 
 Read [the release guide](../../../docs/ReleaseProcess.md), then inspect
-`.github/workflows/build.yml`, `eng/resolve_release_context.py` and `GitVersion.yml`
+`.github/workflows/build.yml`, `scripts/release/resolve_release_context.py` and `GitVersion.yml`
 at the intended release commit. Resolve repository-relative paths with
 `git rev-parse --show-toplevel`. The guide is the human procedure; this skill
 coordinates the same workflows. If the implementation differs, report the gap
@@ -123,11 +123,12 @@ canonical OIDC grants, legacy-token grants and identity separation without
 uploading. Login success or HTTP 200 alone does not establish push permission.
 Do not weaken environment protections or extract secret values to test access.
 
-Historical Docker tags have already been copied. A specifically requested new
-history migration uses the read-only snapshot mode of `eng/migrate_docker_tags.py`
-first, then a reviewed frozen plan and `--copy` only within that authorization.
-The dedicated migration workflow performs real registry writes; it is not an
-access test. Preserve digests, all platforms, attestations and referenced blobs,
+A specifically requested historical Docker tag migration uses the read-only
+snapshot mode of `scripts/release/migrate_docker_tags.py` first, then a reviewed
+frozen plan and `--copy` only within that authorization. The copy command performs
+real registry writes; it is not an access test. Keep its plan and reports outside
+git, using CI artifacts or linked maintenance records. Preserve digests, all
+platforms, attestations and referenced blobs,
 refuse conflicting tags and retain independent verification reports. Do not
 repeat a history copy during an ordinary release or retire the legacy name
 without an agreed transition-end decision.
@@ -135,4 +136,5 @@ without an agreed transition-end decision.
 When updating distribution documentation, migrate channels independently and
 retain supported old names during the transition. Inspect current channel code
 and live acceptance state before changing installation commands. Keep historical
-references and CI evidence separate from instructions for new releases.
+references and CI evidence in external PR/release records or CI artifacts. Do
+not commit point-in-time logs, reports, API snapshots or migration plans.

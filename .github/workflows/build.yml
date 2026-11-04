@@ -14,7 +14,7 @@ on:
       - ".github/workflows/build.yml"
       - "Directory.*"
       - "GitVersion.yml"
-      - "eng/**"
+      - "scripts/release/**"
       - "installers/**"
       - "src/**"
   release:
@@ -80,7 +80,7 @@ jobs:
         MANUAL_PUBLISH: ${{ inputs.publish }}
         GITVERSION_SEMVER: ${{ steps.gitversion.outputs.semVer }}
         GH_TOKEN: ${{ github.token }}
-      run: python3 eng/resolve_release_context.py
+      run: python3 scripts/release/resolve_release_context.py
     # Keep the event ref/cache scope and executed source together. Inputs never select a checkout.
     - name: Verify release tag identifies the event commit
       env:
@@ -105,8 +105,8 @@ jobs:
       with:
         ref: ${{ github.sha }}
         persist-credentials: false
-    - run: python3 -m pip install -r eng/requirements-workflow-tests.txt
-    - run: python3 -m unittest discover -s eng -p 'test_*.py' -v
+    - run: python3 -m pip install -r scripts/release/requirements-workflow-tests.txt
+    - run: python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
     - run: python3 -m unittest discover -s installers/docker -p 'test_*.py' -v
 
   build-netcore-tool:
@@ -471,7 +471,7 @@ jobs:
           # Fail on an existing conflicting Docker version before any GitHub assets change.
           mode=--preflight-only
         fi
-        python3 eng/publish_docker_archive.py "$mode" --archive "$RUNNER_TEMP/grate-image.tar" --report "$RUNNER_TEMP/docker-archive-validation.json"
+        python3 scripts/release/publish_docker_archive.py "$mode" --archive "$RUNNER_TEMP/grate-image.tar" --report "$RUNNER_TEMP/docker-archive-validation.json"
     - name: Retain the exact Docker artifact for gated publication
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
@@ -692,7 +692,7 @@ jobs:
     - name: Check Docker release policy
       run: |
         python3 -m unittest discover -s installers/docker -p 'test_*.py'
-        python3 -m unittest discover -s eng -p 'test_*docker*.py'
+        python3 -m unittest discover -s scripts/release -p 'test_*docker*.py'
 
     - name: Select identical tags for canonical and compatibility names
       id: tags
@@ -738,14 +738,14 @@ jobs:
       env:
         DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
         DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-      run: python3 eng/check_docker_access.py --canonical-authfile "$DOCKER_CONFIG/config.json" --report docker-access.json
+      run: python3 scripts/release/check_docker_access.py --canonical-authfile "$DOCKER_CONFIG/config.json" --report docker-access.json
 
     - name: Publish the verified archive to the canonical repository without rebuilding
       id: image
       env:
         DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
         EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
-      run: python3 eng/publish_docker_archive.py --archive docker-artifact/grate-image.tar --authfile "$DOCKER_CONFIG/config.json" --report docker-canonical.json
+      run: python3 scripts/release/publish_docker_archive.py --archive docker-artifact/grate-image.tar --authfile "$DOCKER_CONFIG/config.json" --report docker-canonical.json
 
     - name: Copy the built digest to the compatibility repository
       id: compatibility
@@ -754,7 +754,7 @@ jobs:
         EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
         DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
         DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-      run: python3 eng/copy_docker_release.py --source-authfile "$DOCKER_CONFIG/config.json" --report docker-compatibility.json
+      run: python3 scripts/release/copy_docker_release.py --source-authfile "$DOCKER_CONFIG/config.json" --report docker-compatibility.json
 
     - name: Verify every published tag against the built digest
       if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' && steps.tags.outputs.tags != '' }}
@@ -763,7 +763,7 @@ jobs:
         EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
         BUILD_OUTCOME: ${{ steps.image.outcome }}
       # Public read-back deliberately does not use the legacy credential for canonical access.
-      run: python3 eng/verify_docker_release.py --report docker-publication.json
+      run: python3 scripts/release/verify_docker_release.py --report docker-publication.json
 
     - name: Retain publication results, including partial failures
       if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' }}
@@ -915,7 +915,7 @@ jobs:
         test -f "$arm64_asset"
         test -f "$x64_asset"
 
-        python3 eng/update_homebrew_cask.py \
+        python3 scripts/release/update_homebrew_cask.py \
           --version "$VERSION" \
           --arm64-sha256 "$(sha256sum "$arm64_asset" | cut -d' ' -f1)" \
           --x64-sha256 "$(sha256sum "$x64_asset" | cut -d' ' -f1)" \
