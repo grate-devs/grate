@@ -32,13 +32,23 @@ Both generators accept a stable numeric version and either that tag or its
   `artifacts/homebrew/formula/grate.rb`.
 - `Create-Cask.ps1 -version 2.2.0 -artifactDirectory <final-macos-zips>` hashes
   both published macOS ZIPs and writes `artifacts/homebrew/cask/grate.rb`.
+  The input files must be named `grate-osx-arm64-self-contained-<version>.zip`
+  and `grate-osx-x64-self-contained-<version>.zip`.
 - Use `-releaseTag v2.2.0` only when that is the actual tag, and use the matching
   archives. The helpers do not verify the provenance of arbitrary local files;
-  the release operator must download the exact URLs being rendered.
-- Stable-only publication must also be enforced by the release workflow:
-  exclude draft/prerelease events, require the intended stable tag and preserve
-  review before changes to external taps or core. Neither generator needs secrets.
-  Cross-repository publication, if added later, needs separately scoped credentials.
+  the release operator must download the exact URLs being rendered. Use
+  `-outputPath` to override either helper's default destination.
+
+The automated release workflow uses
+[`scripts/release/update_homebrew_cask.py`](../../scripts/release/update_homebrew_cask.py)
+to generate the cask update for `erikbra/homebrew-cask`; the PowerShell helper
+supports manual preparation. The workflow publishes the cask only for stable
+releases, after release validation and GitHub publication. Its separate
+`homebrew-cask` environment requires `HOMEBREW_TAP_TOKEN` with write access to the
+tap. Neither PowerShell generator needs credentials or rebuilds grate. See the
+[release runbook](../../docs/ReleaseProcess.md) and
+[release configuration](../../docs/ReleaseConfiguration.md) for publication and
+verification steps. Formula submission to core remains separate.
 
 Run `pwsh -NoProfile -File installers/homebrew/Test-PackageGenerators.ps1` for the
 offline generator checks from the repository root. They use synthetic fixtures
@@ -55,7 +65,7 @@ Homebrew source-build, functional test, linkage, audit and style checks on the
 supported platforms before submitting an update to `Homebrew/homebrew-core`.
 See [Packaging](../../docs/Packaging.md) for commands and local tap setup.
 
-For the existing cask, generate metadata from both final macOS ZIPs, verify clean
+For manual cask updates, generate metadata from both final macOS ZIPs, verify clean
 installation and upgrade from the previous cask on Arm64 and Intel, and submit
 the generated manifest as `Casks/grate.rb` in `erikbra/homebrew-cask`. Check that
 the installed command runs a real database migration. Generating a manifest does

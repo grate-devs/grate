@@ -1,0 +1,42 @@
+name: Docker distribution policy
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/docker-*.yml'
+      - '.github/workflows/build.yml'
+      - 'build-docker-local.sh'
+      - 'installers/docker/**'
+      - 'scripts/release/*docker*.py'
+  workflow_dispatch:
+    inputs:
+      local_registry_check:
+        description: Run the disposable loopback-registry check (local fixture image publication)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test Docker tag selection and local build commands
+        run: python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
+      - name: Test history preservation and release digest verification
+        run: python3 -m unittest discover -s scripts/release -p 'test_*docker*.py' -v
+      - name: Check local helper syntax
+        run: bash -n build-docker-local.sh
+      - name: Verify digest preservation using local files without registry publication
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends skopeo
+          python3 scripts/release/check_docker_oci_copy.py
+      - name: Exercise loopback-registry publication only when explicitly requested
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.local_registry_check == true }}
+        run: python3 installers/docker/tests/check_local_registry.py

@@ -3,6 +3,10 @@
 I'm very happy that you are reading this page! Grate needs all the contributors it can get!
 I'll try to jot down a few notes on how to get started developing grate.
 
+For maintainers, the [release process](docs/ReleaseProcess.md) covers preparation,
+publication, verification, and recovery. The repository's
+[release-grate skill](.agents/skills/release-grate/SKILL.md) supports the same work.
+
 ## Get .NET 11 RC3
 
 Install the SDK pinned in `global.json`: .NET `11.0.100-rc.3.26522.148`.

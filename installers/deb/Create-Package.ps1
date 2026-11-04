@@ -8,7 +8,9 @@ param (
 
 $Root = Resolve-Path "$($PSScriptRoot)";
 
-$pkgVersion = "${version}-1";
+# Debian sorts ~ before the final version; a SemVer '-' would sort after it.
+# Replace only the core/prerelease separator, preserving hyphens in identifiers.
+$pkgVersion = ($version -replace '^([0-9]+\.[0-9]+\.[0-9]+)-', '$1~') + '-1';
 
 function Recreate {
 	param ($dirName)
@@ -61,7 +63,9 @@ ln -s changelog.gz "${changelog}.Debian.gz"
 fakeroot dpkg-deb --build $debianDir
 
 $built = Join-Path $Root debian.deb
-$final = Join-Path $Root "grate_${pkgVersion}_${arch}.deb"
+# Keep the SemVer filename expected by the release workflow; Debian reads the
+# independently formatted Version field from the package metadata.
+$final = Join-Path $Root "grate_${version}-1_${arch}.deb"
 
 mv $built $final
 
