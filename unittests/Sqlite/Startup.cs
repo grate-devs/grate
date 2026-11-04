@@ -5,7 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Sqlite.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
 
 namespace Sqlite;
 

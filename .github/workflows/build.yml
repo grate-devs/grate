@@ -969,7 +969,7 @@ jobs:
         dotnet test \
         --project "$PWD/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
         --max-parallel-test-modules 1 \
-        --report-junit \
+        --report-xunit-junit \
         --results-directory /tmp/test-results/${{ matrix.category }} \
         --coverage \
         --coverage-output-format xml \
