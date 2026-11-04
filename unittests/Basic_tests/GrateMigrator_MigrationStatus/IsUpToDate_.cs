@@ -121,7 +121,7 @@ public class IsUpToDate_ : IDisposable
             .Returns(info =>
             {
                 var sql = info.ArgAt<string>(0);
-                return sql.Contains("ThisIsRun");
+                return (SqlRun: sql.Contains("ThisIsRun"), HistoryRecorded: false);
             });
 
         dbMigrator.Configuration = config;

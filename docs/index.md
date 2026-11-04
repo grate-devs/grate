@@ -47,6 +47,7 @@ grate is short for migrate. And it's also pronounced the same way as _great_, so
 * [Environment scripts](EnvironmentScripts.md)
 * [Token replacement](TokenReplacement.md)
 * [Response files](ConfigurationOptions/ResponseFiles.md)
+* [Agent skill](AgentSkill.md)
 
 ## Status
 
@@ -54,5 +55,8 @@ grate is catching up on RoundhousE features, there are a couple of features miss
 RoundhousE with grate in a 5-year-in-development folder of SQL scripts, without any issues. 
 
 ## Contributing
+
+Maintainers can follow the [release process](ReleaseProcess.md) to prepare,
+publish, verify, and recover a release.
 
 Head over to the [github page]({{ site.github.repository_url }}), and please see [CONTRIBUTING.md]({{ site.github.repository_url }}/blob/main/CONTRIBUTING.md)

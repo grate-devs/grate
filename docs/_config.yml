@@ -8,3 +8,22 @@ kramdown:
 aux_links:
   "grate on GitHub":
     - "//github.com/grate-devs/grate"
+
+# Publish the canonical skill directly from the same files that the CLI embeds.
+defaults:
+  - scope:
+      path: "skills/use-grate"
+    values:
+      layout: default
+  - scope:
+      path: "skills/use-grate/SKILL.md"
+    values:
+      title: Use grate
+      parent: Agent skill
+      has_children: true
+      nav_order: 1
+  - scope:
+      path: "skills/use-grate/references"
+    values:
+      parent: Use grate
+      grand_parent: Agent skill

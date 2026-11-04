@@ -1,0 +1,59 @@
+name: WinGet manifest preparation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build.yml'
+      - 'installers/winget/**'
+      - 'installers/msi/**'
+      - '.github/workflows/winget-validation.yml'
+  push:
+    branches: [main, feat/800-winget-migration, feat/796-automate-releases]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'installers/winget/**'
+      - 'installers/msi/**'
+      - '.github/workflows/winget-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Test preparation and MSI authoring contracts
+        run: |
+          ./installers/winget/tests/Test-CreateInstaller.Tests.ps1
+          ./installers/winget/tests/Test-InstallerCorrelation.Tests.ps1
+          ./installers/winget/tests/Test-LifecycleCatalog.Tests.ps1
+          ./installers/winget/tests/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
+          ./installers/winget/tests/source/preindexed/Test-SingletonManifests.Tests.ps1
+          python -m unittest discover -s installers/winget/tests/source/preindexed -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'Preindexed source file-serving contracts failed.' }
+          ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
+          ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
+      - name: Prepare manifests from a real stable release and inspect MSI metadata
+        run: ./installers/winget/tests/Test-ReleasePreparation.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-evidence"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ github.token }}
+      - name: Compile native MSI actions for both architectures
+        run: |
+          foreach ($arch in @('x64','arm64')) {
+            ./installers/msi/native/Build-UpgradeActions.ps1 -Architecture $arch -OutputDirectory "$env:RUNNER_TEMP/winget-evidence/native-$arch"
+          }
+      - name: Retain candidates and inspection evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: winget-preparation
+          path: ${{ runner.temp }}/winget-evidence
+          if-no-files-found: warn
+          retention-days: 7

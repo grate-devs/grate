@@ -14,8 +14,19 @@ public interface IGrateTestContext
 
     IGrateTestContext External => this;
 
-    IDbConnection CreateAdminDbConnection() => GetDbConnection(AdminConnectionString);
-    IDbConnection CreateDbConnection(string database) => GetDbConnection(ConnectionString(database));
+    // These connections execute in the test host, even when the migrator runs
+    // inside Docker and its configuration uses the internal network endpoint.
+    IDbConnection CreateAdminDbConnection()
+    {
+        var host = External;
+        return host.GetDbConnection(host.AdminConnectionString);
+    }
+
+    IDbConnection CreateDbConnection(string database)
+    {
+        var host = External;
+        return host.GetDbConnection(host.ConnectionString(database));
+    }
 
     ISyntax Syntax { get; }
 

@@ -26,7 +26,8 @@ internal interface IDbMigrator : IAsyncDisposable, ICloneable
     Task OpenAdminConnection();
     Task CloseAdminConnection();
 
-    Task<bool> RunSql(string sql, string scriptName, MigrationsFolder folder, long versionId,
+    // SqlRun includes SQL selected by a dry run; HistoryRecorded means a history row was written.
+    Task<(bool SqlRun, bool HistoryRecorded)> RunSql(string sql, string scriptName, MigrationsFolder folder, long versionId,
         GrateEnvironment? environment,
         ConnectionType connectionType, TransactionHandling transactionHandling);
 

@@ -101,8 +101,26 @@
     <None Include="NuGet.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <!-- Embed the complete skill so every CLI distribution, including single-file installers,
+       can install the matching version without downloading files or locating the source tree. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../docs/skills/use-grate/**/*">
+      <LogicalName>grate.skills.use-grate/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <Target Name="RequireBundledAgentSkill" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('../../docs/skills/use-grate/SKILL.md')"
+           Text="The complete docs/skills/use-grate directory is required when building the grate CLI." />
+  </Target>
+
 
   <PropertyGroup Condition="'$(SelfContained)' == 'true'">
+    <!-- Follow the selected SDK's latest runtime patch; enforce the OOB security minimum below. -->
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+    <MinimumSelfContainedRuntimeVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.33</MinimumSelfContainedRuntimeVersion>
+    <MinimumSelfContainedRuntimeVersion Condition="'$(TargetFramework)' == 'net9.0'">9.0.22</MinimumSelfContainedRuntimeVersion>
+    <MinimumSelfContainedRuntimeVersion Condition="'$(TargetFramework)' == 'net10.0'">10.0.14</MinimumSelfContainedRuntimeVersion>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
     <PublishReadyToRun>false</PublishReadyToRun>
@@ -114,6 +132,12 @@
     <NoWarn>IL2105,NU5118</NoWarn>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
+
+  <Target Name="ValidateSelfContainedRuntimeVersion" AfterTargets="ProcessFrameworkReferences"
+          Condition="'$(SelfContained)' == 'true' and '$(MinimumSelfContainedRuntimeVersion)' != ''">
+    <Error Condition="'%(RuntimeFramework.Identity)' == 'Microsoft.NETCore.App' and $([MSBuild]::VersionLessThan('%(RuntimeFramework.Version)', '$(MinimumSelfContainedRuntimeVersion)'))"
+           Text="Self-contained $(TargetFramework) requires Microsoft.NETCore.App $(MinimumSelfContainedRuntimeVersion) or newer; resolved %(RuntimeFramework.Version). Update the SDK or runtime selection." />
+  </Target>
 
   <PropertyGroup Condition="'$(SelfContained)' == 'true' And $(RuntimeIdentifier.StartsWith('win-'))">
     <PublishTrimmed>false</PublishTrimmed>

@@ -1,12 +1,22 @@
 <?xml version='1.0' encoding='utf-8'?>
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-  <Product Name='grate' Manufacturer='erikbra' Id='E281998A-D8A2-4926-AAA3-066EFA4B2E74' 
+  <Product Name='grate' Manufacturer='grate-devs' Id='%%%PRODUCTCODE%%%'
     UpgradeCode='%%%UPGRADECODE%%%' Language='1033' Codepage='1252' Version='%%%VERSION%%%'>
-    <Package Id='*' Keywords='Installer' Description="grate installer" 
-      Comments='grate - the SQL scripts migration runner' Manufacturer='erikbra' 
-      InstallerVersion='310' Languages='1033' InstallScope="perUser" InstallPrivileges="limited" Compressed='yes' SummaryCodepage='1252' />
+    <Package Id='*' Keywords='Installer' Description="grate installer"
+      Comments='grate - the SQL scripts migration runner' Manufacturer='grate-devs'
+      InstallerVersion='500' Languages='1033' InstallScope="perUser" InstallPrivileges="limited" Compressed='yes' SummaryCodepage='1252' />
     <Media Id='1' Cabinet='grate.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1' />
     <Property Id='DiskPrompt' Value="grate Installation [1]" />
+    <!-- Full SemVer is recorded, but MSI compares only numeric ProductVersion. -->
+    <Property Id='GRATE_RELEASE_VERSION' Value='%%%RELEASEVERSION%%%' />
+    <!-- Keep removal inside the installation transaction so failure restores the
+         previous product. Stable families handle future releases normally. -->
+    <MajorUpgrade Schedule='afterInstallInitialize' DowngradeErrorMessage='A newer version of grate is already installed.' />
+    <Binary Id='GrateUpgradeActions' SourceFile='%%%UPGRADEACTIONS%%%' />
+    <CustomAction Id='DetectLegacyGrate' BinaryKey='GrateUpgradeActions' DllEntry='DetectLegacyGrate' Execute='immediate' Return='check' />
+    <InstallExecuteSequence>
+      <Custom Action='DetectLegacyGrate' After='FindRelatedProducts'>NOT Installed AND NOT WIX_DOWNGRADE_DETECTED</Custom>
+    </InstallExecuteSequence>
 
     <Directory Id='TARGETDIR' Name='SourceDir'>
 
@@ -18,8 +28,8 @@
 
               <!-- Remove all files from the INSTALLFOLDER on uninstall -->
               <RemoveFile Id="ALLFILES" Name="*.*" On="both" />
-              <RemoveFolder Id="INSTALLFOLDER" On="uninstall" />
-              <RemoveFolder Id="ROOTDIRECTORY" On="uninstall" />
+              <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+              <RemoveFolder Id="RemoveCompanyFolder" Directory="ROOTDIRECTORY" On="uninstall" />
 
               <!--Create application registry entry-->
               <RegistryValue Root="HKCU" Key="Software\Microsoft\erikbra\grate" Name="installed" Type="integer" Value="1" KeyPath="yes" />

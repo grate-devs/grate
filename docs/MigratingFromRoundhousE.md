@@ -32,6 +32,75 @@ grate is built using the new [`System.CommandLine`](https://github.com/dotnet/co
 - The `Allow User Variables` connection string option for MySQL connections (used in SPROCs) is no longer set by default.
 
 
+## Reusing existing script history
+
+Use the existing history schema (for example, `--schema=RoundhousE`) and preserve
+any custom history table names. Selecting a different schema does not move the
+old history and can make previously applied scripts appear new.
+
+### Legacy hashes and line endings
+
+Older RoundhousE versions hashed script text with its original line endings.
+Later versions normalized line endings to LF when recording new hashes, while
+still accepting older hashes during comparison. Upgrading RoundhousE did not
+necessarily replace the hashes of scripts that were skipped as unchanged.
+
+grate accepts these legacy hashes, including CRLF and CR hashes, when deciding
+whether an existing script has changed. Changing a checkout between LF, CRLF,
+and CR line endings alone does not require rerunning an already applied script.
+An unchanged one-time or anytime script is skipped; everytime scripts still run
+according to their normal rules. Existing history is not rewritten, and new
+history records continue to use grate's LF-normalized hash format.
+
+Unchanged files with mixed line endings are also recognized from their original
+text. If a legacy file used mixed endings, preserve that mixture: its original
+layout cannot in general be reconstructed from the stored hash after conversion
+to a single line-ending style.
+
+This compatibility applies to grate versions containing the fix for
+[#841](https://github.com/grate-devs/grate/issues/841). Earlier grate versions
+compared only the normalized hash, so an unchanged script with an older
+RoundhousE hash could fail as a changed one-time script or rerun as an anytime
+script.
+
+Line-ending compatibility does not ignore other text changes. Both tools hash
+the SQL after token replacement, so preserve token values and replacement
+settings. Also check file encoding: grate reads UTF-8 by default and recognizes
+supported byte-order marks, but does not support RoundhousE's `--defaultencoding`.
+Files without a BOM that relied on another encoding must decode to the same text
+in grate; convert them to UTF-8 while preserving that text if necessary.
+
+Investigate remaining hash differences instead of using `--baseline`,
+`--warnononetimescriptchanges`, or `--warnandignoreononetimescriptchanges` merely
+to make the migration succeed. These options can hide actual changes or rerun
+one-time scripts.
+
+### Scripts in subdirectories
+
+RoundhousE records only the filename in `ScriptsRun.script_name`. By default,
+grate records the relative path within each migration folder. For example:
+
+| File | RoundhousE history name | Default grate history name |
+| --- | --- | --- |
+| `up/001.sql` | `001.sql` | `001.sql` |
+| `up/2020/001.sql` | `001.sql` | `2020/001.sql` |
+
+For the second example, grate will not find the filename-only history entry and
+can execute the script again as a new migration, even if its hash is unchanged.
+Using `--schema=RoundhousE` alone does not resolve this difference.
+
+Use `--ignoredirectorynames` to retain filename-only identity when taking over
+such history. This option still searches subdirectories, but also sorts scripts
+by filename alone. RoundhousE's default traversal processes files in a directory
+before descending into child directories, so check the order of pending scripts
+and their dependencies before switching. Keep filenames unique across migration
+folders and subdirectories, since filename-only history cannot distinguish
+duplicates. Preserve the selected identity convention on subsequent runs.
+
+Verify the transition on a disposable copy of the database with the intended
+scripts, token values, encoding, folder configuration, and grate version before
+using it against the original database.
+
 ## RH Features that aren't yet in grate
 
 Rebuilding a decade old product from scratch takes time, and features have to be prioritised. The list of items below shows the current set of outstanding RH features that haven't been built yet.  If there's something on this list you can't live without, raise an issue to help us out.  If people take ownership of a feature and contribute PR's then we'll all get there faster 👍

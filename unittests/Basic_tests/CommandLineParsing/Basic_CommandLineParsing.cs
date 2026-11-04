@@ -16,7 +16,7 @@ public class Basic_CommandLineParsing
     [InlineData("-ct=100")]
     public void ParserIsConfiguredCorrectly(string commandline)
     {
-        var command = new MigrateCommand(null!);
+        var command = new MigrateCommand((_, _) => Task.FromResult(0));
         var parseResult = command.Parse(commandline);
         Assert.NotNull(parseResult.Errors);
         Assert.Single(parseResult.Errors);
@@ -403,7 +403,7 @@ public class Basic_CommandLineParsing
             commandline += " -c \"Server=.;Database=master;Trusted_Connection=True;\"";
         }
 
-        var command = new MigrateCommand(null!);
+        var command = new MigrateCommand((_, _) => Task.FromResult(0));
         var parseResult = command.Parse(commandline);
 
         if (parseResult.Errors.Any())

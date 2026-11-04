@@ -40,7 +40,17 @@ public record SqlServerGrateTestContext : GrateTestContext
     public override SqlStatements Sql => new()
     {
         SelectVersion = "SELECT @@VERSION",
-        SleepTwoSeconds = "WAITFOR DELAY '00:00:02'",
+        // WAITFOR can return early under thread starvation. Recheck the deadline
+        // so the timeout test cannot mistake an early return for a completed delay.
+        SleepTwoSeconds =
+            """
+            SET NOCOUNT ON;
+            DECLARE @deadline datetime2 = DATEADD(second, 2, SYSUTCDATETIME());
+            WHILE SYSUTCDATETIME() < @deadline
+            BEGIN
+                WAITFOR DELAY '00:00:00.100';
+            END;
+            """,
         CreateUser = (db, user, password) => 
 $"""
     USE {db};
