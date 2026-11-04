@@ -52,15 +52,17 @@ in the PR/release verification record.
 
 ## Package-manager updates after a release
 
-These channels wrap the release binaries. They do not retarget or rebuild grate.
+Chocolatey, winget and the existing Homebrew cask wrap the release binaries.
+The proposed Homebrew/core formula instead builds from the tagged source and uses
+Homebrew's shared .NET runtime; its preparation is described below.
 Generate their references and checksums from the **final published release
 artifacts**. Do not edit the historical manifests in `installers/winget/grate` or
 invent checksums for an unreleased version. The commands below generate local
 files/packages; submission to the external repositories/feeds is separate.
 
-- **Homebrew:** download both final macOS ZIPs and run
+- **Homebrew cask (existing personal tap):** download both final macOS ZIPs and run
   `./installers/homebrew/Create-Cask.ps1 -version <version> -artifactDirectory <download-directory>`.
-  Review the generated `installers/homebrew/grate.rb`, including the SHA256 of
+  Review the generated `artifacts/homebrew/cask/grate.rb`, including the SHA256 of
   each archive, and update [erikbra/homebrew-cask](https://github.com/erikbra/homebrew-cask/blob/main/Casks/grate.rb).
   Install and smoke-test each native architecture using that cask.
 - **Chocolatey:** extract `grate-win-x64-self-contained-<version>.zip` and run
@@ -84,6 +86,64 @@ Use `-releaseTag <tag>` with the Homebrew/winget generators if the release tag
 differs from the numeric grate version. External channel publication and native
 installation checks remain release steps, because final asset checksums are not
 available while preparing the source PR.
+
+## Homebrew/core formula
+
+The source-built formula is being prepared for grate 2.2.0. It is not yet available
+from `homebrew/core`. The template and generation helper can be included in the
+grate release before Homebrew accepts the formula; Homebrew acceptance does not
+block publishing grate 2.2.0.
+
+`installers/homebrew/grate.rb.in` is the reference template. It uses `dotnet` as
+both a build and runtime dependency and publishes with `--no-self-contained`.
+The apphost locates Homebrew's .NET installation, and Homebrew installs that dependency
+for users. The formula selects the target framework matching Homebrew's SDK rather
+than the .NET 11 RC3 runtime bundled in the self-contained release archives.
+
+After the final stable tag exists, download its source archive and generate the
+formula. For 2.2.0, run from the repository root:
+
+```sh
+mkdir -p artifacts/homebrew
+curl --fail --location \
+  --output artifacts/homebrew/grate-2.2.0.tar.gz \
+  https://github.com/grate-devs/grate/archive/refs/tags/2.2.0.tar.gz
+pwsh -File installers/homebrew/Create-Formula.ps1 \
+  -version 2.2.0 \
+  -sourceArchive artifacts/homebrew/grate-2.2.0.tar.gz
+```
+
+The helper hashes the supplied source archive and writes
+`artifacts/homebrew/formula/grate.rb`. Use `-releaseTag v2.2.0` if the tag has a
+`v` prefix, and download the archive for that exact tag. The cask
+and formula generators have separate output directories. Neither helper publishes
+anything or updates an external repository.
+
+Review the generated URL and SHA256 against the archive that was downloaded,
+then copy the formula to `Formula/g/grate.rb` in the `grate-devs/homebrew-core` fork.
+Build and test the final tagged source using Homebrew's contributor workflow:
+
+```sh
+HOMEBREW_NO_INSTALL_FROM_API=1 brew install --build-from-source grate
+brew test grate
+brew linkage --test --strict grate
+brew audit --new --strict --online grate
+brew style --formula grate
+```
+
+These checks require the formula to be registered in a local Homebrew tap; copying
+it only into an arbitrary clone does not make `brew install grate` find it.
+Follow Homebrew's [contributor setup instructions](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request)
+to register the local core tap.
+Verify a real migration and runtime discovery on the applicable macOS and Linux
+architectures. Validate the final tagged source even if earlier builds from `HEAD`
+passed, and record the source version, SDK, runtime, OS and architecture tested.
+
+Submit the generated formula and check results to `Homebrew/homebrew-core`,
+coordinating with maintainers about the existing submission
+[Homebrew/homebrew-core#296651](https://github.com/Homebrew/homebrew-core/pull/296651).
+Keep the installation documentation marked as pending until the formula is accepted,
+then make `brew install grate` the normal Homebrew instruction.
 
 ## Moving to .NET 11 GA
 
