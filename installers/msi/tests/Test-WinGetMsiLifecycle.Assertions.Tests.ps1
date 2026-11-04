@@ -1,0 +1,124 @@
+#!/usr/bin/env pwsh
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WinGetMsiLifecycle.Assertions.ps1')
+
+function Assert-Rejected([scriptblock]$Action, [string]$ExpectedMessage) {
+    try { & $Action } catch {
+        if ($_.Exception.Message -like $ExpectedMessage) { return }
+        throw
+    }
+    throw "Expected rejection: $ExpectedMessage"
+}
+function Ordinary([int]$ExitCode, [string]$Version, [string]$Hash) {
+    Get-WinGetMsiOrdinaryUpdateOutcome -ExitCode $ExitCode -RegisteredVersion $Version -OldVersion '2.1.6' -NewVersion '2.1.7' -InstalledHash $Hash -OldHash 'old' -NewHash 'new'
+}
+if ((Ordinary 1638 '2.1.6' 'old') -ne 'Rejected1638') { throw 'MSI 1638 must remain an explicit rejected-upgrade observation.' }
+if ((Ordinary 0 '2.1.6' 'old') -ne 'NoUpgrade') { throw 'A successful exit without changed registration/payload is not an upgrade.' }
+if ((Ordinary 0 '2.1.7' 'new') -ne 'Upgraded') { throw 'A verified replacement must be recognized.' }
+if ((Ordinary 3010 '2.1.7' 'new') -ne 'Upgraded') { throw 'A verified replacement that requests reboot must be recognized.' }
+Assert-Rejected { Ordinary 0 '2.1.7' 'old' } '*unexpected exit code/state*'
+Assert-Rejected { Ordinary 1638 '2.1.7' 'new' } '*unexpected exit code/state*'
+Assert-Rejected { Ordinary 1603 '2.1.6' 'old' } '*unexpected exit code/state*'
+
+# The real native per-user install has no conventional HKCU uninstall GUID key.
+# ProductInfo supplies installed ARP metadata; absence of that particular key
+# must not suppress verification of the actual registration or its context.
+$registered = @{ InstalledProductName = 'grate'; Publisher = 'erikbra'; VersionString = '2.1.7' }
+$arp = Get-WinGetMsiRegisteredProduct -ReadProductInfo { param($name) $registered[$name] }
+Assert-WinGetMsiRegistration -State 5 -Version '2.1.7' -AssignmentType 0 -Arp $arp -ExpectedVersion '2.1.7'
+if ((ConvertTo-WinGetMsiProductRegistryKey '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}') -cne 'A899182E2A8D6294AA3A60E6AFB4E247') {
+    throw 'Diagnostic MSI product key does not match the observed native installer log.'
+}
+Assert-Rejected { Assert-WinGetMsiRegistration -State 5 -Version '2.1.7' -AssignmentType 1 -Arp $arp -ExpectedVersion '2.1.7' } '*per-user MSI registration*'
+$arp.DisplayVersion = '2.1.6'
+Assert-Rejected { Assert-WinGetMsiRegistration -State 5 -Version '2.1.7' -AssignmentType 0 -Arp $arp -ExpectedVersion '2.1.7' } '*ARP entry*'
+Assert-Rejected { Assert-WinGetMsiRegistration -State -1 -Version '2.1.7' -AssignmentType 0 -Arp $arp -ExpectedVersion '2.1.7' } '*product state*'
+
+function Native-Inventory {
+    $properties = @{}
+    foreach ($entry in @{ ProductState = '5'; AssignmentType = '0'; InstalledProductName = 'grate'; VersionString = '2.1.7'; Publisher = 'erikbra' }.GetEnumerator()) {
+        $properties[$entry.Key] = [pscustomobject]@{ Value = $entry.Value; ErrorCode = 0 }
+    }
+    [pscustomobject]@{
+        ProductCode = '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'
+        CurrentUserSid = 'S-1-5-21-100-200-300-1000'
+        Contexts = @([pscustomobject]@{ ProductCode = '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'; Context = 2; UserSid = 'S-1-5-21-100-200-300-1000'; Properties = $properties })
+    }
+}
+$inventory = Native-Inventory
+Assert-WinGetMsiNativeContext $inventory '2.1.7'
+$inventory.Contexts[0].Context = 1
+Assert-WinGetMsiNativeContext $inventory '2.1.7'
+# AssignmentType=0 alone must not hide an actual machine/foreign/duplicate
+# registration, or an API failure. Native context and owner are independent.
+$inventory.Contexts[0].Context = 4
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*per-user context*'
+$inventory = Native-Inventory
+$inventory.Contexts[0].UserSid = 'S-1-5-21-100-200-300-1001'
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*per-user context*'
+$inventory = Native-Inventory
+$inventory.Contexts += $inventory.Contexts[0]
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*exactly one current-user MSI instance*'
+$inventory = Native-Inventory
+$inventory.Contexts[0].Properties['VersionString'].ErrorCode = 1605
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*property VersionString*'
+$inventory = Native-Inventory
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.6' } '*property VersionString*'
+$inventory.Contexts = @()
+Assert-Rejected { Assert-WinGetMsiNativeContext $inventory '2.1.7' } '*exactly one current-user MSI instance*'
+
+# Reduced ordered excerpts of the real Windows ARM64 rollback log. This package
+# has no localized "RemoveExistingProducts: Application" description.
+$legacy = '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'
+$family = '{67B1619D-BF0A-4861-B0DF-C7A1AE13AC8F}'
+$candidate = '{BFB0EA52-37D5-59D1-A1F1-3CF697A7E598}'
+$rollbackLines = @(
+    'grate: verified current-user legacy MSI added to transactional major upgrade.',
+    "******* Product: $legacy",
+    "Command Line: UPGRADINGPRODUCTCODE=$candidate CLIENTPROCESSID=3728 REMOVE=ALL",
+    "Executing op: ProductUnregister(UpgradeCode=$family)",
+    'Executing op: FileRemove(,FileName=grate.exe,,)',
+    'Action ended 15:38:36: RemoveExistingProducts. Return value 1.',
+    'Action start 15:38:36: FailRollbackVerification.',
+    'Product: grate -- Injected rollback verification failure.',
+    'Action ended 15:38:36: FailRollbackVerification. Return value 3.',
+    "Executing op: ProductInfo(ProductKey=$legacy,ProductName=grate)",
+    'Executing op: FileCopy(SourceName=C:\Config.Msi\old.rbf,,DestName=C:\Users\runneradmin\AppData\Local\erikbra\grate\grate.exe)'
+)
+Assert-WinGetMsiRollbackLog ($rollbackLines -join "`n") $legacy $family $candidate
+foreach ($missingIndex in @(2, 3, 4, 5, 6, 8, 9, 10)) {
+    $faultyLog = @(for ($i = 0; $i -lt $rollbackLines.Count; $i++) { if ($i -ne $missingIndex) { $rollbackLines[$i] } }) -join "`n"
+    Assert-Rejected { Assert-WinGetMsiRollbackLog $faultyLog $legacy $family $candidate } '*Rollback log lacks ordered native execution evidence*'
+}
+$reordered = @($rollbackLines[9..10]) + @($rollbackLines[0..8])
+Assert-Rejected { Assert-WinGetMsiRollbackLog ($reordered -join "`n") $legacy $family $candidate } '*Rollback log lacks ordered native execution evidence*'
+
+$fixture = Join-Path ([IO.Path]::GetTempPath()) ('winget-msi-assertions-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory $fixture | Out-Null
+try {
+    $data = Join-Path $fixture 'user-data.txt'
+    'Original data' | Set-Content $data
+    $files = @{ $data = (Get-FileHash $data -Algorithm SHA256).Hash }
+    Assert-WinGetMsiProtectedFiles $files
+    'Changed data' | Set-Content $data
+    Assert-Rejected { Assert-WinGetMsiProtectedFiles $files } '*changed protected user data*'
+    Remove-Item $data
+    Assert-Rejected { Assert-WinGetMsiProtectedFiles $files } '*removed protected user data*'
+
+    # Minimal synthetic PE headers exercise architecture discrimination, not
+    # executable validity. Native CI executes real release payloads separately.
+    $pe = Join-Path $fixture 'fixture.exe'
+    foreach ($architecture in @('x64', 'arm64')) {
+        $bytes = [byte[]]::new(134)
+        [BitConverter]::GetBytes([uint16]0x5A4D).CopyTo($bytes, 0)
+        [BitConverter]::GetBytes([int]128).CopyTo($bytes, 0x3c)
+        [BitConverter]::GetBytes([uint32]0x00004550).CopyTo($bytes, 128)
+        $machine = if ($architecture -eq 'x64') { 0x8664 } else { 0xAA64 }
+        [BitConverter]::GetBytes([uint16]$machine).CopyTo($bytes, 132)
+        [IO.File]::WriteAllBytes($pe, $bytes)
+        Assert-WinGetMsiPayloadArchitecture $pe $architecture
+        $other = if ($architecture -eq 'x64') { 'arm64' } else { 'x64' }
+        Assert-Rejected { Assert-WinGetMsiPayloadArchitecture $pe $other } '*does not match native*'
+    }
+} finally { Remove-Item -LiteralPath $fixture -Recurse -Force }
+Write-Host 'PASS: MSI upgrade outcomes, ARP/native context, ordered rollback evidence, data preservation and PE architecture assertions.'

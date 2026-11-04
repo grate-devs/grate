@@ -6,11 +6,18 @@ nav_order: 11
 
 # Building and releasing packages
 
+For the step-by-step maintainer procedure, follow the [release runbook](ReleaseProcess.md).
+This page is the reference for SDK/runtime choices, output formats and manual
+package generation. Publication identities are covered in
+[Release configuration](ReleaseConfiguration.md).
+
 The SDK is pinned in `global.json` to `11.0.100-rc.3.26522.148`. Library and
 .NET tool packages retain `net8.0`, `net9.0` and `net10.0` assets and add `net11.0`.
 Self-contained binaries and the Docker image bundle runtime
 `11.0.0-rc.3.26522.148`. RC3 has [go-live production support](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)
 until November 10, 2026, so a grate release need not wait for .NET 11 GA.
+We will update the SDK and bundled runtime to stable .NET 11 as soon as it is
+released, following the [GA update procedure](#moving-to-net-11-ga) below.
 
 The pinned SDK is used for normal repository builds. Developers who only need
 to work on `net10.0` can use the stable .NET 10 SDK with the
@@ -28,6 +35,10 @@ The Build and Publish workflow produces the existing distribution formats:
 | MSI | Windows x64 and Arm64, built from the corresponding self-contained binaries |
 | Debian | Linux amd64 and Arm64, built from the corresponding self-contained binaries |
 | Docker | Linux amd64 and Arm64 on Alpine 3.24, including ICU |
+
+Debian package metadata maps a SemVer prerelease such as `2.2.0-rc.1` to
+`2.2.0~rc.1-1`, so Debian orders it before the final `2.2.0-1` package.
+Release asset filenames retain the original SemVer version.
 
 MSI generation uses checksum-pinned WiX 3.14.1, whose compiler supports Arm64.
 Pass `-arch x64` or `-arch arm64` to `installers/msi/Create-Installer.ps1` to
@@ -57,13 +68,17 @@ files/packages; submission to the external repositories/feeds is separate.
   on a machine with Chocolatey installed. It embeds the executable and records
   its SHA256 in `tools/VERIFICATION.txt`. Check the generated `.nupkg` and install
   it from a local source before submitting it to the Chocolatey feed.
-- **winget:** install Microsoft's [wingetcreate](https://github.com/microsoft/winget-create),
-  then run `./installers/winget/Create-Installer.ps1 -version <version>`.
-  It downloads and hashes the three Windows ZIPs and two MSIs to match the
-  [community manifest](https://github.com/microsoft/winget-pkgs/tree/master/manifests/e/erikbra/grate).
-  Review the generated URLs, SHA256 values, architectures and MSI metadata;
-  run `winget validate <manifest-directory>` and test local installation before
-  submitting an update to `microsoft/winget-pkgs`.
+- **WinGet:** for a stable release with corrected MSI identity, run
+  `./installers/winget/Create-Installer.ps1 -version <version> -PrepareMigration`.
+  The release workflow prepares the same new-ID candidate after uploading the
+  final assets. It verifies asset URLs and actual MSI hashes/identity; submission
+  remains separate. Default mode is reserved for historical old-identity MSIs
+  and rejects corrected payloads. Do not submit those payloads under `erikbra.grate`.
+  Review the generated `grate-devs.grate` manifests, run
+  `winget validate --manifest <manifest-directory>` and verify installation and
+  migration with the final files before submitting to `microsoft/winget-pkgs`.
+  See the [migration contract and Windows verification](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md)
+  for the different MSI and portable transition commands and pending public acceptance.
 
 Use `-releaseTag <tag>` with the Homebrew/winget generators if the release tag
 differs from the numeric grate version. External channel publication and native

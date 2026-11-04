@@ -1,0 +1,49 @@
+name: Check Docker OIDC and compatibility permissions (no publication)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-access:
+    name: Verify independent identity grants without uploading
+    runs-on: ubuntu-24.04
+    environment: docker-hub
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test access-check behavior
+        run: python3 -m unittest discover -s scripts/release -p 'test_check_docker_access.py' -v
+      - name: Require configured organization connection
+        env:
+          CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        run: |
+          test -n "$CONNECTION_ID" || { echo '::error::DOCKERHUB_OIDC_CONNECTIONID is missing.'; exit 1; }
+          mkdir -p "$RUNNER_TEMP/grate-oidc-docker"
+          chmod 700 "$RUNNER_TEMP/grate-oidc-docker"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/grate-oidc-docker" >> "$GITHUB_ENV"
+      - name: Authenticate canonical organization using GitHub OIDC
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        with:
+          username: gratedevs
+      - name: Request only repository grants; never upload registry content
+        env:
+          DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+        run: python3 scripts/release/check_docker_access.py --canonical-authfile "$DOCKER_CONFIG/config.json" --report docker-access.json
+      - name: Retain sanitized grant evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: docker-oidc-access-${{ github.run_id }}-${{ github.run_attempt }}
+          path: docker-access.json
+          if-no-files-found: warn

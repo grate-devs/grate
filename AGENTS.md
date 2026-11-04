@@ -78,6 +78,13 @@ unavailable or prohibited, report that limitation and perform the review yoursel
   of a migration's connection. Public signature changes need compatibility care.
 - Keep credentials and access tokens out of logs and shared test evidence.
 
+## Keep verification output out of git
+
+Keep point-in-time logs, test reports, API observations, migration plans and other
+execution evidence in CI artifacts or linked PR/release records, not in git.
+Commit reusable tests, configuration templates and instructions; report actual
+check outcomes and their limits in the review or release record.
+
 Finish with the changed behavior, exact checks and outcomes, and remaining
 provider/runtime gaps. A review reports actionable defects and evidence limits;
 it does not silently implement fixes or claim release approval.
