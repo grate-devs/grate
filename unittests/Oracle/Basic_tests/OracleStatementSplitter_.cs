@@ -184,16 +184,15 @@ whatever";
             Assert.Single(result);
         }
 
-        [Fact]
-        public void slash_after_double_dash_comment_with_single_quote_and_single_quote_after_slash()
+        [Theory]
+        [InlineData("\n")]
+        [InlineData("\r\n")]
+        public void slash_after_double_dash_comment_with_single_quote_and_single_quote_after_slash(string lineEnding)
         {
-            string sql_to_match = Words_to_check + @" -- '
-/
-select ''
-/";
+            var sql_to_match = Words_to_check + $" -- '{lineEnding}/{lineEnding}select ''{lineEnding}/";
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
-            Assert.Equal([Words_to_check + " -- '\n", "\nselect ''\n"], result);
+            Assert.Equal([Words_to_check + " -- '" + lineEnding, lineEnding + "select ''" + lineEnding], result);
         }
 
         [Fact]

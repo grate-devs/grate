@@ -13,8 +13,7 @@ public class FolderConfiguration_
     [Fact]
     public async Task Default()
     {
-        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=/tmp");
-        _ = cfg?.SqlFilesDirectory ?? new DirectoryInfo("/tmp");
+        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=" + Path.GetTempPath());
 
         var expected = Folders.Default;
         var actual = cfg?.Folders;
@@ -39,8 +38,7 @@ public class FolderConfiguration_
     [MemberData(nameof(FoldersCommandLines))]
     public async Task Default_With_Overrides(string commandLine, KnownFolderNames folderConfig)
     {
-        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=/tmp", commandLine);
-        _ = cfg?.SqlFilesDirectory ?? new DirectoryInfo("/tmp");
+        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=" + Path.GetTempPath(), commandLine);
         var expected = FoldersConfiguration.Default(folderConfig);
 
         var actual = cfg?.Folders;

@@ -1,4 +1,5 @@
-﻿using Dir = System.IO.Directory;
+﻿using Microsoft.Data.Sqlite;
+using Dir = System.IO.Directory;
 
 namespace TestCommon.TestInfrastructure;
 
@@ -9,6 +10,9 @@ public class SqliteTestDatabase : ITestDatabase, IAsyncLifetime
 
     public ValueTask DisposeAsync()
     {
+        // Pooled connections keep database files open on Windows.
+        SqliteConnection.ClearAllPools();
+
         var dbFiles = Directory.GetFiles(_root, "*.db");
         foreach (var dbFile in dbFiles)
         {
