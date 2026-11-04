@@ -10,7 +10,7 @@ Run the automated checks from the repository root:
 ```sh
 python3 -m pip install -r scripts/release/requirements-workflow-tests.txt
 python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
-python3 -m unittest discover -s installers/docker -p 'test_*.py' -v
+python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
 ```
 
 The test suites use synthetic fixtures and mocked registry requests; they do not

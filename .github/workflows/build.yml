@@ -107,7 +107,7 @@ jobs:
         persist-credentials: false
     - run: python3 -m pip install -r scripts/release/requirements-workflow-tests.txt
     - run: python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
-    - run: python3 -m unittest discover -s installers/docker -p 'test_*.py' -v
+    - run: python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
 
   build-netcore-tool:
     needs: set-version-number
@@ -392,10 +392,10 @@ jobs:
     - name: Test WinGet preparation and MSI identity contracts
       shell: pwsh
       run: |
-        ./installers/winget/Test-CreateInstaller.Tests.ps1
-        ./installers/winget/Test-InstallerCorrelation.Tests.ps1
-        ./installers/msi/Test-InstallerAuthoring.Tests.ps1
-        ./installers/msi/Test-InstallerIdentity.Tests.ps1
+        ./installers/winget/tests/Test-CreateInstaller.Tests.ps1
+        ./installers/winget/tests/Test-InstallerCorrelation.Tests.ps1
+        ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
+        ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
 
     - name: Create msi
       run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -ReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -arch ("${{ matrix.arch }}" -replace "win-", "")
@@ -408,7 +408,7 @@ jobs:
         $name = "grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi"
         $msiFile = Get-ChildItem -Path ./installers/msi/tmp -Filter *.msi | Select-Object -First 1
         Copy-Item $msiFile.FullName -Destination $name
-        ./installers/msi/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
+        ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
 
     - name: Upload MSI release asset ${{ matrix.arch }}
       uses: actions/upload-artifact@v7
@@ -691,7 +691,7 @@ jobs:
 
     - name: Check Docker release policy
       run: |
-        python3 -m unittest discover -s installers/docker -p 'test_*.py'
+        python3 -m unittest discover -s installers/docker/tests -p 'test_*.py'
         python3 -m unittest discover -s scripts/release -p 'test_*docker*.py'
 
     - name: Select identical tags for canonical and compatibility names
@@ -835,7 +835,7 @@ jobs:
         RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
       run: |
         $ErrorActionPreference = 'Stop'
-        $winget = ./installers/winget/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+        $winget = ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
         $candidate = "$env:RUNNER_TEMP/winget-candidate"
         & $winget validate --manifest "$candidate/manifests/g/grate-devs/grate/$env:VERSION" --disable-interactivity *>&1 | Tee-Object -FilePath "$candidate/schema.log"
         if ($LASTEXITCODE -ne 0) { throw 'Final WinGet migration candidate failed schema validation.' }

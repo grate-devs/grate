@@ -7,12 +7,12 @@ param (
     [string]$wingetCreate = 'wingetcreate',
     [string]$outputDirectory = (Join-Path $PSScriptRoot 'artifacts'),
     [switch]$PrepareMigration,
-    [string]$MsiMetadataReader = (Join-Path (Split-Path $PSScriptRoot) 'msi/Get-InstallerMetadata.ps1')
+    [string]$MsiMetadataReader = (Join-Path (Split-Path $PSScriptRoot) 'msi/helpers/Get-InstallerMetadata.ps1')
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-. (Join-Path $PSScriptRoot 'MigrationManifestPolicy.ps1')
+. (Join-Path $PSScriptRoot 'helpers/MigrationManifestPolicy.ps1')
 
 # A GitVersion release flag alone also admits prereleases. Reject them here,
 # independently of workflow conditions, before invoking any external tool.

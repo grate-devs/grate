@@ -108,8 +108,8 @@ Recheck access when releasing; a saved template does not establish live grants.
 
 ### GitHub environment
 
-[github-environment.json](github-environment.json) and
-[github-environment-policies.json](github-environment-policies.json) are reusable
+[github-environment.json](config/github-environment.json) and
+[github-environment-policies.json](config/github-environment-policies.json) are reusable
 setup templates for the `docker-hub` environment: no wait timer or required
 reviewer, with allowed refs `main` and tags matching `*`. Inspect the actual
 repository policy before changing it; these files are desired configuration,
@@ -131,7 +131,7 @@ and [ref-policy API](https://docs.github.com/en/rest/deployments/branch-policies
 
 ### Organization OIDC identity
 
-[oidc-connection-request.json](oidc-connection-request.json) is the reusable
+[oidc-connection-request.json](config/oidc-connection-request.json) is the reusable
 organization connection template. Its contract is:
 
 - Organization `gratedevs`, connection name `grate-github-release`.

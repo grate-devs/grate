@@ -287,7 +287,7 @@ jobs:
       - name: Check per-user MSI authoring regressions
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
-        run: ./installers/msi/Test-InstallerAuthoring.Tests.ps1
+        run: ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
@@ -295,7 +295,7 @@ jobs:
       - name: Check verified Windows MSI metadata
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
-        run: ./installers/msi/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -ExpectedArchitecture ('${{ matrix.rid }}' -replace 'win-', '')
+        run: ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -ExpectedArchitecture ('${{ matrix.rid }}' -replace 'win-', '')
       - name: Build Debian package from verified Linux binary
         if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
         shell: pwsh

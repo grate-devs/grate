@@ -30,12 +30,12 @@ jobs:
           dotnet-version: 10.0.x
       - name: Authoring and deterministic identity contracts
         run: |
-          ./installers/msi/Test-InstallerIdentity.Tests.ps1
-          ./installers/msi/Test-InstallerAuthoring.Tests.ps1
+          ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
+          ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
       - name: Actual prerelease refusals and stable upgrade
         env:
           TEST_ARCH: ${{ matrix.arch }}
-        run: ./installers/msi/Test-PrereleaseMsiPolicy.ps1 -Architecture $env:TEST_ARCH -OutputDirectory "$env:RUNNER_TEMP/msi-prerelease-policy"
+        run: ./installers/msi/tests/Test-PrereleaseMsiPolicy.ps1 -Architecture $env:TEST_ARCH -OutputDirectory "$env:RUNNER_TEMP/msi-prerelease-policy"
       - name: Retain policy evidence on success or failure
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Test Docker tag selection and local build commands
-        run: python3 -m unittest discover -s installers/docker -p 'test_*.py' -v
+        run: python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
       - name: Test history preservation and release digest verification
         run: python3 -m unittest discover -s scripts/release -p 'test_*docker*.py' -v
       - name: Check local helper syntax
@@ -39,4 +39,4 @@ jobs:
           python3 scripts/release/check_docker_oci_copy.py
       - name: Exercise loopback-registry publication only when explicitly requested
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.local_registry_check == true }}
-        run: python3 installers/docker/check_local_registry.py
+        run: python3 installers/docker/tests/check_local_registry.py

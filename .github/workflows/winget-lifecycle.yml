@@ -120,7 +120,7 @@ jobs:
           github-token: ${{ github.token }}
       - name: Download and verify historical payloads
         id: assets
-        run: ./installers/winget/Get-LifecycleAssets.ps1 -Architecture $env:TEST_ARCH -InstallerType $env:TEST_TYPE -CandidateDirectory ./candidate -OutputDirectory "$env:RUNNER_TEMP/lifecycle"
+        run: ./installers/winget/tests/support/Get-LifecycleAssets.ps1 -Architecture $env:TEST_ARCH -InstallerType $env:TEST_TYPE -CandidateDirectory ./candidate -OutputDirectory "$env:RUNNER_TEMP/lifecycle"
       - name: Record test-candidate provenance
         env:
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id || github.run_id }}
@@ -134,13 +134,13 @@ jobs:
         if: matrix.type == 'wix' && inputs.direct_msi
         timeout-minutes: 8
         run: |
-          ./installers/msi/Test-WinGetMsiLifecycle.Assertions.Tests.ps1
-          ./installers/msi/Test-MsiLifecycleSupervisor.Tests.ps1
+          ./installers/msi/tests/Test-WinGetMsiLifecycle.Assertions.Tests.ps1
+          ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
           $inventory = Get-Content "$env:RUNNER_TEMP/lifecycle/inventory.json" -Raw | ConvertFrom-Json
           $old = @($inventory.Versions | Where-Object Version -in @('2.0.0','2.1.6'))
           $candidate = $inventory.Versions | Where-Object Version -eq '2.1.7'
           $next = $inventory.Versions | Where-Object Version -eq '2.1.8'
-          ./installers/msi/Invoke-MsiLifecycle.ps1 -Parameters @{
+          ./installers/msi/tests/support/Invoke-MsiLifecycle.ps1 -Parameters @{
             HistoricalMsiPaths=@($old.MsiPath); HistoricalExecutablePaths=@($old.Executable)
             CandidateMsiPath=$candidate.MsiPath; CandidateExecutable=$candidate.Executable
             NextMsiPath=$next.MsiPath; NextExecutable=$next.Executable
@@ -153,18 +153,18 @@ jobs:
         # Retain its diagnostics before querying that MSI service again.
         if: ${{ !cancelled() && steps.assets.outcome == 'success' && (steps.native_msi.outcome == 'success' || steps.native_msi.outcome == 'skipped') }}
         run: |
-          $winget = ./installers/winget/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+          $winget = ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
           "TEST_WINGET=$winget" | Out-File $env:GITHUB_ENV -Append
       - name: Actual WinGet package-ID transition with selected source and baseline
         if: ${{ !cancelled() && steps.winget.outcome == 'success' }}
         timeout-minutes: 10
         run: |
           if ($env:TEST_TYPE -eq 'wix') {
-            ./installers/winget/Test-MigrationManifestPreparation.ps1 -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/manifest-policy" -Winget $env:TEST_WINGET
+            ./installers/winget/tests/Test-MigrationManifestPreparation.ps1 -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/manifest-policy" -Winget $env:TEST_WINGET
           }
-          ./installers/winget/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
-          if ($env:TEST_SOURCE_TYPE -eq 'PreIndexed') { ./installers/winget/test-source/preindexed/Test-SingletonManifests.Tests.ps1 }
-          ./installers/winget/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests" -SourceType $env:TEST_SOURCE_TYPE -PublicBaseline:($env:TEST_PUBLIC_BASELINE -eq 'true')
+          ./installers/winget/tests/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
+          if ($env:TEST_SOURCE_TYPE -eq 'PreIndexed') { ./installers/winget/tests/source/preindexed/Test-SingletonManifests.Tests.ps1 }
+          ./installers/winget/tests/Test-WinGetLifecycle.ps1 -Winget $env:TEST_WINGET -InventoryPath "$env:RUNNER_TEMP/lifecycle/inventory.json" -OutputDirectory "$env:RUNNER_TEMP/lifecycle/source-tests" -SourceType $env:TEST_SOURCE_TYPE -PublicBaseline:($env:TEST_PUBLIC_BASELINE -eq 'true')
       - name: Retain raw lifecycle evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

@@ -11,8 +11,8 @@ param (
 
 $ErrorActionPreference = 'Stop'
 if (!$IsWindows) { throw 'MSI generation requires Windows, WiX and Visual Studio C++ build tools.' }
-& (Join-Path $PSScriptRoot 'Test-InstallerAuthoring.ps1')
-$identity = & (Join-Path $PSScriptRoot 'Get-InstallerIdentity.ps1') -Version $version -Architecture $arch -ReleaseVersion $ReleaseVersion
+& (Join-Path $PSScriptRoot 'helpers/Test-InstallerAuthoring.ps1')
+$identity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $version -Architecture $arch -ReleaseVersion $ReleaseVersion
 if ($upgradeCode -and $upgradeCode -ne $identity.UpgradeCode) { throw 'The MSI UpgradeCode must match the stable architecture family in identity-contract.json.' }
 $upgradeCode = $identity.UpgradeCode
 $grateExe = (Resolve-Path -LiteralPath $grateExe).Path
@@ -34,7 +34,7 @@ function Recreate {
 
 $wixDir = Recreate 'wix'
 $tmpDir = Recreate 'tmp'
-& (Join-Path $PSScriptRoot 'Build-UpgradeActions.ps1') -Architecture $arch -OutputDirectory (Join-Path $tmpDir 'upgrade-actions') | ForEach-Object { Write-Host $_ }
+& (Join-Path $PSScriptRoot 'native/Build-UpgradeActions.ps1') -Architecture $arch -OutputDirectory (Join-Path $tmpDir 'upgrade-actions') | ForEach-Object { Write-Host $_ }
 $upgradeActions = Join-Path $tmpDir 'upgrade-actions/GrateUpgradeActions.dll'
 if (!(Test-Path -LiteralPath $upgradeActions)) { throw 'The native MSI upgrade action was not built.' }
 
