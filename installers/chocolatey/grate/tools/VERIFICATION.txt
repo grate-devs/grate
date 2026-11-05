@@ -1,7 +1,0 @@
-﻿
-
-VERIFICATION
-Verification is intended to assist the Chocolatey moderators and community
-in verifying that this package's contents are trustworthy.
- 
-Made by me from scratch. Releases here: https://github.com/grate-devs/grate/releases

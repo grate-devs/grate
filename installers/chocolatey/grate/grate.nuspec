@@ -5,19 +5,24 @@
   <metadata>
     <id>grate</id>
     <version>1.0.0.0</version>
-    <owners>Erik A. Brandstadmoen</owners>
-    <title>grate</title>
+    <owners>erikbra</owners>
+    <title>grate SQL Migration Runner</title>
     <authors>Erik A. Brandstadmoen</authors>
-    <projectUrl>https://grate-devs.github.io/grate//</projectUrl>
+    <copyright>Copyright (c) 2021 Erik A. Brandstadmoen</copyright>
+    <projectUrl>https://grate-devs.github.io/grate/</projectUrl>
     <licenseUrl>https://github.com/grate-devs/grate/blob/main/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <projectSourceUrl>https://github.com/grate-devs/grate</projectSourceUrl>
+    <packageSourceUrl>https://github.com/grate-devs/grate/tree/main/installers/chocolatey</packageSourceUrl>
     <docsUrl>https://grate-devs.github.io/grate/</docsUrl>
     <bugTrackerUrl>https://github.com/grate-devs/grate/issues</bugTrackerUrl>
     <tags>grate roundhouse db migration database migrator</tags>
     <summary>grate is a SQL scripts migration runner, using plain, old SQL for migrations</summary>
+    <releaseNotes>https://github.com/grate-devs/grate/releases</releaseNotes>
     <description>
 # grate
+
+This package contains the self-contained Windows x64 CLI.
 
 grate is a SQL scripts migration runner, using plain, old SQL for migrations. No meta-language, no code, no config,
 no EF migrations. It gives you full flexibility, and full control of your migrations, and lets you use
