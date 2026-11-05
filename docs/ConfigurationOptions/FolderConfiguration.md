@@ -19,7 +19,7 @@ grate works with three different folder types:
 | Folder/script type | Name | Explanation | More info |
 | ------ |----|  ------- |------- |
 | One-time scripts | Once | These are scripts that are run **exactly once** per database, and never again. | [One time scripts](../ScriptTypes/OneTimeScripts.md#one-time-scripts) |
-| Anytime Scripts | AnyTime | These scripts are run **any time they're changed** | [Anytime scripts](../ScriptTypes/AnytimeScripts.md#anytime-scripts) |
+| Anytime Scripts | AnyTime | These scripts run when they are new or have changed. | [Anytime scripts](../ScriptTypes/AnytimeScripts.md#anytime-scripts) |
 | Everytime Scripts | EveryTime | These scripts are run (you guessed it) **every time** grate executes :) |  [Everytime scripts](../ScriptTypes/EverytimeScripts.md#everytime-scripts) |
 
 ## Specifying a custom folder configuration
@@ -127,18 +127,18 @@ $ grate --folders up=tables
 
 
 
-grate processes the files in a standard set of directories in a fixed order for deterministic processing.  Folders are run in the following order:
+Database setup precedes the migration folders. `--drop` uses the database provider's drop operation and ignores the configured `dropDatabase` folder. When grate needs to create the database, an existing `createDatabase` folder supplies the creation scripts in place of the provider's default creation logic. Grate runs those setup scripts without checking migration history.
+
+After setup, grate processes the default migration folders in this order.
 
 | Folder | Script type | Explanation |
 | ------ | ------- |------- |
-| <nobr> (-1. dropDatabase)</nobr> | Anytime scripts | If you have the need for a custom `DROP DATABASE` script (used with the `--drop` command-line flag) |
-| <nobr> (0. createDatabase)</nobr> | Anytime scripts | If you have the need for a custom `CREATE DATABASE` script, put it here, and it will be used instead of the default. |
-| <nobr> 1. beforeMigration</nobr> | Everytime scripts | If you have particular tasks you want to perform prior to any database migrations (custom logging? database backups? disable replication?) you can do it here. |
+| <nobr> 1. beforeMigration</nobr> | Everytime scripts | Tasks that run before the other migration folders, such as logging or taking a backup. |
 | <nobr>2. alterDatabase</nobr> | Anytime scripts | If you have scripts that need to alter the database config itself (rather than the _contents_ of the database) this is the place to do it.  For example setting recovery modes, enabling query stores, etc etc |
-| <nobr>3. runAfterCreateDatabase</nobr> | Anytime scripts | This directory is only processed if the database was created from scratch by grate.  Maybe you need to add user accounts or similar?
+| <nobr>3. runAfterCreateDatabase</nobr> | Anytime scripts | Grate processes this folder only on the run that creates the database. A dry run that previews database creation also includes this folder. |
 | <nobr>4. runBeforeUp</nobr> | Anytime scripts | 
 | <nobr>5. up</nobr> | One-time scripts | This is where the bulk of your 'migration' scripts end up, eg adding tables, removing columns, adding reference data etc. <br><br> Note that there's no `down`!  If you've dropped a column in your `up` scripts, how do you possibly script an undo for that operation?  grate has support for running the migration inside a transaction, and will rollback on script failure.
-| <nobr>6. runFirstAfterUp</nobr> | One-time scripts | Scripts run prior to other anytime folders are found here. This folder exists to allow you to put sql files in when you need to run out of order, say a stored procedure prior to a function. It is not a normal occurrence to have many files in here or any for that matter. |
+| <nobr>6. runFirstAfterUp</nobr> | Anytime scripts | Scripts that need to run immediately after `up`, ahead of folders such as `functions` and `sprocs`. |
 | <nobr>7. functions</nobr> | Anytime scripts | If you have any functions that need to run prior to others, make sure they are alphabetically first before the dependent scripts. |
 | <nobr>8. views</nobr> | Anytime scripts | If you have views any that need to run prior to others, make sure they are alphabetically first before the dependent scripts. |
 | <nobr>9. sprocs</nobr> | Anytime scripts | Stored procedures are found in a `sprocs` folder. If you have any that need to run prior to others, make sure they are alphabetically first before the dependent scripts. |
@@ -146,7 +146,7 @@ grate processes the files in a standard set of directories in a fixed order for 
 | <nobr>11. indexes</nobr> | Anytime scripts | |
 | <nobr>12. runAfterOtherAnyTimeScripts</nobr> | Anytime scripts | This folder exists to allow you to run scripts after you have set up your anytime scripts. It's pretty open what you put in here, but remember that it is still an anytime folder. |
 | <nobr>13. permissions</nobr> | Everytime scripts | If you have any that need to run prior to others, make sure they are alphabetically first before the dependent scripts. <br><br> Permissions may contain auto-wiring of permissions, so they are run every time regardless of changes in the files.
-| <nobr>14. afterMigration</nobr> | Everytime scripts | If you have particular tasks you want to perform prior to any database migrations (custom logging? database backups?) you can do it here. |
+| <nobr>14. afterMigration</nobr> | Everytime scripts | Tasks that run after the other migration folders, such as logging. |
 
 ### Notes
 

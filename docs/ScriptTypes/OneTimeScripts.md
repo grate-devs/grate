@@ -8,10 +8,7 @@ parent: Script types
 By default, these scripts run once per database. They typically contain statements such as `create table`, which may fail if run a second time. If a previously run script changes, grate fails the migration unless one of the options below is set.
 
 ## Folders
-Scripts in the following folders are `one time` scripts by default.
-
-* runAfterCreateDatabase
-* up
+The `up` folder uses the `Once` type by default.
 
 ## What goes in the Up Folder?
 
