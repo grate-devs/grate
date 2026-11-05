@@ -33,10 +33,17 @@ If you want to specify a custom folder configuration, you have two options:
 1) specify the parameters directly on the command line, or 
 2) _supply a filename_, and grate will read the folder config from that file.
 
+Before starting a migration, the CLI checks the effective directory paths configured through `--folders`,
+whether supplied inline or read from a configuration file. Relative paths are resolved against `--files`
+(`--sqlfilesdirectory`). A fully custom configuration also requires folders whose paths are inferred
+from their keys, such as `folder1=Once`. When using the default configuration, folders with no explicit
+path override can be absent, including when only their migration type is changed. The CLI reports an
+invalid folder on standard error and exits with code 1 before connecting to the database.
+
 ### Making adjustments to default folder configuration
 
 If you want to change the name of one or more of the default folder names, you specify a semicolon-separated
-list of the folders you want to use a different name for to the `--folder` argument.
+list of the folders you want to use a different name for to the `--folders` argument.
 
 #### Example
 
