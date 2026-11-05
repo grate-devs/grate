@@ -15,10 +15,12 @@ public sealed class DatabaseReadiness_ : IDisposable
     private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory();
     private readonly List<DirectoryInfo> _internalDirectories = [];
 
-    [Fact]
-    public async Task Custom_creation_waits_for_target_connection_before_bootstrapping_and_after_create_scripts()
+    [Theory]
+    [InlineData("create.sql")]
+    [InlineData("nested/create.sql")]
+    public async Task Custom_creation_waits_for_target_connection_before_bootstrapping_and_after_create_scripts(string scriptName)
     {
-        WriteScript("createDatabase/create.sql", "-- create database");
+        WriteScript($"createDatabase/{scriptName}", "-- create database");
         WriteScript("runAfterCreateDatabase/after.sql", "-- after creation");
         var database = CreateDatabase();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -50,21 +52,35 @@ public sealed class DatabaseReadiness_ : IDisposable
     [Theory]
     [InlineData(true, false, "create.sql")]
     [InlineData(false, true, "create.sql")]
-    [InlineData(false, false, null)]
     [InlineData(false, false, "create.PROD.ENV.sql")]
     public async Task Skipped_or_previewed_custom_creation_does_not_probe_readiness(
-        bool dryRun, bool alreadyExists, string? scriptName)
+        bool dryRun, bool alreadyExists, string scriptName)
     {
-        Directory.CreateDirectory(Path.Combine(_directory.FullName, "createDatabase"));
-        if (scriptName is not null) WriteScript($"createDatabase/{scriptName}", "-- create database");
+        WriteScript($"createDatabase/{scriptName}", "-- create database");
         var database = CreateDatabase();
         database.DatabaseExists().Returns(alreadyExists);
         await using var migrator = CreateMigrator(database, dryRun);
 
         await migrator.Migrate();
 
+        await database.DidNotReceive().CreateDatabase();
         await database.DidNotReceive().OpenNewActiveConnection();
         await database.DidNotReceive().RunSql("-- create database", Arg.Any<ConnectionType>(), Arg.Any<TransactionHandling>());
+    }
+
+    [Fact]
+    public async Task Failed_custom_creation_propagates_the_error_without_trying_default_creation()
+    {
+        const string sql = "invalid SQL";
+        WriteScript("createDatabase/create.sql", sql);
+        var database = CreateDatabase();
+        var error = new DatabaseUnavailable();
+        database.RunSql(sql, ConnectionType.Admin, TransactionHandling.Autonomous).Returns(Task.FromException(error));
+        await using var migrator = CreateMigrator(database);
+
+        Assert.Same(error, await Assert.ThrowsAsync<DatabaseUnavailable>(() => migrator.Migrate()));
+        await database.DidNotReceive().CreateDatabase();
+        await database.DidNotReceive().OpenNewActiveConnection();
     }
 
     [Fact]

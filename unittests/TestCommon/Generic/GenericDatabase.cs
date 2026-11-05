@@ -47,6 +47,47 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
         //await Context.DropDatabase(db);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Is_created_when_custom_create_database_folder_has_no_sql_files(bool includeReadme)
+    {
+        var db = TestConfig.RandomDatabase().ToUpper();
+        Assert.DoesNotContain(db, await GetDatabases());
+        var config = GetConfiguration(db, true);
+        var root = config.SqlFilesDirectory;
+        config = config with { OutputPath = Wrap(root, "output") };
+        var folders = Folders.Default;
+
+        try
+        {
+            var createFolder = Wrap(root, folders.CreateDatabase?.Path);
+            createFolder.Create();
+            if (includeReadme)
+                TestConfig.WriteContent(createFolder, "README.txt", "No custom creation script.");
+
+            TestConfig.WriteContent(Wrap(root, folders[KnownFolderKeys.RunAfterCreateDatabase]?.Path),
+                "after.sql", "CREATE TABLE issue532_probe (id INTEGER);");
+            TestConfig.WriteContent(Wrap(root, folders[KnownFolderKeys.Up]?.Path),
+                "up.sql", "INSERT INTO issue532_probe (id) VALUES (532);");
+
+            await using (var migrator = GetMigrator(config))
+            {
+                await migrator.Migrate();
+            }
+
+            Assert.Contains(db, await GetDatabases());
+            using var connection = Context.External.CreateDbConnection(db);
+            Assert.Equal(532, await connection.QuerySingleAsync<int>("SELECT id FROM issue532_probe"));
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+            if (Context.SupportsCreateDatabase && (await GetDatabases()).Contains(db))
+                await Context.DropDatabase(db);
+        }
+    }
+
     [Fact]
     public virtual async Task Is_created_with_custom_script_if_custom_create_database_folder_exists()
     {
