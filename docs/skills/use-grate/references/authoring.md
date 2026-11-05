@@ -18,6 +18,8 @@ Read the project's actual folder mapping before choosing a location. Folder name
 
 The default `up` folder is Once; `functions`, `views`, `sprocs`, `triggers`, and `indexes` are AnyTime. `beforeMigration`, `permissions`, and `afterMigration` are EveryTime. The filename marker `EVERYTIME.` or `.EVERYTIME.` can also force repeat execution, even inside `up`; do not accidentally use it for one-time changes. For repeatable object definitions, prefer the provider's replace/alter pattern that preserves required permissions and dependencies over an unconditional drop/create.
 
+By default, grate skips a previously applied AnyTime script when its SQL is unchanged after token expansion, even if the database object has drifted. Check the runner's settings for overrides that force execution.
+
 `runAfterCreateDatabase` is only processed when grate created the database during that invocation; adding a file there will not initialize an existing database. The source inspected here configures both that folder and `runFirstAfterUp` as AnyTime, despite conflicting published documentation. Check the selected release before relying on either lifecycle. Unused default folders need not exist on disk.
 
 Configured folder order takes precedence over names in different folders. Within a folder grate orders scripts alphabetically, including relative subdirectory paths by default. The `--ignoredirectorynames` option changes sorting and tracked identity to filenames alone. Current sorting ignores case and uses the current culture; avoid names differentiated only by case or locale-sensitive characters.
@@ -45,7 +47,7 @@ up/
   20260905210000_issue821_04_insert_initial_widget.sql
 ```
 
-Use the consumer's existing convention when possible. Each index gets its own file; each separate `INSERT`, `UPDATE`, or `DELETE` gets its own file. Constraint alteration syntax and support vary by provider: the names above illustrate ordering, not portable SQL. A provider-required table rebuild may itself be one coordinated DDL operation; explain and test its atomicity instead of splitting an inseparable operation into an invalid sequence.
+Under this convention, give each independent index or `INSERT`, `UPDATE`, or `DELETE` its own file. Check constraint alteration syntax against the target provider. Keep a provider-required table rebuild together as one coordinated DDL operation and verify its atomicity.
 
 For SQL Server, this **single file still has only one successful history entry**:
 
@@ -57,7 +59,7 @@ GO
 INSERT INTO dbo.Widget (Id, Name) VALUES (1, N'Initial');
 ```
 
-`GO` controls batches, not grate's migration identity. Under ineffective transactions the table may survive an index or insert failure while the file has no successful history entry. Author those three operations in three ordered files. A `CREATE PROCEDURE` with multiple body statements remains one DDL operation; do not split its body into migrations. Batch parsing is provider- and version-specific: do not add SQL Server `GO`, Oracle `/`, or client-specific delimiters to another provider's scripts without checking its grate splitter and executing a representative definition.
+`GO` controls batches within the file. Without effective rollback, the table may survive an index or insert failure while the file has no successful history entry. If the three operations can safely commit separately, put them in three ordered files. A `CREATE PROCEDURE` with multiple body statements remains one DDL operation; do not split its body into migrations. Batch parsing is provider- and version-specific: do not add SQL Server `GO`, Oracle `/`, or client-specific delimiters to another provider's scripts without checking its grate splitter and executing a representative definition.
 
 ## Parallel branches and applied history
 
