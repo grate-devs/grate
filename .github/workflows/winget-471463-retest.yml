@@ -1,0 +1,82 @@
+name: Reproduce Microsoft WinGet validation findings
+on:
+  push:
+    branches: [verify/winget-471463-retest]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { type: zip, arch: x86, runner: windows-latest }
+          - { type: zip, arch: x64, runner: windows-latest }
+          - { type: zip, arch: arm64, runner: windows-11-arm }
+          - { type: wix, arch: x64, runner: windows-latest }
+          - { type: wix, arch: arm64, runner: windows-11-arm }
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      ARCH: ${{ matrix.arch }}
+      INSTALLER_TYPE: ${{ matrix.type }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Microsoft's validation client version
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = "$env:RUNNER_TEMP/winget-retest"
+          New-Item -ItemType Directory -Force $root | Out-Null
+          $script = Get-Content ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -Raw
+          $script = $script.Replace('1.29.380', '1.29.250').
+            Replace('BA875AFE9D190F61218985AC0292A99D1DB710BF93E13C68944CA9D89F0D82D1', '9EFC4C544D65132E5AB145236EE3DAEDE605B1FE19F5E5FF8C250055045CF09B').
+            Replace('65DEA9C01CE08EE7B763366B27C0E651F97DB857C11CA9B9C301826C10092F2E', '6D76E4F75099F3DE2A3AA8905AD377B22C515AF629C10BF585E9376520095265')
+          $helper = "$root/Initialize-WinGet.ps1"
+          $script | Set-Content $helper
+          $winget = & $helper -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+          "WINGET=$winget" | Out-File $env:GITHUB_ENV -Append
+      - name: Validate and install the submitted manifest from the release URLs
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $root = "$env:RUNNER_TEMP/winget-retest"
+          $base = 'https://raw.githubusercontent.com/erikbra/winget-pkgs/9054792565e1dc2b9420debde9b25c17cf0a0b95/manifests/g/grate-devs/grate/2.2.0'
+          $manifest = "$root/manifests"
+          New-Item -ItemType Directory $manifest | Out-Null
+          foreach ($suffix in @('', '.installer', '.locale.en-US')) {
+            $name = "grate-devs.grate$suffix.yaml"
+            Invoke-WebRequest "$base/$name" -OutFile "$manifest/$name"
+          }
+          & $env:WINGET --version | Tee-Object "$root/winget-version.log"
+          & $env:WINGET validate --manifest $manifest --disable-interactivity | Tee-Object "$root/validate.log"
+          & $env:WINGET settings --enable LocalManifestFiles
+          $selection = @('--installer-type', $env:INSTALLER_TYPE)
+          if ($env:ARCH -eq 'x86') { $selection += @('--architecture', 'x86') }
+          & $env:WINGET install --manifest $manifest @selection --silent --accept-package-agreements --disable-interactivity --verbose-logs *>&1 | Tee-Object "$root/install.log"
+          $expectedAsset = if ($env:INSTALLER_TYPE -eq 'wix') { "grate-msi-win-$env:ARCH-2.2.0.msi" } else { "grate-win-$env:ARCH-self-contained-2.2.0.zip" }
+          if (!(Select-String -Path "$root/install.log" -SimpleMatch "https://github.com/grate-devs/grate/releases/download/2.2.0/$expectedAsset")) {
+            throw "WinGet did not select the expected release asset $expectedAsset."
+          }
+      - name: Reproduce the no-argument diagnostic and verify CLI help
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = "$env:RUNNER_TEMP/winget-retest"
+          $exe = if ($env:INSTALLER_TYPE -eq 'wix') { "$env:LOCALAPPDATA/erikbra/grate/grate.exe" } else { "$env:LOCALAPPDATA/Microsoft/WinGet/Links/grate.exe" }
+          $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+          if ([version]::new($version.FileMajorPart, $version.FileMinorPart, $version.FileBuildPart) -ne [version]'2.2.0') { throw 'Unexpected installed version.' }
+          $PSNativeCommandUseErrorActionPreference = $false
+          & $exe *>&1 | Tee-Object "$root/grate-no-arguments.log"
+          if ($LASTEXITCODE -ne 1 -or !(Select-String -Path "$root/grate-no-arguments.log" -SimpleMatch "Option '--connectionstring' is required.")) {
+            throw 'Expected the documented missing-connection-string diagnostic.'
+          }
+          & $exe --help *>&1 | Tee-Object "$root/grate-help.log"
+          if ($LASTEXITCODE -ne 0 -or !(Select-String -Path "$root/grate-help.log" -SimpleMatch '--connectionstring')) { throw 'Installed CLI help failed.' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: winget-retest-${{ matrix.type }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/winget-retest/*.log
+          retention-days: 14
