@@ -16,14 +16,19 @@ or SDK requirement of its own.
 2. Run the actual project migrations and assert the expected schema, index and
    constraint definitions, affected rows, and successful history. Check forbidden
    effects too: a successful exit alone does not establish correctness.
-3. Run again unchanged. One-time changes must preserve data and successful
+3. When changing an anytime definition, test an upgrade from a disposable
+   database with the previous script applied. Run grate with the updated script
+   and verify the resulting object, relevant grants and dependencies, and the
+   new successful history entry. Use replacement syntax supported by the target
+   provider and version.
+4. Run again unchanged. One-time changes must preserve data and successful
    history; account separately for intentional anytime/everytime effects and
    version/log records that may change.
-4. When verifying change detection or adopting a runner, edit an applied one-time
+5. When verifying change detection or adopting a runner, edit an applied one-time
    file only in the disposable fixture. Confirm rejection and inspect the
    unchanged data/hash/history. Restore the original bytes and check that a new
    forward migration applies the intended change once.
-5. When relying on transaction or recovery behavior, inject a controlled failure
+6. When relying on transaction or recovery behavior, inject a controlled failure
    after earlier work. Inspect actual persisted objects/rows, successful history
    and error history before retrying. Reproduce and test the proposed repair;
    assert an unchanged rerun after recovery.
