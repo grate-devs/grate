@@ -1,0 +1,55 @@
+name: Verify grate 2.2.0 Chocolatey package on Windows
+
+on:
+  push:
+    branches: [verify/chocolatey-2.2.0-windows]
+
+permissions:
+  contents: read
+
+jobs:
+  chocolatey-windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Run the documented release checks on native Windows x64
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:RUNNER_OS
+          $env:RUNNER_ARCH
+          choco --version
+          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey is unavailable.' }
+          $readme = Get-Content installers/chocolatey/README.md -Raw
+          $blocks = [regex]::Matches($readme, '(?ms)^```powershell\r?\n(.*?)^```\s*$')
+          if ($blocks.Count -ne 5) { throw 'Unexpected PowerShell recipe layout.' }
+          . ([scriptblock]::Create($blocks[0].Groups[1].Value))
+          if ($version -ne '2.2.0' -or $archiveHash -ne '66ae15e3dbd705dc2b7a2a4b6c92b294c309bb360526722eaea85858144a2476') {
+            throw 'Release identity or archive digest differs from the independently checked release.'
+          }
+          Write-Output "Release archive SHA256: $archiveHash"
+          Write-Output "Release executable SHA256: $payloadHash"
+          Write-Output "Release executable product version: $((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion)"
+          . ([scriptblock]::Create($blocks[1].Groups[1].Value))
+          $releaseUrl = "https://github.com/grate-devs/grate/releases/download/$version"
+          if (-not $verification.Contains("$releaseUrl/$archive") -or -not $verification.Contains("$releaseUrl/checksums.sha256")) {
+            throw 'Verification file must point to the exact release assets.'
+          }
+          . ([scriptblock]::Create($blocks[2].Groups[1].Value))
+          $output = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP 'grate-chocolatey-220')
+          Copy-Item -LiteralPath $package -Destination $output.FullName
+          $packageHash = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$packageHash  $(Split-Path $package -Leaf)" | Set-Content -LiteralPath (Join-Path $output.FullName 'chocolatey-checksums.sha256')
+          Write-Output "Tested package SHA256: $packageHash"
+      - name: Retain the tested Chocolatey candidate
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: grate-chocolatey-2.2.0
+          path: ${{ runner.temp }}/grate-chocolatey-220
+          if-no-files-found: error
+          retention-days: 30
