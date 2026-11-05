@@ -1,0 +1,87 @@
+name: Verify published WinGet release assets
+on:
+  push:
+    branches: [verify/winget-publication-220]
+env:
+  VERSION: '2.2.0'
+  RELEASE_RUN_ID: '41999496521'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  verify:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { type: zip, arch: x86, runner: windows-latest }
+          - { type: zip, arch: x64, runner: windows-latest }
+          - { type: zip, arch: arm64, runner: windows-11-arm }
+          - { type: wix, arch: x64, runner: windows-2022 }
+          - { type: wix, arch: arm64, runner: windows-11-arm }
+    defaults:
+      run:
+        shell: pwsh -NoLogo -NoProfile -NonInteractive -MTA -Command ". '{0}'"
+    env:
+      ARCH: ${{ matrix.arch }}
+      INSTALLER_TYPE: ${{ matrix.type }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: winget-migration-candidate-${{ env.VERSION }}
+          path: candidate
+          run-id: ${{ env.RELEASE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Prepare exact released assets and install WinGet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:VERSION -cnotmatch '^\d+\.\d+\.\d+$') { throw 'Stable version required.' }
+          $root = "$env:RUNNER_TEMP/final-winget"
+          ./installers/winget/tests/support/Get-LifecycleAssets.ps1 -Architecture $env:ARCH -InstallerType $env:INSTALLER_TYPE -CandidateDirectory ./candidate -OutputDirectory $root -ReleaseCandidateVersion $env:VERSION
+          $winget = ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+          "WINGET=$winget" | Out-File $env:GITHUB_ENV -Append
+      - name: Validate the submission schema
+        run: |
+          $root = "$env:RUNNER_TEMP/final-winget"
+          $manifest = "$root/manifests"
+          New-Item -ItemType Directory $manifest | Out-Null
+          foreach ($file in Get-ChildItem "./candidate/manifests/g/grate-devs/grate/$env:VERSION" -Filter '*.yaml') {
+            $text = (Get-Content $file.FullName -Raw) -creplace '(?m)^ManifestVersion: 1\.12\.0', 'ManifestVersion: 1.28.0' -creplace '\.1\.12\.0\.schema\.json', '.1.28.0.schema.json'
+            $text.Replace("`r`n", "`n") | Set-Content "$manifest/$($file.Name)" -NoNewline
+          }
+          & $env:WINGET validate --manifest $manifest --disable-interactivity *>&1 | Tee-Object "$root/validation.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Submission manifest failed validation.' }
+      - name: Migrate from public old ID to private new ID with final release payload
+        run: |
+          $root = "$env:RUNNER_TEMP/final-winget"
+          ./installers/winget/tests/Test-WinGetLifecycle.ps1 -Winget $env:WINGET -InventoryPath "$root/inventory.json" -OutputDirectory "$root/lifecycle" -SourceType PreIndexed -PublicBaseline -ReleaseCandidateVersion $env:VERSION
+      - name: Install from the exact submission manifest
+        run: |
+          $root = "$env:RUNNER_TEMP/final-winget"
+          $manifest = "$root/manifests"
+          & $env:WINGET settings --enable LocalManifestFiles
+          if ($LASTEXITCODE -ne 0) { throw 'Could not enable local manifests.' }
+          $options = @('--manifest', $manifest, '--architecture', $env:ARCH, '--installer-type', $env:INSTALLER_TYPE, '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity')
+          if ($env:INSTALLER_TYPE -eq 'zip') { $options += @('--scope','user') }
+          & $env:WINGET install @options *>&1 | Tee-Object "$root/local-install.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Local manifest installation failed.' }
+          $installed = if ($env:INSTALLER_TYPE -eq 'zip') { "$env:LOCALAPPDATA/Microsoft/WinGet/Links/grate.exe" } else { "$env:LOCALAPPDATA/erikbra/grate/grate.exe" }
+          $expected = "$root/payload-$env:VERSION/grate.exe"
+          if ((Get-FileHash $installed).Hash -cne (Get-FileHash $expected).Hash) { throw 'Local install did not deploy the release executable.' }
+          & $installed --help | Out-File "$root/local-help.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Local install executable failed.' }
+          & $env:WINGET uninstall --manifest $manifest --silent --disable-interactivity *>&1 | Tee-Object "$root/local-uninstall.log"
+          if ($LASTEXITCODE -ne 0 -or (Test-Path $installed)) { throw 'Local uninstall did not remove the release executable.' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: final-winget-${{ matrix.type }}-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/final-winget/**/*.json
+            ${{ runner.temp }}/final-winget/**/*.log
+            ${{ runner.temp }}/final-winget/**/*.yaml
+          retention-days: 7

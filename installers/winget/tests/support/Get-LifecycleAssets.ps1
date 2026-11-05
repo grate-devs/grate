@@ -3,7 +3,8 @@ param (
     [Parameter(Mandatory)][ValidateSet('x86', 'x64', 'arm64')][string]$Architecture,
     [Parameter(Mandatory)][ValidateSet('zip', 'wix')][string]$InstallerType,
     [Parameter(Mandatory)][string]$CandidateDirectory,
-    [Parameter(Mandatory)][string]$OutputDirectory
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [string]$ReleaseCandidateVersion
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -15,7 +16,8 @@ $assets = Join-Path $OutputDirectory 'assets'
 New-Item -ItemType Directory -Force $assets | Out-Null
 $headers = @{ Accept = 'application/vnd.github+json' }
 if ($env:GH_TOKEN) { $headers.Authorization = "Bearer $env:GH_TOKEN" }
-$versions = foreach ($version in @('2.0.0', '2.1.6', '2.1.7', '2.1.8')) {
+$requestedVersions = if ($ReleaseCandidateVersion) { @('2.0.0', $ReleaseCandidateVersion) } else { @('2.0.0', '2.1.6', '2.1.7', '2.1.8') }
+$versions = foreach ($version in $requestedVersions) {
     $zip = Join-Path $assets "grate-$version.zip"
     $msi = Join-Path $assets "grate-$version.msi"
     if ($version -in @('2.1.7','2.1.8')) {

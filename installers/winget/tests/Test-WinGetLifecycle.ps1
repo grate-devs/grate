@@ -4,8 +4,10 @@ param (
     [Parameter(Mandatory)][string]$InventoryPath,
     [Parameter(Mandatory)][string]$OutputDirectory,
     [ValidateSet('Rest','PreIndexed')][string]$SourceType='Rest',
-    [switch]$PublicBaseline
+    [switch]$PublicBaseline,
+    [string]$ReleaseCandidateVersion
 )
+if ($ReleaseCandidateVersion -and !$PublicBaseline) { throw 'Release verification requires a public legacy baseline.' }
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if (!$IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
@@ -289,28 +291,31 @@ try {
     if ($PublicBaseline) {
         Assert-PublicCorrelation 'public-baseline-tracking' -Legacy
         $summary.PublicBaselineVersion='2.0.0'
-        $direct=W (@('upgrade','--id',$newId,'--version','2.1.7')+$upgradeOptions) 'public-new-id-direct-upgrade' -Observe
+        $candidateVersion = if ($ReleaseCandidateVersion) { $ReleaseCandidateVersion } else { '2.1.7' }
+        $direct=W (@('upgrade','--id',$newId,'--version',$candidateVersion)+$upgradeOptions) 'public-new-id-direct-upgrade' -Observe
         if ($direct.ExitHex -ne '0x8A150014') { throw "New ID unexpectedly matched the public legacy installation: $($direct.ExitHex)." }
         Assert-Installed '2.0.0' $oldId $publicSource.Identifier
         Assert-PublicCorrelation 'public-after-rejected-upgrade' -Legacy
         if ($type -eq 'zip') { $null=Uninstall $oldId 'public-old-uninstall' 'winget' }
         $replacementOptions=$upgradeOptions+@('--architecture',$arch,'--installer-type',$type)
         if ($type -eq 'zip') { $replacementOptions+=@('--scope','user') }
-        $null=W (@('install','--id',$newId,'--version','2.1.7')+$replacementOptions) 'public-new-id-replacement-install'
-        Assert-Installed '2.1.7' $newId
+        $null=W (@('install','--id',$newId,'--version',$candidateVersion)+$replacementOptions) 'public-new-id-replacement-install'
+        Assert-Installed $candidateVersion $newId
         Assert-PublicCorrelation 'public-after-replacement'
         Migrate 'public-after-replacement'
-        $null=W (@('upgrade','--id',$newId,'--version','2.1.8')+$upgradeOptions) 'public-new-id-next-upgrade'
-        Assert-Installed '2.1.8' $newId
-        Assert-PublicCorrelation 'public-after-next'
-        Migrate 'public-after-next'
+        if (!$ReleaseCandidateVersion) {
+            $null=W (@('upgrade','--id',$newId,'--version','2.1.8')+$upgradeOptions) 'public-new-id-next-upgrade'
+            Assert-Installed '2.1.8' $newId
+            Assert-PublicCorrelation 'public-after-next'
+            Migrate 'public-after-next'
+            $summary.NewIdNextVersionUpgrade='Passed'
+        }
         $null=Uninstall $newId 'public-final-new-uninstall'
         $summary.CommunityOriginMigrationTested=$true
         $summary.ExclusiveWinGetNewIdCorrelationVerified=$true
         $summary.PublicTrackingPreserved=$true
-        $summary.NewIdNextVersionUpgrade='Passed'
         $summary.Completed=$true
-        Write-Host "PASS: actual public-source $type $arch baseline, preserved tracking, private-$SourceType transition, exclusive multi-source correlation, next upgrade and strict uninstall."
+        Write-Host "PASS: actual public-source $type $arch baseline, preserved tracking, private-$SourceType transition, exclusive multi-source correlation and strict uninstall."
     } elseif ($type -eq 'wix') {
         Write-Catalog -Both
         $summary.LegacyUpgrades=@()
