@@ -74,7 +74,16 @@ jobs:
           if ((Get-FileHash $installed).Hash -cne (Get-FileHash $expected).Hash) { throw 'Local install did not deploy the release executable.' }
           & $installed --help | Out-File "$root/local-help.log"
           if ($LASTEXITCODE -ne 0) { throw 'Local install executable failed.' }
-          & $env:WINGET uninstall --manifest $manifest --silent --disable-interactivity *>&1 | Tee-Object "$root/local-uninstall.log"
+          $uninstall = @('--manifest', $manifest)
+          if ($env:INSTALLER_TYPE -eq 'zip') {
+            $arp = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall'
+            $entries = @(Get-ItemProperty "$arp/*" | Where-Object {
+              $_.WinGetPackageIdentifier -ceq 'grate-devs.grate' -and $_.DisplayVersion -ceq $env:VERSION
+            })
+            if ($entries.Count -ne 1) { throw 'Expected one local portable registration.' }
+            $uninstall = @('--product-code', $entries[0].PSChildName)
+          }
+          & $env:WINGET uninstall @uninstall --silent --disable-interactivity *>&1 | Tee-Object "$root/local-uninstall.log"
           if ($LASTEXITCODE -ne 0 -or (Test-Path $installed)) { throw 'Local uninstall did not remove the release executable.' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
