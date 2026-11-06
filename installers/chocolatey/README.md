@@ -94,29 +94,53 @@ if ($LASTEXITCODE -ne 0 -or (Test-Path -LiteralPath $shim) -or (Test-Path -Liter
 
 ## Submit and follow moderation
 
-Check the version history and maintainer for the existing [`grate` package][package].
-Use a Chocolatey API key belonging to a maintainer of that ID. Configure it on
-the maintainer's trusted Windows machine using the
-[Chocolatey API key instructions][api-key]. Keep it out of scripts, logs and Git.
-Run the push with the already configured key and the tested package path.
+Check the exact version page and the maintainer for the existing
+[`grate` package][package]. If that version already exists, read its moderation
+state before attempting another push.
+
+Use a Chocolatey API key belonging to a maintainer of `grate`. On a trusted
+Windows machine, follow the [Chocolatey API key instructions][api-key] and push
+the tested package with the configured key. Keep the key out of scripts, logs
+and Git.
 
 ```powershell
 choco push $package --source=https://push.chocolatey.org/
 if ($LASTEXITCODE -ne 0) { throw 'Chocolatey submission failed.' }
 ```
 
-A successful push records submission. Check the version page and respond to any
-[moderation][moderation] requests from the maintainer account. After approval,
-verify discovery and a fresh install from the public feed on a clean Windows
-machine.
+For a one-off GitHub Actions submission, have the maintainer save the key as
+`CHOCOLATEY_API_KEY` in [Actions secrets][actions-secrets]. Use a reviewed
+workflow on a dedicated branch scoped to the intended version. Give the job
+`actions: read` to download the tested artifact with `gh run download`, and
+compare its SHA256 with the digest recorded by the Windows test before pushing.
+Pass the secret as an environment variable only to the Chocolatey upload step.
+Keep raw push output out of the log. Record the submission run and the package
+SHA256.
+
+Track the version on its Chocolatey page under **Version History**. If the
+page still shows a cached 404 just after the push, retry with a fresh query
+string and check the version history before retrying submission.
+
+| Milestone | Evidence |
+| --- | --- |
+| Submitted | The push succeeds and the version appears on the package page. The exact-version download can already work during [moderation][moderation]. Compare the downloaded `.nupkg` SHA256 with the tested package. |
+| Ready for review | Automated checks completed and Chocolatey queued the version for a reviewer. Read the check results and distinguish advisory scan notes from required changes. If the status says **Waiting for maintainer**, follow the review comments from the maintainer account. |
+| Approved | Chocolatey marks the exact version approved on the version page. |
+| Publicly available | After approval, normal search finds the version and a fresh install succeeds from the public feed on a clean Windows machine. |
 
 ```powershell
 $feed = 'https://community.chocolatey.org/api/v2/'
-choco search grate --exact --all-versions --source=$feed
+$listed = choco search grate --exact --all-versions --source=$feed --limit-output
+if ($LASTEXITCODE -ne 0 -or $listed -cnotcontains "grate|$version") {
+    throw 'The exact version is missing from public Chocolatey search.'
+}
 choco install grate --version=$version --source=$feed --yes --no-progress
+if ($LASTEXITCODE -ne 0) { throw 'Public Chocolatey installation failed.' }
 grate.exe --help
+if ($LASTEXITCODE -ne 0) { throw 'grate --help failed after public installation.' }
 ```
 
 [package]: https://community.chocolatey.org/packages/grate
 [api-key]: https://docs.chocolatey.org/en-us/choco/commands/apikey/
+[actions-secrets]: https://github.com/grate-devs/grate/settings/secrets/actions
 [moderation]: https://docs.chocolatey.org/en-us/community-repository/moderation/
