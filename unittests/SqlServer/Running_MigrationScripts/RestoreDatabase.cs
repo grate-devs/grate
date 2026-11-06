@@ -1,62 +1,83 @@
-﻿using Dapper;
+using Dapper;
 using grate.Configuration;
 using SqlServer.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
 namespace SqlServer.Running_MigrationScripts;
 
-
 [Collection(nameof(SqlServerGrateTestContext))]
-// ReSharper disable once InconsistentNaming
 public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputHelper testOutput)
     : SqlServerScriptsBase(testContext, testOutput)
 {
-    
-    private static readonly string BackedUpDb = TestConfig.RandomDatabase();
-    private static readonly string BackupPath = $"/var/opt/mssql/backup/{BackedUpDb}.bak";
-
-
-    private async Task RunBeforeTest()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Restores_both_files_and_migrates(bool moveFiles)
     {
-        using var conn = Context.CreateDbConnection("master");
-        await conn.ExecuteAsync($"use [master] CREATE DATABASE [{BackedUpDb}]");
-        await conn.ExecuteAsync($"use [{BackedUpDb}] CREATE TABLE dbo.Table_1 (column1 int NULL)");
-        await conn.ExecuteAsync($"BACKUP DATABASE [{BackedUpDb}] TO  DISK = '{BackupPath}'");
-        await conn.ExecuteAsync($"use [master] DROP DATABASE [{BackedUpDb}]");
-    }
+        var source = TestConfig.RandomDatabase();
+        var target = TestConfig.RandomDatabase();
+        var backupPath = $"/var/opt/mssql/backup/{source} owner's copy.bak";
+        var originalData = $"/var/opt/mssql/data/{source}.mdf";
+        var originalLog = $"/var/opt/mssql/data/{source}_log.ldf";
+        var dataPath = $"/var/opt/mssql/data/{target} owner's moved=data.mdf";
+        var logPath = $"/var/opt/mssql/data/{target} owner's moved=log.ldf";
+        const string scriptName = "001_copy_restored_data.sql";
 
-    [Fact]
-    public async Task Ensure_database_gets_restored()
-    {
-        await RunBeforeTest();
-
-        var db = TestConfig.RandomDatabase();
-
-        var parent = CreateRandomTempDirectory();
-        var knownFolders = Folders.Default;
-        CreateDummySql(parent, knownFolders[KnownFolderKeys.Sprocs]);
-
-        var restoreConfig = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
-            .WithConnectionString(Context.ConnectionString(db))
-            .WithSqlFilesDirectory(parent)
-            .RestoreFrom(BackupPath)
-            .Build();
-
-        await using (var migrator = Context.Migrator.WithConfiguration(restoreConfig))
+        var root = Directory.CreateTempSubdirectory("grate-restore-");
+        using var admin = Context.CreateAdminDbConnection();
+        try
         {
-            await migrator.Migrate();
+            await admin.ExecuteAsync($"""
+                CREATE DATABASE [{source}]
+                ON PRIMARY (NAME = N'Owner''s data', FILENAME = N'{originalData}')
+                LOG ON (NAME = N'Owner''s log', FILENAME = N'{originalLog}');
+                """);
+            await admin.ExecuteAsync($"""
+                CREATE TABLE [{source}].dbo.BackupData (id int NOT NULL);
+                INSERT INTO [{source}].dbo.BackupData VALUES (593);
+                BACKUP DATABASE [{source}] TO DISK = @backupPath;
+                """, new { backupPath });
+
+            // With MOVE, keep the original files in use so either missing mapping fails.
+            if (moveFiles)
+                await admin.ExecuteAsync($"CREATE DATABASE [{target}];");
+            else
+                await Context.DropDatabase(source);
+
+            var scripts = root.CreateSubdirectory("scripts");
+            WriteSql(scripts, "up", scriptName, "SELECT id INTO dbo.MigratedData FROM dbo.BackupData;");
+            var builder = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
+                .WithConnectionString(Context.ConnectionString(target))
+                .WithSqlFilesDirectory(scripts)
+                .WithOutputFolder(root.CreateSubdirectory("output"))
+                .RestoreFrom(backupPath);
+            if (moveFiles)
+                builder.WithRestoreMoves(new("Owner's data", dataPath), new("Owner's log", logPath));
+
+            await using (var migrator = Context.Migrator.WithConfiguration(builder.Build()))
+            {
+                await migrator.Migrate();
+            }
+
+            using var restored = Context.CreateDbConnection(target);
+            var paths = await restored.QueryAsync<string>(
+                "SELECT physical_name FROM sys.database_files WHERE type IN (0, 1) ORDER BY type;");
+            Assert.Equal(moveFiles ? [dataPath, logPath] : new[] { originalData, originalLog }, paths);
+            Assert.Equal(593, await restored.QuerySingleAsync<int>("SELECT id FROM dbo.MigratedData;"));
+            Assert.Equal(1, await restored.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM grate.ScriptsRun WHERE script_name = @scriptName;", new { scriptName }));
         }
-
-        int[] results;
-        string sql = $"select count(1) from sys.tables where [name]='Table_1'";
-
-        using (var conn = Context.CreateDbConnection(db))
+        finally
         {
-            results = (await conn.QueryAsync<int>(sql)).ToArray();
+            try
+            {
+                await Context.DropDatabase(target);
+                await Context.DropDatabase(source);
+            }
+            finally
+            {
+                root.Delete(recursive: true);
+            }
         }
-
-        Assert.Equal(1, results.First());
-        
-        //await Context.DropDatabase(db);
     }
 }

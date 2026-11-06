@@ -44,6 +44,7 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(RunAllAnyTimeScripts);
         Options.Add(DryRun);
         Options.Add(Restore);
+        Options.Add(RestoreMoves);
         Options.Add(IgnoreDirectoryNames);
         Options.Add(UpToDateCheck);
         Options.Add(Verbosity);
@@ -58,6 +59,12 @@ internal sealed class MigrateCommand : RootCommand
         {
             var folders = result.GetValue(Folders);
             var config = GetConfiguration(result, folders?.Configuration);
+            var restoreMoveError = config.GetRestoreMoveError(config.DatabaseType == Configuration.DatabaseType.SQLServer);
+            if (restoreMoveError is not null)
+            {
+                result.InvocationConfiguration.Error.WriteLine(restoreMoveError);
+                return 1;
+            }
             if (folders is { } parsedFolders)
             {
                 foreach (var (key, folder) in parsedFolders.RequiredFolders)
@@ -117,6 +124,7 @@ internal sealed class MigrateCommand : RootCommand
             RunAllAnyTimeScripts = parseResult.GetValue(RunAllAnyTimeScripts),
             DryRun = parseResult.GetValue(DryRun),
             Restore = parseResult.GetValue(Restore),
+            RestoreMoves = parseResult.GetValue(RestoreMoves) ?? [],
             IgnoreDirectoryNames = parseResult.GetValue(IgnoreDirectoryNames),
             UpToDateCheck = parseResult.GetValue(UpToDateCheck),
             LogFormat = logFormat.ToLowerInvariant() is "azure-devops" or "azure" or "devops"
@@ -367,6 +375,38 @@ the last one will expect the folders to be named 'folder1', 'folder2', and 'fold
         new("--restore")
         {
             Description = " Restore - This instructs grate where to get the backed up database file. Defaults to NULL."
+        };
+
+    private readonly Option<RestoreFileMove[]> RestoreMoves =
+        new("--restore-move")
+        {
+            Description = "SQL Server file mapping for --restore, as logical-name=destination-path. Repeat for each file to move.",
+            Arity = ArgumentArity.OneOrMore,
+            CustomParser = result =>
+            {
+                var moves = new List<RestoreFileMove>();
+                foreach (var token in result.Tokens)
+                {
+                    var separator = token.Value.IndexOf('=');
+                    if (separator < 0)
+                    {
+                        result.AddError("--restore-move expects logical-name=destination-path.");
+                        return [];
+                    }
+
+                    moves.Add(new(token.Value[..separator], token.Value[(separator + 1)..]));
+                }
+
+                return moves.ToArray();
+            },
+            Validators =
+            {
+                result =>
+                {
+                    if (result.IdentifierTokenCount != result.Tokens.Count)
+                        result.AddError("Each --restore-move requires one logical-name=destination-path argument.");
+                }
+            }
         };
 
     private readonly Option<bool> Silent =
