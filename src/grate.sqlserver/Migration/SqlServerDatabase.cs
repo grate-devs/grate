@@ -39,6 +39,42 @@ public record SqlServerDatabase : AnsiSqlDatabase
         };
         return conn;
     }
+    protected override async Task ExecuteScriptBatch(DbConnection connection, string sql, int? timeout, string? scriptName)
+    {
+        var logger = Logger;
+        if (connection is not SqlConnection sqlConnection || !logger.IsEnabled(LogLevel.Debug))
+        {
+            await base.ExecuteScriptBatch(connection, sql, timeout, scriptName);
+            return;
+        }
+
+        void LogInfoMessage(object sender, SqlInfoMessageEventArgs args)
+        {
+            foreach (SqlError message in args.Errors)
+            {
+                if (scriptName is null)
+                {
+                    logger.LogDebug("SQL Server: {Message}", message.Message);
+                }
+                else
+                {
+                    logger.LogDebug("SQL Server ({ScriptName}): {Message}", scriptName, message.Message);
+                }
+            }
+        }
+
+        // Leave FireInfoMessageEventOnUserErrors at its default so SQL errors still throw.
+        sqlConnection.InfoMessage += LogInfoMessage;
+        try
+        {
+            await base.ExecuteScriptBatch(connection, sql, timeout, scriptName);
+        }
+        finally
+        {
+            sqlConnection.InfoMessage -= LogInfoMessage;
+        }
+    }
+
     protected string? AccessToken { get; private set; }
 
     public override Task InitializeConnections(GrateConfiguration configuration)
