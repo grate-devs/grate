@@ -8,6 +8,7 @@ public sealed class CliInvocationTests
 {
     [Theory]
     [InlineData(new[] { "--help" }, "--connectionstring")]
+    [InlineData(new[] { "--help" }, "Directory for migration artifacts")]
     [InlineData(new[] { "--databasetype", "999", "--help" }, "--connectionstring")]
     [InlineData(new[] { "skills", "--help" }, "install")]
     [InlineData(new[] { "skills", "install", "--help" }, "--local")]
