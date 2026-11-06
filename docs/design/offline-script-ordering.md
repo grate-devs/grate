@@ -40,6 +40,24 @@ A declaration supplies the complete list of prerequisites for that script. The p
 
 Every declared path must name a file in the planned group. A missing path or a cycle in the combined graph fails offline planning and identifies the files involved. Editing a declaration changes the script text, so the existing `AnyTime` change detection can schedule that script to run again.
 
+## Runnable prototype
+
+The [standalone experiment](offline-script-ordering-poc/README.md) reads the
+three example definitions from local files and emits their ordered paths and
+dependency reasons as JSON. It fixes the candidate group to the default
+`functions` and `views` folders. ScriptDOM is a dependency of the experiment
+alone.
+
+The SQL Server check applies the emitted order in a disposable database. The
+upgrade changes the view and the function that reads it, leaving the first
+function intact. The check applies those two files in plan order and queries the
+result. It also tries the conflicting folder order on an empty database and
+tries applying the changed function before the changed view during upgrade.
+
+The JSON is an observation of the candidate order. Plan validation at deployment,
+grate's script eligibility and history, and integration with the existing folder
+runner are separate work covered by the criteria below.
+
 ## Verification before implementation is ready
 
 - Run the planner with networking disabled and no SQL Server configuration. The three files above must produce the same order and explain both dependencies across the folder boundary.
