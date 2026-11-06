@@ -20,7 +20,7 @@ The default `up` folder is Once; `functions`, `views`, `sprocs`, `triggers`, and
 
 By default, grate skips a previously applied AnyTime script when its SQL is unchanged after token expansion, even if the database object has drifted. Check the runner's settings for overrides that force execution.
 
-`runAfterCreateDatabase` is only processed when grate created the database during that invocation; adding a file there will not initialize an existing database. The source inspected here configures both that folder and `runFirstAfterUp` as AnyTime, despite conflicting published documentation. Check the selected release before relying on either lifecycle. Unused default folders need not exist on disk.
+`runAfterCreateDatabase` and `runFirstAfterUp` are AnyTime by default. Grate processes `runAfterCreateDatabase` only on the run that creates the database. A dry run that previews database creation also includes this folder. Unused default folders need not exist on disk.
 
 Configured folder order takes precedence over names in different folders. Within a folder grate orders scripts alphabetically, including relative subdirectory paths by default. The `--ignoredirectorynames` option changes sorting and tracked identity to filenames alone. Current sorting ignores case and uses the current culture; avoid names differentiated only by case or locale-sensitive characters.
 
@@ -83,6 +83,6 @@ Token names are case-insensitive, but only the selected version's built-in token
 
 Start with [script types](https://grate-devs.github.io/grate/script-types/), [folder configuration](https://grate-devs.github.io/grate/folder-configuration/), [environments](https://grate-devs.github.io/grate/environment-scripts/), and [tokens](https://grate-devs.github.io/grate/token-replacement/). Select the tag/commit matching the consumer's version.
 
-For version-sensitive details, inspect [FoldersConfiguration](https://github.com/grate-devs/grate/blob/main/src/grate.core/Configuration/FoldersConfiguration.cs), [FileSystem](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/FileSystem.cs), [GrateMigrator](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/GrateMigrator.cs), [DbMigrator](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/DbMigrator.cs), and [GrateEnvironment](https://github.com/grate-devs/grate/blob/main/src/grate.core/Infrastructure/GrateEnvironment.cs). For example, current code configures `runAfterCreateDatabase` and `runFirstAfterUp` as AnyTime despite conflicting older documentation.
+For version-sensitive details, inspect [FoldersConfiguration](https://github.com/grate-devs/grate/blob/main/src/grate.core/Configuration/FoldersConfiguration.cs), [FileSystem](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/FileSystem.cs), [GrateMigrator](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/GrateMigrator.cs), [DbMigrator](https://github.com/grate-devs/grate/blob/main/src/grate.core/Migration/DbMigrator.cs), and [GrateEnvironment](https://github.com/grate-devs/grate/blob/main/src/grate.core/Infrastructure/GrateEnvironment.cs).
 
 {% endraw %}
