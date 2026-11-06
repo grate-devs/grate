@@ -1,0 +1,65 @@
+name: Submit the tested grate 2.2.0 Chocolatey package
+
+on:
+  push:
+    branches: [release/chocolatey-2.2.0-submit]
+    paths: [.github/workflows/chocolatey-220-submit.yml]
+
+permissions:
+  actions: read
+
+concurrency:
+  group: chocolatey-community-grate-2.2.0
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    if: github.run_attempt == '1'
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - name: Download and verify the Windows-tested package
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $directory = Join-Path $env:RUNNER_TEMP 'grate-chocolatey-220-submit'
+          gh run download 42026660504 --repo grate-devs/grate --name grate-chocolatey-2.2.0 --dir $directory
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download the Windows-tested artifact.' }
+          $package = Join-Path $directory 'grate.2.2.0.nupkg'
+          $digest = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($digest -cne 'ed912fde1d23952973e1c61d8938eaf7bd0bd1955c8c699f77cb2f9f31bcdddb') {
+              throw 'Package bytes differ from the Windows-tested candidate.'
+          }
+          Write-Output "Verified grate.2.2.0.nupkg SHA256 $digest"
+      - name: Submit the verified bytes to Chocolatey Community Repository
+        shell: pwsh
+        env:
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $package = Join-Path $env:RUNNER_TEMP 'grate-chocolatey-220-submit/grate.2.2.0.nupkg'
+          if ([string]::IsNullOrWhiteSpace($env:CHOCOLATEY_API_KEY)) {
+              throw 'CHOCOLATEY_API_KEY is unavailable to this job.'
+          }
+          $apiKey = $env:CHOCOLATEY_API_KEY.Trim()
+          Remove-Item Env:CHOCOLATEY_API_KEY
+          try {
+              $pushOutput = & choco push $package '--source=https://push.chocolatey.org/' "--api-key=$apiKey" --execution-timeout=500 2>&1
+              $pushExit = $LASTEXITCODE
+          } catch {
+              throw 'Unable to run the Chocolatey push command.'
+          } finally {
+              Remove-Variable apiKey
+          }
+          if ($pushExit -ne 0) {
+              # Report a fixed diagnostic without printing the response or command arguments.
+              $httpStatus = [regex]::Match(($pushOutput -join "`n"), '(?:\bHTTP(?: status)?[ :]+|\()(?<code>400|401|403|404|409|413|429|500|502|503|504)\b', 'IgnoreCase')
+              if ($httpStatus.Success) {
+                  throw "Chocolatey push failed with HTTP $($httpStatus.Groups['code'].Value)."
+              }
+              throw "Chocolatey push failed with exit code $pushExit."
+          }
+          Write-Output 'Chocolatey accepted the push for grate 2.2.0. Check moderation separately.'
