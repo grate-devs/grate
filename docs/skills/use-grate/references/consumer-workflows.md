@@ -17,6 +17,8 @@ Inspect the project pin before copying installation commands from the published 
 | Self-contained binary | Matching OS, architecture, and libc. It needs no installed .NET runtime; OS dependencies such as ICU can still apply. |
 | Container | Image version/digest, entrypoint/wrapper, mounted SQL and output paths, credentials, and the database address reachable from inside the container. |
 
+If the runner is missing, prefer the project's approved, version-pinned setup, such as restoring tools from its local manifest, pulling its pinned container image or downloading its selected release binary. Reserve new global installations for explicit setup requests.
+
 For Alpine, choose the release's `linux-musl` architecture or the project's pinned container; a glibc Linux binary is not interchangeable. See [Alpine support](https://grate-devs.github.io/grate/alpine-linux-support/) and inspect the selected release rather than replacing a pin with `latest`.
 
 Once the runner is known, obtain its `--help`. Set the actual provider explicitly (`--databasetype` in current grate), because the CLI defaults to SQL Server. Confirm its SQL root and working directory: the default SQL root is the current directory, and a successful invocation against the wrong or empty root does not verify the intended migration. Set a migration `--version` from the project's release convention; it is a history label, not a filter that selects scripts up to that version.
