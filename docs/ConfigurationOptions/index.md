@@ -18,6 +18,25 @@ The only required argument to pass to grate is a connection string to tell it wh
 grate --connectionstring="Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Database=grate_test"
 ```
 
+## Connection strings by database
+
+Pass the complete connection string as one value to `--connectionstring` on the
+CLI or `APP_CONNSTRING` in Docker. Select the provider with `--databasetype` on
+the CLI or `DATABASE_TYPE` in Docker. Both default to `sqlserver`.
+
+| Database type | Driver connection string reference |
+| --- | --- |
+| `sqlserver` | [Microsoft.Data.SqlClient](https://learn.microsoft.com/en-us/sql/connect/ado-net/connection-strings) |
+| `postgresql` | [Npgsql](https://www.npgsql.org/doc/connection-string-parameters.html) |
+| `mariadb` | [MySqlConnector](https://mysqlconnector.net/connection-options/) |
+| `oracle` | [ODP.NET Core](https://docs.oracle.com/en/database/oracle/oracle-database/26/odpnt/ConnectionConnectionString.html) |
+| `sqlite` | [Microsoft.Data.Sqlite](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/connection-strings) |
+
+For PostgreSQL, use an Npgsql string such as
+`Host=db;Port=5432;Database=grate_example;Username=postgres;Password=your-password`.
+The [PostgreSQL Docker Compose example](https://github.com/grate-devs/grate/tree/main/examples/docker/postgresql)
+shows how to pass the string at runtime and optionally supply an admin connection.
+
 ## Full Configuration
 
 
