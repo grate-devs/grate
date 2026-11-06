@@ -62,10 +62,10 @@ jobs:
           10.0.x
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4.39.1
+      uses: github/codeql-action/init@v4.39.2
 
     - name: Autobuild
-      uses: github/codeql-action/autobuild@v4.39.1
+      uses: github/codeql-action/autobuild@v4.39.2
 
     # Autobuild selects C#; trace the Windows-only MSI action explicitly too.
     - name: Build native MSI upgrade action for CodeQL
@@ -73,7 +73,7 @@ jobs:
       run: ./installers/msi/native/Build-UpgradeActions.ps1 -Architecture x64 -OutputDirectory "$env:RUNNER_TEMP/codeql-msi-upgrade-actions"
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4.39.1
+      uses: github/codeql-action/analyze@v4.39.2
 
   test:
     name: Run tests
