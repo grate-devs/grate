@@ -54,7 +54,25 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(Database);
         Options.Add(ServerName);
 
-        SetAction((result, _) => migrate(GetConfiguration(result), result.InvocationConfiguration));
+        SetAction(async (result, _) =>
+        {
+            var folders = result.GetValue(Folders);
+            var config = GetConfiguration(result, folders?.Configuration);
+            if (folders is { } parsedFolders)
+            {
+                foreach (var (key, folder) in parsedFolders.RequiredFolders)
+                {
+                    var path = Path.Combine(config.SqlFilesDirectory.FullName, folder.Path);
+                    if (!Directory.Exists(path))
+                    {
+                        result.InvocationConfiguration.Error.WriteLine($"Migration folder '{key}' requires an existing directory: '{path}'.");
+                        return 1;
+                    }
+                }
+            }
+
+            return await migrate(config, result.InvocationConfiguration);
+        });
     }
 
     /// <summary>
@@ -62,7 +80,10 @@ internal sealed class MigrateCommand : RootCommand
     /// This is the explicit replacement for the convention-based model binder that used to live in
     /// System.CommandLine.NamingConventionBinder.
     /// </summary>
-    public CommandLineGrateConfiguration GetConfiguration(ParseResult parseResult)
+    public CommandLineGrateConfiguration GetConfiguration(ParseResult parseResult) =>
+        GetConfiguration(parseResult, parseResult.GetValue(Folders)?.Configuration);
+
+    private CommandLineGrateConfiguration GetConfiguration(ParseResult parseResult, IFoldersConfiguration? folders)
     {
         // Preserve configuration defaults for optional values without a default value factory.
         var defaults = new CommandLineGrateConfiguration();
@@ -74,7 +95,7 @@ internal sealed class MigrateCommand : RootCommand
             AdminConnectionString = parseResult.GetValue(AdminConnectionString),
             SqlFilesDirectory = parseResult.GetValue(SqlFilesDirectory)!,
             OutputPath = parseResult.GetValue(OutputPath)!,
-            Folders = parseResult.GetValue(Folders) ?? defaults.Folders,
+            Folders = folders ?? defaults.Folders,
             AccessToken = parseResult.GetValue(AccessToken),
             CommandTimeout = parseResult.GetValue(CommandTimeout),
             AdminCommandTimeout = parseResult.GetValue(CommandTimeoutAdmin),
@@ -148,17 +169,20 @@ internal sealed class MigrateCommand : RootCommand
             DefaultValueFactory = _ => new DirectoryInfo(DefaultOutputPath)
         };
 
-    private readonly Option<IFoldersConfiguration?> Folders =
+    private readonly Option<(IFoldersConfiguration Configuration, IReadOnlyDictionary<string, MigrationsFolder> RequiredFolders)?> Folders =
         new("--folders")
         {
             CustomParser = result =>
-                FoldersCommand.Parse(result.Tokens.Count > 0 ? result.Tokens[0].Value : null),
+                FoldersCommand.ParseWithRequiredFolders(result.Tokens.Count > 0 ? result.Tokens[0].Value : null),
             Description =
 @"Folder configuration.
 
 If you wish to override any of the default folder names, supply a semicolon separated list of mappings.
 You can also specify a file name that has the same contents as you would supply on the command line,
 if you find it cumbersome to write all the folders on the command line.
+
+Explicit folder paths and folders in a fully custom configuration must exist.
+Standard folders with no explicit path override are optional.
 
 Example:
 
