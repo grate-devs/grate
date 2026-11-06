@@ -140,6 +140,7 @@ internal record GrateMigrator : IGrateMigrator
         _logger.LogInformation("Migration Scripts");
         Separator('=');
         bool anyScriptRecordedOrRun = false;
+        bool commitRequested = false;
         try
         {
             // Start the transaction, if configured
@@ -221,9 +222,10 @@ internal record GrateMigrator : IGrateMigrator
 
             await dbMigrator.CloseConnection();
 
-            if (!exceptionOccured)
+            if (!exceptionOccured && scope is not null)
             {
-                scope?.Complete();
+                scope.Complete();
+                commitRequested = true;
             }
         }
         finally
@@ -232,7 +234,28 @@ internal record GrateMigrator : IGrateMigrator
             {
                 scope?.Dispose();
             }
-            catch (TransactionAbortedException) { }
+            catch (TransactionAbortedException) when (!commitRequested)
+            {
+                // Preserve the original failure when rolling back an incomplete scope.
+            }
+            catch (TransactionAbortedException ex)
+            {
+                _logger.LogError("The migration transaction failed to commit. {ErrorMessage}", ex.InnerException?.Message ?? ex.Message);
+
+                if (!config.DryRun)
+                {
+                    try
+                    {
+                        await database.ChangeVersionStatus(MigrationStatus.Error, versionId);
+                    }
+                    catch (Exception statusException)
+                    {
+                        _logger.LogWarning(statusException, "Unable to record the transaction failure for version {VersionId}.", versionId);
+                    }
+                }
+
+                throw;
+            }
         }
 
         if (exceptions.Any())
