@@ -47,6 +47,7 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(IgnoreDirectoryNames);
         Options.Add(UpToDateCheck);
         Options.Add(Verbosity);
+        Options.Add(LogFormat);
         Subcommands.Add(new SkillsCommand());
 
         // Obsolete options - kept so that grate keeps reporting helpful messages, but not bound.
@@ -96,12 +97,20 @@ internal sealed class MigrateCommand : RootCommand
             Restore = parseResult.GetValue(Restore),
             IgnoreDirectoryNames = parseResult.GetValue(IgnoreDirectoryNames),
             UpToDateCheck = parseResult.GetValue(UpToDateCheck),
+            LogFormat = Enum.Parse<MigrationLogFormat>(parseResult.GetValue(LogFormat) ?? "auto", ignoreCase: true),
             // Verbosity has no default value factory; when it isn't supplied keep the record default.
             Verbosity = parseResult.GetResult(Verbosity) is { Implicit: false }
                 ? parseResult.GetValue(Verbosity)
                 : defaults.Verbosity,
         };
     }
+
+    private readonly Option<string> LogFormat =
+        new Option<string>("--log-format")
+        {
+            Description = "Format migration logs for a terminal or CI runner.",
+            DefaultValueFactory = _ => "auto"
+        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure", "teamcity");
 
     //REQUIRED OPTIONS
     private readonly Option<string> ConnectionString =

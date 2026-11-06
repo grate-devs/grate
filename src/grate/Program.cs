@@ -39,7 +39,9 @@ public static class Program
             config = config with { Verbosity = LogLevel.Critical, DryRun = true };
         }
 
-        await using var serviceProvider = BuildServiceProvider(config);
+        var format = MigrationLogFormatSelection.Resolve(config.LogFormat);
+        using var ciLogger = format == MigrationLogFormat.Console ? null : new CiMigrationLoggerProvider(format, Console.Out);
+        await using var serviceProvider = BuildServiceProvider(config, ciLogger);
         await using var scope = serviceProvider.CreateAsyncScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<GrateMigrator>>();
 
@@ -51,10 +53,22 @@ public static class Program
         }
         catch (Exception ex)
         {
-            result = ExceptionHandler(ex, invocationConfiguration, logger);
+            if (ciLogger is null)
+            {
+                result = ExceptionHandler(ex, invocationConfiguration, logger);
+            }
+            else
+            {
+                logger.LogDebug(ex, "{ErrorMessage}", ex.Message);
+                ciLogger.ReportFailure(logger, ex);
+                result = 1;
+            }
         }
 
-        await WaitForLoggerToFinish();
+        if (ciLogger is null)
+        {
+            await WaitForLoggerToFinish();
+        }
         return result;
     }
 
@@ -99,20 +113,32 @@ public static class Program
         }
     }
 
-    private static ServiceProvider BuildServiceProvider(CommandLineGrateConfiguration config)
+    private static ServiceProvider BuildServiceProvider(
+        CommandLineGrateConfiguration config, CiMigrationLoggerProvider? ciLogger)
     {
         IServiceCollection services = new ServiceCollection();
 
-        services.AddLogging(logging => logging.AddConsole(options =>
+        services.AddLogging(logging =>
+        {
+            logging.AddFilter("Grate.Migration.Internal", LogLevel.Critical)
+                .AddFilter("Grate.Migration.IsUpToDate", LogLevel.Information)
+                .SetMinimumLevel(config.Verbosity);
+
+            if (ciLogger is not null)
             {
-                options.FormatterName = GrateConsoleFormatter.FormatterName;
-                options.LogToStandardErrorThreshold = LogLevel.Warning;
-            })
-            .AddFilter("Grate.Migration.Internal", LogLevel.Critical)
-            .AddFilter("Grate.Migration.IsUpToDate", LogLevel.Information)
-            .SetMinimumLevel(config.Verbosity)
-            .AddConsoleFormatter<GrateConsoleFormatter, SimpleConsoleFormatterOptions>());
-        
+                logging.AddProvider(ciLogger);
+            }
+            else
+            {
+                logging.AddConsole(options =>
+                    {
+                        options.FormatterName = GrateConsoleFormatter.FormatterName;
+                        options.LogToStandardErrorThreshold = LogLevel.Warning;
+                    })
+                    .AddConsoleFormatter<GrateConsoleFormatter, SimpleConsoleFormatterOptions>();
+            }
+        });
+
         services = config.DatabaseType switch
         {
             DatabaseType.MariaDB => services.AddGrateWithMariaDb(config),

@@ -23,12 +23,14 @@ public sealed class CliInvocationTests
     [InlineData(new string[0], "--connectionstring")]
     [InlineData(new[] { "--connectionstring", "unused", "--databasetype", "invalid" }, "--databasetype")]
     [InlineData(new[] { "--connectionstring", "unused", "--commandtimeout", "invalid" }, "--commandtimeout")]
-    public async Task Invalid_arguments_report_parse_errors_without_starting_a_migration(string[] arguments, string expectedOption)
+    [InlineData(new[] { "--connectionstring", "unused", "--log-format", "invalid" }, "'invalid'")]
+    [InlineData(new[] { "--connectionstring", "unused", "--log-format", "1" }, "'1'")]
+    public async Task Invalid_arguments_report_parse_errors_without_starting_a_migration(string[] arguments, string expectedDiagnostic)
     {
         var result = await Invoke(arguments);
 
         Assert.Equal(1, result.ExitCode);
-        Assert.Contains(expectedOption, result.Error);
+        Assert.Contains(expectedDiagnostic, result.Error);
         Assert.DoesNotContain("Unhandled exception", result.Error);
         Assert.DoesNotContain("An error occurred:", result.Error);
     }
@@ -64,7 +66,11 @@ public sealed class CliInvocationTests
         }
     }
 
-    private static async Task<(int ExitCode, string Output, string Error)> Invoke(params string[] arguments)
+    private static Task<(int ExitCode, string Output, string Error)> Invoke(params string[] arguments) =>
+        Invoke(arguments, []);
+
+    internal static async Task<(int ExitCode, string Output, string Error)> Invoke(
+        string[] arguments, (string Name, string Value)[] ciEnvironment)
     {
         var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
         {
@@ -72,6 +78,15 @@ public sealed class CliInvocationTests
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        foreach (var name in new[] { "GITHUB_ACTIONS", "TF_BUILD", "TEAMCITY_VERSION", "JENKINS_URL", "BUILD_TAG", "CI" })
+        {
+            start.Environment.Remove(name);
+        }
+        foreach (var (name, value) in ciEnvironment)
+        {
+            start.Environment[name] = value;
+        }
+
         start.ArgumentList.Add(typeof(Program).Assembly.Location);
         foreach (var argument in arguments)
         {
