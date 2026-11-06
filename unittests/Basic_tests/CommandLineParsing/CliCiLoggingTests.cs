@@ -79,6 +79,7 @@ public sealed class CliCiLoggingTests : IDisposable
     [InlineData("github", "::warning::")]
     [InlineData("azure-devops", "##vso[task.logissue type=warning;]")]
     [InlineData("azure", "##vso[task.logissue type=warning;]")]
+    [InlineData("devops", "##vso[task.logissue type=warning;]")]
     [InlineData("teamcity", "##teamcity[message ")]
     public async Task Explicit_format_overrides_detection(string format, string? warningPrefix)
     {

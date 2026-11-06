@@ -98,7 +98,7 @@ internal sealed class MigrateCommand : RootCommand
             Restore = parseResult.GetValue(Restore),
             IgnoreDirectoryNames = parseResult.GetValue(IgnoreDirectoryNames),
             UpToDateCheck = parseResult.GetValue(UpToDateCheck),
-            LogFormat = logFormat.ToLowerInvariant() is "azure-devops" or "azure"
+            LogFormat = logFormat.ToLowerInvariant() is "azure-devops" or "azure" or "devops"
                 ? MigrationLogFormat.AzureDevOps
                 : Enum.Parse<MigrationLogFormat>(logFormat, ignoreCase: true),
             // Verbosity has no default value factory; when it isn't supplied keep the record default.
@@ -113,7 +113,7 @@ internal sealed class MigrateCommand : RootCommand
         {
             Description = "Format migration logs for a terminal or CI runner.",
             DefaultValueFactory = _ => "auto"
-        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure-devops", "teamcity", "azure");
+        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure-devops", "teamcity", "azure", "devops");
 
     //REQUIRED OPTIONS
     private readonly Option<string> ConnectionString =

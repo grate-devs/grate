@@ -58,7 +58,7 @@ grate --connectionstring="Server=(localdb)\MSSQLLocalDB;Integrated Security=true
 ## Migration logs in CI
 
 `--log-format=auto` selects a format once when the CLI starts a migration.
-Set `--log-format` explicitly to override detection. `azure` is an alias for `azure-devops`.
+Set `--log-format` explicitly to override detection. `azure` and `devops` are aliases for `azure-devops`.
 
 | Runner | Signal in `auto` | Format |
 | --- | --- | --- |
