@@ -10,7 +10,11 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
     private readonly TextWriter _stdout;
     private readonly CiLogWriter _output;
     private readonly List<ScriptError> _scriptErrors = [];
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _gate = new();
+#else
     private readonly object _gate = new();
+#endif
     private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();
 
     public CiMigrationLoggerProvider(MigrationLogFormat format, TextWriter stdout)
@@ -39,7 +43,7 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
             var terminalErrors = new List<string>();
             foreach (var failure in GetFailures(exception))
             {
-                var index = _scriptErrors.FindIndex(item => !item.Matched && IsOrWraps(failure, item.Failure));
+                var index = _scriptErrors.FindIndex(item => !item.Matched && ExceptionChainContains(failure, item.Failure));
                 if (index >= 0)
                 {
                     var original = _scriptErrors[index];
@@ -68,7 +72,7 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
             ? aggregate.InnerExceptions.SelectMany(GetFailures)
             : [exception];
 
-    private static bool IsOrWraps(Exception exception, Exception original)
+    private static bool ExceptionChainContains(Exception exception, Exception original)
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)
         {

@@ -15,7 +15,7 @@ internal sealed class CiLogWriter(MigrationLogFormat format, TextWriter output)
             var annotation = format switch
             {
                 MigrationLogFormat.GitHub => $"::{kind}::{EscapeGitHub(text)}",
-                MigrationLogFormat.Azure => $"##vso[task.logissue type={kind};]{EscapeAzure(text)}",
+                MigrationLogFormat.AzureDevOps => $"##vso[task.logissue type={kind};]{EscapeAzureDevOps(text)}",
                 MigrationLogFormat.TeamCity => $"##teamcity[message text='{EscapeTeamCity(text)}' status='{kind.ToUpperInvariant()}']",
                 _ => throw new InvalidOperationException($"Expected a CI log format, got {format}.")
             };
@@ -49,7 +49,7 @@ internal sealed class CiLogWriter(MigrationLogFormat format, TextWriter output)
         .Replace("\r", "%0D", StringComparison.Ordinal)
         .Replace("\n", "%0A", StringComparison.Ordinal);
 
-    private static string EscapeAzure(string text) => text
+    private static string EscapeAzureDevOps(string text) => text
         .Replace("%", "%AZP25", StringComparison.Ordinal)
         .Replace(";", "%3B", StringComparison.Ordinal)
         .Replace("]", "%5D", StringComparison.Ordinal)

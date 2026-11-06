@@ -6,7 +6,7 @@ internal enum MigrationLogFormat
     Console,
     Ci,
     GitHub,
-    Azure,
+    AzureDevOps,
     TeamCity
 }
 
@@ -19,21 +19,33 @@ internal static class MigrationLogFormatSelection
             return configured;
         }
 
-        var github = IsTrue("GITHUB_ACTIONS");
-        var azure = IsTrue("TF_BUILD");
-        var teamCity = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TEAMCITY_VERSION"));
-        var jenkins = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("JENKINS_URL"))
-            || Environment.GetEnvironmentVariable("BUILD_TAG")?.StartsWith("jenkins-", StringComparison.Ordinal) == true;
-        var matches = (github ? 1 : 0) + (azure ? 1 : 0) + (teamCity ? 1 : 0) + (jenkins ? 1 : 0);
-
-        return matches switch
+        // Jenkins uses plain CI output, whether or not another provider is detected.
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("JENKINS_URL"))
+            || Environment.GetEnvironmentVariable("BUILD_TAG")?.StartsWith("jenkins-", StringComparison.Ordinal) == true)
         {
-            0 when !IsTrue("CI") => MigrationLogFormat.Console,
-            1 when github => MigrationLogFormat.GitHub,
-            1 when azure => MigrationLogFormat.Azure,
-            1 when teamCity => MigrationLogFormat.TeamCity,
-            _ => MigrationLogFormat.Ci
-        };
+            return MigrationLogFormat.Ci;
+        }
+
+        var nativeFormats = new List<MigrationLogFormat>(3);
+        if (IsTrue("GITHUB_ACTIONS"))
+        {
+            nativeFormats.Add(MigrationLogFormat.GitHub);
+        }
+        if (IsTrue("TF_BUILD"))
+        {
+            nativeFormats.Add(MigrationLogFormat.AzureDevOps);
+        }
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TEAMCITY_VERSION")))
+        {
+            nativeFormats.Add(MigrationLogFormat.TeamCity);
+        }
+
+        if (nativeFormats.Count == 1)
+        {
+            return nativeFormats[0];
+        }
+
+        return nativeFormats.Count > 1 || IsTrue("CI") ? MigrationLogFormat.Ci : MigrationLogFormat.Console;
     }
 
     private static bool IsTrue(string name) =>

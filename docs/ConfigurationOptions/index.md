@@ -50,7 +50,7 @@ grate --connectionstring="Server=(localdb)\MSSQLLocalDB;Integrated Security=true
 | --version <version> | 1.0.0.0 | **Database Version** - specify the version of the current migration directly on the command line. |
 | --isuptodate<br>--uptodatecheck | - | Outputs whether the database is up to date or not (whether any non-everytime scripts would be run) |
 | -v<br>--verbosity &lt;Critical\|<br>Debug\|<br>Error\|<br>Information\|<br>None\|<br>Trace\|Warning&gt; | Information | **Verbosity level** (as defined here: https://docs.microsoft.com/dotnet/api/Microsoft.Extensions.Logging.LogLevel) |
-| --log-format &lt;auto\|console\|ci\|github\|azure\|teamcity&gt; | auto | Selects how the CLI writes migration logs. See [Migration logs in CI](#migration-logs-in-ci). |
+| --log-format &lt;auto\|console\|ci\|github\|azure-devops\|teamcity&gt; | auto | Selects how the CLI writes migration logs. See [Migration logs in CI](#migration-logs-in-ci). |
 | --createdatabase<br>--create | true | **Create** - Instructs grate to create the target database if it does not exist. Set to false to emulate the `--donotcreatedatabase` flag in roundhouse. |
 | -?<br>-h<br>--help | - |  Show help and usage information | 
 
@@ -58,12 +58,12 @@ grate --connectionstring="Server=(localdb)\MSSQLLocalDB;Integrated Security=true
 ## Migration logs in CI
 
 `--log-format=auto` selects a format once when the CLI starts a migration.
-Set `--log-format` explicitly to override detection.
+Set `--log-format` explicitly to override detection. `azure` is an alias for `azure-devops`.
 
 | Runner | Signal in `auto` | Format |
 | --- | --- | --- |
 | [GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables) | `GITHUB_ACTIONS=true` | `github`: warning and error annotations |
-| [Azure Pipelines](https://learn.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=azure-devops) | `TF_BUILD=True` | `azure`: warning and error issues via `task.logissue` |
+| [Azure Pipelines](https://learn.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=azure-devops) | `TF_BUILD=True` | `azure-devops`: warning and error issues via `task.logissue` |
 | [TeamCity](https://www.jetbrains.com/help/teamcity/predefined-build-parameters.html) | Nonempty `TEAMCITY_VERSION` | `teamcity`: build log messages with `WARNING` or `ERROR` status |
 | [Jenkins](https://www.jenkins.io/doc/book/pipeline/jenkinsfile/#using-environment-variables) | Nonempty `JENKINS_URL` or a `BUILD_TAG` starting with `jenkins-` | `ci`: plain text in the standard build console |
 | Other CI, or more than one runner matches | `CI=true` without a runner match, or multiple runner matches | `ci`: plain text |
@@ -98,4 +98,4 @@ docker run --rm --env GITHUB_ACTIONS --env DATABASE_TYPE=sqlite \
 
 For other runners, forward the corresponding variable from the table. You can
 also pass a flag after the image name, for example
-`gratedevs/grate --log-format=azure`, without forwarding any runner variables.
+`gratedevs/grate --log-format=azure-devops`, without forwarding any runner variables.

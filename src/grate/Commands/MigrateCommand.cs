@@ -66,6 +66,7 @@ internal sealed class MigrateCommand : RootCommand
     {
         // Preserve configuration defaults for optional values without a default value factory.
         var defaults = new CommandLineGrateConfiguration();
+        var logFormat = parseResult.GetValue(LogFormat) ?? "auto";
 
         return new CommandLineGrateConfiguration
         {
@@ -97,7 +98,9 @@ internal sealed class MigrateCommand : RootCommand
             Restore = parseResult.GetValue(Restore),
             IgnoreDirectoryNames = parseResult.GetValue(IgnoreDirectoryNames),
             UpToDateCheck = parseResult.GetValue(UpToDateCheck),
-            LogFormat = Enum.Parse<MigrationLogFormat>(parseResult.GetValue(LogFormat) ?? "auto", ignoreCase: true),
+            LogFormat = logFormat.ToLowerInvariant() is "azure-devops" or "azure"
+                ? MigrationLogFormat.AzureDevOps
+                : Enum.Parse<MigrationLogFormat>(logFormat, ignoreCase: true),
             // Verbosity has no default value factory; when it isn't supplied keep the record default.
             Verbosity = parseResult.GetResult(Verbosity) is { Implicit: false }
                 ? parseResult.GetValue(Verbosity)
@@ -110,7 +113,7 @@ internal sealed class MigrateCommand : RootCommand
         {
             Description = "Format migration logs for a terminal or CI runner.",
             DefaultValueFactory = _ => "auto"
-        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure", "teamcity");
+        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure-devops", "teamcity", "azure");
 
     //REQUIRED OPTIONS
     private readonly Option<string> ConnectionString =

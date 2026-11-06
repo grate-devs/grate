@@ -8,7 +8,7 @@ public sealed class CiLogWriterTests
 {
     [Theory]
     [InlineData("GitHub", "::error::Critical diagnostic")]
-    [InlineData("Azure", "##vso[task.logissue type=error;]Critical diagnostic")]
+    [InlineData("AzureDevOps", "##vso[task.logissue type=error;]Critical diagnostic")]
     [InlineData("TeamCity", "##teamcity[message text='Critical diagnostic' status='ERROR']")]
     public void Native_formats_report_critical_logs_as_errors(string format, string annotation)
     {
