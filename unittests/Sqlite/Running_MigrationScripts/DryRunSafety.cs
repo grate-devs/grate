@@ -72,6 +72,18 @@ public sealed class DryRunSafety(ITestOutputHelper output) : IDisposable
             Assert.Contains("Up to date: False", _lastOutput);
     }
 
+    [Fact]
+    public async Task Preview_with_empty_create_database_folder_includes_after_create_scripts()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "scripts", "createDatabase"));
+        WriteScript("runAfterCreateDatabase", "SELECT 1;");
+
+        Assert.Equal(0, await Run("--dryrun"));
+
+        Assert.False(File.Exists(Database));
+        Assert.Contains("DryRun '001_runAfterCreateDatabase.sql'", _lastOutput);
+    }
+
     private string _lastOutput = "";
 
     private void WriteScript(string folder, string sql)

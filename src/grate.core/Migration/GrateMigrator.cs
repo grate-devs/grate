@@ -368,43 +368,36 @@ internal record GrateMigrator : IGrateMigrator
 
     private async Task<bool> CreateDatabaseIfItDoesNotExist(IDbMigrator dbMigrator)
     {
-        bool databaseCreated;
         if (await dbMigrator.DatabaseExists())
         {
-            databaseCreated = false;
+            return false;
         }
-        else
+
+        var config = dbMigrator.Configuration;
+        if (config.Folders?.CreateDatabase is { } folder)
         {
-            var config = dbMigrator.Configuration;
-            var createDatabaseFolder = config.Folders?.CreateDatabase;
-            var database = DbMigrator.Database;
+            var path = Wrap(config.SqlFilesDirectory, folder.Path);
+            var files = path.Exists
+                ? FileSystem.GetFiles(path, "*.sql", config.IgnoreDirectoryNames).OfType<FileInfo>().ToArray()
+                : [];
 
-            var path = Wrap(config.SqlFilesDirectory, createDatabaseFolder?.Path ?? "zz-xx-øø-definitely-does-not-exist");
-
-            if (createDatabaseFolder is not null && path.Exists)
+            if (files.Length > 0)
             {
-                //await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
+                var database = dbMigrator.Database;
                 var changeDropFolder = ChangeDropFolder(config, database.ServerName, database.DatabaseName);
-                databaseCreated = await ProcessWithoutLogging(
-                    config.SqlFilesDirectory,
-                    createDatabaseFolder,
-                    changeDropFolder,
-                    createDatabaseFolder.ConnectionType,
-                    createDatabaseFolder.TransactionHandling
-                );
+                var databaseCreated = await ProcessWithoutLogging(path, folder, files, changeDropFolder);
 
                 if (databaseCreated && !config.DryRun)
                 {
                     await DatabaseReadiness.Wait(database);
                 }
-            }
-            else
-            {
-                // Include runAfterCreateDatabase scripts in a preview of a new database.
-                databaseCreated = config.DryRun || await dbMigrator.CreateDatabase();
+
+                return databaseCreated;
             }
         }
-        return databaseCreated;
+
+        // Include runAfterCreateDatabase scripts in a preview of a new database.
+        return config.DryRun || await dbMigrator.CreateDatabase();
     }
 
     private static async Task RestoreDatabaseFromPath(string backupPath, IDbMigrator dbMigrator)
@@ -511,15 +504,10 @@ internal record GrateMigrator : IGrateMigrator
 
     }
 
-    private async ValueTask<bool> ProcessWithoutLogging(DirectoryInfo root, MigrationsFolder folder, string changeDropFolder,
-        ConnectionType connectionType, TransactionHandling transactionHandling)
+    private async ValueTask<bool> ProcessWithoutLogging(DirectoryInfo path, MigrationsFolder folder,
+        IEnumerable<FileInfo> files, string changeDropFolder)
     {
-        var path = Wrap(root, folder.Path);
-
-        await EnsureConnectionIsOpen(connectionType);
-
-        var pattern = "*.sql";
-        var files = FileSystem.GetFiles(path, pattern, DbMigrator.Configuration.IgnoreDirectoryNames);
+        await EnsureConnectionIsOpen(folder.ConnectionType);
 
         var anySqlRun = false;
 
@@ -533,7 +521,7 @@ internal record GrateMigrator : IGrateMigrator
             : string.Join('/', Path.GetRelativePath(path.ToString(), file.FullName).Split(Path.DirectorySeparatorChar));
 
             bool theSqlRan = await DbMigrator.RunSqlWithoutLogging(sql, fileNameToLog, DbMigrator.Configuration.Environment,
-                connectionType, transactionHandling);
+                folder.ConnectionType, folder.TransactionHandling);
 
             if (theSqlRan)
             {
