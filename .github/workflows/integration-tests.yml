@@ -83,6 +83,9 @@ jobs:
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
+    - name: Show GitHub Actions annotations for SQLite migrations
+      run: bash examples/ci-logging/smoke.sh "./publish/${{ matrix.arch }}/self-contained/grate"
+
     - name: Upload self-contained ${{ matrix.arch }}
       uses: actions/upload-artifact@v7
       with:

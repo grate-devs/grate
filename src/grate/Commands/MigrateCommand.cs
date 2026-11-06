@@ -47,6 +47,7 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(IgnoreDirectoryNames);
         Options.Add(UpToDateCheck);
         Options.Add(Verbosity);
+        Options.Add(LogFormat);
         Subcommands.Add(new SkillsCommand());
 
         // Obsolete options - kept so that grate keeps reporting helpful messages, but not bound.
@@ -65,6 +66,7 @@ internal sealed class MigrateCommand : RootCommand
     {
         // Preserve configuration defaults for optional values without a default value factory.
         var defaults = new CommandLineGrateConfiguration();
+        var logFormat = parseResult.GetValue(LogFormat) ?? "auto";
 
         return new CommandLineGrateConfiguration
         {
@@ -96,12 +98,22 @@ internal sealed class MigrateCommand : RootCommand
             Restore = parseResult.GetValue(Restore),
             IgnoreDirectoryNames = parseResult.GetValue(IgnoreDirectoryNames),
             UpToDateCheck = parseResult.GetValue(UpToDateCheck),
+            LogFormat = logFormat.ToLowerInvariant() is "azure-devops" or "azure" or "devops"
+                ? MigrationLogFormat.AzureDevOps
+                : Enum.Parse<MigrationLogFormat>(logFormat, ignoreCase: true),
             // Verbosity has no default value factory; when it isn't supplied keep the record default.
             Verbosity = parseResult.GetResult(Verbosity) is { Implicit: false }
                 ? parseResult.GetValue(Verbosity)
                 : defaults.Verbosity,
         };
     }
+
+    private readonly Option<string> LogFormat =
+        new Option<string>("--log-format")
+        {
+            Description = "Format migration logs for a terminal or CI runner.",
+            DefaultValueFactory = _ => "auto"
+        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure-devops", "teamcity", "azure", "devops");
 
     //REQUIRED OPTIONS
     private readonly Option<string> ConnectionString =
