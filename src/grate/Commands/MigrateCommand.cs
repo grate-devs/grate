@@ -174,7 +174,7 @@ internal sealed class MigrateCommand : RootCommand
     private readonly Option<DirectoryInfo> OutputPath =
         new("--outputPath", "-o", "--output")
         {
-            Description = "This is where everything related to the migration is stored. This includes any backups, all items that ran, permission dumps, logs, etc.",
+            Description = "Directory for migration artifacts such as copies of executed SQL scripts. To save console logs, redirect stdout and stderr.",
             DefaultValueFactory = _ => new DirectoryInfo(DefaultOutputPath)
         };
 

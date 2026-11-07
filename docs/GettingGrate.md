@@ -23,6 +23,8 @@ There's a `gratedevs/grate` Docker image published to [Docker Hub](https://hub.d
 
 The Docker image is built on Alpine Linux, making it lightweight and suitable for containerized environments. For more information about Alpine Linux support, see [Alpine Linux Support](AlpineLinuxSupport.md).
 
+For Azure Container Apps Jobs, see how to [capture console logs on a persistent volume](ConfigurationOptions/index.md#azure-container-apps-jobs).
+
 Start the sqlserver database 
 ```sh
 docker network create grate_network && docker run -e SA_PASSWORD=gs8j4AS7h87jHg -e ACCEPT_EULA=Y --name db --network grate_network -d mcr.microsoft.com/mssql/server:2019-latest

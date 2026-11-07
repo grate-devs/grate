@@ -157,8 +157,8 @@ Options:
   --database <database>                                                    OBSOLETE: Please specify the connection string instead
   -c, -cs, --connectionstring, --connstring <connectionstring> (REQUIRED)  You now provide an entire connection string. ServerName and Database are obsolete.
   -f, --files, --sqlfilesdirectory <sqlfilesdirectory>                     The directory where your SQL scripts are [default: .]
-  -o, --output, --outputPath <outputPath>                                  This is where everything related to the migration is stored. This includes any 
-                                                                           backups, all items that ran, permission dumps, logs, etc. [default: 
+  -o, --output, --outputPath <outputPath>                                  Directory for migration artifacts such as copies of executed SQL scripts.
+                                                                           To save console logs, redirect stdout and stderr. [default:
                                                                            /Users/erik/.local/share/grate]
   -s, --instance, --server, --servername <servername>                      OBSOLETE: Please specify the connection string instead.
   -a, -acs, -csa, --adminconnectionstring, --adminconnstring               The connection string for connecting to master, if you want to create the database.

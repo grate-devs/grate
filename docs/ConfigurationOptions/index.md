@@ -46,7 +46,7 @@ shows how to pass the string at runtime and optionally supply an admin connectio
 | -a<br>-acs<br>-csa<br>--adminconnectionstring<br>--adminconnstring &lt;adminconnectionstring&gt; | The value provided via --connectionstring, with the target database replaced with a database that can be assumed to be present. For example, "master" for SQL Server. | Used when creating a new database, rather than migrating an existing one. |
 | -f<br>--files<br>--sqlfilesdirectory &lt;sqlfilesdirectory&gt; | . (current directory) | The directory where your SQL scripts are located |
 | --folders | Default folders as described in [Getting started](../GettingStarted.md) | Folder configuration, see [Folder configuration](FolderConfiguration.md) for details. | 
-| -o<br>--output<br>--outputPath &lt;outputPath&gt; | %LOCALAPPDATA%/grate | This is where everything related to the migration is stored. This includes any backups, all items that ran, permission dumps, logs, etc. |
+| -o<br>--output<br>--outputPath &lt;outputPath&gt; | %LOCALAPPDATA%/grate | Directory for migration artifacts such as copies of executed SQL scripts. To save console logs, see [Capture console logs](#capture-console-logs). |
 | --accesstoken &lt;token&gt; | - | Specify an access token to use when connecting to SQL Server. |
 | -ct<br>--commandtimeout &lt;commandtimeout&gt; | 60 | This is the timeout in seconds when commands are run. This is not for admin commands or restore. |
 | -cta<br>--admincommandtimeout &lt;admincommandtimeout&gt; | 300 | This is the timeout in seconds when administration commands are run (except for restore, which has its own) |
@@ -94,6 +94,36 @@ applies its normal restore rules for any files you leave unmapped.
 In .NET, call `RestoreFrom(backupPath)` and
 `WithRestoreMoves(new RestoreFileMove(logicalName, destinationPath), ...)`
 on the `GrateConfigurationBuilder`.
+
+## Capture console logs
+
+Use shell redirection to save stdout and stderr in the same file. The shell
+returns grate's exit code for this command.
+
+```sh
+grate --connectionstring "$APP_CONNSTRING" --silent > grate.log 2>&1
+```
+
+### Azure Container Apps Jobs
+
+Use the published Docker image and override the job container's startup command
+in its template. Keep the existing migration environment variables (including
+`APP_CONNSTRING`) and SQL scripts at `/db`. Mount writable persistent storage
+such as an Azure Files share at `/output` so the log is available after the
+container exits. [Azure job template reference](https://learn.microsoft.com/en-us/azure/container-apps/azure-resource-manager-api-spec#container-apps-job)
+
+Set these fields on the job's container.
+
+```yaml
+command: ["/bin/sh", "-c"]
+args:
+  - 'exec /app/entrypoint.sh > /output/grate.log 2>&1'
+```
+
+`exec` runs the image's usual entrypoint in place of the shell, so the
+container keeps grate's exit code. The example overwrites `grate.log` on each
+start. Use distinct log paths for replicas or attempts that share the mount
+when you need to keep their logs.
 
 ## Migration logs in CI
 
