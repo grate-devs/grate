@@ -8,6 +8,7 @@ public sealed class CliInvocationTests
 {
     [Theory]
     [InlineData(new[] { "--help" }, "--connectionstring")]
+    [InlineData(new[] { "--help" }, "Directory for migration artifacts")]
     [InlineData(new[] { "--databasetype", "999", "--help" }, "--connectionstring")]
     [InlineData(new[] { "skills", "--help" }, "install")]
     [InlineData(new[] { "skills", "install", "--help" }, "--local")]
@@ -26,6 +27,13 @@ public sealed class CliInvocationTests
     [InlineData(new[] { "--connectionstring", "unused", "--commandtimeout", "invalid" }, "--commandtimeout")]
     [InlineData(new[] { "--connectionstring", "unused", "--log-format", "invalid" }, "'invalid'")]
     [InlineData(new[] { "--connectionstring", "unused", "--log-format", "1" }, "'1'")]
+    [InlineData(new[] { "--connectionstring", "unused", "--restore-move", "Data=/data/new.mdf" }, "require a backup path")]
+    [InlineData(new[] { "--connectionstring", "unused", "--databasetype", "sqlite", "--restore", "copy.bak", "--restore-move", "Data=/data/new.mdf" }, "supported only for SQL Server")]
+    [InlineData(new[] { "--connectionstring", "unused", "--restore", "copy.bak", "--restore-move", "missing-delimiter" }, "expects logical-name=destination-path")]
+    [InlineData(new[] { "--connectionstring", "unused", "--restore", "copy.bak", "--restore-move", "Data=new.mdf", "--restore-move" }, "Each --restore-move requires one")]
+    [InlineData(new[] { "--connectionstring", "unused", "--restore", "copy.bak", "--restore-move", "=new.mdf" }, "needs a logical name and a destination path")]
+    [InlineData(new[] { "--connectionstring", "unused", "--restore", "copy.bak", "--restore-move", "Data=first.mdf", "--restore-move", "Data=second.mdf" }, "mapped more than once")]
+    [InlineData(new[] { "--connectionstring", "unused", "--restore", "copy.bak", "--restore-move", "Data=same", "--restore-move", "Log=same" }, "used more than once")]
     public async Task Invalid_arguments_report_parse_errors_without_starting_a_migration(string[] arguments, string expectedDiagnostic)
     {
         var result = await Invoke(arguments);
