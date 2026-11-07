@@ -168,36 +168,56 @@ public record GrateConfiguration
     /// </summary>
     public IReadOnlyList<RestoreFileMove> RestoreMoves { get; init; } = [];
 
-    internal string? GetRestoreMoveError(bool isSqlServer)
+    internal string? ValidateRestoreMoves(bool supportsRestoreMoves)
     {
         if (RestoreMoves is null)
+        {
             return "Restore file mappings must be a list.";
+        }
+
         if (RestoreMoves.Count == 0)
+        {
             return null;
-        if (!isSqlServer)
+        }
+
+        if (!supportsRestoreMoves)
+        {
             return "Restore file mappings are supported only for SQL Server.";
+        }
+
         if (string.IsNullOrWhiteSpace(Restore))
+        {
             return "Restore file mappings require a backup path (--restore).";
+        }
 
         var names = new HashSet<string>(StringComparer.Ordinal);
         var paths = new HashSet<string>(StringComparer.Ordinal);
         foreach (var move in RestoreMoves)
         {
-            if (move is null || string.IsNullOrWhiteSpace(move.LogicalName) ||
-                string.IsNullOrWhiteSpace(move.DestinationPath) ||
-                move.LogicalName.Contains('\0') || move.DestinationPath.Contains('\0'))
+            if (move is null || !HasValidRestoreMoveValues(move))
             {
                 return "Each restore file mapping needs a logical name and a destination path.";
             }
 
             if (!names.Add(move.LogicalName))
+            {
                 return $"Restore file '{move.LogicalName}' is mapped more than once.";
+            }
+
             if (!paths.Add(move.DestinationPath))
+            {
                 return $"Restore destination '{move.DestinationPath}' is used more than once.";
+            }
         }
 
         return null;
     }
+
+    private static bool HasValidRestoreMoveValues(RestoreFileMove move) =>
+        !string.IsNullOrWhiteSpace(move.LogicalName) &&
+        !string.IsNullOrWhiteSpace(move.DestinationPath) &&
+        !move.LogicalName.Contains('\0') &&
+        !move.DestinationPath.Contains('\0');
 
     /// <summary>
     /// By default, scripts are ordered by relative path including subdirectories. This option searches subdirectories, but order is based on filename alone.

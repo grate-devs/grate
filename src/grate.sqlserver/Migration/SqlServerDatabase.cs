@@ -82,9 +82,14 @@ public record SqlServerDatabase : AnsiSqlDatabase
     // }
     public override async Task RestoreDatabase(string backupPath)
     {
-        var database = $"[{DatabaseName.Replace("]", "]]", StringComparison.Ordinal)}]";
-        var moves = string.Concat((Config?.RestoreMoves ?? []).Select(move =>
-            $", MOVE {RestoreLiteral(move.LogicalName)} TO {RestoreLiteral(move.DestinationPath)}"));
+        var databaseName = DatabaseName;
+        // ALTER DATABASE requires an identifier. QuoteIdentifier doubles any closing bracket in the name.
+        using var commandBuilder = new SqlCommandBuilder { QuotePrefix = "[", QuoteSuffix = "]" };
+        var quotedDatabaseName = commandBuilder.QuoteIdentifier(databaseName);
+
+        // RESTORE accepts parameters for the database and backup path, but MOVE requires string literals.
+        var moveClauses = string.Concat((Config?.RestoreMoves ?? []).Select(move =>
+            $", MOVE {QuoteRestoreLiteral(move.LogicalName)} TO {QuoteRestoreLiteral(move.DestinationPath)}"));
 
         using (new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
         {
@@ -97,22 +102,26 @@ public record SqlServerDatabase : AnsiSqlDatabase
                 cmd.CommandText =
                     $"""
                     USE [master];
-                    ALTER DATABASE {database} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-                    RESTORE DATABASE {database}
+                    ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                    RESTORE DATABASE @databaseName
                     FROM DISK = @backupPath
-                    WITH NOUNLOAD, STATS = 10, RECOVERY, REPLACE{moves};
+                    WITH NOUNLOAD, STATS = 10, RECOVERY, REPLACE{moveClauses};
                     """;
+                AddParameter(cmd, "@databaseName", databaseName);
                 AddParameter(cmd, "@backupPath", backupPath);
                 restoreStarted = true;
                 await cmd.ExecuteNonQueryAsync();
                 await ExecuteNonQuery(AdminConnection,
-                    $"USE [master]; ALTER DATABASE {database} SET MULTI_USER WITH ROLLBACK IMMEDIATE;", timeout: null);
+                    $"USE [master]; ALTER DATABASE {quotedDatabaseName} SET MULTI_USER WITH ROLLBACK IMMEDIATE;", timeout: null);
             }
             catch (Exception ex)
             {
                 Logger.LogDebug(ex, "Got error: {ErrorMessage}", ex.Message);
                 if (restoreStarted)
-                    await RestoreMultiUserAccess(database);
+                {
+                    await RestoreMultiUserAccess(databaseName, quotedDatabaseName);
+                }
+
                 throw;
             }
             finally
@@ -126,7 +135,7 @@ public record SqlServerDatabase : AnsiSqlDatabase
         Logger.LogInformation("Database {DbName} successfully restored from path {Path}.", DatabaseName, backupPath);
     }
 
-    private async Task RestoreMultiUserAccess(string database)
+    private async Task RestoreMultiUserAccess(string databaseName, string quotedDatabaseName)
     {
         try
         {
@@ -141,9 +150,9 @@ public record SqlServerDatabase : AnsiSqlDatabase
                 $"""
                 USE [master];
                 IF EXISTS (SELECT 1 FROM sys.databases WHERE name = @databaseName AND user_access = 1)
-                    ALTER DATABASE {database} SET MULTI_USER WITH ROLLBACK IMMEDIATE;
+                    ALTER DATABASE {quotedDatabaseName} SET MULTI_USER WITH ROLLBACK IMMEDIATE;
                 """;
-            AddParameter(cmd, "@databaseName", DatabaseName);
+            AddParameter(cmd, "@databaseName", databaseName);
             await cmd.ExecuteNonQueryAsync();
         }
         catch (Exception ex)
@@ -152,8 +161,7 @@ public record SqlServerDatabase : AnsiSqlDatabase
         }
     }
 
-    // SQL Server accepts a variable for FROM DISK, but MOVE requires string literals.
-    private static string RestoreLiteral(string value) => $"N'{value.Replace("'", "''", StringComparison.Ordinal)}'";
+    private static string QuoteRestoreLiteral(string value) => $"N'{value.Replace("'", "''", StringComparison.Ordinal)}'";
 
     private static void AddParameter(DbCommand command, string name, string value)
     {

@@ -59,10 +59,11 @@ internal sealed class MigrateCommand : RootCommand
         {
             var folders = result.GetValue(Folders);
             var config = GetConfiguration(result, folders?.Configuration);
-            var restoreMoveError = config.GetRestoreMoveError(config.DatabaseType == Configuration.DatabaseType.SQLServer);
-            if (restoreMoveError is not null)
+            var supportsRestoreMoves = config.DatabaseType == Configuration.DatabaseType.SQLServer;
+            var validationMessage = config.ValidateRestoreMoves(supportsRestoreMoves);
+            if (validationMessage is not null)
             {
-                result.InvocationConfiguration.Error.WriteLine(restoreMoveError);
+                result.InvocationConfiguration.Error.WriteLine(validationMessage);
                 return 1;
             }
             if (folders is { } parsedFolders)
@@ -404,7 +405,9 @@ the last one will expect the folders to be named 'folder1', 'folder2', and 'fold
                 result =>
                 {
                     if (result.IdentifierTokenCount != result.Tokens.Count)
+                    {
                         result.AddError("Each --restore-move requires one logical-name=destination-path argument.");
+                    }
                 }
             }
         };

@@ -15,7 +15,9 @@ public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputH
     public async Task Restores_both_files_and_migrates(bool moveFiles)
     {
         var source = TestConfig.RandomDatabase();
-        var target = TestConfig.RandomDatabase();
+        var targetPrefix = TestConfig.RandomDatabase();
+        var target = moveFiles ? $"{targetPrefix}] mapped" : targetPrefix;
+        var quotedTarget = moveFiles ? $"[{targetPrefix}]] mapped]" : $"[{targetPrefix}]";
         var backupPath = $"/var/opt/mssql/backup/{source} owner's copy.bak";
         var originalData = $"/var/opt/mssql/data/{source}.mdf";
         var originalLog = $"/var/opt/mssql/data/{source}_log.ldf";
@@ -40,9 +42,13 @@ public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputH
 
             // With MOVE, keep the original files in use so either missing mapping fails.
             if (moveFiles)
-                await admin.ExecuteAsync($"CREATE DATABASE [{target}];");
+            {
+                await admin.ExecuteAsync($"CREATE DATABASE {quotedTarget};");
+            }
             else
+            {
                 await Context.DropDatabase(source);
+            }
 
             var scripts = root.CreateSubdirectory("scripts");
             WriteSql(scripts, "up", scriptName, "SELECT id INTO dbo.MigratedData FROM dbo.BackupData;");
@@ -52,7 +58,9 @@ public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputH
                 .WithOutputFolder(root.CreateSubdirectory("output"))
                 .RestoreFrom(backupPath);
             if (moveFiles)
+            {
                 builder.WithRestoreMoves(new("Owner's data", dataPath), new("Owner's log", logPath));
+            }
 
             await using (var migrator = Context.Migrator.WithConfiguration(builder.Build()))
             {
@@ -71,7 +79,7 @@ public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputH
         {
             try
             {
-                await Context.DropDatabase(target);
+                await admin.ExecuteAsync($"DROP DATABASE IF EXISTS {quotedTarget};");
                 await Context.DropDatabase(source);
             }
             finally

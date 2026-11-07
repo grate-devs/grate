@@ -33,10 +33,12 @@ internal record DbMigrator : IDbMigrator
     {
         if (Configuration.RestoreMoves is not { Count: 0 })
         {
-            var error = Configuration.GetRestoreMoveError(
-                string.Equals(Database.DatabaseType, "sqlserver", StringComparison.OrdinalIgnoreCase));
-            if (error is not null)
-                throw new ArgumentException(error, nameof(Configuration));
+            var supportsRestoreMoves = string.Equals(Database.DatabaseType, "sqlserver", StringComparison.OrdinalIgnoreCase);
+            var validationMessage = Configuration.ValidateRestoreMoves(supportsRestoreMoves);
+            if (validationMessage is not null)
+            {
+                throw new ArgumentException(validationMessage, nameof(Configuration));
+            }
         }
 
         return Database.InitializeConnections(Configuration);
