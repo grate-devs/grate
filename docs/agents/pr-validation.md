@@ -17,6 +17,12 @@ the same immutable run can be reused. API failure or missing context fails close
 Workflow cancellation may cancel the aggregate; a cancelled required check blocks
 merging. CodeQL and dependency-security checks remain separate controls.
 
+This aggregate covers the required producers in `ci.yml`. The separate
+heavyweight `Integration tests` workflow retains its existing advisory
+`continue-on-error` lanes and disabled Docker execution steps. Path-specific
+skill, installer and release-contract workflows retain their separate checks;
+they are not silently promoted into required workflows by this proposal.
+
 ## Permissions and maintenance
 
 The aggregate uses `contents: read` and `actions: read`, the ordinary
