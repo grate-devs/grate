@@ -1,29 +1,15 @@
-# Build, security analysis, and the full database/runtime test matrix for PRs.
+# TEST ONLY: synthetic producers exercise the real PR validation scripts.
+# No real build, test, package, native platform, or security coverage is claimed.
+# This workflow targets only the isolated fixture base; never merge it to main.
 name: CI
-
 on:
-  # PR updates already include branch pushes. Running both events doubles the
-  # database suites and CodeQL work; use workflow_dispatch for pre-PR checks.
   pull_request:
-    branches:
-      - main
-      - ci/pr-validation-fixture-base
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
+    branches: [ci/pr-validation-fixture-base]
 permissions:
   contents: read
-
-# Replace obsolete test runs without letting a manual branch run cancel a PR's
-# merge-ref validation. Publishing on main is handled by build.yml separately.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   validation-policy:
     name: PR validation policy
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -39,7 +25,7 @@ jobs:
   pr-validation:
     # Keep this name stable: the proposed main ruleset consumes it.
     name: PR validation
-    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
+    if: always()
     needs: [validation-policy, build-code, test, packages, standalone, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -58,447 +44,126 @@ jobs:
       run: ./scripts/ci/Invoke-PRValidation.ps1
 
   build-code:
-    name: Build
+    name: "Build"
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v7
-    - name: Setup .NET 11 RC3 and earlier
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
-      with:
-         global-json-file: global.json
-         dotnet-version: |
-          8.0.x
-          9.0.x
-          10.0.x
-    - name: Restore dependencies
-      run: |
-       dotnet restore -r linux-x64 grate.sln
-    - name: Build
-      run: dotnet build --no-restore --no-self-contained -r linux-x64 src/grate/grate.csproj -c release
-
-
-  analyze:
-    name: Analyze Code Security
-    runs-on: windows-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v7
-
-    - name: Setup .NET 11 RC3 and earlier
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
-      with:
-        global-json-file: global.json
-        dotnet-version: |
-          8.0.x
-          9.0.x
-          10.0.x
-    # Initializes the CodeQL tools for scanning.
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4.39.2
-
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v4.39.2
-
-    # Autobuild selects C#; trace the Windows-only MSI action explicitly too.
-    - name: Build native MSI upgrade action for CodeQL
+    - name: "Restore dependencies"
       shell: pwsh
-      run: ./installers/msi/native/Build-UpgradeActions.ps1 -Architecture x64 -OutputDirectory "$env:RUNNER_TEMP/codeql-msi-upgrade-actions"
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4.39.2
-
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Build"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC NEGATIVE: producer failure with green report.'; exit 1"
   test:
-    name: Run tests
-
-    runs-on: ${{ matrix.os }}
-    # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
-    timeout-minutes: ${{ matrix.category == 'Oracle' && 45 || 30 }}
-    #needs: build-code
-
+    name: "Run tests"
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            category: Basic_tests
-            test_filter: ''
-          - os: ubuntu-latest
-            category: SqlServer
-            test_filter: ''
-          - os: ubuntu-latest
-            category: SqlServerCaseSensitive
-            test_filter: ''
-          - os: ubuntu-latest
-            category: PostgreSQL
-            test_filter: ''
-          - os: ubuntu-latest
-            category: MariaDB
-            test_filter: ''
-          - os: ubuntu-latest
-            category: Sqlite
-            test_filter: ''
-          - os: ubuntu-latest
-            category: Oracle
-            test_filter: ''
-          - os: windows-latest
-            category: Basic_tests
-            test_filter: ''
-          - os: windows-latest
-            category: Sqlite
-            test_filter: ''
-          - os: windows-latest
-            category: SqlServer
-            test_filter: SqlServer.Basic_tests.*
-          - os: windows-latest
-            category: SqlServerCaseSensitive
-            test_filter: SqlServerCaseSensitive.Basic_tests.*
-          - os: windows-latest
-            category: MariaDB
-            test_filter: MariaDB.Basic_tests.*
-          - os: windows-latest
-            category: Oracle
-            test_filter: Oracle.Basic_tests.*
-        #category: [ "Basic_tests", "Sqlite"  ]
-
+        - {"os": "ubuntu-latest", "category": "Basic_tests", "test_filter": ""}
+        - {"os": "ubuntu-latest", "category": "SqlServer", "test_filter": ""}
+        - {"os": "ubuntu-latest", "category": "SqlServerCaseSensitive", "test_filter": ""}
+        - {"os": "ubuntu-latest", "category": "PostgreSQL", "test_filter": ""}
+        - {"os": "ubuntu-latest", "category": "MariaDB", "test_filter": ""}
+        - {"os": "ubuntu-latest", "category": "Sqlite", "test_filter": ""}
+        - {"os": "ubuntu-latest", "category": "Oracle", "test_filter": ""}
+        - {"os": "windows-latest", "category": "Basic_tests", "test_filter": ""}
+        - {"os": "windows-latest", "category": "Sqlite", "test_filter": ""}
+        - {"os": "windows-latest", "category": "SqlServer", "test_filter": "SqlServer.Basic_tests.*"}
+        - {"os": "windows-latest", "category": "SqlServerCaseSensitive", "test_filter": "SqlServerCaseSensitive.Basic_tests.*"}
+        - {"os": "windows-latest", "category": "MariaDB", "test_filter": "MariaDB.Basic_tests.*"}
+        - {"os": "windows-latest", "category": "Oracle", "test_filter": "Oracle.Basic_tests.*"}
     steps:
-    - uses: actions/checkout@v7
-    - name: Setup .NET 11 RC3 and earlier
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
-      with:
-        global-json-file: global.json
-        dotnet-version: |
-          8.0.x
-          9.0.x
-          10.0.x
-    - name: Test on Linux
-      if: runner.os == 'Linux'
-      shell: bash
-      # SDK 11 multi-TFM discovery requires an absolute project-file path.
-      # The Sqlite lane also executes the SQL examples shipped with the skill.
-      # Avoid starting a database container for each TFM concurrently on the same runner.
-      run: |
-        # Keep host state and database crash logs even if a runtime never starts.
-        timeout --kill-after=5s "$MONITOR_TIMEOUT" bash .github/scripts/monitor-test-containers.sh \
-          "/tmp/test-results/${{ matrix.category }}" &
-        diagnostics_pid=$!
-        stop_diagnostics() {
-          test_exit_code=$?
-          trap - EXIT
-          kill "$diagnostics_pid" 2>/dev/null || true
-          wait "$diagnostics_pid" 2>/dev/null || true
-          exit "$test_exit_code"
-        }
-        trap stop_diagnostics EXIT
-
-        dotnet test \
-        --project "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
-        --max-parallel-test-modules 1 \
-        --stop-on-fail on \
-        --long-running 60 \
-        --timeout "$TEST_TIMEOUT" \
-        --results-directory /tmp/test-results/${{ matrix.category }} \
-        --report-xunit-trx \
-        --coverage \
-        --coverage-output-format xml
-      env:
-        LogLevel: Warning
-        TZ: UTC
-        # The 35-minute budget can expire during the fourth sequential Oracle TFM.
-        # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
-        TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
-        MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
-
-    - name: Test on Windows
-      if: runner.os == 'Windows'
+    - name: "Test on Linux"
+      if: matrix.os == 'ubuntu-latest'
       shell: pwsh
-      run: |
-        $outDir = Join-Path "${{ runner.temp }}" "test-results/${{ matrix.category }}"
-        New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-
-        $testArgs = @(
-          "--project", "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj",
-          "--max-parallel-test-modules", "1",
-          "--minimum-expected-tests", "1",
-          "--stop-on-fail", "on",
-          "--long-running", "60",
-          "--timeout", "20m",
-          "--results-directory", $outDir,
-          "--report-xunit-trx",
-          "--xunit-info",
-          "--coverage",
-          "--coverage-output-format", "xml"
-        )
-
-        if ("${{ matrix.test_filter }}") {
-          $testArgs += @("--filter-class", "${{ matrix.test_filter }}")
-        }
-
-        dotnet test @testArgs
-      env:
-        LogLevel: Warning
-        TZ: UTC
-
-    - name: Upload Unit Test Results
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
-        path: |
-          ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}/
-        retention-days: 1
-
-
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Test on Windows"
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
   report:
-     # Diagnostic output only. PR validation reads test results directly;
-     # successful report generation never overrides a failed test producer.
-     runs-on: ubuntu-latest
-     name: Create test report
-     needs: test
-     if: always()
-
-     steps:
-      - name: Download XML test reports
-        uses: actions/download-artifact@v8
-        with:
-          path: test-results
-          pattern: '* XML test results'
-
-      - name: Setup .NET # Required to execute ReportGenerator
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Create HTML test report
-        uses: danielpalme/ReportGenerator-GitHub-Action@v5
-        with:
-          reports: 'test-results/**/*.xml'
-          targetdir: 'test-outputs' # REQUIRED # The directory where the generated report should be saved.
-          reporttypes: 'HtmlInline;Cobertura' # The output formats and scope (separated by semicolon) Values: Badges, Clover, Cobertura, OpenCover, CsvSummary, Html, Html_Dark, Html_Light, Html_BlueRed, HtmlChart, HtmlInline, HtmlInline_AzurePipelines, HtmlInline_AzurePipelines_Dark, HtmlInline_AzurePipelines_Light, HtmlSummary, Html_BlueRed_Summary, JsonSummary, Latex, LatexSummary, lcov, MarkdownSummary, MarkdownSummaryGithub, MarkdownDeltaSummary, MHtml, SvgChart, SonarQube, TeamCitySummary, TextSummary, TextDeltaSummary, Xml, XmlSummary
-          sourcedirs: '' # Optional directories which contain the corresponding source code (separated by semicolon). The source directories are used if coverage report contains classes without path information.
-          historydir: '' # Optional directory for storing persistent coverage information. Can be used in future reports to show coverage evolution.
-          workingdir: '' # Optional working directory. If available, the targetdir, sourcedirs and historydir are interpreted relative to the working directory (only if not specified as absolute paths).'
-          plugins: '' # Optional plugin files for custom reports or custom history storage (separated by semicolon).
-          assemblyfilters: '+*' # Optional list of assemblies that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
-          classfilters: '+*' # Optional list of classes that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
-          filefilters: '+*' # Optional list of files that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
-          verbosity: 'Info' # The verbosity level of the log messages. Values: Verbose, Info, Warning, Error, Off
-          title: 'grate unit tests' # Optional title.
-          tag: '${{ github.run_number }}_${{ github.run_id }}' # Optional tag or build version.
-          license: '' # Optional license for PRO version. Get your license here: https://reportgenerator.io/pro
-          customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
-          toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
-
-      # - name: Install smink
-      #   run: |
-      #     BASEURL="https://github.com/erikbra/smink/releases/download/"
-      #     VERSION="0.3.0"
-
-      #     INSTALL_DIR="/tmp/smink"
-      #     SMINK="${INSTALL_DIR}/smink"
-
-      #     FILENAME="smink-linux-x64-${VERSION}.zip"
-      #     FULL_URL="${BASEURL}${VERSION}/${FILENAME}"
-      #     DOWNLOAD_DIR="/tmp/smink-download"
-
-      #     DOWNLOAD_FILE="${DOWNLOAD_DIR}/${FILENAME}"
-
-      #     test -f "${SMINK}" && \
-      #     echo "smink already installed - not installing" || \
-      #     echo "Installing smink v ${VERSION}" && \
-      #     (test -d "${DOWNLOAD_DIR}" || mkdir -p "${DOWNLOAD_DIR}") && \
-      #     (test -d "${INSTALL_DIR}" || mkdir -p "${INSTALL_DIR}") && \
-      #     (test -f "${DOWNLOAD_FILE}" || curl -o "${DOWNLOAD_FILE}" -sL "${FULL_URL}") && \
-      #     unzip -o "${DOWNLOAD_FILE}" -d "${INSTALL_DIR}" 
-
-      #     chmod u+x "${SMINK}"
-
-      # - name: Create HTML test report
-      #   run: |
-
-      #     XML_DIR='/tmp/xml'
-      #     REPORT_DIR='/tmp/test-results'
-
-      #     test -d $XML_DIR  || mkdir $XML_DIR
-      #     find "test-results" -name '*.xml' -exec cp "{}" $XML_DIR \;
-      #     echo "Found the following test results files:"
-      #     ls -1 $XML_DIR
-
-      #     test -d $REPORT_DIR || mkdir $REPORT_DIR
-      #     echo "Running smink"
-      #     /tmp/smink/smink "${XML_DIR}/*.xml" "${REPORT_DIR}/test-report.html" --title "grate unit tests"
-
-      - name: Upload HTML test report
-        uses: actions/upload-artifact@v7
-        with:
-          name: HTML test report
-          path: |
-            test-outputs/*.html
-          retention-days: 1
-
-
-
+    name: Create test report
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    steps:
+    - name: "Create synthetic successful report"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
   packages:
-    name: NuGet libraries and installed tool
+    name: "NuGet libraries and installed tool"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          global-json-file: global.json
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
-      - name: Check standalone verification command contract
-        shell: pwsh
-        run: ./scripts/Test-VerifyPackages.Tests.ps1
-      - name: Verify packages across supported frameworks
-        shell: pwsh
-        run: ./scripts/verify-packages.ps1 -Kind Packages -OutputDirectory "${{ runner.temp }}/grate-packages"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: grate-nuget-packages
-          retention-days: 3
-          path: |
-            ${{ runner.temp }}/grate-packages/packages/*
-            ${{ runner.temp }}/grate-packages/tool-runtimes.txt
-
+    - name: "Check standalone verification command contract"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Verify packages across supported frameworks"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
   standalone:
-    name: CLI ${{ matrix.rid }}
-    timeout-minutes: 30
-    env:
-      # Publish and package the same fixture identity; MSI rejects mismatched payloads.
-      STANDALONE_VERSION: '0.0.1'
+    name: "CLI ${{ matrix.rid }}"
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { rid: win-x64, os: windows-latest, smoke: true }
-          - { rid: win-x86, os: windows-latest, smoke: true }
-          - { rid: win-arm64, os: windows-11-arm, smoke: true }
-          - { rid: linux-x64, os: ubuntu-latest, smoke: true }
-          - { rid: linux-arm64, os: ubuntu-24.04-arm, smoke: true }
-          # musl execution is covered by native Alpine container checks below.
-          - { rid: linux-musl-x64, os: ubuntu-latest, smoke: false }
-          - { rid: linux-musl-arm64, os: ubuntu-24.04-arm, smoke: false }
-          - { rid: osx-x64, os: macos-15-intel, smoke: true }
-          - { rid: osx-arm64, os: macos-15, smoke: true }
-    runs-on: ${{ matrix.os }}
+        - {"rid": "win-x64"}
+        - {"rid": "win-x86"}
+        - {"rid": "win-arm64"}
+        - {"rid": "linux-x64"}
+        - {"rid": "linux-arm64"}
+        - {"rid": "linux-musl-x64"}
+        - {"rid": "linux-musl-arm64"}
+        - {"rid": "osx-x64"}
+        - {"rid": "osx-arm64"}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          global-json-file: global.json
-      - name: Verify self-contained runtime and execution
-        shell: pwsh
-        env:
-          RUN_SMOKE_TEST: ${{ matrix.smoke }}
-        run: ./scripts/verify-packages.ps1 -Kind Standalone -RuntimeIdentifier '${{ matrix.rid }}' -StandaloneVersion $env:STANDALONE_VERSION -OutputDirectory "${{ runner.temp }}/grate-cli" -RunSmokeTest:($env:RUN_SMOKE_TEST -eq 'true')
-      - name: Check per-user MSI authoring regressions
-        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
-        shell: pwsh
-        run: |
-          ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
-          ./installers/msi/Test-InstallerLifecycle.Assertions.Tests.ps1
-      - name: Build MSI from verified Windows binary
-        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
-        shell: pwsh
-        run: ./installers/msi/Create-Installer.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate.exe" -Version $env:STANDALONE_VERSION -arch ('${{ matrix.rid }}' -replace 'win-', '')
-      - name: Check verified Windows MSI metadata
-        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
-        shell: pwsh
-        run: ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -ExpectedArchitecture ('${{ matrix.rid }}' -replace 'win-', '')
-      - name: Verify installed MSI, major upgrade and uninstall
-        if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
-        shell: pwsh
-        run: ./installers/msi/Test-InstallerLifecycle.ps1 -MsiPath "./installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -PublishedExecutable "${{ runner.temp }}/grate-cli/published/grate.exe" -Architecture ('${{ matrix.rid }}' -replace 'win-', '') -OutputDirectory "${{ runner.temp }}/grate-msi-lifecycle"
-      - name: Build Debian packages from verified Linux binary
-        if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          $architecture = '${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64'
-          foreach ($version in @('0.0.1', '0.0.2')) {
-            ./installers/deb/Create-Package.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate" -Version $version -arch $architecture
-          }
-      - name: Verify Debian installation, package upgrade and purge
-        if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
-        shell: pwsh
-        run: |
-          $architecture = '${{ matrix.rid }}' -replace 'linux-', '' -replace 'x64', 'amd64'
-          ./installers/deb/Test-PackageLifecycle.ps1 `
-            -InitialPackage "installers/deb/grate_0.0.1-1_${architecture}.deb" `
-            -UpgradePackage "installers/deb/grate_0.0.2-1_${architecture}.deb" `
-            -Architecture $architecture -InitialVersion '0.0.1-1' -UpgradeVersion '0.0.2-1' `
-            -OutputDirectory "${{ runner.temp }}/grate-debian-lifecycle"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: grate-package-${{ matrix.rid }}
-          retention-days: 3
-          path: |
-            ${{ runner.temp }}/grate-cli/published/*
-            ${{ runner.temp }}/grate-cli/*.json
-            installers/msi/tmp/*.msi
-            installers/deb/*.deb
-            ${{ runner.temp }}/grate-msi-lifecycle/
-            ${{ runner.temp }}/grate-debian-lifecycle/
-            !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/
-
+    - name: "Verify self-contained runtime and execution"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Check per-user MSI authoring regressions"
+      if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Build MSI from verified Windows binary"
+      if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Check verified Windows MSI metadata"
+      if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Verify installed MSI, major upgrade and uninstall"
+      if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Build Debian packages from verified Linux binary"
+      if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Verify Debian installation, package upgrade and purge"
+      if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
   docker:
-    name: Alpine ${{ matrix.arch }}
-    timeout-minutes: 20
+    name: "Alpine ${{ matrix.arch }}"
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, os: ubuntu-latest }
-          - { arch: arm64, os: ubuntu-24.04-arm }
-    runs-on: ${{ matrix.os }}
+        - {"arch": "amd64"}
+        - {"arch": "arm64"}
     steps:
-      - uses: actions/checkout@v7
-      - name: Build native image for verification
-        run: docker build --build-arg VERSION=0.0.1 -f installers/docker/Dockerfile -t grate-package-test:local .
-      - name: Verify Alpine globalization, migration and bundled skill
-        shell: bash
-        run: |
-          set -euo pipefail
-          work="${RUNNER_TEMP}/grate-docker-smoke"
-          mkdir -p "$work/sql/up" "$work/output" "$work/skill"
-          echo 'CREATE TABLE package_smoke (id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES (1); CREATE TEMP TABLE package_check (value INTEGER CHECK(value = 1)); INSERT INTO package_check SELECT CASE WHEN COUNT(*) = 1 AND MIN(id) = 1 THEN 1 ELSE 0 END FROM package_smoke;' > "$work/sql/up/001_create.sql"
-          docker run --rm --entrypoint /app/grate grate-package-test:local --help
-          for _ in 1 2; do
-            docker run --rm -e LANG=nb_NO.UTF-8 -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local \
-              --databasetype sqlite --connectionstring 'Data Source=/smoke/smoke.db' --files /smoke/sql --output /smoke/output --silent
-          done
-          test -s "$work/smoke.db"
-          test "$(find "$work/output" -path '*/itemsRan/up/001_create.sql' | wc -l)" -eq 1
-          docker run --rm -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local skills install --local --path /smoke/skill
-          test -s "$work/skill/.agents/skills/use-grate/SKILL.md"
-      - name: Ensure SQLite client for entrypoint verification
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          if (!(Get-Command sqlite3 -ErrorAction SilentlyContinue)) {
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends sqlite3
-          }
-          sqlite3 --version
-      - name: Verify default image entrypoint
-        shell: pwsh
-        run: ./installers/docker/Test-Entrypoint.ps1 -Image grate-package-test:local -OutputDirectory "${{ runner.temp }}/grate-entrypoint-results"
-      - name: Upload entrypoint diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: grate-entrypoint-${{ matrix.arch }}
-          retention-days: 3
-          path: ${{ runner.temp }}/grate-entrypoint-results/
+    - name: "Build native image for verification"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Verify Alpine globalization, migration and bundled skill"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Ensure SQLite client for entrypoint verification"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+    - name: "Verify default image entrypoint"
+      shell: pwsh
+      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
