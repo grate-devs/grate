@@ -27,10 +27,6 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(CommandTimeout);
         Options.Add(CommandTimeoutAdmin);
         Options.Add(DatabaseType);
-#if SQLITE_ONLY
-        DatabaseType.CompletionSources.Clear();
-        DatabaseType.CompletionSources.Add("SQLite");
-#endif
         Options.Add(RunInTransaction);
         Options.Add(Environments);
         Options.Add(SchemaName);
@@ -274,32 +270,7 @@ the last one will expect the folders to be named 'folder1', 'folder2', and 'fold
         };
 
     //DATABASE OPTIONS
-#if SQLITE_ONLY
-    private readonly Option<DatabaseType> DatabaseType =
-        new("--databasetype", "--dt", "--dbt")
-        {
-            Description = "This build supports SQLite only.",
-            HelpName = "SQLite",
-            DefaultValueFactory = _ => Configuration.DatabaseType.SQLite,
-            CustomParser = result =>
-            {
-                if (result.Tokens.Count != 1 ||
-                    !Enum.TryParse<Configuration.DatabaseType>(result.Tokens[0].Value, ignoreCase: true, out var databaseType) ||
-                    databaseType != Configuration.DatabaseType.SQLite)
-                {
-                    result.AddError("This build supports SQLite only. Use the all-in-one grate distribution for other databases.");
-                }
-                return Configuration.DatabaseType.SQLite;
-            }
-        };
-#else
-    private readonly Option<DatabaseType> DatabaseType =
-        new("--databasetype", "--dt", "--dbt")
-        {
-            Description = "TELLS GRATE WHAT TYPE OF DATABASE IT IS RUNNING ON.",
-            DefaultValueFactory = _ => Configuration.DatabaseType.SQLServer
-        };
-#endif
+    private readonly Option<DatabaseType> DatabaseType = DatabaseProviders.CreateDatabaseTypeOption();
 
     private readonly Option<bool> RunInTransaction =
         new("--transaction", "--trx", "-t")

@@ -1,152 +1,134 @@
-# SQLite-only CLI and .NET tool distributions
+# Database-specific CLI and .NET tool distributions
 
-Offer a ready-to-run SQLite-only download and an installable .NET tool alongside
-the existing all-in-one releases. Both SQLite formats would carry the same
-migration engine and SQLite provider. The broader provider architecture has its
-own discussion. [Distribution issue #909](https://github.com/grate-devs/grate/issues/909) ·
+Offer ready-to-run downloads and installable .NET tools for individual databases
+alongside the existing all-in-one releases. The distribution choices are tracked
+in #909, and the broader provider architecture has its own discussion.
+[Distribution issue #909](https://github.com/grate-devs/grate/issues/909) ·
 [Architecture issue #891](https://github.com/grate-devs/grate/issues/891)
 
-The Linux x64 PoC builds both variants, installs the tools from local packages,
-runs SQLite migrations and compares artifact sizes. [Run the PoC](sqlite-only-poc/README.md)
+The Linux x64 PoC builds `All`, `SQLite`, `SQLServer` and `MariaDB`, installs
+the tools from local packages, runs migrations against the respective databases
+and compares artifact sizes. [Run the PoC](slim-distributions-poc/README.md)
 
-## What the build does today
+## Existing release build
 
-- The CLI project references all five provider projects and directly references
-  `Microsoft.Data.SqlClient` and `Microsoft.Data.SqlClient.Extensions.Azure`.
-  `Program.cs` selects the provider during service registration.
-  `MigrateCommand` parses `--databasetype` and defaults to SQL Server.
-  [CLI project](../../src/grate/grate.csproj) ·
-  [Provider selection](../../src/grate/Program.cs) ·
-  [Migration command](../../src/grate/Commands/MigrateCommand.cs)
-- The release workflow uses that project to publish a self-contained
-  single-file binary per runtime identifier (RID), currently targeting
-  `net11.0`, and to pack the framework-dependent `grate` tool with assets
-  for each supported target framework. It builds the six library packages
-  separately. The SQLite provider library already references `grate.core`
-  and `Microsoft.Data.Sqlite`. [Release workflow](../../.github/workflows/build.yml) ·
-  [Framework targets](../../Directory.Build.props) ·
-  [SQLite provider project](../../src/grate.sqlite/grate.sqlite.csproj)
-- The release workflow checks the exact GitHub asset list before generating
-  `checksums.sha256` and `release-manifest.json`. The NuGet publisher checks
-  for exactly seven package IDs at the release version. CI exercises both
-  standalone and installed-tool builds. [CI workflow](../../.github/workflows/ci.yml) ·
+- The default CLI build references all five provider projects and directly
+  references `Microsoft.Data.SqlClient` and its Azure extensions. The CLI
+  defaults to SQL Server. [CLI project](../../src/grate/grate.csproj)
+- The release workflow publishes self-contained, single-file ZIPs per runtime
+  identifier (RID), currently targeting `net11.0`. It also packs the
+  framework-dependent `grate` tool with assets for each supported framework
+  and builds six provider/core library packages separately.
+  [Release workflow](../../.github/workflows/build.yml) ·
+  [Framework targets](../../Directory.Build.props)
+- The release workflow validates its expected GitHub asset list before generating
+  `checksums.sha256` and `release-manifest.json`. The NuGet publisher validates
+  seven package IDs at the release version. CI exercises standalone and installed
+  tool builds. [CI workflow](../../.github/workflows/ci.yml) ·
   [Package verification script](../../scripts/verify-packages.ps1)
 
-## Proposed packages
+## Package choices demonstrated by the PoC
 
-| Format | All-in-one | SQLite-only |
-| --- | --- | --- |
-| GitHub release ZIP | `grate-<rid>-self-contained-<version>.zip` | `grate-sqlite-<rid>-self-contained-<version>.zip` |
-| Executable inside ZIP | `grate` or `grate.exe` | `grate` or `grate.exe`, extracted to a separate directory |
-| NuGet tool ID and installed command | `grate` | `grate-sqlite` |
-| Default database | SQL Server | SQLite |
+| Format | All-in-one | SQLite | SQL Server | MariaDB |
+| --- | --- | --- | --- | --- |
+| NuGet tool ID | `grate` | `grate-sqlite` | `grate-sqlserver` | `grate-mariadb` |
+| Installed command | `grate` | `grate` | `grate` | `grate` |
+| Default database | SQL Server | SQLite | SQL Server | MariaDB |
+| ZIP prefix | `grate-` | `grate-sqlite-` | `grate-sqlserver-` | `grate-mariadb-` |
 
-Users would install the tool with `dotnet tool install --global grate-sqlite`.
-The distinct command lets both tools be installed side by side. The standalone binary keeps the same executable name so an existing SQLite script
-can swap the binary by path. Both forms accept explicit `--databasetype sqlite`.
-The SQLite build should show SQLite as its only supported database in help and
-reject another database type with a clear error and a nonzero exit code before
-initializing any database services. Keep the all-in-one provider selection and
-default as they are today. [.NET tool packaging](https://learn.microsoft.com/en-us/dotnet/core/tools/global-tools-how-to-create)
-
-The first set of ZIPs could cover `linux-x64`, `win-x64` and `osx-arm64`.
-That adds three downloads to the release page and gives us a native smoke test
-on each OS. Reuse the native macOS Arm64 runner for that bundle and use the
-existing framework targets for the new .NET tool. Keep MSI, Debian, Docker
-and the existing package-manager channels on the all-in-one build during the
-pilot.
-
-## Select providers at build time
-
-Keep one CLI project with a build property such as `GrateDistribution`.
-Default to `All` and fail the build for unknown values. When the value is
-`SQLite`, include the SQLite project reference and condition out the four
-other provider references and the two direct SQL Server client references.
-Leave the shared CLI and existing SQLite dependency graph in place, including
-the native SQLite assets and bundled `use-grate` skill. A runtime flag alone
-would leave the unused clients in the package.
-
-Move the provider-specific registrations out of `Program.cs` into two small
-compile-time alternatives in the CLI project. Each supplies the supported
-database types, the default and the registration logic. Let `MigrateCommand`
-use that same information for help and validation. This keeps provider code
-that needs the omitted assemblies out of the SQLite compilation and keeps the
-migration command, logging and bootstrap path shared. A separate SQLite
-executable project could also express the reference graph, but would require
-extracting a shared CLI host or maintaining two entry points.
-
-Set `PackageId` and `ToolCommandName` to `grate-sqlite` for the SQLite build,
-keeping the assembly name `grate`. Include a tool README that explains the
-SQLite-only scope and points to the all-in-one tool and the `grate.sqlite`
-library. Use separate MSBuild artifact roots for each variant and build form
-so one restore or build cannot reuse the other variant's `obj` or `bin`.
-[MSBuild artifact layout](https://learn.microsoft.com/en-us/dotnet/core/sdk/artifacts-output)
-
-These commands illustrate the proposed project changes using a local candidate
-version. CI would use the existing version outputs and SDK pin.
+Each ZIP follows `<prefix><rid>-self-contained-<version>.zip` and contains
+`grate` or `grate.exe`. Users select a package, then invoke the same command.
 
 ```sh
-out="$PWD/artifacts/sqlite-pilot"
+dotnet tool install --global grate-mariadb
+grate --connectionstring "Server=localhost;Database=example;User ID=example;Password=example"
+```
+
+A global tool installation or a project tool manifest selects one variant.
+Switching a global installation requires uninstalling the current package before
+installing another variant with the same command name. The PoC uses separate
+tool paths to verify every package. [.NET tool packaging](https://learn.microsoft.com/en-us/dotnet/core/tools/global-tools-how-to-create)
+
+Each slim build accepts explicit selection of its database as well as its default.
+Help and completions expose the selected provider, and an unsupported provider
+produces a parse error before database services are constructed.
+
+## Build-time provider selection
+
+The CLI project uses `GrateDistribution` with `All` as the default. The three
+slim profiles select their provider project and dependencies. For example, the
+SQLite profile excludes the direct SQL Server client references as well as
+the four other provider projects.
+
+`DatabaseProviders` owns the compiled provider list, database option construction
+and service registration. Its imports, provider list entries and switch arms each
+have an individual `ALL_DATABASES || <PROVIDER>_ONLY` condition. The single-provider
+default, help, completions and validation derive from that list. This lets
+`MigrateCommand` and `Program` delegate provider configuration to one place.
+[Provider configuration](../../src/grate/Configuration/DatabaseProviders.cs)
+
+The package ID identifies the variant while `ToolCommandName` and the assembly
+name are both `grate`. Each package includes a matching README. Migration
+commands, logging and bundled skills use shared CLI code. Separate MSBuild
+artifact roots keep the variants' restore and build outputs isolated.
+[MSBuild artifact layout](https://learn.microsoft.com/en-us/dotnet/core/sdk/artifacts-output)
+
+These commands build the SQL Server variant using a local candidate version.
+CI would use the existing version outputs and SDK pin.
+
+```sh
+out="$PWD/artifacts/sqlserver-pilot"
 
 dotnet publish src/grate/grate.csproj -c Release -f net11.0 -r linux-x64 \
-  --self-contained -p:TargetFrameworks=net11.0 -p:GrateDistribution=SQLite \
+  --self-contained -p:TargetFrameworks=net11.0 -p:GrateDistribution=SQLServer \
   -p:Version=0.0.1 -p:ArtifactsPath="$out/standalone-build" -o "$out/publish"
 
 dotnet pack src/grate/grate.csproj -c Release \
-  -p:PackAsTool=true -p:SelfContained=false -p:GrateDistribution=SQLite \
+  -p:PackAsTool=true -p:SelfContained=false -p:GrateDistribution=SQLServer \
   -p:Version=0.0.1 -p:PackageVersion=0.0.1-pilot \
   -p:ArtifactsPath="$out/tool-build" -o "$out/feed"
 ```
 
-## Verify the packages before adding them to releases
+## Verification and size comparison
 
-1. Build the two SQLite formats as unpublished CI artifacts first. Extend the
-   existing package smoke checks to exercise the extracted ZIP executable and
-   the installed tool. Install the exact tool version from an isolated local
-   feed using a temporary tool path and an explicit NuGet config.
-   [Tool installation options](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-tool-install)
-2. On each proposed ZIP platform, run a real migration against a fresh SQLite
-   file with the default database type, then rerun with `--databasetype sqlite`
-   and check that the schema, seeded data and history show the one-time script
-   ran once. Exercise the installed tool with each supported target framework
-   on Linux and smoke-test its native SQLite loading on Windows and macOS.
-   Check the unsupported-provider error and bundled skill installation on
-   both packaged forms. Keep the existing all-in-one checks and verify that
-   both tool commands resolve to their own installations.
-3. Inspect the tool payload and dependency manifests for each framework, and
-   the standalone bundle contents or recorded bundle inputs for each RID.
-   Require SQLite's managed and native assets and exclude the other provider
-   assemblies and their exclusive clients, including SqlClient, Npgsql,
-   MySqlConnector and Oracle Managed Data Access. Verify the native SQLite
-   version loaded by the migration against the existing security floor.
-4. Compare ZIP bytes per RID and `.nupkg` bytes against all-in-one builds from
-   the same commit, version and SDK. Keep the compression and runtime settings
-   matched. Record bytes and percentage saved for each format. The standalone
-   ZIP still includes .NET, so measure its savings separately from the tool.
+The PoC exercises every slim variant's extracted ZIP and installed tool against
+its database, then reruns the migration with explicit provider selection. A
+separate direct-client program queries data, script hashes/history and migration
+errors after both invocations. The all-in-one packages exercise all three
+databases using the same fixture and checks.
 
-## Add the pilot to the release contract
+Each tool framework's metadata must declare command `grate`. Dependency checks
+require the selected provider and client libraries, and exclude other provider
+assemblies and clients from slim builds. Installed tool package bytes must
+match the local build. Bundled skill installation is exercised as well.
 
-Once the pilot scope is agreed, add the SQLite builds to the existing
-`build.yml` release path using the version from `set-version-number`.
-Give their Actions artifacts distinct names. Run the artifact checks against
-the candidates that will be uploaded and have `release-ready` require
-their successful results. Add the selected ZIPs to its expected asset list
-so the same checksums and manifest cover both variants. Expand the NuGet
-allowlist from seven IDs to eight and validate the complete set and versions
-before the first push. Use the existing release-only publication conditions
-and promote the checked files from that run.
+Executable, ZIP and NuGet package sizes are compared using matching versions,
+SDK, frameworks and compression. Standalone ZIPs include .NET, while tool
+packages include four framework targets and their runtime assets. Measurements
+and execution limits belong in the PR verification record. The runnable checks
+and reproduction instructions are in the PoC directory.
+[PoC verification](slim-distributions-poc/README.md)
 
-Confirm availability of the `grate-sqlite` package ID and that the existing
-NuGet trusted-publishing policy permits creating it and publishing subsequent
-versions. Update the installation guide and release runbook when the pilot
-ships. [Release configuration](../ReleaseConfiguration.md) ·
+## Add selected variants to the release contract
+
+Once the released variants and platform coverage are agreed in #909, add them to
+the existing release workflow with distinct Actions artifacts and the version
+from `set-version-number`. Run the packaged checks against the candidates
+that will be uploaded, and have `release-ready` require their successful results.
+Add the ZIPs to the expected asset list so checksums and the manifest cover them.
+
+Expand the NuGet allowlist to include the selected tool IDs. Shipping all three
+slim tools would produce ten packages with the existing six libraries and
+all-in-one tool. Validate the complete set and versions before publication.
+Confirm availability of the new package IDs and that the NuGet trusted-publishing
+policy permits their creation and subsequent versions.
+[Release configuration](../ReleaseConfiguration.md) ·
 [NuGet trusted publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
 
 ## Decisions for #909
 
-- Are three ZIP platforms the right starting point? Linux x64 alone would
-  keep the initial release smaller. Matching every current RID would give
-  users the same platform coverage and increase the native test matrix.
-- Is the measured download saving worth the extra artifacts and support
-  surface? Use the SQLite pilot to decide which, if any, additional providers
-  or distribution channels warrant their own variants.
+- Which of the demonstrated variants should ship, and on which RIDs? The PoC
+  covers Linux x64. Windows x64 and macOS Arm64 would extend the native test
+  matrix and release asset list.
+- Do the download savings justify maintaining more packages? Use the measurements
+  to decide which providers and additional distribution channels warrant variants.

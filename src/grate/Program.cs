@@ -4,13 +4,6 @@ using grate.Commands;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;
-using grate.sqlite.DependencyInjection;
-#if !SQLITE_ONLY
-using grate.mariadb.DependencyInjection;
-using grate.oracle.DependencyInjection;
-using grate.postgresql.DependencyInjection;
-using grate.sqlserver.DependencyInjection;
-#endif
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
@@ -141,22 +134,8 @@ public static class Program
             }
         });
 
-#if SQLITE_ONLY
-        services.AddGrateWithSqlite(config);
-#else
-        services = config.DatabaseType switch
-        {
-            DatabaseType.MariaDB => services.AddGrateWithMariaDb(config),
-            DatabaseType.Oracle => services.AddGrateWithOracle(config),
-            DatabaseType.PostgreSQL => services.AddGrateWithPostgreSQL(config),
-            DatabaseType.SQLServer => services.AddGrateWithSqlServer(config),
-            DatabaseType.SQLite => services.AddGrateWithSqlite(config),
-            _ => throw new ArgumentOutOfRangeException(nameof(config), 
-                config.DatabaseType, 
-                "Unknown target database type: " + config.DatabaseType)
-        };
+        services = DatabaseProviders.Register(services, config);
 
-#endif
         return services.BuildServiceProvider();
     }
 }

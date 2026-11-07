@@ -4,7 +4,7 @@ Run SQL migrations against SQLite with the SQLite-only grate command-line tool.
 
 ```sh
 dotnet tool install --global grate-sqlite
-grate-sqlite --connectionstring "Data Source=example.db" --files ./sql --silent
+grate --connectionstring "Data Source=example.db" --files ./sql --silent
 ```
 
 SQLite is the default database. Explicit `--databasetype sqlite` is also supported.
