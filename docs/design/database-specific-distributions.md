@@ -109,6 +109,173 @@ and execution limits belong in the PR verification record. The runnable checks
 and reproduction instructions are in the PoC directory.
 [PoC verification](slim-distributions-poc/README.md)
 
+## Other distribution channels
+
+The same four profiles can feed the other channels. The proposed names below
+show SQLite as the example. SQL Server and MariaDB use the corresponding
+`sqlserver` and `mariadb` identifiers. These are channel design proposals for
+#909. The current executable PoC covers Linux x64 ZIPs and NuGet tools.
+
+| Channel | Existing all-in-one identity | Proposed SQLite selection | Installed command |
+| --- | --- | --- | --- |
+| GitHub ZIP | `grate-<rid>-self-contained-<version>.zip` | `grate-sqlite-<rid>-self-contained-<version>.zip` | `grate` |
+| Docker | `gratedevs/grate:<version>` and `:latest` | `gratedevs/grate:sqlite-<version>` and stable alias `:sqlite` | `/app/grate` |
+| Debian download | `grate_<version>_<arch>.deb` | `grate-sqlite_<version>_<arch>.deb`, package `grate-sqlite` | `/usr/bin/grate` |
+| MSI download | `grate-msi-win-<arch>-<version>.msi` | `grate-sqlite-msi-win-<arch>-<version>.msi` | `grate.exe` |
+| WinGet manifest | Generator's `grate-devs.grate` identity | Proposed ID `grate-devs.grate.SQLite` | `grate` |
+| Chocolatey | Package `grate` | Package `grate-sqlite` | `grate` |
+| Homebrew cask | `erikbra/cask/grate` | Proposed `erikbra/cask/grate-sqlite` | `grate` |
+| Homebrew formula | Source-built `grate` template | Proposed formula `grate-sqlite`, subject to channel acceptance | `grate` |
+
+ZIP users select a directory, and container users select an image. For package
+managers, propose one active grate variant per managed installation. Document
+removing the installed variant before selecting another, and detect conflicting
+variants before changing shared files, shims or PATH. Each manager controls
+its own installation records. Document how users verify the selected `grate` when
+mixing installation methods.
+
+### ZIPs and Docker
+
+Extend standalone publishing with the distribution dimension and reuse the
+matching verified output in downstream installers. Match the current RID
+support explicitly. The Linux x64 PoC provides execution evidence for that RID.
+Each additional Windows, macOS, Arm64 and musl build needs its own packaged
+checks. Release downloads should group assets by provider and platform so users
+can find one artifact without scanning the complete matrix.
+
+Docker uses Alpine and musl builds for amd64/arm64. Pass `GrateDistribution`
+through the Docker build into `dotnet publish`. Keep one checked OCI archive
+and multi-platform digest per profile. Add a distribution label so verification
+can match the selected profile to its payload and expected platforms.
+[Docker build](../../installers/docker/Dockerfile)
+
+The entrypoint currently supplies `--databasetype=sqlserver` whenever
+`DATABASE_TYPE` is unset or empty. Change it to supply that argument only when
+the environment variable has a value. The compiled CLI then supplies the default
+for its profile. Verify environment overrides and argument forwarding against
+each profile, including an unsupported database selection.
+[Entrypoint](../../installers/docker/entrypoint.sh)
+
+Use profile-prefixed tags such as `sqlite-<version>`, `sqlserver-<version>`
+and `mariadb-<version>`. A suffix such as `<version>-sqlite` can collide with
+a valid all-in-one SemVer prerelease tag. Stable releases can update `:sqlite`,
+`:sqlserver` and `:mariadb`. Prereleases publish only their versioned tags.
+Keep version parsing separate from tag rendering, and validate complete tags.
+The proposal adds new variants under the canonical repository. The existing
+compatibility-image policy continues to govern the all-in-one image.
+[Tag policy](../../installers/docker/release_tags.py) ·
+[Digest-preserving publication](../../installers/docker/RELEASE.md)
+
+### Debian
+
+Parameterize the package ID, description, document paths, maintainer scripts and
+release filename. Each slim package installs its selected binary at
+`/usr/bin/grate`. Declare conflicts between the grate package variants and
+exercise explicit removal/installation when switching. A dependency requiring
+the full provider set should continue to select the all-in-one package. Keep
+Debian version ordering, including the existing prerelease conversion, separate
+from the provider name. The current channel publishes downloadable .deb files.
+[Debian recipe](../../installers/deb/Create-Package.ps1) ·
+[Package relationships](https://www.debian.org/doc/debian-policy/ch-relationships.html)
+
+Give each package its own `/usr/share/doc/<package>` content. The common binary
+and manpage paths participate in the package-conflict policy. Test install,
+same-variant upgrade, remove and purge with the matching database. Then test a
+variant switch while preserving migration files, database contents and history.
+[Existing lifecycle test](../../installers/deb/Verify-PackageLifecycle.sh)
+
+### MSI, WinGet and Chocolatey
+
+MSI needs a distribution-aware identity contract. Propose a stable UpgradeCode
+for each new profile/architecture family, and a ProductCode derived from
+profile, architecture and full release version. Preserve the existing all-in-one
+identity derivation and family. Give new families their own display names,
+installation paths, registry keys and component identities. Reject another installed grate variant
+in the relevant installation scope before changing files or PATH. Switching
+variants is an explicit uninstall/install operation, including at the same
+version. This also requires checking how the legacy-product detection applies
+to each profile. [Current identity contract](../../installers/msi/identity-contract.json) ·
+[MSI template](../../installers/msi/grate.wxs) ·
+[ProductCode](https://learn.microsoft.com/en-us/windows/win32/msi/productcode) ·
+[UpgradeCode](https://learn.microsoft.com/en-us/windows/win32/msi/upgradecode)
+
+WinGet can expose each variant under a separate package ID and generate its
+URLs, hashes, ProductCode and upgrade metadata from that variant's final MSI.
+The current generator also handles portable ZIPs, whose aliases need the same
+single-command policy. Test install, upgrade, uninstall and source correlation
+per ID, followed by switching between variants. Publishing candidates to the
+community repository remains a channel acceptance step.
+[Manifest generator](../../installers/winget/Create-Installer.ps1) ·
+[Existing identity migration](../../installers/winget/MIGRATION.md) ·
+[WinGet manifest identity](https://learn.microsoft.com/en-us/windows/package-manager/package/manifest)
+
+Chocolatey can use one package ID per variant, embedding the corresponding
+verified Windows x64 executable. Parameterize the nuspec, output directory and
+verification URL/hash. Its common `grate.exe` shim requires an install-time
+check for another installed grate package before accepting a variant. Test that
+upgrade and uninstall operate on the selected package's shim and payload.
+[Chocolatey recipe](../../installers/chocolatey/Create-Package.ps1) ·
+[Executable shimming](https://docs.chocolatey.org/en-us/features/shim/)
+
+### Homebrew
+
+For the existing cask channel, generate a cask per selected profile from its final
+Intel and Arm64 macOS ZIPs. Keep `binary "grate"` and declare conflicts with
+other grate casks. Verify the interaction with a linked grate formula as well.
+Update both the manual cask generator and automated tap-update path to select
+the profile's archives and hashes.
+[Cask generator](../../installers/homebrew/Create-Cask.ps1) ·
+[Automated cask update](../../scripts/release/update_homebrew_cask.py) ·
+[Cask conflict declarations](https://docs.brew.sh/Cask-Cookbook#stanza-conflicts_with)
+
+For the source-built formula, pass `-p:GrateDistribution=<profile>` through
+its existing publish command and expose `grate` from the formula's own
+`libexec`. Use formula conflict declarations for competing grate commands.
+Separate slim formulae require upstream acceptance. Their placement should be
+agreed with the channel maintainers alongside the current source-formula work.
+The existing formula test runs SQLite, so SQL Server and MariaDB variants need
+an appropriate database verification arrangement before claiming formula
+coverage. [Formula template](../../installers/homebrew/grate.rb.in) ·
+[Homebrew channel plan](../../installers/homebrew/README.md) ·
+[Formula conflicts](https://docs.brew.sh/Formula-Cookbook#specifying-conflicts-with-other-formulae)
+
+### Release and verification cost
+
+Use one profile catalog for names, CLI build properties, supported providers and
+package-manager identities. Have builders and release validation consume the
+selected channel/profile matrix. Installer jobs should wrap the matching checked
+binary from that run. Docker musl and Homebrew source builds retain their own
+build and verification paths. Record the profile in artifact metadata so a
+correct filename alone cannot select an all-in-one payload for a slim package.
+
+If all four profiles covered every current platform, the primary output counts
+would grow as follows. This is a planning comparison for choosing coverage.
+
+| Output | All-in-one today | Four profiles at current coverage |
+| --- | ---: | ---: |
+| Standalone ZIPs, nine RIDs | 9 | 36 |
+| MSI, x64/Arm64 | 2 | 8 |
+| Debian, amd64/Arm64 | 2 | 8 |
+| NuGet tools | 1 | 4 |
+| Docker multi-platform images | 1 | 4 |
+
+The ZIP/MSI/Debian release inventory would therefore grow from 13 to 52 files,
+plus checksum and manifest files. Measure installer and image download sizes in
+MB independently. The Linux glibc ZIP measurements do not establish Alpine
+image sizes or Windows/macOS installer savings.
+
+The existing MSI, Debian, Docker-entrypoint and Homebrew tests use SQLite.
+Retain that fixture for All/SQLite and use SQL Server or MariaDB for their slim
+variants. Every channel needs a real migration/rerun through its installed entry
+point, unsupported-provider rejection, bundled-skill verification, and clean
+upgrade/uninstall behavior. Bind those checks to the artifacts being released.
+[Package lifecycle checks](../Packaging.md#package-lifecycle-checks-in-ci)
+
+A next PoC can extend the existing Linux setup to Docker musl-x64 and Debian
+amd64 for the three providers. The Windows installer/identity chain and macOS
+Homebrew validation then have explicit native-runner work. Select which of those
+channels and profiles should ship through #909.
+
 ## Add selected variants to the release contract
 
 Once the released variants and platform coverage are agreed in #909, add them to
