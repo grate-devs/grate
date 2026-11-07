@@ -134,7 +134,7 @@ public static class Program
             }
         });
 
-        services = DatabaseProviders.Register(services, config);
+        services = services.AddGrateDatabase(config);
 
         return services.BuildServiceProvider();
     }

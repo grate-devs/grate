@@ -57,4 +57,4 @@ MariaDB test data live in the disposable containers during verification.
 
 Keep point-in-time outputs in local artifacts or the PR verification record.
 The proposal covers the larger release discussion.
-[Distribution proposal](../sqlite-only-distributions.md)
+[Distribution proposal](../database-specific-distributions.md)

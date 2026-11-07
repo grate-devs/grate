@@ -70,7 +70,8 @@ internal static class DatabaseProviders
         return option;
     }
 
-    internal static IServiceCollection Register(IServiceCollection services, CommandLineGrateConfiguration config) =>
+    internal static IServiceCollection AddGrateDatabase(
+        this IServiceCollection services, CommandLineGrateConfiguration config) =>
         config.DatabaseType switch
         {
 #if ALL_DATABASES || MARIADB_ONLY
