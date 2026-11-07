@@ -138,6 +138,10 @@ jobs:
           8.0.x
           9.0.x
           10.0.x
+    - name: Test container diagnostic monitor contracts
+      if: runner.os == 'Linux' && matrix.category == 'Basic_tests'
+      shell: pwsh
+      run: ./.github/scripts/monitor-test-containers.Tests.ps1
     - name: Test on Linux
       if: runner.os == 'Linux'
       shell: bash
@@ -146,8 +150,8 @@ jobs:
       # Avoid starting a database container for each TFM concurrently on the same runner.
       run: |
         # Keep host state and database crash logs even if a runtime never starts.
-        timeout --kill-after=5s "$MONITOR_TIMEOUT" bash .github/scripts/monitor-test-containers.sh \
-          "/tmp/test-results/${{ matrix.category }}" &
+        timeout --kill-after=5s "$MONITOR_TIMEOUT" pwsh -NoLogo -NoProfile -File .github/scripts/monitor-test-containers.ps1 \
+          -ResultsDirectory "/tmp/test-results/${{ matrix.category }}" &
         diagnostics_pid=$!
         stop_diagnostics() {
           test_exit_code=$?

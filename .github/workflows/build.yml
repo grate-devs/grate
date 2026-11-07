@@ -112,6 +112,9 @@ jobs:
       run: ./scripts/release/Run-Tests.ps1
     - shell: pwsh
       run: ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
+    - name: Test Debian package lifecycle orchestration
+      shell: pwsh
+      run: ./installers/deb/Test-PackageLifecycle.Tests.ps1
 
   build-netcore-tool:
     needs: set-version-number

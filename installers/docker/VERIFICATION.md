@@ -13,8 +13,6 @@ Run from the repository root with PowerShell 7:
 ```sh
 pwsh -File scripts/release/Run-Tests.ps1 -Path installers/docker/tests
 pwsh -File scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
-bash -n build-docker-local.sh
-shellcheck build-docker-local.sh
 pwsh -File scripts/release/check_docker_oci_copy.ps1
 ```
 
@@ -36,7 +34,7 @@ image's advertised architectures.
 ## Application images
 
 Build the selected source on each architecture being claimed, using
-`installers/docker/Dockerfile` or `build-docker-local.sh`. Record the resulting
+`installers/docker/Dockerfile` or `build-docker-local.ps1`. Record the resulting
 image digest. Verify `--help`, a representative database migration, an unchanged
 rerun and bundled skill installation. The matching Docker integration suites
 exercise database effects and migration history; follow

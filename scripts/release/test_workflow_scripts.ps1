@@ -1,14 +1,14 @@
 #!/usr/bin/env pwsh
 . "$PSScriptRoot/workflow_test_helpers.ps1"
 $checked = 0
-foreach ($name in @('build.yml', 'docker-access-check.yml', 'docker-distribution.yml', 'winget-validation.yml')) {
+foreach ($name in @('build.yml', 'ci.yml', 'integration-tests.yml', 'docker-access-check.yml', 'docker-distribution.yml', 'winget-validation.yml')) {
     $workflow = Read-Workflow $name
     foreach ($jobName in $workflow.jobs.Keys) {
         $job = $workflow.jobs[$jobName]
         foreach ($step in $job.steps) {
             if (!$step.run) { continue }
             Assert-Policy ($step.run -notmatch '\bpython(?:3)?\b|\.py\b') "Python caller remains in $name/$jobName."
-            foreach ($match in [regex]::Matches($step.run, '(?:\./)?(?:scripts|installers)/[\w./-]+\.ps1')) {
+            foreach ($match in [regex]::Matches($step.run, '(?:\./)?(?:\.github/scripts|scripts|installers|examples)/[\w./-]+\.ps1|(?:\./)?build-docker-local\.ps1')) {
                 Assert-Policy (Test-Path -LiteralPath "$repositoryRoot/$($match.Value)" -PathType Leaf) "Missing workflow script: $($match.Value)"
             }
             $shell = $step.shell

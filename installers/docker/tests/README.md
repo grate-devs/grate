@@ -9,11 +9,10 @@ pwsh -File scripts/release/Run-Tests.ps1 -Path installers/docker/tests
 | File | Purpose |
 | --- | --- |
 | `test_release_tags.ps1` | Checks stable/prerelease tag selection and CLI outputs |
-| `test_local_build.ps1` | Exercises `build-docker-local.sh` with fake Docker/GitVersion commands, including invocation outside the checkout |
+| `test_local_build.ps1` | Exercises `build-docker-local.ps1` with fake Docker/GitVersion commands, including invocation outside the checkout |
 | `check_local_registry.ps1` | Optional real Buildx check using synthetic images and a temporary loopback registry |
 
-The unit tests use temporary fixtures and do not need a Docker daemon. The local
-Bash build test uses POSIX executable shims and reports a skip on Windows.
+The unit tests use temporary fixtures and PowerShell command shims and do not need a Docker daemon.
 `pwsh -File installers/docker/tests/check_local_registry.ps1` requires Docker and
 Buildx, creates local registry/builder/network resources and removes them on
 exit. It does not authenticate to or publish to Docker Hub.

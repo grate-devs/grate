@@ -20,6 +20,12 @@ docker build -f installers/docker/Dockerfile -t grate-local:tests .
 | [RELEASE.md](RELEASE.md) | Publication identities, digest-preserving promotion and recovery |
 | [VERIFICATION.md](VERIFICATION.md) | Repeatable image and release verification procedures |
 
+`entrypoint.sh` remains a small POSIX shell runtime launcher: the application
+image does not include PowerShell. Host-side build and verification scripts use
+PowerShell 7, including `build-docker-local.ps1` in the repository root. Use
+`-Amd64`, `-Arm64`, or `-Platform linux/amd64` to load a single-platform image;
+the default builds both platforms without loading or publishing.
+
 The normal entrypoint needs `APP_CONNSTRING`, reads scripts from `/db` and writes
 output to `/output`. To check help without connecting to a database, use
 `docker run --rm --entrypoint /app/grate grate-local:tests --help`.

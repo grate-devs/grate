@@ -92,6 +92,13 @@ Use native PowerShell parameters, stop on errors, and propagate failures from
 external commands. Update workflow callers, documentation, and relevant tests
 when converting or renaming scripts. Keep SQL migration files in SQL.
 
+The only shell-script exceptions are the small runtime launchers
+`installers/docker/entrypoint.sh`, `examples/docker/my-entrypoint.sh`, and
+`examples/k8s/multitenancy/script/migrate.sh`. Their container images do not
+include PowerShell. Keep these launchers in POSIX shell unless changing that
+runtime dependency is explicitly requested. Use PowerShell for host-side
+development, CI and test orchestration, including Docker container tests.
+
 ## Keep verification output out of git
 
 Keep point-in-time logs, test reports, API observations, migration plans and other

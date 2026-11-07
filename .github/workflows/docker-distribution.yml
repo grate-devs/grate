@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/docker-*.yml'
       - '.github/workflows/build.yml'
-      - 'build-docker-local.sh'
+      - 'build-docker-local.ps1'
       - 'installers/docker/**'
       - 'scripts/release/**'
   workflow_dispatch:
@@ -33,7 +33,12 @@ jobs:
         shell: pwsh
         run: ./scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
       - name: Check local helper syntax
-        run: bash -n build-docker-local.sh
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $null = [Management.Automation.Language.Parser]::ParseFile("$PWD/build-docker-local.ps1", [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw ($errors.Message -join '; ') }
       - name: Verify digest preservation using local files without registry publication
         shell: pwsh
         run: |
