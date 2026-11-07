@@ -25,6 +25,7 @@ public abstract record AnsiSqlDatabase : IDatabase
     private DbConnection? _connection;
     private DbConnection? _adminConnection;
     private readonly ISyntax _syntax;
+    private readonly AsyncLocal<string?> _scriptName = new();
 
     public void SetLogger(ILogger logger) => Logger = logger;
 
@@ -50,8 +51,9 @@ public abstract record AnsiSqlDatabase : IDatabase
         ScriptsRunTableName = original.ScriptsRunTableName;
         ScriptsRunErrorsTableName = original.ScriptsRunErrorsTableName;
 
-        // Copies own their connections, history cache and pending writes.
+        // Copies own their connections, history cache, pending writes and script context.
         _deferredWrites = new();
+        _scriptName = new();
         // The active connection is selected by SetDefaultConnectionActive before use.
         ActiveConnection = default!;
     }
@@ -471,9 +473,29 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
         var connection = GetDbConnection(connectionType);
 
         await Open(connection);
-        await ExecuteNonQuery(connection, sql, timeout);
+        await ExecuteScriptBatch(connection, sql, timeout, _scriptName.Value);
     }
 
+    protected virtual Task ExecuteScriptBatch(DbConnection connection, string sql, int? timeout, string? scriptName) =>
+        ExecuteNonQuery(connection, sql, timeout);
+
+    // Keep script context local to execution without changing IDatabase.RunSql dispatch.
+    internal IDisposable BeginScript(string scriptName) => new ScriptNameScope(_scriptName, scriptName);
+
+    private sealed class ScriptNameScope : IDisposable
+    {
+        private readonly AsyncLocal<string?> _scriptName;
+        private readonly string? _previous;
+
+        public ScriptNameScope(AsyncLocal<string?> scriptName, string current)
+        {
+            _scriptName = scriptName;
+            _previous = scriptName.Value;
+            scriptName.Value = current;
+        }
+
+        public void Dispose() => _scriptName.Value = _previous;
+    }
 
     private DbConnection GetDbConnection(ConnectionType connectionType) =>
         connectionType switch

@@ -74,6 +74,13 @@ shows how to pass the string at runtime and optionally supply an admin connectio
 | -?<br>-h<br>--help | - |  Show help and usage information | 
 
 
+## Messages from SQL Server scripts
+
+Use `--verbosity=Debug` (or `Trace`) to see SQL Server `PRINT` output and
+other informational messages from migration scripts. Grate logs them at
+`Debug` with the script name. The default `Information` level keeps these
+messages hidden. SQL errors still fail the migration.
+
 ## Migration logs in CI
 
 `--log-format=auto` selects a format once when the CLI starts a migration.
