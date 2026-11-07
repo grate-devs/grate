@@ -2,11 +2,16 @@
 name: CI
 
 on:
-  # PR updates already include branch pushes. Running both events doubles the
-  # database suites and CodeQL work; use workflow_dispatch for pre-PR checks.
+  # Feature branches are validated through PRs; main also needs a CodeQL baseline.
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
+  schedule:
+    # Refresh the main baseline with new queries without rerunning the test matrix.
+    - cron: '23 5 * * 1'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -21,6 +26,7 @@ concurrency:
 
 jobs:
   build-code:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     name: Build
     runs-on: ubuntu-latest
     steps:
@@ -76,6 +82,7 @@ jobs:
       uses: github/codeql-action/analyze@v4.39.2
 
   test:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     name: Run tests
 
     runs-on: ${{ matrix.os }}
@@ -220,7 +227,7 @@ jobs:
      runs-on: ubuntu-latest
      name: Create test report
      needs: test
-     if: always()
+     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
 
      steps:
       - name: Download XML test reports
@@ -304,6 +311,7 @@ jobs:
 
 
   packages:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     name: NuGet libraries and installed tool
     runs-on: ubuntu-latest
     steps:
@@ -331,6 +339,7 @@ jobs:
             ${{ runner.temp }}/grate-packages/tool-runtimes.txt
 
   standalone:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     name: CLI ${{ matrix.rid }}
     timeout-minutes: 30
     env:
@@ -414,6 +423,7 @@ jobs:
             !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/
 
   docker:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     name: Alpine ${{ matrix.arch }}
     timeout-minutes: 20
     strategy:

@@ -1,0 +1,48 @@
+name: Dependency security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '43 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime, development, unknown
+          warn-only: false
+          comment-summary-in-pr: never
+          show-openssf-scorecard: false
+
+  nuget-audit:
+    name: NuGet dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+        with:
+          global-json-file: global.json
+      - name: Verify dependency security policy
+        shell: pwsh
+        run: ./scripts/security/Test-DependencySecurityPolicy.ps1
+      - name: Audit resolved direct and transitive NuGet dependencies
+        shell: pwsh
+        run: ./scripts/security/Test-NuGetDependencies.ps1
