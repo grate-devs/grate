@@ -30,6 +30,33 @@ names per package and invocation. The test account needs database creation right
 python3 docs/design/slim-distributions-poc/verify.py --output "$PWD/artifacts/slim-poc"
 ```
 
+## Docker and Debian comparison
+
+Run the packaging mode from the repository root with Python 3.9+, Docker and
+a fresh output directory.
+
+```sh
+bash docs/design/slim-distributions-poc/run.sh artifacts/slim-packaging packaging
+```
+
+This builds local Linux amd64 images using the real Alpine Dockerfile and .deb
+packages using the existing Debian recipe, for All, SQLite, SQLServer and
+MariaDB. It runs Docker migrations through the normal entrypoint and Debian
+migrations through the installed `/usr/bin/grate`. Each migration is rerun and
+its data/history is queried by the same independent database checker used by
+the CLI PoC. The test also exercises package conflicts and purge behavior.
+
+The CLI build uses the pinned .NET 11 SDK. Debian archive assembly uses a native
+Linux packaging container, with the payload architecture explicitly set to
+amd64. The installed packages and Docker images execute as Linux amd64, using
+emulation on Apple Silicon.
+
+Record Docker's reported image size separately from the compressed `docker save`
+archive and the .deb size. The gzip image archive is a local transfer artifact.
+Registry transfer size depends on registry layer compression and which layers
+the client already has. Keep all measured sizes and reductions
+in the PR record, with MB used for the human-readable tables.
+
 ## What it checks
 
 - Build each standalone Linux x64 binary with the existing `net11.0`

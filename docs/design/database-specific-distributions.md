@@ -8,7 +8,9 @@ in #909, and the broader provider architecture has its own discussion.
 
 The Linux x64 PoC builds `All`, `SQLite`, `SQLServer` and `MariaDB`, installs
 the tools from local packages, runs migrations against the respective databases
-and compares artifact sizes. [Run the PoC](slim-distributions-poc/README.md)
+and compares artifact sizes. Packaging mode also builds Linux amd64 Docker
+images and Debian packages and exercises their normal entry points.
+[Run the PoC](slim-distributions-poc/README.md)
 
 ## Existing release build
 
@@ -114,7 +116,8 @@ and reproduction instructions are in the PoC directory.
 The same four profiles can feed the other channels. The proposed names below
 show SQLite as the example. SQL Server and MariaDB use the corresponding
 `sqlserver` and `mariadb` identifiers. These are channel design proposals for
-#909. The current executable PoC covers Linux x64 ZIPs and NuGet tools.
+#909. The executable PoC covers Linux x64 ZIPs, NuGet tools, Linux amd64
+Docker images and Debian packages.
 
 | Channel | Existing all-in-one identity | Proposed SQLite selection | Installed command |
 | --- | --- | --- | --- |
@@ -143,17 +146,17 @@ Each additional Windows, macOS, Arm64 and musl build needs its own packaged
 checks. Release downloads should group assets by provider and platform so users
 can find one artifact without scanning the complete matrix.
 
-Docker uses Alpine and musl builds for amd64/arm64. Pass `GrateDistribution`
-through the Docker build into `dotnet publish`. Keep one checked OCI archive
+Docker uses Alpine and musl builds for amd64/arm64. The Dockerfile accepts
+`GRATE_DISTRIBUTION` and passes `GrateDistribution` to `dotnet publish`. The
+release proposal would keep one checked OCI archive
 and multi-platform digest per profile. Add a distribution label so verification
 can match the selected profile to its payload and expected platforms.
 [Docker build](../../installers/docker/Dockerfile)
 
-The entrypoint currently supplies `--databasetype=sqlserver` whenever
-`DATABASE_TYPE` is unset or empty. Change it to supply that argument only when
-the environment variable has a value. The compiled CLI then supplies the default
-for its profile. Verify environment overrides and argument forwarding against
-each profile, including an unsupported database selection.
+The entrypoint supplies `--databasetype` only when `DATABASE_TYPE` has a value.
+The compiled CLI supplies the profile default when the variable is unset or
+empty. The packaging checks exercise these defaults, environment overrides,
+argument forwarding and unsupported database selections.
 [Entrypoint](../../installers/docker/entrypoint.sh)
 
 Use profile-prefixed tags such as `sqlite-<version>`, `sqlserver-<version>`
@@ -168,10 +171,11 @@ compatibility-image policy continues to govern the all-in-one image.
 
 ### Debian
 
-Parameterize the package ID, description, document paths, maintainer scripts and
-release filename. Each slim package installs its selected binary at
-`/usr/bin/grate`. Declare conflicts between the grate package variants and
-exercise explicit removal/installation when switching. A dependency requiring
+The Debian recipe accepts `Distribution` and `OutputDirectory`, selecting the
+package ID, description, document paths, maintainer scripts and filename. Each
+slim package installs its selected binary at `/usr/bin/grate`. Its metadata
+declares conflicts with the other variants. Switching uses explicit removal
+and installation. A dependency requiring
 the full provider set should continue to select the all-in-one package. Keep
 Debian version ordering, including the existing prerelease conversion, separate
 from the provider name. The current channel publishes downloadable .deb files.
@@ -271,10 +275,10 @@ point, unsupported-provider rejection, bundled-skill verification, and clean
 upgrade/uninstall behavior. Bind those checks to the artifacts being released.
 [Package lifecycle checks](../Packaging.md#package-lifecycle-checks-in-ci)
 
-A next PoC can extend the existing Linux setup to Docker musl-x64 and Debian
-amd64 for the three providers. The Windows installer/identity chain and macOS
-Homebrew validation then have explicit native-runner work. Select which of those
-channels and profiles should ship through #909.
+The packaging PoC exercises Docker musl-x64 and installed Debian amd64 packages
+for the three providers. Additional architectures, the Windows installer/identity
+chain and macOS Homebrew validation require their own runner coverage. Select
+which channels and profiles should ship through #909.
 
 ## Add selected variants to the release contract
 

@@ -72,6 +72,14 @@ def database_state(checker, provider, connection, log):
     return json.loads(output)
 
 
+def check_migration_states(first, second):
+    require(first == second, "Database state changed on one-time script rerun")
+    require(second["data"] == [["1", "Slim PoC"]], "Incorrect migration data")
+    history = [row for row in second["history"] if row[0] == "001_widgets.sql"]
+    require(len(history) == 1 and history[0][1], "Missing or duplicated one-time script history")
+    require(second["errors"] == [["0"]], "Migration errors were recorded")
+
+
 def smoke(executable, directory, provider, slim, checker, database_prefix):
     directory.mkdir(parents=True)
     scripts = directory / "sql/up"
@@ -103,11 +111,7 @@ def smoke(executable, directory, provider, slim, checker, database_prefix):
     first = database_state(checker, provider, connection, directory / "state-first.json")
     run(arguments + (["--databasetype", provider] if slim else []), directory / "rerun.log")
     second = database_state(checker, provider, connection, directory / "state-rerun.json")
-    require(first == second, "Database state changed on one-time script rerun")
-    require(second["data"] == [["1", "Slim PoC"]], "Incorrect migration data")
-    history = [row for row in second["history"] if row[0] == "001_widgets.sql"]
-    require(len(history) == 1 and history[0][1], "Missing or duplicated one-time script history")
-    require(second["errors"] == [["0"]], "Migration errors were recorded")
+    check_migration_states(first, second)
     run([executable, "skills", "install", "--local", "--path", directory / "skills"],
         directory / "skills.log")
     require((directory / "skills/.agents/skills/use-grate/SKILL.md").is_file(),
