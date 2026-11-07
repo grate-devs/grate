@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using grate.Configuration;
 using grate.Migration;
 using SqlServer.TestInfrastructure;
@@ -12,7 +12,7 @@ namespace SqlServer.Reported_issues;
 /// Test for issue where grate fails when schema exists with different case in case-insensitive SQL Server.
 /// </summary>
 [Collection(nameof(SqlServerGrateTestContext))]
-public class Schema_case_sensitivity_issue(SqlServerGrateTestContext context, ITestOutputHelper testOutput) 
+public class Schema_case_sensitivity_issue(SqlServerGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
     [Fact]
@@ -20,7 +20,7 @@ public class Schema_case_sensitivity_issue(SqlServerGrateTestContext context, IT
     {
         var db = TestConfig.RandomDatabase();
         var parent = CreateRandomTempDirectory();
-        
+
         // First migration with "RoundhousE" schema
         var config1 = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))

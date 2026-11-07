@@ -81,7 +81,7 @@ whatever";
             Assert.Empty(result);
         }
 
-        
+
         [Theory]
         [InlineData("\r\n", "CRLF")]
         [InlineData("\n", "LF")]

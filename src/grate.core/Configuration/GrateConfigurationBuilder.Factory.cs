@@ -2,7 +2,7 @@
 
 public partial class GrateConfigurationBuilder
 {
-    
+
     /// <summary>
     /// Create the grate configuration builder from an existing service collection and grate configuration.
     /// </summary>
@@ -21,6 +21,6 @@ public partial class GrateConfigurationBuilder
     {
         return new GrateConfigurationBuilder(GrateConfiguration.Default with { NonInteractive = true });
     }
-    
+
 }
 

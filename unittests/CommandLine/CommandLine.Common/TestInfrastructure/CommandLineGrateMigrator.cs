@@ -18,43 +18,46 @@ public record CommandLineGrateMigrator(DatabaseType DatabaseType) : IGrateMigrat
         // Convert configuration to command-line arguments
         var convertToCommandLineArguments = ConvertToCommandLineArguments(Configuration);
         var commandLineArguments = convertToCommandLineArguments.ToList();
-        
+
         // Add the database type
         commandLineArguments.Add("--databasetype=" + DatabaseType.ToString().ToLowerInvariant());
-        
-        
+
+
         // Run the command-line tool with the arguments
-        #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
         var processInfo = new ProcessStartInfo(GrateExecutable, commandLineArguments)
-        #else
+#else
         var processInfo = new ProcessStartInfo(GrateExecutable, string.Join(' ', commandLineArguments))
-        #endif
+#endif
         {
-            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
         };
 
         using var process = Process.Start(processInfo);
         await process!.WaitForExitAsync();
-        
+
         var output = await process.StandardOutput.ReadToEndAsync();
         var error = await process.StandardError.ReadToEndAsync();
-        
+
         var exitCode = process.ExitCode;
         if (exitCode != 0)
         {
             try
             {
                 throw new Exception($"grate failed with exit code {exitCode}. Output: {output}. Error: {error}");
-            }catch (Exception e)
+            }
+            catch (Exception e)
             {
                 throw new MigrationFailed(e);
             }
         }
-        
+
     }
 
     public GrateConfiguration Configuration { get; private init; } = null!;
-    
+
     public IGrateMigrator WithConfiguration(GrateConfiguration configuration)
     {
         return this with { Configuration = configuration };
@@ -66,11 +69,11 @@ public record CommandLineGrateMigrator(DatabaseType DatabaseType) : IGrateMigrat
         builder.Invoke(b);
         return this with { Configuration = b.Build() };
     }
-    
+
     public IGrateMigrator WithDatabase(IDatabase database) => this with { Database = database };
     public IDatabase? Database { get; set; }
-    
-    
+
+
     private List<string> ConvertToCommandLineArguments(GrateConfiguration configuration)
     {
         List<string> result = new();
@@ -84,7 +87,7 @@ public record CommandLineGrateMigrator(DatabaseType DatabaseType) : IGrateMigrat
             // Skip properties with default values
             var value = prop.GetValue(configuration);
             var defaultValue = prop.GetValue(GrateConfiguration.Default);
-            
+
             var serializedValue = JsonSerializer.Serialize(value?.ToString(), SerializerOptions);
             var serializedDefault = JsonSerializer.Serialize(defaultValue?.ToString(), SerializerOptions);
 
@@ -98,7 +101,7 @@ public record CommandLineGrateMigrator(DatabaseType DatabaseType) : IGrateMigrat
             {
                 value = string.Join(';', foldersConfiguration.Values);
             }
-            
+
             var name = prop.Name;
             // In System.CommandLine the option Name now includes the prefix (e.g. "--connectionstring")
             // and Aliases no longer contains the name, so match on the prefix-stripped name and use
@@ -126,21 +129,21 @@ public record CommandLineGrateMigrator(DatabaseType DatabaseType) : IGrateMigrat
         return result;
 #pragma warning restore CS0162 // Unreachable code detected
     }
-    
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerOptions.Default)
     {
         ReferenceHandler = ReferenceHandler.IgnoreCycles
     };
 
-    private static string GrateExecutable => 
+    private static string GrateExecutable =>
         Environment.GetEnvironmentVariable("GrateExecutablePath") ??
-        typeof(CommandLineGrateMigrator).Assembly.GetCustomAttribute<GrateExecutablePathAttribute>()?.Path 
+        typeof(CommandLineGrateMigrator).Assembly.GetCustomAttribute<GrateExecutablePathAttribute>()?.Path
         ?? throw new Exception("Grate executable path not found");
-    
+
 
     public ValueTask DisposeAsync()
     {
         return new ValueTask(Task.CompletedTask);
     }
-    
+
 }

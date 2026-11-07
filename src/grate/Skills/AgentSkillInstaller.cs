@@ -1,4 +1,4 @@
-namespace grate.Skills;
+﻿namespace grate.Skills;
 
 internal static class AgentSkillInstaller
 {

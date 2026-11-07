@@ -14,7 +14,7 @@ public static class RegistrationExtensions
         services.TryAddTransient<IDatabase, MariaDbDatabase>();
         return services;
     }
-    
+
     public static IServiceCollection AddGrateWithMariaDb(this IServiceCollection services, GrateConfiguration? config = null) =>
         services
             .AddGrate(config ?? GrateConfiguration.Default)

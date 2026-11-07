@@ -5,6 +5,7 @@ using grate.Configuration;
 using grate.Migration;
 
 namespace grate.Infrastructure;
+
 internal static class ConnectionStringExtension
 {
     public static string? GetAdminConnectionString(this IDatabase database, GrateConfiguration grateConfiguration)

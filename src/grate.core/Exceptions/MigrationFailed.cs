@@ -27,7 +27,7 @@ public class MigrationFailed : AggregateException
             .SelectMany(exception => exception.Data.Cast<KeyValuePair<string, object?>>())
             .ToDictionary(entry => entry.Key, entry => entry.Value);
 
-    public bool IsTransient => 
+    public bool IsTransient =>
         InnerExceptions.OfType<DbException>().All(ex => ex.IsTransient)
         && InnerExceptions.OfType<ScriptFailed>().All(ex => ex.IsTransient)
         ;
@@ -42,15 +42,15 @@ public class MigrationFailed : AggregateException
             }
 
             StringBuilder sb = new StringBuilder();
-            
+
             sb.Append("Migration failed due to the following errors");
             sb.Append(":\n\n");
 
             var migrationExceptions = InnerExceptions.OfType<MigrationException>().ToArray();
-            
+
             foreach (var folderErrors in migrationExceptions.GroupBy(ex => ex.Folder))
             {
-                var folder= folderErrors.Key;
+                var folder = folderErrors.Key;
                 sb.AppendLine($"{folder.Name} (\"{folder.Path}\"):");
                 sb.AppendLine("--------------------------------------------------------------------------------");
                 foreach (var error in folderErrors)
@@ -58,7 +58,7 @@ public class MigrationFailed : AggregateException
                     sb.AppendLine(error.Message);
                 }
             }
-            
+
             foreach (var t in InnerExceptions.Except(migrationExceptions))
             {
                 sb.Append(" * ");

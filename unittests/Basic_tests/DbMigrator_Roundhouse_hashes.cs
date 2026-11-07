@@ -28,11 +28,11 @@ public class DbMigrator_Roundhouse_hashes
         {
             var cases = new TheoryData<string, string, MigrationType>();
             foreach (var hash in StoredHashes)
-            foreach (var lineEnding in new[] { "\n", "\r\n", "\r" })
-            foreach (var type in new[] { MigrationType.Once, MigrationType.AnyTime })
-            {
-                cases.Add(hash.Data, $"SELECT 'æ';{lineEnding}SELECT 2;{lineEnding}", type);
-            }
+                foreach (var lineEnding in new[] { "\n", "\r\n", "\r" })
+                    foreach (var type in new[] { MigrationType.Once, MigrationType.AnyTime })
+                    {
+                        cases.Add(hash.Data, $"SELECT 'æ';{lineEnding}SELECT 2;{lineEnding}", type);
+                    }
 
             return cases;
         }

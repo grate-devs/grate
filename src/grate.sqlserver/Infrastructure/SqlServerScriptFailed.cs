@@ -5,13 +5,13 @@ using Microsoft.Data.SqlClient;
 
 namespace grate.sqlserver.Infrastructure;
 
-public class SqlServerScriptFailed: ScriptFailed
+public class SqlServerScriptFailed : ScriptFailed
 {
-    public SqlServerScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception cause) 
+    public SqlServerScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception cause)
         : base(folder, file, scriptText, cause)
     {
     }
-    
+
     protected override IDictionary<string, object?> GetDbScriptErrors()
         => GatherDetails(SqlException);
 
@@ -25,7 +25,7 @@ public class SqlServerScriptFailed: ScriptFailed
 
     private IDictionary<string, object?> GatherDetails(SqlException? ex)
     {
-        return DbException is null 
+        return DbException is null
             ? new Dictionary<string, object?>()
             : new Dictionary<string, object?>()
             {
@@ -43,8 +43,8 @@ public class SqlServerScriptFailed: ScriptFailed
                 { nameof(SqlException.IsTransient), ex.IsTransient },
                 { nameof(SqlException.HelpLink), ex.HelpLink },
                 { nameof(SqlException.HResult), ex.HResult },
-                { nameof(SqlException.StackTrace), ex.StackTrace } 
+                { nameof(SqlException.StackTrace), ex.StackTrace }
             };
     }
-    
+
 }

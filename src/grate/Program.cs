@@ -146,8 +146,8 @@ public static class Program
             DatabaseType.PostgreSQL => services.AddGrateWithPostgreSQL(config),
             DatabaseType.SQLServer => services.AddGrateWithSqlServer(config),
             DatabaseType.SQLite => services.AddGrateWithSqlite(config),
-            _ => throw new ArgumentOutOfRangeException(nameof(config), 
-                config.DatabaseType, 
+            _ => throw new ArgumentOutOfRangeException(nameof(config),
+                config.DatabaseType,
                 "Unknown target database type: " + config.DatabaseType)
         };
 

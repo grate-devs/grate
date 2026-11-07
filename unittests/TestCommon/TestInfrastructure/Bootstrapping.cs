@@ -43,7 +43,7 @@ internal static class Bootstrapping
 
         return resourceText;
     }
-    
+
     internal static async Task WriteResourceToFolder(
         string resource,
         string resourceText,
@@ -58,21 +58,21 @@ internal static class Bootstrapping
 
         var nextDot = resource.IndexOf('.', prefixLength + 1);
         var folderName = resource.Substring(prefixLength + 1, nextDot - prefixLength - 1);
-            
-        var fullFolder = sqlFolderNamePrefix is {} 
+
+        var fullFolder = sqlFolderNamePrefix is { }
             ? Path.Combine(folder, folderName, sqlFolderNamePrefix)
             : Path.Combine(folder, folderName);
-        
+
         if (!Directory.Exists(fullFolder))
         {
             Directory.CreateDirectory(fullFolder);
         }
-            
+
         var resourceName = resource.Substring(prefixLength + 1 + folderName.Length + 1);
 
         var filePath = Path.Combine(fullFolder, resourceName);
         await File.WriteAllTextAsync(filePath, resourceText);
     }
-    
-    
+
+
 }
