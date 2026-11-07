@@ -25,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
+    - name: Check staged CI policy
+      shell: pwsh
+      run: ./scripts/Test-CiPolicy.Tests.ps1
     - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
@@ -40,8 +43,67 @@ jobs:
       run: dotnet build --no-restore --no-self-contained -r linux-x64 src/grate/grate.csproj -c release
 
 
+  # These isolated suites run alongside Build, once per supported OS/runtime.
+  # Keep the existing check names and artifact names after splitting the tiers.
+  fast-tests:
+    name: Run tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            category: Basic_tests
+            test_filter: ''
+          - os: windows-latest
+            category: Basic_tests
+            test_filter: ''
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup .NET 11 RC3 and earlier
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Test on ${{ runner.os }}
+        shell: pwsh
+        env:
+          LogLevel: Warning
+          TZ: UTC
+          TEST_RESULTS_DIRECTORY: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $testArgs = @(
+            'test',
+            '--project', "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj",
+            '--max-parallel-test-modules', '1',
+            '--minimum-expected-tests', '1',
+            '--stop-on-fail', 'on',
+            '--long-running', '60',
+            '--timeout', '20m',
+            '--results-directory', $env:TEST_RESULTS_DIRECTORY,
+            '--report-xunit-trx',
+            '--xunit-info',
+            '--coverage',
+            '--coverage-output-format', 'xml'
+          )
+          dotnet @testArgs
+      - name: Upload Unit Test Results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
+          path: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}/
+          retention-days: 1
+
   analyze:
     name: Analyze Code Security
+    needs: [build-code, fast-tests]
     runs-on: windows-latest
     permissions:
       actions: read
@@ -81,15 +143,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
     timeout-minutes: ${{ matrix.category == 'Oracle' && 45 || 30 }}
-    #needs: build-code
+    needs: [build-code, fast-tests]
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            category: Basic_tests
-            test_filter: ''
           - os: ubuntu-latest
             category: SqlServer
             test_filter: ''
@@ -109,9 +168,6 @@ jobs:
             category: Oracle
             test_filter: ''
           - os: windows-latest
-            category: Basic_tests
-            test_filter: ''
-          - os: windows-latest
             category: Sqlite
             test_filter: ''
           - os: windows-latest
@@ -126,7 +182,6 @@ jobs:
           - os: windows-latest
             category: Oracle
             test_filter: Oracle.Basic_tests.*
-        #category: [ "Basic_tests", "Sqlite"  ]
 
     steps:
     - uses: actions/checkout@v7
@@ -219,7 +274,7 @@ jobs:
   report:
      runs-on: ubuntu-latest
      name: Create test report
-     needs: test
+     needs: [fast-tests, test]
      if: always()
 
      steps:
@@ -305,6 +360,7 @@ jobs:
 
   packages:
     name: NuGet libraries and installed tool
+    needs: [build-code, fast-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -332,6 +388,7 @@ jobs:
 
   standalone:
     name: CLI ${{ matrix.rid }}
+    needs: [build-code, fast-tests]
     timeout-minutes: 30
     env:
       # Publish and package the same fixture identity; MSI rejects mismatched payloads.
@@ -415,6 +472,7 @@ jobs:
 
   docker:
     name: Alpine ${{ matrix.arch }}
+    needs: [build-code, fast-tests]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -463,3 +521,19 @@ jobs:
           name: grate-entrypoint-${{ matrix.arch }}
           retention-days: 3
           path: ${{ runner.temp }}/grate-entrypoint-results/
+
+  ci-result:
+    name: CI result
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A skipped dependent job can look green in isolation. Only this aggregate
+    # represents complete CI, including early failures and cancellations.
+    needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker]
+    if: always()
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require successful results from every CI phase
+        shell: pwsh
+        env:
+          CI_NEEDS_JSON: ${{ toJSON(needs) }}
+        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON
