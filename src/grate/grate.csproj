@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <GrateDistribution Condition="'$(GrateDistribution)' == ''">All</GrateDistribution>
     <DebugType>Embedded</DebugType>
     <Nullable>enable</Nullable>
     <IsPublishable>true</IsPublishable>
@@ -15,6 +16,17 @@
     <ImageName>grate</ImageName>
     
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GrateDistribution)' == 'SQLite'">
+    <DefineConstants>$(DefineConstants);SQLITE_ONLY</DefineConstants>
+    <PackageId>grate-sqlite</PackageId>
+    <PackageReadmeFile>NuGet.Sqlite.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <Target Name="ValidateGrateDistribution" BeforeTargets="PrepareForBuild;CollectPackageReferences">
+    <Error Condition="'$(GrateDistribution)' != 'All' and '$(GrateDistribution)' != 'SQLite'"
+           Text="Unknown GrateDistribution '$(GrateDistribution)'. Supported values are All and SQLite." />
+  </Target>
 
   <!-- Need to do this by hand, due to https://github.com/dotnet/sdk/issues/40690 (duplicate of https://github.com/dotnet/sdk-container-builds/issues/559) -->
   <ItemGroup Label="ContainerEntryPoint Assignment">
@@ -70,26 +82,27 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient.Extensions.Azure" />
+    <PackageReference Include="Microsoft.Data.SqlClient.Extensions.Azure" Condition="'$(GrateDistribution)' == 'All'" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting"  />
     <PackageReference Include="System.CommandLine" />
-    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Condition="'$(GrateDistribution)' == 'All'" />
     <PackageReference Include="Dapper" />
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\grate.mariadb\grate.mariadb.csproj" />
-    <ProjectReference Include="..\grate.oracle\grate.oracle.csproj" />
-    <ProjectReference Include="..\grate.postgresql\grate.postgresql.csproj" />
+    <ProjectReference Include="..\grate.mariadb\grate.mariadb.csproj" Condition="'$(GrateDistribution)' == 'All'" />
+    <ProjectReference Include="..\grate.oracle\grate.oracle.csproj" Condition="'$(GrateDistribution)' == 'All'" />
+    <ProjectReference Include="..\grate.postgresql\grate.postgresql.csproj" Condition="'$(GrateDistribution)' == 'All'" />
     <ProjectReference Include="..\grate.sqlite\grate.sqlite.csproj" />
-    <ProjectReference Include="..\grate.sqlserver\grate.sqlserver.csproj" />
+    <ProjectReference Include="..\grate.sqlserver\grate.sqlserver.csproj" Condition="'$(GrateDistribution)' == 'All'" />
   </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DebugType>None</DebugType>
-    <ToolCommandName>grate</ToolCommandName>
+    <ToolCommandName Condition="'$(GrateDistribution)' == 'All'">grate</ToolCommandName>
+    <ToolCommandName Condition="'$(GrateDistribution)' == 'SQLite'">grate-sqlite</ToolCommandName>
     <!--    Bug #714: Opt out of RID-specific .NET Tool packaging until we only support net10 or later -->
     <!--    <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-musl-x64;linux-musl-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>-->
     <ManageAppHostPerConfiguration>false</ManageAppHostPerConfiguration>
@@ -98,7 +111,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="NuGet.md" Pack="true" PackagePath="\" />
+    <None Include="NuGet.md" Pack="true" PackagePath="\" Condition="'$(GrateDistribution)' == 'All'" />
+    <None Include="NuGet.Sqlite.md" Pack="true" PackagePath="\" Condition="'$(GrateDistribution)' == 'SQLite'" />
   </ItemGroup>
 
   <!-- Embed the complete skill so every CLI distribution, including single-file installers,

@@ -6,6 +6,9 @@ migration engine and SQLite provider. The broader provider architecture has its
 own discussion. [Distribution issue #909](https://github.com/grate-devs/grate/issues/909) ·
 [Architecture issue #891](https://github.com/grate-devs/grate/issues/891)
 
+The Linux x64 PoC builds both variants, installs the tools from local packages,
+runs SQLite migrations and compares artifact sizes. [Run the PoC](sqlite-only-poc/README.md)
+
 ## What the build does today
 
 - The CLI project references all five provider projects and directly references
