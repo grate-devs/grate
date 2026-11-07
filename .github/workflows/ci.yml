@@ -79,10 +79,10 @@ jobs:
       shell: pwsh
       run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
     - name: "Test on Windows"
-      if: matrix.os == 'windows-latest' && matrix.category != 'SqlServer'
+      if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        Write-Host 'SYNTHETIC TEST: successful placeholder; Windows SQL Server mandatory step is intentionally skipped.'
+        Write-Host 'SYNTHETIC TEST: all included producer steps succeed; one CLI matrix member is intentionally omitted.'
   report:
     name: Create test report
     runs-on: ubuntu-latest
@@ -110,7 +110,6 @@ jobs:
       matrix:
         include:
         - {"rid": "win-x64"}
-        - {"rid": "win-x86"}
         - {"rid": "win-arm64"}
         - {"rid": "linux-x64"}
         - {"rid": "linux-arm64"}
