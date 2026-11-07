@@ -68,7 +68,7 @@ unavailable or prohibited, report that limitation and perform the review yoursel
 
 - Inspect `global.json`, `Directory.Build.props`, `Directory.Packages.props`,
   `.editorconfig`, and the changed project's `.csproj`. The repository targets
-  net8.0/net9.0/net10.0 with nullable analysis and warnings as errors; a net10-only
+  net8.0/net9.0/net10.0/net11.0 with nullable analysis and warnings as errors; a net10-only
   local run does not establish compatibility with all targets.
 - Use central package versions and existing dependencies. Match neighboring
   file-scoped namespaces, records/classes, naming, and async conventions; public

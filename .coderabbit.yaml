@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Shared review rules live in AGENTS.md and docs/agents, not in copied prompts.
+language: en-US
+early_access: false
+enable_free_tier: true
+inheritance: false
+tone_instructions: >-
+  Be concise. Report concrete defects with file/line, triggering condition and
+  consequence. Separate evidence gaps from defects; omit mechanical style nits.
+
+reviews:
+  profile: chill
+  auto_approvals:
+    enabled: false
+    allow_author_approval: false
+  # Retain the review/configuration evidence needed to evaluate the pilot.
+  review_info: true
+  review_details: true
+  high_level_summary: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  poem: false
+  in_progress_fortune: false
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  slop_detection:
+    enabled: false
+  auto_review:
+    enabled: false
+    description_keyword: grate-coderabbit-pilot
+    auto_incremental_review: false
+    drafts: false
+  # This pilot provides advice, without generating or committing changes.
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    issue_assessment:
+      mode: "off"
+  tools:
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    yamllint:
+      enabled: false
+    # Embedded SQL spans five dialects; do not apply a default lint dialect.
+    sqlfluff:
+      enabled: false
+    squawk:
+      enabled: false
+
+knowledge_base:
+  learnings:
+    scope: local
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - AGENTS.md
+      # Without applyTo, these documents govern only docs/agents/**.
+      - files: docs/agents/providers.md,docs/agents/verification.md,docs/agents/testing.md
+        applyTo: "**/*"
