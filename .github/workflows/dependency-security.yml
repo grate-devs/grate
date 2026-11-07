@@ -2,9 +2,9 @@ name: Dependency security
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, ci/codeql-dependency-review]
   push:
-    branches: [main]
+    branches: [main, ci/codeql-dependency-review]
   schedule:
     - cron: '43 5 * * 1'
   workflow_dispatch:
