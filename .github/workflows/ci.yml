@@ -52,7 +52,7 @@ jobs:
       run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
     - name: "Build"
       shell: pwsh
-      run: "Write-Host 'SYNTHETIC NEGATIVE: producer failure with green report.'; exit 1"
+      run: "Write-Host 'SYNTHETIC PRODUCER: build control succeeds.'"
   test:
     name: "Run tests"
     runs-on: ubuntu-latest
@@ -81,7 +81,9 @@ jobs:
     - name: "Test on Windows"
       if: matrix.os == 'windows-latest'
       shell: pwsh
-      run: "Write-Host 'SYNTHETIC PRODUCER: no real build, test or package work is performed.'"
+      run: |
+        Write-Host 'SYNTHETIC TEST: harmless failure for Windows SQL Server; no real test suite runs.'
+        if ('${{ matrix.category }}' -eq 'SqlServer') { exit 1 }
   report:
     name: Create test report
     runs-on: ubuntu-latest
