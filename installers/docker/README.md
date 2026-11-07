@@ -14,7 +14,7 @@ docker build -f installers/docker/Dockerfile -t grate-local:tests .
 | `Dockerfile` | Pinned SDK build stage and runtime-dependencies image |
 | `Dockerfile.dockerignore` | Keeps the build context to the files the Dockerfile needs |
 | `entrypoint.sh` | Maps connection/version/environment variables to CLI arguments and forwards extra arguments |
-| `release_tags.py` | Selects version tags and stable-only `latest` for canonical and compatibility image names |
+| `release_tags.ps1` | Selects version tags and stable-only `latest` for canonical and compatibility image names |
 | [config/](config/README.md) | Reusable GitHub environment and Docker OIDC setup templates |
 | [tests/](tests/README.md) | Tag-policy and local-build tests, plus an optional loopback-registry check |
 | [RELEASE.md](RELEASE.md) | Publication identities, digest-preserving promotion and recovery |

@@ -84,6 +84,14 @@ unavailable or prohibited, report that limitation and perform the review yoursel
   of a migration's connection. Public signature changes need compatibility care.
 - Keep credentials and access tokens out of logs and shared test evidence.
 
+## Write repository scripts in PowerShell
+
+Use PowerShell 7 (`.ps1`, run with `pwsh`) for new repository automation and
+script changes. Do not introduce Python scripts or a Python runtime dependency.
+Use native PowerShell parameters, stop on errors, and propagate failures from
+external commands. Update workflow callers, documentation, and relevant tests
+when converting or renaming scripts. Keep SQL migration files in SQL.
+
 ## Keep verification output out of git
 
 Keep point-in-time logs, test reports, API observations, migration plans and other

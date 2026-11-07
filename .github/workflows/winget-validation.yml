@@ -35,8 +35,8 @@ jobs:
           ./installers/winget/tests/Test-LifecycleCatalog.Tests.ps1
           ./installers/winget/tests/Test-WinGetSourceCorrelation.Assertions.Tests.ps1
           ./installers/winget/tests/source/preindexed/Test-SingletonManifests.Tests.ps1
-          python -m unittest discover -s installers/winget/tests/source/preindexed -p 'test_*.py' -v
-          if ($LASTEXITCODE -ne 0) { throw 'Preindexed source file-serving contracts failed.' }
+          ./installers/winget/tests/source/preindexed/test_server.ps1
+          ./installers/winget/tests/source/test_server.ps1
           ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
           ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
       - name: Prepare manifests from a real stable release and inspect MSI metadata

@@ -66,7 +66,7 @@ if [[ "$LOAD_IMAGE" = true && "$PLATFORM" == *,* ]]; then
 fi
 
 # Use the same version/tag policy as release automation, without publishing.
-TAGS=$(python3 installers/docker/release_tags.py "$VERSION")
+TAGS=$(pwsh -NoLogo -NoProfile -File installers/docker/release_tags.ps1 -Version "$VERSION")
 
 # Create a builder instance if it doesn't exist
 if ! docker buildx ls | grep -q "multiarch-builder"; then

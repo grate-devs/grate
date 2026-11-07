@@ -8,27 +8,26 @@ do not commit point-in-time evidence to git.
 
 ## Policy and local archive checks
 
-With the Python dependencies in `scripts/release/requirements-workflow-tests.txt`
-installed, run from the repository root:
+Run from the repository root with PowerShell 7:
 
 ```sh
-python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
-python3 -m unittest discover -s scripts/release -p 'test_*docker*.py' -v
+pwsh -File scripts/release/Run-Tests.ps1 -Path installers/docker/tests
+pwsh -File scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
 bash -n build-docker-local.sh
 shellcheck build-docker-local.sh
-python3 scripts/release/check_docker_oci_copy.py
+pwsh -File scripts/release/check_docker_oci_copy.ps1
 ```
 
 The last command requires Skopeo. It copies a synthetic OCI layout with amd64,
 arm64 and attestation descriptors between local directories, verifying the exact
 root digest and every blob without contacting a registry or publishing images.
 
-`tests/check_local_registry.py` exercises stable/prerelease tags and compatibility
+`tests/check_local_registry.ps1` exercises stable/prerelease tags and compatibility
 copying in a disposable loopback registry. It creates a temporary builder,
 registry and network. Use it when local registry execution is in scope:
 
 ```sh
-python3 installers/docker/tests/check_local_registry.py
+pwsh -File installers/docker/tests/check_local_registry.ps1
 ```
 
 Neither synthetic check establishes that Grate executes successfully on the

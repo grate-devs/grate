@@ -1,0 +1,28 @@
+#!/usr/bin/env pwsh
+$ErrorActionPreference = 'Stop'
+$temporary = Join-Path ([IO.Path]::GetTempPath()) ('grate-cask-' + [guid]::NewGuid().ToString('N'))
+$pwsh = (Get-Process -Id $PID).Path
+try {
+    $output = Join-Path $temporary 'nested/grate.rb'
+    $arm = 'A' * 64
+    $intel = 'b' * 64
+    & $pwsh -NoLogo -NoProfile -File "$PSScriptRoot/update_homebrew_cask.ps1" -Version 2.3.4 -Arm64Sha256 $arm -X64Sha256 $intel -Output $output
+    if ($LASTEXITCODE -ne 0) { throw 'Cask generation failed.' }
+    $content = [IO.File]::ReadAllText($output)
+    foreach ($expected in @('version "2.3.4"', ('sha256 arm:   "' + ('a' * 64) + '"'), ('intel: "' + $intel + '"'), 'releases/download/#{version}/grate-osx-#{arch}-self-contained-#{version}.zip', 'binary "grate"')) {
+        if (!$content.Contains($expected)) { throw "Cask missing expected release value: $expected" }
+    }
+    $bytes = [IO.File]::ReadAllBytes($output)
+    if ($content.Contains("`r") -or $bytes[0] -ne [byte][char]'c' -or !$content.EndsWith("end`n")) { throw 'Cask must be UTF-8 without BOM and use LF newlines.' }
+    foreach ($version in @('2.3.4-rc.1', 'v2.3.4', '2.3.4+build')) {
+        & $pwsh -NoLogo -NoProfile -File "$PSScriptRoot/update_homebrew_cask.ps1" -Version $version -Arm64Sha256 $arm -X64Sha256 $intel -Output $output *> $null
+        if ($LASTEXITCODE -eq 0 -or [IO.File]::ReadAllText($output) -cne $content) { throw "Invalid version '$version' must fail without overwriting the cask." }
+    }
+    foreach ($checksum in @('bad', ('g' * 64), ('a' * 63))) {
+        & $pwsh -NoLogo -NoProfile -File "$PSScriptRoot/update_homebrew_cask.ps1" -Version 2.3.4 -Arm64Sha256 $checksum -X64Sha256 $intel -Output $output *> $null
+        if ($LASTEXITCODE -eq 0 -or [IO.File]::ReadAllText($output) -cne $content) { throw 'Invalid checksum must fail without overwriting the cask.' }
+    }
+} finally {
+    Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
+}
+Write-Host 'PASS: Homebrew CLI version/hash validation, rendered release values and file encoding.'
