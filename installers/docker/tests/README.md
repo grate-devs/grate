@@ -8,6 +8,7 @@ python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
 
 | File | Purpose |
 | --- | --- |
+| `test_entrypoint.py` | Runs the real entrypoint with a fixture executable to check compiled defaults, environment values and argument forwarding |
 | `test_release_tags.py` | Checks stable/prerelease tag selection and CLI outputs |
 | `test_local_build.py` | Exercises `build-docker-local.sh` with fake Docker/GitVersion commands, including invocation outside the checkout |
 | `check_local_registry.py` | Optional real Buildx check using synthetic images and a temporary loopback registry |

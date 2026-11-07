@@ -3,12 +3,7 @@ using System.Reflection;
 using grate.Commands;
 using grate.Configuration;
 using grate.Infrastructure;
-using grate.mariadb.DependencyInjection;
 using grate.Migration;
-using grate.oracle.DependencyInjection;
-using grate.postgresql.DependencyInjection;
-using grate.sqlite.DependencyInjection;
-using grate.sqlserver.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
@@ -139,17 +134,7 @@ public static class Program
             }
         });
 
-        services = config.DatabaseType switch
-        {
-            DatabaseType.MariaDB => services.AddGrateWithMariaDb(config),
-            DatabaseType.Oracle => services.AddGrateWithOracle(config),
-            DatabaseType.PostgreSQL => services.AddGrateWithPostgreSQL(config),
-            DatabaseType.SQLServer => services.AddGrateWithSqlServer(config),
-            DatabaseType.SQLite => services.AddGrateWithSqlite(config),
-            _ => throw new ArgumentOutOfRangeException(nameof(config), 
-                config.DatabaseType, 
-                "Unknown target database type: " + config.DatabaseType)
-        };
+        services = services.AddGrateDatabase(config);
 
         return services.BuildServiceProvider();
     }
