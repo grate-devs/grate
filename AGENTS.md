@@ -99,6 +99,33 @@ include PowerShell. Keep these launchers in POSIX shell unless changing that
 runtime dependency is explicitly requested. Use PowerShell for host-side
 development, CI and test orchestration, including Docker container tests.
 
+### Keep PowerShell readable
+
+- Use four spaces for indentation and spaces around assignments and operators.
+  Separate functions and related setup, execution and assertion sections with
+  blank lines. Keep closely related statements together.
+- Write one statement per line. Expand `if`/`else`, loops, `try`/`catch`/`finally`,
+  and nonempty returned objects into multiline blocks. Put function parameters
+  in a multiline `param(...)` block and object properties on separate lines.
+- Use descriptive names and full cmdlet and parameter names, without aliases or
+  abbreviated parameters. Prefer straightforward control flow over clever
+  pipelines or deeply nested inline expressions. Extract helpers for coherent
+  responsibilities, not to satisfy arbitrary size limits.
+- Wrap long argument lists as arrays; use splatting for long command calls.
+  Prefer natural line breaks over backtick continuations. Build structured data
+  as PowerShell objects or hashtables, then serialize with `ConvertTo-Json`.
+- Prefer `Get-Content`, `Set-Content` and `Add-Content` with `-LiteralPath` for
+  ordinary text files. Specify encoding and newline behavior when they matter.
+  Keep .NET APIs where byte fidelity, atomic writes, streaming or bounded process
+  control require them; explain the constraint beside the code.
+- Keep formatting/refactoring behavior-preserving: retain array shapes, case
+  sensitivity, output streams, exit codes, timeouts and cleanup. Run affected
+  checks; formatting alone does not prove the behavior stayed the same.
+
+References: Microsoft's [PowerShell style guidance](https://learn.microsoft.com/powershell/scripting/community/contributing/powershell-style-guide#coding-style-rules),
+[consistent indentation rule](https://learn.microsoft.com/powershell/utility-modules/psscriptanalyzer/rules/useconsistentindentation),
+and [guidance on aliases in scripts](https://learn.microsoft.com/powershell/scripting/learn/shell/using-aliases#dont-use-aliases-in-scripts).
+
 ## Keep verification output out of git
 
 Keep point-in-time logs, test reports, API observations, migration plans and other
