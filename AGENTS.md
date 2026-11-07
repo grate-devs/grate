@@ -24,6 +24,9 @@ for code changes and reviews. Use the [test and artifact map](docs/agents/testin
 to choose suites, database providers, binaries, and platforms. Read callers and
 nearby tests before editing.
 
+Keep Docker-backed provider tests out of `Basic_tests`. Windows CI runs those
+provider namespaces without Docker.
+
 ## Implement and challenge separately
 
 For nontrivial implementation, use separate implementation and critical-review
@@ -70,6 +73,9 @@ unavailable or prohibited, report that limitation and perform the review yoursel
 - Use central package versions and existing dependencies. Match neighboring
   file-scoped namespaces, records/classes, naming, and async conventions; public
   methods here often have no `Async` suffix. Avoid style-only API changes.
+- Use braces for C# `if` and `else` bodies, including single statements.
+- When SQL grammar requires an interpolated identifier or literal, quote it
+  using the provider's rules and explain why a parameter cannot be used.
 - Keep failure and absence distinct. Do not mask errors with empty results,
   weaken assertions, or silence new warnings with broad suppressions. Explain
   narrowly necessary suppressions beside the code.

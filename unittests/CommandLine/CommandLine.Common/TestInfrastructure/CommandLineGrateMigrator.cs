@@ -120,6 +120,9 @@ public record CommandLineGrateMigrator(DatabaseType DatabaseType) : IGrateMigrat
             }
         }
 
+        result.AddRange(configuration.RestoreMoves.Select(move =>
+            $"--restore-move={move.LogicalName}={move.DestinationPath}"));
+
         return result;
 #pragma warning restore CS0162 // Unreachable code detected
     }

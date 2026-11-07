@@ -29,7 +29,20 @@ internal record DbMigrator : IDbMigrator
         Database = database;
     }
 
-    public Task InitializeConnections() => Database.InitializeConnections(Configuration);
+    public Task InitializeConnections()
+    {
+        if (Configuration.RestoreMoves is not { Count: 0 })
+        {
+            var supportsRestoreMoves = string.Equals(Database.DatabaseType, "sqlserver", StringComparison.OrdinalIgnoreCase);
+            var validationMessage = Configuration.ValidateRestoreMoves(supportsRestoreMoves);
+            if (validationMessage is not null)
+            {
+                throw new ArgumentException(validationMessage, nameof(Configuration));
+            }
+        }
+
+        return Database.InitializeConnections(Configuration);
+    }
 
     public IDatabase Database { get; set; }
 
