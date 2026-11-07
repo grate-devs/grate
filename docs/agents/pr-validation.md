@@ -47,21 +47,20 @@ implementation PR, not in git.
 [The ruleset JSON](../../.github/main-ruleset.proposed.json) is a **disabled
 proposal**, not applied repository settings. It proposes:
 
-- PRs with one approval, stale approval dismissal and resolved review threads.
+- PRs with no required approvals, stale approval dismissal and resolved review
+  threads.
 - Required `PR validation`, `Analyze Code Security`, `Dependency Review` and
   `NuGet dependency audit` from GitHub Actions (app ID 15368), on up-to-date PRs.
 - Native CodeQL protection rejecting high/critical security alerts, no additional
   non-security threshold. Green analysis alone does not enforce alert severity.
   Dependency Review and NuGet audit also use high/critical.
-- No main deletion or force pushes; merge, squash and rebase remain available.
+- No main deletion or force pushes; PRs merge using squash.
 - Administrator bypass through a PR only for emergencies, with reasons and
   follow-up recorded in that PR. No actor receives direct-push bypass.
 
-Administrators `erikbra` and `wokket` can provide independent reviews;
-`hoangthanh28` also has write access. Recheck permissions before activation.
-Eligibility does not establish willingness to own an area. No CODEOWNERS
-requirement is proposed until maintainers agree. Discuss both administrators
-for `.github/` and `scripts/ci/`, then test any agreed ownership requirement.
+Maintainers with write access can provide voluntary reviews. Confirm current
+repository permissions and agree ownership before introducing a CODEOWNERS
+requirement for `.github/` or `scripts/ci/`, then test any agreed requirement.
 CodeRabbit stays advisory. Merge queue requires a future `merge_group` trigger
 and separate verification.
 
