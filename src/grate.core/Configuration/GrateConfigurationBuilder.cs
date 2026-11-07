@@ -304,5 +304,15 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { Restore = backupPath };
         return this;
     }
+
+    /// <summary>
+    /// Set the optional SQL Server file mappings for the backup specified by <see cref="RestoreFrom"/>.
+    /// </summary>
+    public GrateConfigurationBuilder WithRestoreMoves(params RestoreFileMove[] moves)
+    {
+        ArgumentNullException.ThrowIfNull(moves);
+        _grateConfiguration = _grateConfiguration with { RestoreMoves = Array.AsReadOnly(moves.ToArray()) };
+        return this;
+    }
     
 }

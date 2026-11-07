@@ -63,7 +63,8 @@ shows how to pass the string at runtime and optionally supply an admin connectio
 | --forceanytimescripts<br>--runallanytimescripts | false | **RunAllAnyTimeScripts** - This instructs grate to run any time scripts every time it is run even if they haven't changed. Defaults to false. |
 | --baseline | - | **Baseline** - This instructs grate to mark the scripts as run, but not to actually run anything against the database. Use this option if you already have scripts that have been run through other means (and BEFORE you start the new ones). | 
 | --dryrun | false | **DryRun** - This instructs grate to log what would have run, but not to actually run anything against the database.  Use this option if you are trying to figure out what grate is going to do. |
-| --restore | - | **Restore** - This instructs grate where to find the database backup file (.bak) to restore from. If this option is not specified, no restore will be done. |
+| --restore &lt;backup-path&gt; | - | Restore a SQL Server backup before running migrations. The backup path is on the SQL Server host. |
+| --restore-move &lt;logical-name=destination-path&gt; | - | Map a file in the SQL Server backup to a new path on the SQL Server host. Repeat for each file to move. Requires `--restore`. |
 | -ni<br>--noninteractive<br>--silent | false | **Silent** - tells grate not to ask for any input when it runs. |
 | -r<br>--repo<br>--repositorypath <repositorypath> | - | **Repository Path** - RepositoryPath - The repository. A string that can be anything. Used to track versioning along with the version. Defaults to `null`. |
 | --version <version> | 1.0.0.0 | **Database Version** - specify the version of the current migration directly on the command line. |
@@ -73,6 +74,26 @@ shows how to pass the string at runtime and optionally supply an admin connectio
 | --createdatabase<br>--create | true | **Create** - Instructs grate to create the target database if it does not exist. Set to false to emulate the `--donotcreatedatabase` flag in roundhouse. |
 | -?<br>-h<br>--help | - |  Show help and usage information | 
 
+
+## Move SQL Server files when restoring a backup
+
+Use `RESTORE FILELISTONLY FROM DISK = N'path-to-backup.bak'` in SQL Server to find
+the `LogicalName` for each file you want to move. Quote each mapping as one shell
+argument. The first `=` separates the logical name from the destination path.
+
+```sh
+grate --connectionstring "$CONNECTION_STRING" \
+  --restore '/var/opt/mssql/backup/example.bak' \
+  --restore-move 'Example Data=/var/opt/mssql/data/New Data.mdf' \
+  --restore-move 'Example Log=/var/opt/mssql/data/New Log.ldf'
+```
+
+Specify destination paths that the SQL Server service can write to. SQL Server
+applies its normal restore rules for any files you leave unmapped.
+
+In .NET, call `RestoreFrom(backupPath)` and
+`WithRestoreMoves(new RestoreFileMove(logicalName, destinationPath), ...)`
+on the `GrateConfigurationBuilder`.
 
 ## Migration logs in CI
 
