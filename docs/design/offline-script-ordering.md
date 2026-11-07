@@ -58,6 +58,10 @@ The JSON is an observation of the candidate order. Plan validation at deployment
 grate's script eligibility and history, and integration with the existing folder
 runner are separate work covered by the criteria below.
 
+The [PostgreSQL experiment](postgresql-script-ordering-poc/README.md) compares
+libpg_query and SqlParserCS against shared dependency scenarios and a disposable
+PostgreSQL database. Its parser-specific adapters feed one shared planner.
+
 ## Verification before implementation is ready
 
 - Run the planner with networking disabled and no SQL Server configuration. The three files above must produce the same order and explain both dependencies across the folder boundary.
