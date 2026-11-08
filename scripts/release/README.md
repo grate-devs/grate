@@ -27,3 +27,24 @@ from an ordinary release and requires a fresh, reviewed plan.
 Keep generated plans, logs, reports, and observed configuration outside git, using
 CI artifacts or a temporary directory. Commit reusable scripts, tests, desired
 configuration, and instructions.
+
+## macOS Arm64 SDK setup
+
+The native macOS release build uses `.github/actions/setup-dotnet-macos-arm64`.
+It installs the SDK from `global.json` and the caller's additional SDK versions
+with the existing pinned `actions/setup-dotnet`, then checks SDK selection,
+host architecture, `PATH` and `DOTNET_ROOT` before building.
+
+Hosted macOS runners can encounter transient filesystem errors during extraction
+([upstream report](https://github.com/actions/runner-images/issues/15265)). The
+action allows one retry after an installation failure, preserving the first error
+and attempting filesystem diagnostics. Persistent installation failures still fail
+the job. The action cannot classify the upstream action's unstructured errors, so
+the single retry also applies to other installation failures.
+
+Each attempt has separate fresh installation and temporary directories. This is
+required because the pinned installer copies files even after extraction fails,
+and later detects an installed SDK by its version directory's presence. Reusing
+that partial tree could turn a failed extraction into a false successful setup.
+This mitigation is independent of prerelease/GA versions; SDK version changes
+remain in `global.json`.

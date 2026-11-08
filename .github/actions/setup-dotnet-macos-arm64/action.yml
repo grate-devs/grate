@@ -1,0 +1,113 @@
+name: Set up .NET on macOS Arm64
+description: Install .NET with one clean retry for transient hosted-runner filesystem failures.
+inputs:
+  global-json-file:
+    description: SDK selection file
+    required: true
+  dotnet-version:
+    description: Additional SDK versions
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Prepare isolated .NET installation attempts
+      id: prepare
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $root = Join-Path $env:RUNNER_TEMP ('grate-dotnet-' + [Guid]::NewGuid().ToString('N'))
+        foreach ($attempt in @('first', 'retry')) {
+            foreach ($directory in @('install', 'temp')) {
+                New-Item -ItemType Directory -Path "$root/$attempt/$directory" -Force | Out-Null
+            }
+        }
+        "root=$root" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+
+    - name: Install .NET in a fresh directory
+      id: first
+      continue-on-error: true
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
+      env:
+        DOTNET_INSTALL_DIR: ${{ steps.prepare.outputs.root }}/first/install
+        TMPDIR: ${{ steps.prepare.outputs.root }}/first/temp
+      with:
+        global-json-file: ${{ inputs.global-json-file }}
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Report the failed installation and filesystem diagnostics
+      if: steps.first.outcome == 'failure'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        # Diagnostics must not prevent the clean retry on a faulted filesystem.
+        try {
+            Write-Warning 'Initial .NET installation failed. Retrying once in separate installation and temporary directories.'
+            'Initial .NET installation failed; one clean retry was required. Inspect the installation errors and filesystem diagnostics in this job log.' | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+            & /bin/df -h 2>&1 | Out-Host
+            $predicate = 'process == "kernel" AND (eventMessage CONTAINS[c] "I/O error" OR eventMessage CONTAINS[c] "apfs")'
+            & /usr/bin/log show --last 2m --style compact --predicate $predicate 2>&1 | Select-Object -Last 100 | Out-Host
+        }
+        catch {
+            Write-Warning "Could not collect filesystem diagnostics: $_"
+        }
+        finally {
+            # GitHub's pwsh wrapper exits with the last native exit code.
+            $global:LASTEXITCODE = 0
+        }
+
+    - name: Retry .NET installation in a fresh directory
+      id: retry
+      if: steps.first.outcome == 'failure'
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
+      env:
+        # dotnet-install copies partial files even after tar fails. Never reuse that tree.
+        DOTNET_INSTALL_DIR: ${{ steps.prepare.outputs.root }}/retry/install
+        TMPDIR: ${{ steps.prepare.outputs.root }}/retry/temp
+      with:
+        global-json-file: ${{ inputs.global-json-file }}
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Verify the selected Arm64 .NET host
+      shell: pwsh
+      env:
+        FIRST_OUTCOME: ${{ steps.first.outcome }}
+        RETRY_OUTCOME: ${{ steps.retry.outcome }}
+        INSTALL_ROOT: ${{ steps.prepare.outputs.root }}
+        GLOBAL_JSON_FILE: ${{ inputs.global-json-file }}
+        DOTNET_CLI_UI_LANGUAGE: en-US
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $attempt = if ($env:FIRST_OUTCOME -ceq 'success') {
+            'first'
+        }
+        elseif ($env:FIRST_OUTCOME -ceq 'failure' -and $env:RETRY_OUTCOME -ceq 'success') {
+            'retry'
+        }
+        else {
+            throw 'Neither isolated .NET installation succeeded.'
+        }
+        $expectedRoot = [IO.Path]::GetFullPath("$env:INSTALL_ROOT/$attempt/install")
+        if (!$env:DOTNET_ROOT -or [IO.Path]::GetFullPath($env:DOTNET_ROOT) -cne $expectedRoot) {
+            throw 'DOTNET_ROOT does not select the successful isolated installation.'
+        }
+        $dotnet = Join-Path $expectedRoot 'dotnet'
+        if ([IO.Path]::GetFullPath((Get-Command dotnet -CommandType Application).Source) -cne $dotnet) {
+            throw 'PATH does not select the successful isolated installation.'
+        }
+        $version = & $dotnet --version
+        if ($LASTEXITCODE -ne 0) {
+            throw "The selected .NET SDK failed with exit code $LASTEXITCODE."
+        }
+        $expectedVersion = (Get-Content -LiteralPath $env:GLOBAL_JSON_FILE -Raw | ConvertFrom-Json).sdk.version
+        if ($version -cne $expectedVersion) {
+            throw "Expected SDK $expectedVersion from global.json, selected $version."
+        }
+        $info = & $dotnet --info
+        if ($LASTEXITCODE -ne 0) {
+            throw "The installed .NET host failed with exit code $LASTEXITCODE."
+        }
+        $info | Out-Host
+        if (($info -join "`n") -cnotmatch '(?m)^\s*Architecture:\s*arm64\s*$') {
+            throw 'The installed .NET host is not Arm64.'
+        }
