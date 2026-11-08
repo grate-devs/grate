@@ -1,48 +1,68 @@
-name: macOS SDK extraction investigation
+name: Validate isolated macOS SDK setup
 on:
   push:
     branches: [investigate/macos-arm64-extraction]
 permissions:
   contents: read
 jobs:
-  extraction:
+  setup:
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, partial-first-install, stable-sdk]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: fix/macos-arm64-dotnet-extraction
           persist-credentials: false
-      - name: Compare extraction modes with the same archive
+      - name: Prepare controlled installer boundary
         shell: pwsh
+        env:
+          VALIDATION_MODE: ${{ matrix.mode }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $archive = Join-Path $env:RUNNER_TEMP 'sdk.tar.gz'
-          Invoke-WebRequest 'https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100-rc.3.26522.148/dotnet-sdk-11.0.100-rc.3.26522.148-osx-arm64.tar.gz' -OutFile $archive
-          Get-FileHash $archive -Algorithm SHA512
-          & sw_vers
-          & tar --version
-          & locale
-          Get-ChildItem Env: | Where-Object Name -Match 'COPYFILE|TAR|LANG|LC_'
-          foreach ($mode in @('default', 'copyfile-disabled', 'c-locale', 'no-hfs-compression')) {
-              $destination = Join-Path $env:RUNNER_TEMP "extract-$mode"
-              New-Item -ItemType Directory -Path $destination | Out-Null
-              $arguments = @('-xzf', $archive, '-C', $destination)
-              if ($mode -eq 'copyfile-disabled') {
-                  $env:COPYFILE_DISABLE = '1'
-              }
-              if ($mode -eq 'c-locale') {
-                  $env:LC_ALL = 'C'
-              }
-              if ($mode -eq 'no-hfs-compression') {
-                  $arguments += '--no-hfsCompression'
-              }
-              & /usr/bin/tar @arguments 2>&1 | Tee-Object -FilePath "$destination.log"
-              $result = $LASTEXITCODE
-              Write-Output "EXTRACTION $mode exit=$result"
-              if ($result -eq 0) {
-                  & "$destination/dotnet" --version
-              }
-              Remove-Item Env:COPYFILE_DISABLE -ErrorAction SilentlyContinue
-              Remove-Item Env:LC_ALL -ErrorAction SilentlyContinue
-              Remove-Item -LiteralPath $destination -Recurse -Force
+          ./scripts/release/Install-TestDependencies.ps1
+          $source = '.github/actions/setup-dotnet-macos-arm64/action.yml'
+          $action = Get-Content -LiteralPath $source -Raw | ConvertFrom-Yaml
+          if ($env:VALIDATION_MODE -eq 'partial-first-install') {
+              $first = @($action.runs.steps | Where-Object id -EQ first)[0]
+              $first.Remove('uses')
+              $first.Remove('with')
+              $first.shell = 'pwsh'
+              $first.run = @'
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path "$env:DOTNET_INSTALL_DIR/sdk/partial" -Force | Out-Null
+          'injected partial SDK' | Set-Content -LiteralPath "$env:DOTNET_INSTALL_DIR/sdk/partial/marker.txt"
+          Write-Output 'Injected installer failure after creating a partial SDK tree.'
+          exit 1
+          '@
+          }
+          $action | ConvertTo-Yaml | Set-Content -LiteralPath $source -Encoding utf8
+          if ($env:VALIDATION_MODE -eq 'stable-sdk') {
+              @{ sdk = @{ version = '10.0.403'; rollForward = 'latestPatch'; allowPrerelease = $false } } | ConvertTo-Json | Set-Content -LiteralPath global.json
+          }
+      - name: Run the actual composite installer
+        uses: ./.github/actions/setup-dotnet-macos-arm64
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - name: Assert selected installation and run native artifact checks
+        shell: pwsh
+        env:
+          VALIDATION_MODE: ${{ matrix.mode }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $expectedAttempt = if ($env:VALIDATION_MODE -eq 'partial-first-install') { 'retry' } else { 'first' }
+          if ($env:DOTNET_ROOT -notmatch "/$expectedAttempt/install$") {
+              throw "Wrong installation selected: $env:DOTNET_ROOT"
+          }
+          if (Test-Path -LiteralPath "$env:DOTNET_ROOT/sdk/partial/marker.txt") {
+              throw 'The successful installation contains partial files from the failed attempt.'
+          }
+          dotnet --version
+          if ($env:VALIDATION_MODE -ne 'stable-sdk') {
+              ./scripts/verify-packages.ps1 -Kind Standalone -RuntimeIdentifier osx-arm64 -OutputDirectory "$env:RUNNER_TEMP/artifact-check" -RunSmokeTest
           }
