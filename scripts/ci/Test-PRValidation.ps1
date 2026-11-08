@@ -27,7 +27,7 @@ function New-Fixture {
     foreach ($job in $jobs) {
         $stepNames = @()
         if ($job.name -ceq 'Build') { $stepNames = @('Restore dependencies', 'Build') }
-        if ($job.name -ceq 'PR validation policy') { $stepNames = @('Test aggregate decision policy') }
+        if ($job.name -ceq 'PR validation policy') { $stepNames = @('Check build-independent contracts') }
         if ($job.name -ceq 'NuGet libraries and installed tool') {
             $stepNames = @('Check standalone verification command contract', 'Verify packages across supported frameworks')
         }

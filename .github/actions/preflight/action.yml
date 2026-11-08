@@ -1,0 +1,40 @@
+name: Build-independent checks
+description: Check repository policies, automation and documentation before compiling grate.
+runs:
+  using: composite
+  steps:
+    - name: Check repository policies and automation
+      shell: pwsh
+      run: ./scripts/ci/Invoke-Preflight.ps1
+    - name: Verify local OCI digest preservation
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        sudo apt-get update -qq
+        sudo apt-get install --yes --no-install-recommends skopeo
+        ./scripts/release/check_docker_oci_copy.ps1
+    - name: Build documentation
+      uses: actions/jekyll-build-pages@v1
+      with:
+        source: docs
+        destination: _site
+    - name: Check published skill and literal SQL tokens
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        foreach ($path in @(
+          '_site/skills/use-grate/SKILL.html',
+          '_site/skills/use-grate/references/authoring.html',
+          '_site/skills/use-grate/assets/sqlite-example/up/001_create_widgets.sql'
+        )) {
+          if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Missing documentation output: $path"
+          }
+        }
+        if (!(Select-String -LiteralPath '_site/skills/use-grate/references/authoring.html' -Pattern '{{TokenName}}' -SimpleMatch -Quiet)) {
+          throw 'Published authoring guidance must retain literal SQL tokens.'
+        }
+        if (!(Select-String -LiteralPath '_site/skills/use-grate/SKILL.html' -Pattern 'references/authoring.html' -SimpleMatch -Quiet)) {
+          throw 'Published skill must link to its authoring guidance.'
+        }

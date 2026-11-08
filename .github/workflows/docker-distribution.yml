@@ -26,27 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Test Docker tag selection and local build commands
-        shell: pwsh
-        run: ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
-      - name: Test history preservation and release digest verification
-        shell: pwsh
-        run: ./scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
-      - name: Check local helper syntax
-        shell: pwsh
-        run: |
-          $tokens = $null
-          $errors = $null
-          $null = [Management.Automation.Language.Parser]::ParseFile("$PWD/build-docker-local.ps1", [ref]$tokens, [ref]$errors)
-          if ($errors.Count) { throw ($errors.Message -join '; ') }
-      - name: Verify digest preservation using local files without registry publication
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          sudo apt-get update -qq
-          sudo apt-get install --yes --no-install-recommends skopeo
-          ./scripts/release/check_docker_oci_copy.ps1
+      - uses: ./.github/actions/preflight
       - name: Exercise loopback-registry publication only when explicitly requested
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.local_registry_check == true }}
         shell: pwsh

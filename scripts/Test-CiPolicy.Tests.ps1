@@ -7,13 +7,15 @@ Set-StrictMode -Version Latest
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $workflow = Get-Content -LiteralPath "$repositoryRoot/.github/workflows/ci.yml" -Raw
+$preflightScript = Get-Content -LiteralPath "$repositoryRoot/scripts/ci/Invoke-Preflight.ps1" -Raw
 $aggregate = Join-Path $PSScriptRoot 'Assert-CiResults.ps1'
 $requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
 $expensiveJobs = @('analyze', 'test', 'packages', 'standalone', 'docker')
 
 function Assert-WorkflowPolicy {
     param(
-        [string] $Workflow
+        [string] $Workflow,
+        [string] $Preflight = $preflightScript
     )
 
     # Inspect only this scheduling contract. actionlint checks full YAML and
@@ -32,6 +34,18 @@ function Assert-WorkflowPolicy {
         }
     }
 
+    foreach ($job in @('build-code', 'fast-tests')) {
+        if ($jobs[$job] -notmatch '(?m)^    needs: validation-policy\r?$') {
+            throw "$job must depend on build-independent checks."
+        }
+        if ($jobs[$job] -match '(?m)^    (if|continue-on-error):') {
+            throw "$job cannot bypass failed build-independent checks."
+        }
+    }
+    if (!$jobs['validation-policy'].Contains('uses: ./.github/actions/preflight')) {
+        throw 'The first job must run the shared build-independent checks.'
+    }
+
     $aggregateJob = $jobs['ci-result']
     $expectedNeeds = '    needs: [' + ($requiredJobs -join ', ') + ']'
     if (!$aggregateJob -or !$aggregateJob.Contains($expectedNeeds) -or $aggregateJob -notmatch '(?m)^    if: always\(\)\r?$') {
@@ -44,10 +58,10 @@ function Assert-WorkflowPolicy {
         throw 'The test report must collect both test tiers.'
     }
     if ($jobs['test'] -match 'category: Basic_tests' -or ([regex]::Matches($jobs['fast-tests'], 'category: Basic_tests')).Count -ne 2) {
-        throw 'Linux and Windows isolated tests must run once in the first tier.'
+        throw 'Linux and Windows isolated tests must run once after preflight.'
     }
-    if (!$jobs['fast-tests'].Contains('run: ./.github/scripts/monitor-test-containers.Tests.ps1') -or $jobs['test'].Contains('run: ./.github/scripts/monitor-test-containers.Tests.ps1')) {
-        throw 'Container monitor regressions must run in the Linux isolated-test lane.'
+    if (!$Preflight.Contains('-Path .github/scripts -Filter monitor-test-containers.Tests.ps1') -or $jobs['fast-tests'].Contains('monitor-test-containers.Tests.ps1') -or $jobs['test'].Contains('monitor-test-containers.Tests.ps1')) {
+        throw 'Container monitor regressions must run before compiling test projects.'
     }
 }
 
@@ -117,7 +131,11 @@ $skippedAggregate = $workflow.Replace('    if: always()', '    if: success()')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $skippedAggregate } -ExpectedMessage 'must always evaluate'
 $missingProducer = $workflow.Replace('needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy, pr-validation]', 'needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy]')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $missingProducer } -ExpectedMessage 'must always evaluate'
-$missingMonitorTests = $workflow.Replace('run: ./.github/scripts/monitor-test-containers.Tests.ps1', 'run: Write-Host skipped')
-Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $missingMonitorTests } -ExpectedMessage 'Container monitor regressions must run'
+$missingMonitorTests = $preflightScript.Replace('-Path .github/scripts -Filter monitor-test-containers.Tests.ps1', '-Path scripts -Filter skipped.ps1')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Preflight $missingMonitorTests } -ExpectedMessage 'Container monitor regressions must run'
+$ungatedBuilds = $workflow.Replace('    needs: validation-policy', '')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $ungatedBuilds } -ExpectedMessage 'must depend on build-independent checks'
+$bypassedChecks = $workflow.Replace('uses: ./.github/actions/preflight', 'run: Write-Host skipped')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $bypassedChecks } -ExpectedMessage 'must run the shared'
 
 Write-Host "PASS: staged wiring, all-success aggregate, $rejectionCount per-job rejection cases, empty input and scheduling mutations."
