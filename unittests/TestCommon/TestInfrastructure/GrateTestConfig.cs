@@ -1,4 +1,4 @@
-namespace TestCommon.TestInfrastructure;
+﻿namespace TestCommon.TestInfrastructure;
 
 public record GrateTestConfig
 {

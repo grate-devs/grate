@@ -6,16 +6,16 @@ using Microsoft.Data.Sqlite;
 
 namespace grate.sqlite.Infrastructure;
 
-public class SqliteScriptFailed: ScriptFailed
+public class SqliteScriptFailed : ScriptFailed
 {
-    public SqliteScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception cause) 
+    public SqliteScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception cause)
         : base(folder, file, scriptText, cause)
     {
     }
 
     protected override IDictionary<string, object?> GetDbScriptErrors()
         => GatherDetails(DbException as SqliteException);
-    
+
     protected override int Position => this.DbException is SqliteException sqliteException
         ? sqliteException.ErrorCode
         : 0;
@@ -25,7 +25,7 @@ public class SqliteScriptFailed: ScriptFailed
 
     private IDictionary<string, object?> GatherDetails(SqliteException? ex)
     {
-        return ex is null  
+        return ex is null
             ? new Dictionary<string, object?>()
             : new Dictionary<string, object?>()
             {

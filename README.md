@@ -1,61 +1,109 @@
-# IMPORTANT!
-
-To keep the `grate` project healthy and sustainable, we have made the decision to move from `erikbra/grate` to `grate-devs/grate`.
-
-Please update your remote URLs to point to the new location:
-
-| Platform   | Old location  | New location     |
-| ---------- | ------------- | ---------------- |
-| Github org | erikbra/grate | grate-devs/grate |
-| NuGet      | erikbra.grate | grate-devs.grate |
-| DockerHub  | erikbra/grate | no change        |
-
-
 # grate
 
-SQL scripts migration runner 
+SQL scripts migration runner
+
+**Database migrations in plain SQL.**
+
+Keep your database changes alongside your application code. grate runs your SQL
+scripts in a predictable order and records what has been applied, so you can
+deploy the same changes from your laptop, your tests, or your CI/CD pipeline.
+Use your database's SQL dialect and features without a migration DSL or an ORM.
+
+Supports **SQL Server (including Azure SQL), PostgreSQL, MariaDB/MySQL, SQLite,
+and Oracle**, on Windows, Linux, and macOS.
+
+[Documentation](https://grate-devs.github.io/grate/) ·
+[Installation](docs/GettingGrate.md) ·
+[Releases](https://github.com/grate-devs/grate/releases/latest) ·
+[Examples](examples) ·
+[Contributing](CONTRIBUTING.md)
 
 [![CI](https://github.com/grate-devs/grate/actions/workflows/ci.yml/badge.svg)](https://github.com/grate-devs/grate/actions/workflows/ci.yml)
 [![Build](https://github.com/grate-devs/grate/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/grate-devs/grate/actions/workflows/build.yml)
 [![Integration tests](https://github.com/grate-devs/grate/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/grate-devs/grate/actions/workflows/integration-tests.yml)
 
-## Example workflow runs
+## SQL files, with a place for each kind of change
 
-Below are examples on how to integrate grate in your workflow in different CI systems.
+Schema changes and stored procedure definitions have different maintenance needs.
+grate lets you keep both in source control without turning every edit into a new
+one-time migration.
 
-| Build pipeline | Last run                                                                                                                                                                                    | Build definition                                                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Github actions | [![Example grate workflow](https://github.com/grate-devs/grate/actions/workflows/grate-workflow.yml/badge.svg)](https://github.com/grate-devs/grate/actions/workflows/grate-workflow.yml)   | [/examples/github-actions/grate-workflow.yml](https://github.com/grate-devs/grate/blob/main/.github/workflows/grate-workflow.yml)   |
-| Azure DevOps   | [![Build Status](https://dev.azure.com/my-grate/grate/_apis/build/status/erikbra.grate?branchName=main)](https://dev.azure.com/my-grate/grate/_build/latest?definitionId=1&branchName=main) | [/examples/AzureDevops/azure-pipelines.yml](https://github.com/grate-devs/grate/blob/main/examples/AzureDevops/azure-pipelines.yml) |
+| Script type | Default folders include | When it runs |
+| --- | --- | --- |
+| [One-time](docs/ScriptTypes/OneTimeScripts.md) | `up` | Once per database. Changing an applied script fails the migration by default. |
+| [Anytime](docs/ScriptTypes/AnytimeScripts.md) | `functions`, `views`, `sprocs`, `indexes` | When the script is new or has changed. Write these scripts so they can run again. |
+| [Everytime](docs/ScriptTypes/EverytimeScripts.md) | `beforeMigration`, `permissions`, `afterMigration` | On every migration, whether the script has changed or not. |
 
-## Goal
+Folders run in a defined order, with scripts sorted alphabetically within them.
+Create only the folders you need, or [customize the layout and execution policies](docs/ConfigurationOptions/FolderConfiguration.md)
+to fit an existing project. grate stores [migration history](docs/MigrationTables.md)
+in the target database, including script names, hashes, and versions.
 
-The goal of grate is to be largely backwards compatible with RoundhousE, which is an amazing tool. It is initiated by the main
-maintainer of RoundhousE for the last three years, please see this issue in the RoundhousE repo for details: https://github.com/chucknorris/roundhouse/issues/438.
+## Try it with SQLite
 
-While early versions of grate may not support every last RoundhousE feature, those features that are implemented should work identically, or with only very small changes.  For detailed information see the [migration](docs/MigratingFromRoundhousE.md) docco.
+This example uses a local database file, so you don't need a database server.
 
-## Docs
+Install the [.NET tool](https://www.nuget.org/packages/grate/) with the .NET SDK
+and a matching runtime installed:
 
-Full documentation is available [on the grate site](https://grate-devs.github.io/grate/).
+```sh
+dotnet tool install --global grate
+```
 
-For coding agents working in projects that use grate, install the bundled [use-grate skill](docs/skills/use-grate/SKILL.md) with `grate skills install --local` or `--global`. See its [usage and verification guide](docs/AgentSkill.md).
+Prefer a standalone executable or Docker? See [installation options and runtime requirements](docs/GettingGrate.md).
 
-## Why the name grate?
+Create a directory named `db/up` and save this as `db/up/001_create_greetings.sql`:
 
-grate is short for migrate. And it's also pronounced the same way as _great_, so, there you go. 
+```sql
+CREATE TABLE greetings (
+    id INTEGER PRIMARY KEY,
+    message TEXT NOT NULL
+);
+```
 
-## Status
+Run from the directory containing `db`:
 
-grate is catching up on RoundhousE features, there are a couple of features missing, they are documented in unit tests. But I've successfully replaced 
-RoundhousE with grate in a 5-year-in-development folder of SQL scripts, without any issues. 
+```sh
+grate --databasetype sqlite --connectionstring "Data Source=hello-grate.db" --files ./db --silent
+```
+
+grate creates `hello-grate.db`, runs the script, and records it in its migration
+history. Run the same command again: the unchanged one-time script is skipped.
+For the next schema change, add `002_...sql` to `db/up` and run grate again.
+
+For another database, select its `--databasetype` and supply its connection string.
+See [getting started](docs/GettingStarted.md) for the full folder order and workflow.
+
+## Fit grate into your workflow
+
+Use the CLI locally and in CI/CD, run it in a container, or embed the
+[.NET libraries](src/grate.core/NuGet.md) in your application or test setup.
+
+| What you want to do | Where to start |
+| --- | --- |
+| Configure connections, transactions, previews, or baselining | [Configuration options](docs/ConfigurationOptions/index.md) |
+| Select scripts by environment or supply deployment values | [Environment scripts](docs/EnvironmentScripts.md) and [token replacement](docs/TokenReplacement.md) |
+| Run migrations in a pipeline | [GitHub Actions](.github/workflows/grate-workflow.yml), [Azure Pipelines](examples/AzureDevops/azure-pipelines.yml), and [CI logging](examples/ci-logging/README.md) |
+| Run migrations in containers or Kubernetes | [Docker](examples/docker/readme.md), [init containers](examples/k8s/initcontainer/README.md), and [multi-tenant deployments](examples/k8s/multitenancy/README.md) |
+| Prepare a database for automated tests | [Test integration example](examples/test-integration/sample-test-integration/readme.md) |
+| Work with a coding agent | [Bundled use-grate skill](docs/AgentSkill.md) |
+
+## Coming from RoundhousE?
+
+grate grew out of experience maintaining RoundhousE and carries forward its
+SQL-first workflow. See [migrating from RoundhousE](docs/MigratingFromRoundhousE.md)
+for compatibility details and the changes to make when moving an existing project.
 
 ## Contributing
+
+Bug reports, documentation improvements, and code contributions are welcome.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and tests,
+or [open an issue](https://github.com/grate-devs/grate/issues) to report a problem
+or discuss an idea. Coding agents should also follow [AGENTS.md](AGENTS.md).
 
 We welcome AI-assisted contributions. You are responsible for understanding,
 reviewing, and verifying the changes you submit, with the same quality standards
 as code you wrote yourself. Include good automated test coverage for new behavior
 and regression tests for bug fixes, and describe the checks you ran and any gaps.
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md). Coding agents should also follow
-[AGENTS.md](AGENTS.md), including the [test and artifact guide](docs/agents/testing.md).
+grate is short for *migrate*, pronounced like *great*, and [MIT licensed](LICENSE).

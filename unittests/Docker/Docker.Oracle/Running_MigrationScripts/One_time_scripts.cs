@@ -14,7 +14,7 @@ public class One_time_scripts(OracleGrateTestContext testContext, ITestOutputHel
 {
     protected override string CreateView1 => base.CreateView1 + " FROM DUAL";
     protected override string CreateView2 => base.CreateView2 + " FROM DUAL";
-    
+
     [Fact]
     public override async Task Fails_if_changed_between_runs()
     {
@@ -52,7 +52,7 @@ public class One_time_scripts(OracleGrateTestContext testContext, ITestOutputHel
 
         Assert.Single(scripts);
         Assert.Equal(Context.Sql.SelectVersion, scripts.First());
-        
+
         //await Context.DropDatabase(db);
     }
 

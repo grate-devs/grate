@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 
 namespace Sqlite.Running_MigrationScripts;
@@ -96,8 +96,11 @@ public sealed class DryRunSafety(ITestOutputHelper output) : IDisposable
     {
         var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
         {
-            WorkingDirectory = _root, UseShellExecute = false,
-            RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true
+            WorkingDirectory = _root,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         foreach (var argument in new[]
         {

@@ -9,7 +9,7 @@ namespace TestCommon.Generic;
 
 public abstract class GenericMigrationTables(IGrateTestContext context, ITestOutputHelper testOutput)
 {
-    protected GenericMigrationTables(): this(null!, null!)
+    protected GenericMigrationTables() : this(null!, null!)
     {
     }
 
@@ -33,7 +33,7 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await migrator.Migrate();
@@ -61,13 +61,13 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
         var parent = TestConfig.CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateInvalidSql(parent, knownFolders[KnownFolderKeys.Up]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             var ex = await Assert.ThrowsAsync<MigrationFailed>(migrator.Migrate);
@@ -96,7 +96,7 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
 
         var parent = TestConfig.CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -183,7 +183,7 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
             Assert.Equal(1, errorCaseCountAfterSecondMigration);
             Assert.Equal(0, normalCountAfterSecondMigration);
         });
-        
+
         //await Context.DropDatabase(db);
 
     }
@@ -214,7 +214,7 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
 
         var parent = TestConfig.CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -241,7 +241,7 @@ public abstract class GenericMigrationTables(IGrateTestContext context, ITestOut
         Assert.Equal("a.b.c.d", version.version);
         // Validate the version is finished after running without errors
         Assert.Equal(MigrationStatus.Finished, version.status);
-        
+
         //await Context.DropDatabase(db);
     }
 

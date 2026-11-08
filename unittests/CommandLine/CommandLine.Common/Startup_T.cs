@@ -1,4 +1,4 @@
-using CommandLine.Common.TestInfrastructure;
+﻿using CommandLine.Common.TestInfrastructure;
 using grate.Configuration;
 using grate.Migration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,13 +11,13 @@ namespace CommandLine.Common;
 public abstract class Startup<
     TTestContainerDatabase,
     TExternalDatabase,
-    TGrateTestContext>: TestCommon.Startup<TTestContainerDatabase, TExternalDatabase, TGrateTestContext>
+    TGrateTestContext> : TestCommon.Startup<TTestContainerDatabase, TExternalDatabase, TGrateTestContext>
     where TTestContainerDatabase : ITestDatabase
     where TExternalDatabase : ITestDatabase
-    where TGrateTestContext : IGrateTestContext 
+    where TGrateTestContext : IGrateTestContext
 {
     protected abstract DatabaseType DatabaseType { get; }
-    
+
     protected override void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context)
     {
         services.AddSingleton<IGrateMigrator>(new CommandLineGrateMigrator(DatabaseType));

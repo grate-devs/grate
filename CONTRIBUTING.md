@@ -44,6 +44,30 @@ The second command runs the test executable directly because the repository's
 `global.json` also selects the test runner. This workflow covers `net10.0` only;
 building and testing `net11.0` still requires the pinned SDK.
 
+### Solution and package configuration
+
+Open `grate.slnx` in your IDE or use `dotnet build grate.slnx`. The XML solution
+uses the same projects and build configurations as the former `.sln` file.
+The `CoreTests.slnf` and `UnitTests.slnf` filters select subsets of this solution.
+SLNX requires .NET SDK 9.0.200 or newer; the pinned SDK and stable .NET 10 fallback
+both support it.
+
+Define package versions in `Directory.Packages.props` and add versionless
+`PackageReference` entries to projects. Central transitive pinning remains enabled:
+centrally listed versions also constrain transitive dependencies, and pinned
+dependencies can become explicit dependencies of packed libraries. Per-project
+`VersionOverride` entries are disabled so package updates have one source of truth.
+See [Central Package Management](https://learn.microsoft.com/nuget/consume-packages/central-package-management).
+
+`NuGet.Config` selects nuget.org for packages and vulnerability data, including in
+Docker builds. `Directory.Build.props` enables audit of direct and transitive
+dependencies at every severity and package pruning, including when building only
+`net8.0` or `net9.0`. Pruning removes packages already supplied by the target
+framework. Audit warnings fail the build through the existing warnings-as-errors
+policy; fix the dependency rather than disabling audit.
+See [NuGet Audit](https://learn.microsoft.com/nuget/concepts/auditing-packages)
+and [package pruning](https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#pruning-packagereference-dependencies).
+
 ## Get (buy, borrow, rent, or whatever) a computer with an operating system on it
 
 .NET 8+ runs on Windows, macOS or Linux. You choose what you like to use for development.
@@ -123,6 +147,29 @@ When automatic image building is disabled, prepare it explicitly:
 ```sh
 docker build -f installers/docker/Dockerfile -t grate-local:tests .
 ```
+
+## CI scheduling
+
+PR CI first runs `Build`, `PR validation policy` and the Linux/Windows
+`Basic_tests` lanes in parallel.
+The database matrix, CodeQL analysis, NuGet/tool validation, standalone packages
+and Alpine checks start only after all four first-tier jobs succeed. Each suite
+still runs all supported target frameworks; isolated tests are not repeated in
+the database tier. Superseded PR runs are cancelled by workflow concurrency.
+
+This saves runner time on early failures at the cost of delaying expensive checks
+on successful runs. Test artifacts and the combined report cover both test tiers.
+`CI result` succeeds only when every CI phase succeeds, including reporting and
+the `PR validation` policy/inventory checks. A failed, cancelled, missing or
+unexpectedly skipped phase fails the aggregate.
+This phase summary complements the `PR validation` matrix-inventory check added
+in #913. Its main-protection ruleset remains a separate proposal; workflow changes
+do not themselves configure repository branch protection.
+
+Run scheduling/gate regressions locally with
+`pwsh -NoProfile -File scripts/Test-CiPolicy.Tests.ps1` and validate workflow syntax
+with `actionlint .github/workflows/ci.yml`. Separate integration and
+release-artifact workflows retain their own triggers and trust boundaries.
 
 ## Build a self-contained executable (if you want)
 

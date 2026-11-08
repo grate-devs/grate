@@ -46,7 +46,7 @@ public record OracleTestContainerDatabase(
                 "/container-entrypoint-startdb.d/01-test-logon-delay.sql")
             .Build();
     }
-    
+
     public override string AdminConnectionString => $@"Data Source={Hostname}:{Port}/FREEPDB1;User ID=system;Password={AdminPassword};Pooling=False";
     public override string ConnectionString(string database) => $@"Data Source={Hostname}:{Port}/FREEPDB1;User ID={database.ToUpper()};Password={AdminPassword};Pooling=False";
     public override string UserConnectionString(string database) => $@"Data Source={Hostname}:{Port}/FREEPDB1;User ID={database.ToUpper()};Password={AdminPassword};Pooling=False";

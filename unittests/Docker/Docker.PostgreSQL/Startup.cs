@@ -1,4 +1,4 @@
-using grate.Configuration;
+﻿using grate.Configuration;
 using PostgreSQL.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
@@ -7,7 +7,7 @@ using TestCommon.TestInfrastructure;
 namespace Docker.PostgreSQL;
 
 // ReSharper disable once UnusedType.Global
-public class Startup: Docker.Common.Startup<PostgreSqlTestContainerDatabase, PostgreSqlExternalDatabase, PostgreSqlGrateTestContext>
+public class Startup : Docker.Common.Startup<PostgreSqlTestContainerDatabase, PostgreSqlExternalDatabase, PostgreSqlGrateTestContext>
 {
     protected override DatabaseType DatabaseType => DatabaseType.PostgreSQL;
 }

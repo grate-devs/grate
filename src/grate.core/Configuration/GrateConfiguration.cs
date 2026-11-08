@@ -15,7 +15,7 @@ public record GrateConfiguration
     /// </summary>
 
     public IFoldersConfiguration? Folders { get; init; } = FoldersConfiguration.Default();
-  
+
     /// <summary>
     /// The folder used by grate to find the scripts. The subfolders must follow the naming convention of grate. See grate default folder structure for more information.
     /// </summary>

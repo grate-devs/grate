@@ -20,24 +20,24 @@ public class DbMigrator_
 
         var changedConfig = config with { ConnectionString = "Server=server2" };
         var changedMigrator = migrator with { Configuration = changedConfig };
-        
+
         Assert.Equal("Server=server1", migrator.Configuration.ConnectionString);
         Assert.Equal("Server=server2", changedMigrator.Configuration.ConnectionString);
     }
-    
+
     [Fact]
     public void Setting_the_Database_does_not_change_the_original()
     {
         _database.DatabaseName.Returns("server1");
-        
+
         var migrator = new DbMigrator(_database, null!, null!, _config);
 
         var changedDatabase = Substitute.For<IDatabase>();
         changedDatabase.DatabaseName.Returns("server2");
         var changedMigrator = migrator with { Database = changedDatabase };
-        
+
         Assert.Equal("server1", migrator.Database.DatabaseName);
         Assert.Equal("server2", changedMigrator.Database.DatabaseName);
     }
-    
+
 }

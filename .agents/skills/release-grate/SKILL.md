@@ -6,7 +6,7 @@ description: "Prepare, publish, verify, or recover grate project releases using 
 # Release grate
 
 Read [the release guide](../../../docs/ReleaseProcess.md), then inspect
-`.github/workflows/build.yml`, `scripts/release/resolve_release_context.py` and `GitVersion.yml`
+`.github/workflows/build.yml`, `scripts/release/resolve_release_context.ps1` and `GitVersion.yml`
 at the intended release commit. Resolve repository-relative paths with
 `git rev-parse --show-toplevel`. The guide is the human procedure; this skill
 coordinates the same workflows. If the implementation differs, report the gap
@@ -124,8 +124,8 @@ uploading. Login success or HTTP 200 alone does not establish push permission.
 Do not weaken environment protections or extract secret values to test access.
 
 A specifically requested historical Docker tag migration uses the read-only
-snapshot mode of `scripts/release/migrate_docker_tags.py` first, then a reviewed
-frozen plan and `--copy` only within that authorization. The copy command performs
+snapshot mode of `scripts/release/migrate_docker_tags.ps1` first, then a reviewed
+frozen plan and `-Copy` only within that authorization. The copy command performs
 real registry writes; it is not an access test. Keep its plan and reports outside
 git, using CI artifacts or linked maintenance records. Preserve digests, all
 platforms, attestations and referenced blobs,
