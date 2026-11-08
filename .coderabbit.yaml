@@ -1,0 +1,101 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Shared review rules live in AGENTS.md and docs/agents, not in copied prompts.
+language: en-US
+early_access: false
+enable_free_tier: true
+inheritance: false
+tone_instructions: >-
+  Be concise. Report concrete defects with file/line, triggering condition and
+  consequence. Separate evidence gaps from defects; omit mechanical style nits.
+
+reviews:
+  profile: chill
+  auto_approvals:
+    enabled: false
+    allow_author_approval: false
+  # Retain the review/configuration evidence needed to evaluate the pilot.
+  review_info: true
+  review_details: true
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  high_level_summary_instructions: >-
+    Summarize the concrete problem and resulting behavior concisely. Distinguish
+    mechanical formatting, functional changes and compatibility implications.
+    Keep the author's PR description intact; put the generated summary in the walkthrough.
+  merge_risk_instructions: >-
+    Changes to migration identity, persisted script hashes/names/history,
+    transaction/rollback/retry behavior, provider SQL/splitters, upgrades of
+    existing databases, public APIs and packaged CLI behavior need concrete
+    compatibility evidence. Whitespace/encoding-only source changes with identical
+    syntax tokens and literal values are low risk. Use AGENTS.md and
+    docs/agents/providers.md, docs/agents/verification.md and docs/agents/testing.md
+    as repository guidance. Passing CI alone does not establish correctness.
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  poem: false
+  in_progress_fortune: false
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  related_issues: false
+  related_prs: false
+  auto_assign_reviewers: false
+  slop_detection:
+    enabled: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 5
+    drafts: false
+  # This pilot provides advice, without generating or committing changes.
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: warning
+    description:
+      mode: warning
+    issue_assessment:
+      mode: warning
+  tools:
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    yamllint:
+      enabled: false
+    # Embedded SQL spans five dialects; do not apply a default lint dialect.
+    sqlfluff:
+      enabled: false
+    squawk:
+      enabled: false
+
+knowledge_base:
+  learnings:
+    scope: local
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - files: AGENTS.md
+        applyTo: "**/*"
+      # Without applyTo, these documents govern only docs/agents/**.
+      - files: docs/agents/providers.md
+        applyTo: "**/*"
+      - files: docs/agents/verification.md
+        applyTo: "**/*"
+      - files: docs/agents/testing.md
+        applyTo: "**/*"
