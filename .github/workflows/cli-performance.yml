@@ -1,4 +1,4 @@
-name: CLI performance experiments
+name: POC · CLI performance experiments
 
 on:
   pull_request:
