@@ -53,20 +53,20 @@ public class GrateMigrator_
         Assert.Equal("server1", grateMigrator.Database.DatabaseName);
         Assert.Equal("server2", changedMigrator!.Database.DatabaseName);
     }
-    
+
     [Theory]
     [MemberData(nameof(Environments))]
     public void Logger_has_the_correct_LogCategory(GrateEnvironment environment, string logCategory)
     {
         var config = new GrateConfiguration() { Environment = environment };
         var dbMigrator = new DbMigrator(_database, null!, null!, config);
-        
+
         var loggerFactory = Substitute.For<ILoggerFactory>();
         _ = new GrateMigrator(loggerFactory, dbMigrator);
 
         loggerFactory.Received().CreateLogger(logCategory);
     }
-    
+
     public static TheoryData<GrateEnvironment, string> Environments() => new()
     {
         { GrateEnvironment.Internal, "Grate.Migration.Internal" },

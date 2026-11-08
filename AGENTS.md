@@ -17,6 +17,10 @@ product scope; their names do not make them external development instructions.
   `unittests/TestCommon`: shared fixtures and inherited provider contracts.
   Provider projects exercise actual databases. CommandLine and Docker projects
   exercise distribution boundaries; their artifacts and environments matter.
+- `README.md`: the GitHub entry point. `docs/`: user documentation and the
+  GitHub Pages site; `docs/agents/`: repository development guidance.
+- `examples/`: consumer workflows. `installers/` and `scripts/release/`:
+  distribution packaging and release automation.
 
 Read [provider guidance](docs/agents/providers.md) for SQL, history, splitters,
 or transaction changes, and [verification guidance](docs/agents/verification.md)
@@ -68,8 +72,10 @@ unavailable or prohibited, report that limitation and perform the review yoursel
 
 - Inspect `global.json`, `Directory.Build.props`, `Directory.Packages.props`,
   `.editorconfig`, and the changed project's `.csproj`. The repository targets
-  net8.0/net9.0/net10.0 with nullable analysis and warnings as errors; a net10-only
-  local run does not establish compatibility with all targets.
+  net8.0/net9.0/net10.0/net11.0 with nullable analysis and warnings as errors.
+  Treat those files as the source of truth for SDK, test runner, and framework
+  selection; a single-framework local run does not establish compatibility with
+  all targets. See `CONTRIBUTING.md` for setup and the stable-SDK fallback.
 - Use central package versions and existing dependencies. Match neighboring
   file-scoped namespaces, records/classes, naming, and async conventions; public
   methods here often have no `Async` suffix. Avoid style-only API changes.
@@ -83,6 +89,22 @@ unavailable or prohibited, report that limitation and perform the review yoursel
   visible. Do not introduce blocking waits, unobserved tasks, or concurrent use
   of a migration's connection. Public signature changes need compatibility care.
 - Keep credentials and access tokens out of logs and shared test evidence.
+
+## Keep public documentation useful
+
+- Lead the README with what grate does, supported databases, a small working
+  example, and links to the next tasks. Keep RoundhousE compatibility in the
+  migration guide rather than presenting feature catch-up as grate's purpose.
+- Keep the README and `docs/index.md` consistent. Link to detailed configuration,
+  installation, and release guidance instead of duplicating option tables or
+  runtime/package-manager version lists that can drift.
+- Check documented CLI options and defaults against the parser and configuration,
+  and SQL examples against the named provider. Distinguish released features
+  from changes available only in the checkout.
+- For documentation-only changes, check relative links and affected examples.
+  Exercise changed runnable examples against a disposable local database when
+  practical; a full provider test matrix is not needed for prose edits. Report
+  which executable/version was used and any checks that were not run.
 
 ## Write repository scripts in PowerShell
 

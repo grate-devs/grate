@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using grate.Configuration;
 using grate.Exceptions;
 using SqlServer.TestInfrastructure;
@@ -144,10 +144,10 @@ CREATE USER [myuser] WITHOUT LOGIN";
             .WithSqlFilesDirectory(parent)
             .WithTransaction()
             .Build() with
-            {
-                // Keep script commands bounded during the regression.
-                CommandTimeout = 10
-            };
+        {
+            // Keep script commands bounded during the regression.
+            CommandTimeout = 10
+        };
 
     private async Task Migrate(GrateConfiguration config)
     {

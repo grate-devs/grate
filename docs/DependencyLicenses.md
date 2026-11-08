@@ -12,7 +12,7 @@ existing JSON library and require no additional build-time package or PowerShell
 installation. Both paths call the same notice-generation engine.
 
 ```powershell
-dotnet restore grate.sln
+dotnet restore grate.slnx
 $assets = Get-ChildItem -Path src,unittests -Filter project.assets.json -Recurse -Force |
     ForEach-Object FullName
 ./scripts/licenses/Export-DependencyLicenses.ps1 `

@@ -9,8 +9,8 @@ internal static class ArgumentParsers
     // Accept both multiple arguments and comma/semicolon-separated environment names.
     public static CommandLineGrateEnvironment? ParseEnvironment(ArgumentResult result)
     {
-        return result.Tokens.Any() 
-            ? new CommandLineGrateEnvironment(result.Tokens.SelectMany(GetEnvironments)) 
+        return result.Tokens.Any()
+            ? new CommandLineGrateEnvironment(result.Tokens.SelectMany(GetEnvironments))
             : null;
     }
 

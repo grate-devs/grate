@@ -557,7 +557,7 @@ GO
 
 " + Symbols_to_check + @" 
 */";
-            
+
             _testOutput.WriteLine(sql_to_match);
             var result = _splitter.Split(sql_to_match).ToList();
             Assert.Single(result);

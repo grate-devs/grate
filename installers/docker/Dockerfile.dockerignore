@@ -2,6 +2,7 @@
 # invalidate the image cache each time dotnet test builds the solution.
 **
 !global.json
+!NuGet.Config
 !*.props
 !*.targets
 !LICENSE

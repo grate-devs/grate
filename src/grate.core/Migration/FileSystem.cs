@@ -20,7 +20,7 @@ internal static class FileSystem
                         GetFileNameWithoutExtension(f.FullName)),
                     CurrentCultureIgnoreCase);
     }
-    
+
     public static DirectoryInfo CreateRandomTempDirectory()
     {
         var dummyFile = Path.GetTempFileName();

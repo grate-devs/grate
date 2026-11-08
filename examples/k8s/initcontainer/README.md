@@ -38,5 +38,11 @@ Now let's get started with your terminal (any Linux dist, MacOS or WSL2):
 
 ## Notes
 
+- The sample service targets .NET 10 and has explicit package versions, so it can
+  be built both inside this repository and from the `sample-service/` directory
+  copied by the Dockerfile. Build locally with `dotnet build sample-service` using
+  a stable .NET 10 SDK, or build the image from this directory with
+  `docker build -t grate-k8s-sample .`.
+
 - Curious how it works, see the `Dockerfile` and `Dockerfile-db`.
 

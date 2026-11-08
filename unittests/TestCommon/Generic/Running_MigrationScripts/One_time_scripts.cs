@@ -8,13 +8,13 @@ using static grate.Configuration.KnownFolderKeys;
 namespace TestCommon.Generic.Running_MigrationScripts;
 
 // ReSharper disable once InconsistentNaming
-public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
-    protected One_time_scripts(): this(null!, null!)
+    protected One_time_scripts() : this(null!, null!)
     {
     }
-    
+
     [Fact]
     public async Task Are_not_run_more_than_once_when_unchanged()
     {
@@ -91,7 +91,7 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
 
         Assert.Single(scripts);
         Assert.Equal(Context.Sql.SelectVersion, scripts.First());
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -105,7 +105,7 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Up]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
@@ -134,7 +134,7 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
 
         Assert.Equal(2, scripts.Length); //script run twice
         Assert.Equal(Context.Syntax.CurrentDatabase, scripts.Last()); // the script was re-run
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -153,7 +153,7 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
         var path = new DirectoryInfo(Path.Combine(parent.ToString(), knownFolders[Up]?.Path ?? throw new Exception("Config Fail")));
 
         WriteSql(path, "token.sql", CreateView1);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
@@ -181,7 +181,7 @@ public abstract class One_time_scripts(IGrateTestContext context, ITestOutputHel
 
         Assert.Equal(2, scripts.Count()); //script marked as run twice
         Assert.Equal("1", result); // but still the first version of the view
-        
+
         //await Context.DropDatabase(db);
     }
 }

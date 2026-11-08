@@ -27,7 +27,7 @@ internal class FoldersConfiguration : Dictionary<string, MigrationsFolder?>, IFo
     public MigrationsFolder? DropDatabase { get; set; }
 
     public static FoldersConfiguration Empty => new();
-    
+
     public override string ToString() => string.Join(';', Values);
 
     public static IFoldersConfiguration Default(IKnownFolderNames? folderNames = null)

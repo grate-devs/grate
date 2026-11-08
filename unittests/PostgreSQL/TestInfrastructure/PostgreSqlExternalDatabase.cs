@@ -1,4 +1,4 @@
-using Npgsql;
+﻿using Npgsql;
 using TestCommon.TestInfrastructure;
 
 namespace PostgreSQL.TestInfrastructure;
@@ -20,14 +20,14 @@ public class PostgreSqlExternalDatabase(GrateTestConfig grateTestConfig) : ITest
 
     public string UserConnectionString(string database)
     {
-         var builder = new NpgsqlConnectionStringBuilder(AdminConnectionString)
-         {
+        var builder = new NpgsqlConnectionStringBuilder(AdminConnectionString)
+        {
             Database = database,
             Username = "zorro" + database.ToLower()[..4],
             Password = "batmanZZ4",
             Timeout = 3
-         };
-         return builder.ConnectionString;
+        };
+        return builder.ConnectionString;
     }
-    
+
 }

@@ -15,7 +15,7 @@ public static class RegistrationExtensions
         services.TryAddTransient<IDatabase, SqliteDatabase>();
         return services;
     }
-    
+
     // ReSharper disable once InconsistentNaming
     public static IServiceCollection AddGrateWithSqlite(this IServiceCollection services, GrateConfiguration? config = null) =>
         services

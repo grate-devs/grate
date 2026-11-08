@@ -5,13 +5,13 @@ using static grate.Configuration.KnownFolderKeys;
 
 namespace TestCommon.Generic.Running_MigrationScripts;
 
-public abstract class DropDatabase(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class DropDatabase(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
-    protected DropDatabase(): this(null!, null!)
+    protected DropDatabase() : this(null!, null!)
     {
     }
-    
+
     [Fact]
     public async Task Ensure_database_gets_dropped()
     {
@@ -20,13 +20,13 @@ public abstract class DropDatabase(IGrateTestContext context, ITestOutputHelper 
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Sprocs]);
-        
+
         var dropConfig = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
             .DropDatabase()  // This is important!
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(dropConfig))
         {
             await migrator.Migrate();

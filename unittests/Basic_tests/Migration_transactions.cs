@@ -1,4 +1,4 @@
-using System.Transactions;
+﻿using System.Transactions;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;

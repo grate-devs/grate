@@ -1,4 +1,4 @@
-using grate.Migration;
+﻿using grate.Migration;
 using Microsoft.Extensions.Logging;
 
 namespace Basic_tests.Infrastructure;
@@ -6,7 +6,7 @@ namespace Basic_tests.Infrastructure;
 /// <summary>
 /// Cannot Substitute ILogger&lt;GrateMigrator&gt;, since GrateMigrator is internal, so we need to create a mock logger.
 /// </summary>
-public record MockGrateLogger: ILogger<GrateMigrator>
+public record MockGrateLogger : ILogger<GrateMigrator>
 {
     public virtual void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
@@ -23,11 +23,11 @@ public record MockGrateLogger: ILogger<GrateMigrator>
     {
         throw new NotImplementedException();
     }
-    
+
     public IList<string> LoggedMessages { get; } = new List<string>();
 }
 
-public record MockGrateLoggerFactory: ILoggerFactory
+public record MockGrateLoggerFactory : ILoggerFactory
 {
     private readonly MockGrateLogger _logger;
 

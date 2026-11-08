@@ -86,7 +86,7 @@ public class GrateConfigurationBuilder_Factory
         var grateConfiguration = builder.Build();
         Assert.Equal(version, grateConfiguration.Version);
     }
-    
+
     [Fact]
     public void Creates_default_builder_with_do_not_create_database()
     {
@@ -119,7 +119,7 @@ public class GrateConfigurationBuilder_Factory
         Assert.NotNull(grateConfiguration.Environment);
         Assert.Equivalent(new GrateEnvironment(environmentName), grateConfiguration.Environment);
     }
-    
+
     [Fact]
     public void Creates_default_builder_with_custom_folder_configuration()
     {
@@ -133,5 +133,5 @@ public class GrateConfigurationBuilder_Factory
         Assert.Equal("ddl", folders[KnownFolderKeys.Up]!.Path);
         Assert.Equal("binoculars", folders[KnownFolderKeys.Views]!.Path);
     }
-    
+
 }

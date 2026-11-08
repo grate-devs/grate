@@ -10,6 +10,7 @@ using grate.SqlServer.Infrastructure;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 namespace grate.SqlServer.Migration;
+
 public record SqlServerDatabase : AnsiSqlDatabase
 {
     public override string MasterDatabaseName => "master";
@@ -17,7 +18,7 @@ public record SqlServerDatabase : AnsiSqlDatabase
     public SqlServerDatabase(ILogger<SqlServerDatabase> logger)
         : base(logger, Syntax)
     { }
-    
+
     public static string Type => "sqlserver";
     public static ISyntax Syntax { get; } = new SqlServerSyntax();
 
@@ -83,10 +84,10 @@ public record SqlServerDatabase : AnsiSqlDatabase
         AccessToken = configuration.AccessToken;
         return base.InitializeConnections(configuration);
     }
-    
+
     // Needs admin connection, which we do not always have.
     // Could we use the optimization _if_ we have an admin connection, and turn it off if we don't?
-    
+
     // public override async Task<bool> DatabaseExists()
     // {
     //     var sql = @$"USE master;
