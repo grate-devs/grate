@@ -49,12 +49,17 @@ jobs:
           global-json-file: global.json
           dotnet-version: 10.0.x
       - name: Assert selected installation and run native artifact checks
+        if: always()
         shell: pwsh
         env:
           VALIDATION_MODE: ${{ matrix.mode }}
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          Get-Command dotnet -All | Format-List Name,Source,Path,CommandType
+          Write-Output "DOTNET_ROOT=$env:DOTNET_ROOT"
+          Write-Output "PATH=$env:PATH"
+          & /bin/ls -ld $env:DOTNET_ROOT
           $expectedAttempt = if ($env:VALIDATION_MODE -eq 'partial-first-install') { 'retry' } else { 'first' }
           if ($env:DOTNET_ROOT -notmatch "/$expectedAttempt/install$") {
               throw "Wrong installation selected: $env:DOTNET_ROOT"
