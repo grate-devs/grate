@@ -21,13 +21,19 @@ foreach ($name in $jobs.Keys) {
         }
     }
 
-    if ($name -ne 'set-version-number') {
+    if ($name -ceq 'validate-release-policy') {
+        Assert-Policy (!$job.needs) 'Build-independent checks must run before version resolution.'
+        Assert-Policy ($job.steps.uses -ccontains './.github/actions/preflight') 'Require the shared build-independent checks.'
+        Assert-Policy (!$job.if -and !$job.'continue-on-error') 'Build-independent checks cannot bypass failures.'
+    } elseif ($name -ne 'set-version-number') {
         Assert-Policy ($job.needs -ccontains 'set-version-number' -or $name -ceq 'release-ready') "$name must depend on source validation."
         if ($name -ne 'release-ready') {
             Assert-Policy ($job.if -cnotlike '*always()*') "$name cannot bypass failed source validation."
         }
     }
 }
+
+Assert-Policy ($jobs['set-version-number'].needs -ceq 'validate-release-policy') 'Version resolution must wait for build-independent checks.'
 
 Assert-Policy ($checkoutCount -gt 10 -and !$jobs['set-version-number'].outputs.ContainsKey('checkout-ref')) 'Keep event SHA checkout coverage and do not expose a mutable checkout ref.'
 

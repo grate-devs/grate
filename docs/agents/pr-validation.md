@@ -4,6 +4,20 @@
 Every category runs the full existing build, test and packaging matrix. There
 is no documentation classifier or permitted skip.
 
+Each PR build workflow starts with the shared `.github/actions/preflight` action.
+It checks CI scheduling, the aggregate policy, container-monitor contracts,
+release/Docker/Debian automation and the generated documentation before compiling
+grate. Run its script checks locally with `pwsh -File scripts/ci/Invoke-Preflight.ps1`.
+
+In `CI`, the existing `PR validation policy` job runs this preflight. Build and
+Basic_tests wait for it; database, CodeQL and packaging jobs then wait for Build
+and Basic_tests. Release artifacts and integration tests perform preflight before
+version resolution, installation checks wait for their documentation/preflight
+job, and WinGet preparation waits before compiling native MSI actions. Each
+workflow evaluates its own first job using the same action. Failed, cancelled or
+skipped preflight prevents its build jobs from starting. The final `PR validation`
+and `CI result` checks still run to report incomplete CI.
+
 `PR validation` uses `always()` and requires all six dependencies to succeed:
 `validation-policy`, `build-code`, `test`, `packages`, `standalone` and `docker`.
 It also queries every page of the current run's Jobs API and requires all 27

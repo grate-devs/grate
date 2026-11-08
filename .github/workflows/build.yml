@@ -41,6 +41,7 @@ concurrency:
 jobs:
   set-version-number:
     name: Resolve release context
+    needs: validate-release-policy
     runs-on: ubuntu-latest
     outputs:
       nuGetVersion: ${{ steps.release-context.outputs.core_version }}
@@ -99,22 +100,14 @@ jobs:
 
   validate-release-policy:
     name: Test release policy without publishing
-    needs: set-version-number
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
       with:
         ref: ${{ github.sha }}
         persist-credentials: false
-    - shell: pwsh
-      run: ./scripts/release/Install-TestDependencies.ps1
-    - shell: pwsh
-      run: ./scripts/release/Run-Tests.ps1
-    - shell: pwsh
-      run: ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
-    - name: Test Debian package lifecycle orchestration
-      shell: pwsh
-      run: ./installers/deb/Test-PackageLifecycle.Tests.ps1
+    - name: Check build-independent contracts
+      uses: ./.github/actions/preflight
 
   build-netcore-tool:
     needs: set-version-number

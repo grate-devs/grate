@@ -89,7 +89,7 @@ foreach ($name in $requiredJobs) {
     # intentionally skips the other platform's steps within the same job.
     $stepNames = @(switch -CaseSensitive -Wildcard ($name) {
         'Build' { 'Restore dependencies'; 'Build' }
-        'PR validation policy' { 'Test aggregate decision policy' }
+        'PR validation policy' { 'Check build-independent contracts' }
         'NuGet libraries and installed tool' {
             'Check standalone verification command contract'
             'Verify packages across supported frameworks'

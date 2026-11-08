@@ -24,16 +24,13 @@ jobs:
     name: PR validation policy
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
-    - name: Test aggregate decision policy
-      shell: pwsh
-      run: |
-        ./scripts/ci/Test-PRValidation.ps1
-        ./scripts/ci/Test-InvokePRValidation.ps1
+    - name: Check build-independent contracts
+      uses: ./.github/actions/preflight
 
   pr-validation:
     # Keep this name stable: the proposed main ruleset consumes it.
@@ -58,12 +55,10 @@ jobs:
 
   build-code:
     name: Build
+    needs: validation-policy
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
-    - name: Check staged CI policy
-      shell: pwsh
-      run: ./scripts/Test-CiPolicy.Tests.ps1
     - name: Setup .NET 11 RC3 and earlier
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
@@ -79,10 +74,11 @@ jobs:
       run: dotnet build --no-restore --no-self-contained -r linux-x64 src/grate/grate.csproj -c release
 
 
-  # These isolated suites run alongside Build, once per supported OS/runtime.
+  # After preflight, isolated suites run alongside Build on each supported OS.
   # Keep the existing check names and artifact names after splitting the tiers.
   fast-tests:
     name: Run tests
+    needs: validation-policy
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -105,10 +101,6 @@ jobs:
             8.0.x
             9.0.x
             10.0.x
-      - name: Test container diagnostic monitor contracts
-        if: runner.os == 'Linux'
-        shell: pwsh
-        run: ./.github/scripts/monitor-test-containers.Tests.ps1
       - name: Test on ${{ runner.os }}
         shell: pwsh
         env:
