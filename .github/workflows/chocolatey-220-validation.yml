@@ -1,4 +1,4 @@
-name: Verify grate 2.2.0 Chocolatey package on Windows
+name: Archive · Chocolatey 2.2.0 validation
 
 on:
   push:
