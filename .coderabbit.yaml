@@ -16,7 +16,20 @@ reviews:
   # Retain the review/configuration evidence needed to evaluate the pilot.
   review_info: true
   review_details: true
-  high_level_summary: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  high_level_summary_instructions: >-
+    Summarize the concrete problem and resulting behavior concisely. Distinguish
+    mechanical formatting, functional changes and compatibility implications.
+    Keep the author's PR description intact; put the generated summary in the walkthrough.
+  merge_risk_instructions: >-
+    Changes to migration identity, persisted script hashes/names/history,
+    transaction/rollback/retry behavior, provider SQL/splitters, upgrades of
+    existing databases, public APIs and packaged CLI behavior need concrete
+    compatibility evidence. Whitespace/encoding-only source changes with identical
+    syntax tokens and literal values are low risk. Use AGENTS.md and
+    docs/agents/providers.md, docs/agents/verification.md and docs/agents/testing.md
+    as repository guidance. Passing CI alone does not establish correctness.
   changed_files_summary: false
   sequence_diagrams: false
   estimate_code_review_effort: false
@@ -25,13 +38,14 @@ reviews:
   suggested_labels: false
   auto_apply_labels: false
   suggested_reviewers: false
+  related_issues: false
+  related_prs: false
   auto_assign_reviewers: false
   slop_detection:
     enabled: false
   auto_review:
-    enabled: false
-    description_keyword: grate-coderabbit-pilot
-    auto_incremental_review: false
+    enabled: true
+    auto_incremental_review: true
     drafts: false
   # This pilot provides advice, without generating or committing changes.
   finishing_touches:
@@ -51,11 +65,11 @@ reviews:
     docstrings:
       mode: "off"
     title:
-      mode: "off"
+      mode: warning
     description:
-      mode: "off"
+      mode: warning
     issue_assessment:
-      mode: "off"
+      mode: warning
   tools:
     markdownlint:
       enabled: false
@@ -75,7 +89,12 @@ knowledge_base:
   code_guidelines:
     enabled: true
     filePatterns:
-      - AGENTS.md
+      - files: AGENTS.md
+        applyTo: "**/*"
       # Without applyTo, these documents govern only docs/agents/**.
-      - files: docs/agents/providers.md,docs/agents/verification.md,docs/agents/testing.md
+      - files: docs/agents/providers.md
+        applyTo: "**/*"
+      - files: docs/agents/verification.md
+        applyTo: "**/*"
+      - files: docs/agents/testing.md
         applyTo: "**/*"

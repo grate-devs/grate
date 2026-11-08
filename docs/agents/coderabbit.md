@@ -1,4 +1,4 @@
-# CodeRabbit advisory review pilot
+# CodeRabbit automatic advisory review
 
 The root [.coderabbit.yaml](../../.coderabbit.yaml) controls this pilot. Review
 criteria remain in [AGENTS.md](../../AGENTS.md), [providers](providers.md),
@@ -6,6 +6,13 @@ criteria remain in [AGENTS.md](../../AGENTS.md), [providers](providers.md),
 when a rule changes; do not maintain another grate-specific prompt here or in
 the CodeRabbit UI. The YAML explicitly maps the documents under `docs/agents`
 to all files, because their default directory scope would miss product code.
+
+The YAML records the repository UI choices: Chill, automatic reviews and
+incremental reviews on pushes, drafts excluded, automatic approvals disabled,
+and summaries in the walkthrough with review details enabled. It keeps the
+author's PR description intact. The general docstring coverage check and
+docstring/unit-test generation are disabled. Keep future UI and YAML changes
+aligned; the committed YAML takes precedence over repository UI settings.
 
 ## Connect the repository
 
@@ -45,10 +52,10 @@ do not make its check or approval a merge requirement during the pilot.
    Review commands can explicitly review a draft; ordinary automatic draft
    reviews are disabled. A same-repository draft configuration PR can instead use
    the isolated `@coderabbitai review --preview-config` command (post it alone).
-   For a selected ready PR, the description keyword
-   `grate-coderabbit-pilot` opts it into an initial review. Pushes do not trigger
-   automatic incremental reviews; request another review only after a material
-   fix. See the [command reference](https://docs.coderabbit.ai/reference/review-commands).
+   Ready PRs targeting the default branch receive an automatic review, and pushes
+   receive incremental reviews. No opt-in keyword is needed. Use manual commands
+   when another complete review is warranted; avoid duplicating an active review.
+   See the [command reference](https://docs.coderabbit.ai/reference/review-commands).
 3. Inspect the summary's **Additional context used → Code guidelines**. Require
    the four configured files above to be listed; inspect skipped-source and
    parse warnings. Review details are enabled to expose other context and
@@ -83,8 +90,8 @@ After three completed product reviews, compare confirmed defects, false positive
 duplicate/style comments, known misses, and triage time. Report precision as
 confirmed / (confirmed + false positives), or **not measurable** when that
 denominator is zero. Do not infer recall from an unknown number of defects.
-Keep or tune the pilot only if maintainers judge the actionable findings worth
-the triage time; discuss broader automatic review separately. A silent review
+Keep or tune the review profile and instructions based on whether maintainers
+judge the actionable findings worth the triage time. A silent review
 is not acceptance or release approval. High-risk changes still need the separate
 critical review and verification described in [verification](verification.md).
 
