@@ -34,6 +34,15 @@ deciding which grants apply. In particular, library NuGet packages generally
 declare dependencies; the tool, standalone binaries and installers copy them.
 Test-only and analyzer packages must remain distinct from shipped product code.
 
+Normal publish/pack supplies the product project's assets file, not the test
+projects' graphs. Its notices conservatively cover that product restore graph
+across restored frameworks; they can include build dependencies and assets for
+other RIDs. The full-solution audit and source cache also cover test/example
+dependencies. This is not a payload-only selection engine. Build tooling can
+generate code and native/static inputs can contribute output code, so excluding
+every analyzer/build package by its NuGet asset category would be unsafe. Use
+actual payload and generation/linking evidence before narrowing shipped notices.
+
 ## Preserve original license texts
 
 The exporter reads original LICENSE/COPYING/NOTICE/third-party notice files from
@@ -41,6 +50,10 @@ the exact restored packages. When a package supplies only an SPDX expression,
 `scripts/licenses/sources.json` identifies original upstream license/notice texts
 and their SHA256 hashes. The source cache is checked in so publishing remains
 offline. Generic SPDX templates cannot replace original copyright notices.
+Original texts have readable upstream-repository paths under
+[`scripts/licenses/text`](../scripts/licenses/text/README.md). Different retained
+variants identify a package/version, while `sources.json` keeps exact source URLs,
+revisions and full hashes independently of filenames.
 
 For a dependency update whose original license is absent:
 
@@ -59,6 +72,9 @@ any NOTICE files before committing the cache. A download is evidence, not legal
 approval. Old packages with no repository revision require an explicit verified
 source mapping. Microsoft.SqlServer.Server 1.0.0's mapping comes from the exact
 package DLL's informational version and its PDB's SourceLink document URLs.
+[`verified-sources.json`](../scripts/licenses/verified-sources.json) records these
+reviewed exceptions and whether each dependency belongs to product, test or
+example work. An old version number alone does not show that a package is unused.
 
 Run the first export again without `-AllowMissingLicenseEvidence`. Missing source
 texts, missing declared files, changed cache hashes and path traversal fail the

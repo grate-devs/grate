@@ -4,6 +4,8 @@ param (
 )
 
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/SourceTextPaths.ps1"
+$verifiedSources = Get-Content -LiteralPath "$PSScriptRoot/verified-sources.json" -Raw | ConvertFrom-Json -AsHashtable
 $inventory = Get-Content -LiteralPath $InventoryFile -Raw | ConvertFrom-Json -AsHashtable
 $cachePath = Join-Path $PSScriptRoot 'sources.json'
 $cache = [Collections.Generic.SortedDictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -19,7 +21,10 @@ $directory = Join-Path $PSScriptRoot 'text'
 New-Item -ItemType Directory -Path $directory -Force | Out-Null
 
 function Get-SourceText {
-    param ([string]$Url)
+    param (
+        [string]$Url,
+        [string]$PackageKey
+    )
 
     if (!$requests.ContainsKey($Url)) {
         $response = Invoke-WebRequest -Uri $Url -SkipHttpErrorCheck
@@ -32,7 +37,8 @@ function Get-SourceText {
         else {
             $content = [string]$response.Content
             $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($content))).ToLowerInvariant()
-            $path = "text/$hash.txt"
+            $path = Get-LicenseSourceRelativePath -Url $Url -PackageKey $PackageKey -Sha256 $hash -SourceDirectory $PSScriptRoot
+            New-Item -ItemType Directory -Path (Split-Path -Parent (Join-Path $PSScriptRoot $path)) -Force | Out-Null
             [IO.File]::WriteAllText((Join-Path $PSScriptRoot $path), $content, [Text.UTF8Encoding]::new($false))
             $requests[$Url] = [ordered]@{
                 url = $Url
@@ -54,27 +60,14 @@ foreach ($package in $inventory) {
     }
     $repository = $package.repository -replace '\.git$', ''
     $revision = $package.repositoryCommit
-    # A tag can identify source for old packages whose nuspec predates SourceLink.
-    if ($key -eq 'Mono.Cecil/0.11.6') {
-        $repository = 'https://github.com/jbevain/cecil'
-        $revision = '0.11.6'
-    }
-    elseif ($key -eq 'SQLitePCLRaw.bundle_e_sqlite3/3.0.5') {
-        $revision = 'v3.0.5'
-    }
-    elseif ($key -eq 'Microsoft.SqlServer.Server/1.0.0') {
-        # AssemblyInformationalVersion in the exact NuGet DLL identifies this commit.
-        $revision = '54ab5aef2e1b74c0971a00711fecb003b624efdf'
-    }
-    elseif ($key -eq 'Microsoft.Data.SqlClient/5.1.5') {
-        # Historical example dependency: exact DLL AssemblyInformationalVersion.
-        $revision = '01a589e54afe43c85c7607aa05f8605fa6f13bb3'
-    }
-    elseif ($key -eq 'Microsoft.Data.SqlClient/5.1.9') {
-        $revision = '96dff8240157a99d47fb2ace4633806e72526fac'
-    }
-    elseif ($key -eq 'Microsoft.Data.SqlClient/5.2.2') {
-        $revision = 'a98592718693168af42ec4af3eb974d58497373e'
+    # Some active dependencies predate source-revision metadata. Their verified
+    # revisions, provenance and product/test/example roles live in reviewed data.
+    if ($verifiedSources.ContainsKey($key)) {
+        $verified = $verifiedSources[$key]
+        if ($verified.repository) {
+            $repository = $verified.repository
+        }
+        $revision = $verified.revision
     }
     if ($repository -notmatch '^https://github.com/([^/]+/[^/]+)/?$' -or !$revision) {
         $failures += $key
@@ -84,7 +77,7 @@ foreach ($package in $inventory) {
     $base = "https://raw.githubusercontent.com/$($Matches[1])/$revision"
     $texts = @()
     foreach ($name in @('LICENSE.TXT', 'LICENSE', 'LICENSE.txt', 'License.txt', 'license.txt', 'LICENSE.md', 'License.md', 'LICENSE-MIT')) {
-        $found = Get-SourceText "$base/$name"
+        $found = Get-SourceText -Url "$base/$name" -PackageKey $key
         if ($found) {
             $texts += $found
             break
@@ -96,14 +89,14 @@ foreach ($package in $inventory) {
         continue
     }
     foreach ($name in @('NOTICE', 'NOTICE.txt', 'NOTICE.TXT')) {
-        $found = Get-SourceText "$base/$name"
+        $found = Get-SourceText -Url "$base/$name" -PackageKey $key
         if ($found) {
             $texts += $found
         }
     }
     if ($package.license -eq 'Apache-2.0') {
         # Some upstream files identify Apache-2.0 by link; reproduce its full terms too.
-        $texts += Get-SourceText 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+        $texts += Get-SourceText -Url 'https://www.apache.org/licenses/LICENSE-2.0.txt' -PackageKey $key
     }
     $cache[$key] = [ordered]@{
         repositoryCommit = $package.repositoryCommit

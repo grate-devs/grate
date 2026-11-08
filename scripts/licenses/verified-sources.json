@@ -1,0 +1,23 @@
+{
+  "Mono.Cecil/0.11.6": {
+    "repository": "https://github.com/jbevain/cecil",
+    "revision": "0.11.6",
+    "evidence": "Upstream release tag for this package; the package supplies no repository revision.",
+    "role": "Transitive test dependency; keep separate from shipped product payloads."
+  },
+  "SQLitePCLRaw.bundle_e_sqlite3/3.0.5": {
+    "revision": "v3.0.5",
+    "evidence": "Upstream release tag for the selected SQLite bundle.",
+    "role": "Current SQLite provider dependency."
+  },
+  "Microsoft.SqlServer.Server/1.0.0": {
+    "revision": "54ab5aef2e1b74c0971a00711fecb003b624efdf",
+    "evidence": "Exact NuGet DLL AssemblyInformationalVersion and PDB SourceLink.",
+    "role": "Transitive SQL Server provider dependency."
+  },
+  "Microsoft.Data.SqlClient/5.1.9": {
+    "revision": "96dff8240157a99d47fb2ace4633806e72526fac",
+    "evidence": "Exact NuGet DLL AssemblyInformationalVersion; nuspec has no revision.",
+    "role": "Standalone Kubernetes initcontainer sample; product uses its central version."
+  }
+}

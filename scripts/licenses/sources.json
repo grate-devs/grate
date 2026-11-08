@@ -5,12 +5,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AwesomeAssertions/AwesomeAssertions/e3679af2c80726b2d046faba91cbebee0b6175aa/LICENSE",
-        "file": "text/1cae0eae3b1043a0fe1fc189d7298cae765ab7cc02593e1ea4bb2589137a286c.txt",
+        "file": "text/awesomeassertions/awesomeassertions/license.txt",
         "sha256": "1cae0eae3b1043a0fe1fc189d7298cae765ab7cc02593e1ea4bb2589137a286c"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -21,12 +21,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/9778223a863e948789824301ae9226cdd2e71787/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/9778223a863e948789824301ae9226cdd2e71787/NOTICE.txt",
-        "file": "text/5a9f94b129573a6bf1d3ba7ea4354716968f5d329751555641b332f76ddf4f98.txt",
+        "file": "text/azure/azure-sdk-for-net/notice.txt",
         "sha256": "5a9f94b129573a6bf1d3ba7ea4354716968f5d329751555641b332f76ddf4f98"
       }
     ]
@@ -37,12 +37,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/dae9516a40d0661a3351c3f6ddf0e0eb85ea2f6b/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/dae9516a40d0661a3351c3f6ddf0e0eb85ea2f6b/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-azure.core-1.38.0.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -53,12 +53,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/08a6829c0a46226cf4535410114ced6c58488750/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/08a6829c0a46226cf4535410114ced6c58488750/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-azure.core-1.41.0.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -69,12 +69,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/738d40b80fff0ceb8053b2177453c52f6349606a/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/738d40b80fff0ceb8053b2177453c52f6349606a/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-azure.core-1.51.1.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -85,12 +85,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/a4954de627877bdebdb938b431c918bed192cea5/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/a4954de627877bdebdb938b431c918bed192cea5/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-azure.identity-1.10.3.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -101,12 +101,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/2856f9a00d6cb96f71b724d29b1ce8ce271c4137/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/2856f9a00d6cb96f71b724d29b1ce8ce271c4137/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-azure.identity-1.11.4.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -117,12 +117,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/d01e747362084eb1d1d5542d533cf6e18c7ed35b/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/d01e747362084eb1d1d5542d533cf6e18c7ed35b/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-azure.identity-1.12.1.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -133,12 +133,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/05d48fdf0c35f249c2b2453b1579644099bd85c4/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/05d48fdf0c35f249c2b2453b1579644099bd85c4/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-azure.identity-1.18.0.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -149,12 +149,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/DapperLib/Dapper/c46c69a174fd983885e453414bc358bcfa5594d0/License.txt",
-        "file": "text/9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9.txt",
+        "file": "text/dapperlib/dapper/license.txt",
         "sha256": "9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -165,12 +165,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/DapperLib/Dapper/360367ca5475425944fb390433cb0f1817ad2dcb/License.txt",
-        "file": "text/9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9.txt",
+        "file": "text/dapperlib/dapper/license.txt",
         "sha256": "9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -181,12 +181,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/DapperLib/Dapper/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/License.txt",
-        "file": "text/9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9.txt",
+        "file": "text/dapperlib/dapper/license.txt",
         "sha256": "9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -197,7 +197,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/erikbra/grate/4b1749ca2d0dea4c7f805e8c3142b4c9ac74630e/LICENSE",
-        "file": "text/8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd.txt",
+        "file": "text/erikbra/grate/license.txt",
         "sha256": "8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd"
       }
     ]
@@ -208,7 +208,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/grate-devs/grate/38e0d5a18271e43bda675275067871f8bbb2254d/LICENSE",
-        "file": "text/8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd.txt",
+        "file": "text/grate-devs/grate/license.txt",
         "sha256": "8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd"
       }
     ]
@@ -219,12 +219,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/martincostello/xunit-logging/cf061e79fb1d0bfdb0b5bb2349879c10c3e15144/LICENSE",
-        "file": "text/bc971f2f8b56a270f4772d9c1e42c53483dbe5caee1c8529ce44019869bdfcab.txt",
+        "file": "text/martincostello/xunit-logging/license.txt",
         "sha256": "bc971f2f8b56a270f4772d9c1e42c53483dbe5caee1c8529ce44019869bdfcab"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -235,7 +235,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Microsoft/ApplicationInsights-dotnet/2faa7e8b157a431daa2e71785d68abd5fa817b53/LICENSE",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/microsoft/applicationinsights-dotnet/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       }
     ]
@@ -246,7 +246,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/aspnetcore/380bd0d498fbaa0a8ddd67c325aa748dd21f7596/LICENSE.txt",
-        "file": "text/cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310.txt",
+        "file": "text/dotnet/aspnetcore/license.txt",
         "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
       }
     ]
@@ -257,7 +257,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/aspnetcore/5aeb916d29e761492c987f1c09895c3ba9cbe1ac/LICENSE.txt",
-        "file": "text/cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310.txt",
+        "file": "text/dotnet/aspnetcore/license.txt",
         "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
       }
     ]
@@ -268,7 +268,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/aspnetcore/380bd0d498fbaa0a8ddd67c325aa748dd21f7596/LICENSE.txt",
-        "file": "text/cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310.txt",
+        "file": "text/dotnet/aspnetcore/license.txt",
         "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
       }
     ]
@@ -279,7 +279,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/aspnetcore/5aeb916d29e761492c987f1c09895c3ba9cbe1ac/LICENSE.txt",
-        "file": "text/cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310.txt",
+        "file": "text/dotnet/aspnetcore/license.txt",
         "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
       }
     ]
@@ -290,7 +290,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/44525024595742ebe09023abe709df51de65009b/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -301,7 +301,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -312,7 +312,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/5a2162bea6845eabc1fc721624a43568c65db3b1/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -323,7 +323,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/58dbd027217ac035a4e9114c9213b11dc0e988bd/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -334,7 +334,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/36206450d47fec22e281ba9846445edc796f5080/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -345,12 +345,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/SqlClient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
+        "file": "text/dotnet/sqlclient/license.txt",
         "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
       },
       {
         "url": "https://raw.githubusercontent.com/dotnet/SqlClient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/NOTICE.txt",
-        "file": "text/db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c.txt",
+        "file": "text/dotnet/sqlclient/notice.txt",
         "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c"
       }
     ]
@@ -361,12 +361,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/SqlClient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
+        "file": "text/dotnet/sqlclient/license.txt",
         "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
       },
       {
         "url": "https://raw.githubusercontent.com/dotnet/SqlClient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/NOTICE.txt",
-        "file": "text/db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c.txt",
+        "file": "text/dotnet/sqlclient/notice.txt",
         "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c"
       }
     ]
@@ -377,29 +377,13 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/SqlClient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
+        "file": "text/dotnet/sqlclient/license.txt",
         "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
       },
       {
         "url": "https://raw.githubusercontent.com/dotnet/SqlClient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/NOTICE.txt",
-        "file": "text/db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c.txt",
+        "file": "text/dotnet/sqlclient/notice.txt",
         "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c"
-      }
-    ]
-  },
-  "Microsoft.Data.SqlClient/5.1.5": {
-    "repositoryCommit": "",
-    "sourceRevision": "01a589e54afe43c85c7607aa05f8605fa6f13bb3",
-    "texts": [
-      {
-        "url": "https://raw.githubusercontent.com/dotnet/sqlclient/01a589e54afe43c85c7607aa05f8605fa6f13bb3/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
-        "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
-      },
-      {
-        "url": "https://raw.githubusercontent.com/dotnet/sqlclient/01a589e54afe43c85c7607aa05f8605fa6f13bb3/NOTICE.txt",
-        "file": "text/008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28.txt",
-        "sha256": "008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28"
       }
     ]
   },
@@ -409,29 +393,13 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/sqlclient/96dff8240157a99d47fb2ace4633806e72526fac/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
+        "file": "text/dotnet/sqlclient/license.txt",
         "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
       },
       {
         "url": "https://raw.githubusercontent.com/dotnet/sqlclient/96dff8240157a99d47fb2ace4633806e72526fac/NOTICE.txt",
-        "file": "text/008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28.txt",
+        "file": "text/dotnet/sqlclient/notice-microsoft.data.sqlclient-5.1.9.txt",
         "sha256": "008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28"
-      }
-    ]
-  },
-  "Microsoft.Data.SqlClient/5.2.2": {
-    "repositoryCommit": "a98592718693168af42ec4af3eb974d58497373e",
-    "sourceRevision": "a98592718693168af42ec4af3eb974d58497373e",
-    "texts": [
-      {
-        "url": "https://raw.githubusercontent.com/dotnet/sqlclient/a98592718693168af42ec4af3eb974d58497373e/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
-        "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
-      },
-      {
-        "url": "https://raw.githubusercontent.com/dotnet/sqlclient/a98592718693168af42ec4af3eb974d58497373e/NOTICE.txt",
-        "file": "text/db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c.txt",
-        "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c"
       }
     ]
   },
@@ -441,12 +409,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/sqlclient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
+        "file": "text/dotnet/sqlclient/license.txt",
         "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
       },
       {
         "url": "https://raw.githubusercontent.com/dotnet/sqlclient/29ce2d856cb5a9450f79ea62c0afc744fd337fde/NOTICE.txt",
-        "file": "text/db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c.txt",
+        "file": "text/dotnet/sqlclient/notice.txt",
         "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c"
       }
     ]
@@ -457,7 +425,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -468,7 +436,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -479,7 +447,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/f7d90799ce4ef09a0bb257852a57248d2a8fb8dd/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -490,7 +458,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -501,7 +469,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -512,7 +480,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -523,7 +491,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -534,7 +502,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -545,7 +513,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -556,7 +524,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -567,7 +535,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -578,7 +546,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -589,7 +557,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -600,7 +568,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -611,7 +579,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/f7d90799ce4ef09a0bb257852a57248d2a8fb8dd/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -622,7 +590,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -633,7 +601,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -644,7 +612,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -655,7 +623,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -666,7 +634,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -677,7 +645,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -688,7 +656,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -699,7 +667,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -710,7 +678,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -721,7 +689,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -732,7 +700,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -743,7 +711,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -754,7 +722,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -765,7 +733,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -776,7 +744,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -787,7 +755,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -798,7 +766,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -809,7 +777,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -820,7 +788,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/bad7cae331c1d9e699ca2150a5fecb108ea54916/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -831,7 +799,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/29cbbb0ebe4361c98bcfaf9f00092c1517939ea3/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -842,7 +810,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/88df64013795d4e3716e1f677600f8164ffdb542/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -853,7 +821,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/e8baa99af1726fe40b9a0ba302dfb9f3bde12803/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -864,7 +832,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/d6f9310e2f1073ad2db8ca3bf39827b9bcf26e06/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -875,7 +843,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/29cbbb0ebe4361c98bcfaf9f00092c1517939ea3/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -886,7 +854,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/88df64013795d4e3716e1f677600f8164ffdb542/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -897,7 +865,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/c21e39b9e83f38834c9f6e31947b3ccb5290ea90/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -908,7 +876,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/bad7cae331c1d9e699ca2150a5fecb108ea54916/LICENSE",
-        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "file": "text/azuread/microsoft-authentication-library-for-dotnet/license.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
     ]
@@ -919,7 +887,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c94c7fc235501d478221e979062bd8837a55575b/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -930,7 +898,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -941,7 +909,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c94c7fc235501d478221e979062bd8837a55575b/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -952,7 +920,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -963,7 +931,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c94c7fc235501d478221e979062bd8837a55575b/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -974,7 +942,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -985,7 +953,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c94c7fc235501d478221e979062bd8837a55575b/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -996,7 +964,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -1007,7 +975,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c94c7fc235501d478221e979062bd8837a55575b/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -1018,7 +986,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -1029,7 +997,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c94c7fc235501d478221e979062bd8837a55575b/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -1040,8 +1008,19 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+      }
+    ]
+  },
+  "Microsoft.NET.ILLink.Tasks/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/dotnet/dotnet/license.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
   },
@@ -1051,7 +1030,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/5254d8bcf59917edc1e1abc33bdf2442b77b1c70/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1062,7 +1041,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/58dbd027217ac035a4e9114c9213b11dc0e988bd/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1073,7 +1052,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/36206450d47fec22e281ba9846445edc796f5080/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1084,12 +1063,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/sqlclient/54ab5aef2e1b74c0971a00711fecb003b624efdf/LICENSE",
-        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
+        "file": "text/dotnet/sqlclient/license.txt",
         "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
       },
       {
         "url": "https://raw.githubusercontent.com/dotnet/sqlclient/54ab5aef2e1b74c0971a00711fecb003b624efdf/NOTICE.txt",
-        "file": "text/008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28.txt",
+        "file": "text/dotnet/sqlclient/notice-microsoft.sqlserver.server-1.0.0.txt",
         "sha256": "008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28"
       }
     ]
@@ -1100,7 +1079,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/testfx/0bf77e3aedbf86f1fa16220bc951d3b52ba56763/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/testfx/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1111,7 +1090,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/testfx/0bf77e3aedbf86f1fa16220bc951d3b52ba56763/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/testfx/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1122,7 +1101,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/testfx/0bf77e3aedbf86f1fa16220bc951d3b52ba56763/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/testfx/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1133,7 +1112,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/testfx/0bf77e3aedbf86f1fa16220bc951d3b52ba56763/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/testfx/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1144,7 +1123,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/58dbd027217ac035a4e9114c9213b11dc0e988bd/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1155,7 +1134,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/36206450d47fec22e281ba9846445edc796f5080/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1166,7 +1145,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/58dbd027217ac035a4e9114c9213b11dc0e988bd/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1177,7 +1156,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/microsoft/vstest/36206450d47fec22e281ba9846445edc796f5080/LICENSE",
-        "file": "text/4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d.txt",
+        "file": "text/microsoft/vstest/license.txt",
         "sha256": "4d0502953fdb7784a9ca9e1f7e93da5db076de7c52456d6a2a666327a1a9981d"
       }
     ]
@@ -1188,7 +1167,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/jbevain/cecil/0.11.6/LICENSE.txt",
-        "file": "text/13d58ecbed676511c0c4c4009bff107025e50007ff5e7901dc562700ec62509e.txt",
+        "file": "text/jbevain/cecil/license.txt",
         "sha256": "13d58ecbed676511c0c4c4009bff107025e50007ff5e7901dc562700ec62509e"
       }
     ]
@@ -1199,7 +1178,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/mysql-net/MySqlConnector/775689bb3e1ab55d16171e0795264fa746e364c4/LICENSE",
-        "file": "text/8b976f3fbc2575d2b3456ae02c8c438e12e39ba31056d26538b1820dffcbce33.txt",
+        "file": "text/mysql-net/mysqlconnector/license.txt",
         "sha256": "8b976f3fbc2575d2b3456ae02c8c438e12e39ba31056d26538b1820dffcbce33"
       }
     ]
@@ -1210,7 +1189,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/npgsql/npgsql/d3768398c17877b3a916c3c4d87e8e11698991fc/LICENSE",
-        "file": "text/2e1d9cc6ed4eb7fe6fa82091846c06b4f58571a2c3b54777db6baeca10dd2d74.txt",
+        "file": "text/npgsql/npgsql/license.txt",
         "sha256": "2e1d9cc6ed4eb7fe6fa82091846c06b4f58571a2c3b54777db6baeca10dd2d74"
       }
     ]
@@ -1221,7 +1200,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/nsubstitute/NSubstitute/05109e8daff5bf79643cb78fee07792bfbdcee95/LICENSE.txt",
-        "file": "text/9339c42a7223518ccf11741a9bca995f26b2e7ac9a81dd284b66be45c4ca92a9.txt",
+        "file": "text/nsubstitute/nsubstitute/license.txt",
         "sha256": "9339c42a7223518ccf11741a9bca995f26b2e7ac9a81dd284b66be45c4ca92a9"
       }
     ]
@@ -1232,7 +1211,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/icsharpcode/SharpZipLib/33f64eb0f28cdd2b084cb822fcc224c7c5aba553/LICENSE.txt",
-        "file": "text/d7fbbc16f871bf24fa5624c7eaf945054b778985f32676dcacba41fddca61133.txt",
+        "file": "text/icsharpcode/sharpziplib/license.txt",
         "sha256": "d7fbbc16f871bf24fa5624c7eaf945054b778985f32676dcacba41fddca61133"
       }
     ]
@@ -1243,17 +1222,17 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/v3.0.5/LICENSE.TXT",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/ericsink/sqlitepcl.raw/license.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       },
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/v3.0.5/NOTICE.TXT",
-        "file": "text/5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9.txt",
+        "file": "text/ericsink/sqlitepcl.raw/notice.txt",
         "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1264,17 +1243,17 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/96043b8cff323f21919df86a431c136655d81b4a/LICENSE.TXT",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/ericsink/sqlitepcl.raw/license.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       },
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/96043b8cff323f21919df86a431c136655d81b4a/NOTICE.TXT",
-        "file": "text/5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9.txt",
+        "file": "text/ericsink/sqlitepcl.raw/notice.txt",
         "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1285,17 +1264,17 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/ericsink/sqlitepcl.raw/license.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       },
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/NOTICE.TXT",
-        "file": "text/5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9.txt",
+        "file": "text/ericsink/sqlitepcl.raw/notice.txt",
         "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1306,17 +1285,17 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/ericsink/sqlitepcl.raw/license.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       },
       {
         "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/NOTICE.TXT",
-        "file": "text/5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9.txt",
+        "file": "text/ericsink/sqlitepcl.raw/notice.txt",
         "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1327,7 +1306,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/sshnet/SSH.NET/7b2fd3dbf2c86a80a7b06cea020aa5f821c9902e/LICENSE",
-        "file": "text/84c79a38515de2833a7c353395e04056c0cbd77545d450fe216d569e1570b78e.txt",
+        "file": "text/sshnet/ssh.net/license.txt",
         "sha256": "84c79a38515de2833a7c353395e04056c0cbd77545d450fe216d569e1570b78e"
       }
     ]
@@ -1338,12 +1317,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/8ffa7d7f26bb2c5e3dadf74b2aa9c9ba9c9d9208/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/8ffa7d7f26bb2c5e3dadf74b2aa9c9ba9c9d9208/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-system.clientmodel-1.0.0.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -1354,12 +1333,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/6e97c088050cd354e944784385f43adaaeb29f33/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/6e97c088050cd354e944784385f43adaaeb29f33/NOTICE.txt",
-        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "file": "text/azure/azure-sdk-for-net/notice-system.clientmodel-1.9.0.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
     ]
@@ -1370,7 +1349,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/c2435c3e0f46de784341ac3ed62863ce77e117b4/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1381,7 +1360,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1392,7 +1371,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1403,7 +1382,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1414,7 +1393,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1425,7 +1404,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c94c7fc235501d478221e979062bd8837a55575b/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -1436,7 +1415,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
-        "file": "text/cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd.txt",
+        "file": "text/azuread/azure-activedirectory-identitymodel-extensions-for-dotnet/license.txt",
         "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
       }
     ]
@@ -1447,7 +1426,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1458,12 +1437,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/7e3cf643977591e9041f4c628fd4d28237398e0b/LICENSE.txt",
-        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "file": "text/azure/azure-sdk-for-net/license.txt",
         "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/7e3cf643977591e9041f4c628fd4d28237398e0b/NOTICE.txt",
-        "file": "text/5a9f94b129573a6bf1d3ba7ea4354716968f5d329751555641b332f76ddf4f98.txt",
+        "file": "text/azure/azure-sdk-for-net/notice.txt",
         "sha256": "5a9f94b129573a6bf1d3ba7ea4354716968f5d329751555641b332f76ddf4f98"
       }
     ]
@@ -1474,7 +1453,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/fad253f51b461736dfd3cd9c15977bb7493becef/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1485,7 +1464,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1496,7 +1475,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1507,7 +1486,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
-        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "file": "text/dotnet/dotnet/license.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
     ]
@@ -1518,12 +1497,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit.analyzers/95965a554f51b23032e943c2edc7b96ec043cdbb/LICENSE",
-        "file": "text/918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56.txt",
+        "file": "text/xunit/xunit.analyzers/license.txt",
         "sha256": "918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1534,12 +1513,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit.analyzers/2620a4ddabcba16ceb64ea9ad19c566252015fe8/LICENSE",
-        "file": "text/918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56.txt",
+        "file": "text/xunit/xunit.analyzers/license.txt",
         "sha256": "918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1550,12 +1529,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit.analyzers/5686c9200f788f87fbe0ff3b63d2b821ee63758b/LICENSE",
-        "file": "text/918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56.txt",
+        "file": "text/xunit/xunit.analyzers/license.txt",
         "sha256": "918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1566,12 +1545,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1582,12 +1561,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1598,12 +1577,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1614,12 +1593,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1630,7 +1609,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/pengweiqhca/Xunit.DependencyInjection/089970331640c313b5cf4bf1cc868c9ac7dbcb77/LICENSE",
-        "file": "text/a1cc4a8ec12257a0bd2f88b4b81bef71dede0a63ec11b1f517999bca6bf52ccc.txt",
+        "file": "text/pengweiqhca/xunit.dependencyinjection/license.txt",
         "sha256": "a1cc4a8ec12257a0bd2f88b4b81bef71dede0a63ec11b1f517999bca6bf52ccc"
       }
     ]
@@ -1641,7 +1620,7 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/pengweiqhca/Xunit.DependencyInjection/089970331640c313b5cf4bf1cc868c9ac7dbcb77/LICENSE",
-        "file": "text/a1cc4a8ec12257a0bd2f88b4b81bef71dede0a63ec11b1f517999bca6bf52ccc.txt",
+        "file": "text/pengweiqhca/xunit.dependencyinjection/license.txt",
         "sha256": "a1cc4a8ec12257a0bd2f88b4b81bef71dede0a63ec11b1f517999bca6bf52ccc"
       }
     ]
@@ -1652,12 +1631,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1668,12 +1647,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1684,12 +1663,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1700,12 +1679,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1716,12 +1695,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/visualstudio.xunit/699d445a1aab46a014bce946edc4995b6b46accf/License.txt",
-        "file": "text/2db414dcd8f29ebc03790a1386e0a6ded2bb8813ba6763bd5df100d6f78c1b3d.txt",
+        "file": "text/xunit/visualstudio.xunit/license.txt",
         "sha256": "2db414dcd8f29ebc03790a1386e0a6ded2bb8813ba6763bd5df100d6f78c1b3d"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1732,12 +1711,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/visualstudio.xunit/0f7d528729972578553fb146cbde5f95b316cdc4/License.txt",
-        "file": "text/2db414dcd8f29ebc03790a1386e0a6ded2bb8813ba6763bd5df100d6f78c1b3d.txt",
+        "file": "text/xunit/visualstudio.xunit/license.txt",
         "sha256": "2db414dcd8f29ebc03790a1386e0a6ded2bb8813ba6763bd5df100d6f78c1b3d"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1748,12 +1727,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/0c7aa4991fa340689155d52043ce88f52f2f7421/LICENSE",
-        "file": "text/58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581.txt",
+        "file": "text/xunit/xunit/license-xunit.v3.assert-4.0.2.txt",
         "sha256": "58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1764,12 +1743,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/0c7aa4991fa340689155d52043ce88f52f2f7421/LICENSE",
-        "file": "text/58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581.txt",
+        "file": "text/xunit/xunit/license-xunit.v3.common-4.0.2.txt",
         "sha256": "58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1780,12 +1759,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/0c7aa4991fa340689155d52043ce88f52f2f7421/LICENSE",
-        "file": "text/58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581.txt",
+        "file": "text/xunit/xunit/license-xunit.v3.core.mtp-v2-4.0.2.txt",
         "sha256": "58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1796,12 +1775,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/0c7aa4991fa340689155d52043ce88f52f2f7421/LICENSE",
-        "file": "text/58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581.txt",
+        "file": "text/xunit/xunit/license-xunit.v3.extensibility.core-4.0.2.txt",
         "sha256": "58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1812,12 +1791,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/0c7aa4991fa340689155d52043ce88f52f2f7421/LICENSE",
-        "file": "text/58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581.txt",
+        "file": "text/xunit/xunit/license-xunit.v3.mtp-v2-4.0.2.txt",
         "sha256": "58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1828,12 +1807,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/0c7aa4991fa340689155d52043ce88f52f2f7421/LICENSE",
-        "file": "text/58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581.txt",
+        "file": "text/xunit/xunit/license-xunit.v3.runner.common-4.0.2.txt",
         "sha256": "58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1844,12 +1823,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/0c7aa4991fa340689155d52043ce88f52f2f7421/LICENSE",
-        "file": "text/58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581.txt",
+        "file": "text/xunit/xunit/license-xunit.v3.runner.inproc.console-4.0.2.txt",
         "sha256": "58662904756b51beb58c8828c89fe83957100e864ef916867a9602cfbcd02581"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1860,12 +1839,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]
@@ -1876,12 +1855,12 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
-        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "file": "text/xunit/xunit/license.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
       {
         "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "file": "text/apache/license-2.0.txt",
         "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
       }
     ]

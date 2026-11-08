@@ -172,3 +172,4 @@ finally {
     }
 }
 Write-Host "PASS: $count dependency license export scenarios."
+& "$PSScriptRoot/Test-LicenseSourcePaths.Tests.ps1"
