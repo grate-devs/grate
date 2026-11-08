@@ -1,11 +1,11 @@
 # Check migration logs in a CI runner
 
-Run this from a GitHub Actions shell step, an Azure Pipelines Bash task, a TeamCity
-Command Line step, or a Jenkins freestyle shell build step. Use a grate executable
+Run this with PowerShell 7 from a GitHub Actions `pwsh` step, an Azure Pipelines
+PowerShell task, a TeamCity Command Line step, or a Jenkins build step. Use a grate executable
 built from this checkout for the agent's OS and architecture.
 
-```sh
-bash examples/ci-logging/smoke.sh /path/to/grate
+```powershell
+pwsh -File examples/ci-logging/smoke.ps1 -Grate /path/to/grate
 ```
 
 The script runs two SQLite migrations in a temporary directory. The first reports

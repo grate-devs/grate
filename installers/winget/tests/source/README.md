@@ -7,7 +7,8 @@ trust and server processes afterwards.
 | File or folder | Purpose |
 | --- | --- |
 | `Start-TestSource.ps1` / `Stop-TestSource.ps1` | Start and clean up the read-only REST source, including its temporary certificate. |
-| `server.py` / `test_server.py` | REST protocol/asset server and HTTPS protocol checks. |
+| `server.ps1` / `test_server.ps1` | REST protocol/asset server and HTTPS protocol checks. |
+| `SourceServer.ps1` / `SourceTestHelpers.ps1` | Shared HTTPS transport, catalog/search rules, and isolated test setup. |
 | `Start-PreIndexedSource.ps1` / `Stop-PreIndexedSource.ps1` | Build, host and clean up a native SQLite source package. |
 | `preindexed/` | Catalog conversion, native index API wrapper, static server and focused tests; see its [file guide](preindexed/README.md). |
 
@@ -87,11 +88,11 @@ version's default locale for package search display metadata.
 
 ## Windows CI startup and cleanup
 
-The launcher requires PowerShell 7, Python 3.9+, an elevated disposable GitHub-hosted
+The launcher requires PowerShell 7, an elevated disposable GitHub-hosted
 Windows runner, `GITHUB_ACTIONS=true`, and `RUNNER_ENVIRONMENT=github-hosted`. It
 creates a one-day certificate covering DNS `localhost` and IP `127.0.0.1`, trusts its public certificate in
 `LocalMachine\Root`, exports its key to a unique temporary directory, and launches
-Python. The source URL uses `https://127.0.0.1:8765`, matching the listening address
+a PowerShell child process. The source URL uses `https://127.0.0.1:8765`, matching the listening address
 and certificate IP SAN without DNS/IPv6 fallback. Readiness requests bypass proxies
 and use ordinary certificate validation with a bounded five-second timeout.
 
@@ -120,19 +121,19 @@ test. Upload the server logs with the test evidence; do not upload temporary key
 For manual protocol inspection on another host, provide a trusted certificate and
 key explicitly. The server always binds only to `127.0.0.1`:
 
-```sh
-python3 installers/winget/tests/source/server.py --catalog /tmp/catalog.json \
-  --certificate /tmp/localhost.pem --private-key /tmp/localhost-key.pem \
-  --assets /tmp/assets --port 8765
+```powershell
+pwsh -NoProfile -File installers/winget/tests/source/server.ps1 -Catalog /tmp/catalog.json `
+  -Certificate /tmp/localhost.pem -PrivateKey /tmp/localhost-key.pem `
+  -Assets /tmp/assets -Port 8765
 ```
 
 ## Verification scope
 
-Run protocol checks with Python and OpenSSL (used only to generate a temporary
-certificate for the tests):
+Run protocol checks with PowerShell 7. The tests create an isolated temporary
+certificate with .NET and trust it only in their own HTTPS client:
 
-```sh
-python3 -m unittest discover -s installers/winget/tests/source -p 'test_*.py' -v
+```powershell
+pwsh -NoProfile -File installers/winget/tests/source/test_server.ps1
 ```
 
 These checks make real HTTPS requests and cover both IDs, exact/substring
@@ -140,8 +141,8 @@ selection, inclusion/filter semantics, duplicate MSI correlation data, version
 filtering, dynamic catalog updates, source identity stability, and asset isolation.
 They also verify certificate trust/name rejection and that an incomplete TLS
 connection cannot block another request. TLS handshakes run in separate workers
-with a ten-second timeout; server logs distinguish TCP acceptance, TLS success or
-failure, and HTTP requests. Public certificate metadata and startup errors are
+with a ten-second timeout. The servers log TCP acceptance, TLS success/failure and
+HTTP responses to their error logs. Public certificate metadata and startup errors are
 recorded alongside those logs.
 They do not establish successful WinGet client negotiation, installation, or
 upgrade. Those require the Windows lifecycle workflow.

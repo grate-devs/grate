@@ -7,7 +7,7 @@ transition, `erikbra/grate` receives the exact same
 immutable digest through a Skopeo copy using the retained personal credential.
 There is no second application build. Login identity does not choose the repository.
 
-`release_tags.py` selects exact version tags for both names. Stable releases also
+`release_tags.ps1` selects exact version tags for both names. Stable releases also
 select `latest` on both; SemVer prereleases and releases explicitly marked as
 prereleases never select `latest`. Optional `v` prefixes are removed. Build
 metadata (`+...`) is rejected because it is not legal in a Docker tag; silently
@@ -18,7 +18,7 @@ for metadata-free `SemVer`, falls back to `1.0.0-local`, and never pushes.
 
 All artifact jobs use the immutable workflow event SHA, and selected release
 tags must match the event ref and commit.
-`resolve_release_context.py` accepts only strict metadata-free SemVer;
+`resolve_release_context.ps1` accepts only strict metadata-free SemVer;
 publishing requires a published non-draft release event, or explicit manual
 publishing against an existing non-draft GitHub release. Ordinary push/PR events
 and the default manual `publish=false` cannot enable publication.
@@ -37,13 +37,13 @@ packaging gate does not claim to include those database tests.
 
 A release-only `publish-github-release` job uploads the validated assets.
 `publish-docker` waits for that job and the gate, downloads the OCI archive and
-uses `publish_docker_archive.py` to promote it without rebuilding. The canonical
+uses `publish_docker_archive.ps1` to promote it without rebuilding. The canonical
 job uses password-free login with username `gratedevs`, environment
 `docker-hub`, its `DOCKERHUB_OIDC_CONNECTIONID` variable and `id-token: write`.
 Its 3600-second credential outlives the bounded 45-minute publication job.
 Compatibility then copies the same immutable digest using the personal token.
 
-Version and stable-only `latest` policies come from `release_tags.py`, using the
+Version and stable-only `latest` policies come from `release_tags.ps1`, using the
 validated `is-prerelease` output for both release events and manual recovery.
 Per-tag verification, publication serialization (`cancel-in-progress: false`),
 credential isolation, and redacted partial-outcome reports remain in place.
@@ -79,7 +79,7 @@ versions are verified without recopying. Temporary legacy authfiles use mode
 0600 and are removed on success or failure. Tool responses and authentication
 exceptions are not printed. `docker-compatibility.json` journals partial outcomes.
 
-Before image publication, `check_docker_access.py` requests repository grants
+Before image publication, `check_docker_access.ps1` requests repository grants
 for each identity. It requires canonical OIDC pull/push and legacy-token
 pull/push, and rejects OIDC push access to the legacy repository. A login alone
 does not establish those grants. Final public manifest read-back deliberately
@@ -166,8 +166,8 @@ record its last supported release and retain the migration link.
 
 A normal release does not copy registry history. For a separately authorized
 history migration, first generate a read-only snapshot with
-`scripts/release/migrate_docker_tags.py`, review its immutable digests and plan
-hash, then copy only that plan with `--copy`. Keep plans and reports outside git
+`scripts/release/migrate_docker_tags.ps1`, review its immutable digests and plan
+hash, then copy only that plan with `-Copy`. Keep plans and reports outside git
 in CI artifacts or linked maintenance records. Preserve platform/attestation
 manifests and referenced blobs, reject conflicting tags and verify the result
 independently. Inspect current destinations before retrying any partial copy.
