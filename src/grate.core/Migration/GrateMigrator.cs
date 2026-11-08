@@ -102,33 +102,38 @@ internal record GrateMigrator : IGrateMigrator
 
         CreateChangeDropFolder(changeDropFolder);
 
-        Separator('=');
-
-        _logger.LogInformation("Setup, Backup, Create/Restore/Drop");
-        Separator('=');
-
         TransactionScope? scope = null;
         IList<Exception> exceptions = new List<Exception>();
-        dbMigrator.SetDefaultConnectionActive();
-
-        if (config.Drop)
-        {
-            await dbMigrator.DropDatabase();
-            if (config.DryRun)
-                _logger.LogInformation("Skipping database drop due to --dryrun.");
-            else
-                _logger.LogInformation("{AppName} has removed database ({DatabaseName}) if it existed.", ApplicationInfo.Name, database.DatabaseName);
-        }
-
         var databaseCreated = false;
-        if (config.CreateDatabase)
+        using (BeginLogActivity("⚙️ Setup, backup, create/restore/drop"))
         {
-            databaseCreated = await CreateDatabaseIfItDoesNotExist(dbMigrator);
-        }
+            Separator('=');
+            _logger.LogInformation("Setup, Backup, Create/Restore/Drop");
+            Separator('=');
+            dbMigrator.SetDefaultConnectionActive();
 
-        if (!string.IsNullOrEmpty(config.Restore))
-        {
-            await RestoreDatabaseFromPath(config.Restore, dbMigrator);
+            if (config.Drop)
+            {
+                await dbMigrator.DropDatabase();
+                if (config.DryRun)
+                {
+                    _logger.LogInformation("Skipping database drop due to --dryrun.");
+                }
+                else
+                {
+                    _logger.LogInformation("{AppName} has removed database ({DatabaseName}) if it existed.", ApplicationInfo.Name, database.DatabaseName);
+                }
+            }
+
+            if (config.CreateDatabase)
+            {
+                databaseCreated = await CreateDatabaseIfItDoesNotExist(dbMigrator);
+            }
+
+            if (!string.IsNullOrEmpty(config.Restore))
+            {
+                await RestoreDatabaseFromPath(config.Restore, dbMigrator);
+            }
         }
 
         // Run these first without a transaction, to make sure the tables are created even on a potential rollback
@@ -177,9 +182,11 @@ internal record GrateMigrator : IGrateMigrator
             }
 
             bool exceptionOccured = false;
+            var visitedFolders = 0;
 
             foreach (var folder in knownFolders.Values)
             {
+                var completedFolders = visitedFolders++;
                 var processingFolderInDefaultTransaction = folder?.TransactionHandling == TransactionHandling.Default;
 
                 // Don't run any more folders that runs in the default transaction, if the transaction is already aborted
@@ -200,14 +207,14 @@ internal record GrateMigrator : IGrateMigrator
                 {
                     if (processingFolderInDefaultTransaction || config.DryRun)
                     {
-                        anyScriptRecordedOrRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
+                        anyScriptRecordedOrRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling, completedFolders);
                     }
                     else
                     {
                         using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
                         using (await dbMigrator.OpenNewActiveConnection())
                         {
-                            anyScriptRecordedOrRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
+                            anyScriptRecordedOrRun |= await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling, completedFolders);
                         }
                         s.Complete();
                     }
@@ -263,6 +270,7 @@ internal record GrateMigrator : IGrateMigrator
             throw new MigrationFailed(exceptions);
         }
 
+        using var finalizationActivity = BeginLogActivity("🏁 Finalizing migration", knownFolders.Count);
         if (!config.DryRun)
         {
             //If we get here this means no exceptions are thrown above, so we can conclude the migration was successful!
@@ -325,6 +333,7 @@ internal record GrateMigrator : IGrateMigrator
 
     private async Task CreateGrateStructure(IDbMigrator dbMigrator)
     {
+        using var activity = BeginLogActivity("🏗️ Grate structure");
         Separator('=');
         _logger.LogInformation("Grate Structure");
         Separator('=');
@@ -354,6 +363,7 @@ internal record GrateMigrator : IGrateMigrator
 
     private async Task<(long, string)> VersionTheDatabase(IDbMigrator dbMigrator)
     {
+        using var activity = BeginLogActivity("🏷️ Versioning");
         Separator('=');
         _logger.LogInformation("Versioning");
         Separator('=');
@@ -408,7 +418,7 @@ internal record GrateMigrator : IGrateMigrator
     private static DirectoryInfo Wrap(DirectoryInfo root, string subFolder) => new(Path.Combine(root.ToString(), subFolder));
 
     private async ValueTask<bool> LogAndProcess(DirectoryInfo root, MigrationsFolder folder, string changeDropFolder, long versionId,
-        ConnectionType connectionType, TransactionHandling transactionHandling)
+        ConnectionType connectionType, TransactionHandling transactionHandling, int completedFolders)
     {
         var path = Wrap(root, folder.Path);
 
@@ -424,6 +434,7 @@ internal record GrateMigrator : IGrateMigrator
             return false;
         }
 
+        using var activity = BeginLogActivity($"📂 {folder.Name} ({folder.Path})", completedFolders);
         Separator(' ');
 
         var msg = folder.Type switch
@@ -445,6 +456,10 @@ internal record GrateMigrator : IGrateMigrator
         Separator(' ');
         return result;
     }
+
+    private IDisposable? BeginLogActivity(string name, int completedFolders = 0) => IsInternalMigration() || !_logger.IsEnabled(LogLevel.Information)
+        ? null
+        : _logger.BeginScope(new MigrationLogActivity(name, completedFolders, Configuration.Folders!.Count));
 
     private async ValueTask<bool> Process(DirectoryInfo root, MigrationsFolder folder, string changeDropFolder, long versionId,
         ConnectionType connectionType, TransactionHandling transactionHandling)

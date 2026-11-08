@@ -139,9 +139,9 @@ Set `--log-format` explicitly to override detection. `azure` and `devops` are al
 
 | Runner | Signal in `auto` | Format |
 | --- | --- | --- |
-| [GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables) | `GITHUB_ACTIONS=true` | `github`: warning and error annotations |
-| [Azure Pipelines](https://learn.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=azure-devops) | `TF_BUILD=True` | `azure-devops`: warning and error issues via `task.logissue` |
-| [TeamCity](https://www.jetbrains.com/help/teamcity/predefined-build-parameters.html) | Nonempty `TEAMCITY_VERSION` | `teamcity`: build log messages with `WARNING` or `ERROR` status |
+| [GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables) | `GITHUB_ACTIONS=true` | `github`: collapsible groups, activity icons, warning and error annotations |
+| [Azure Pipelines](https://learn.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=azure-devops) | `TF_BUILD=True` | `azure-devops`: collapsible groups, progress percentage, warning and error issues |
+| [TeamCity](https://www.jetbrains.com/help/teamcity/predefined-build-parameters.html) | Nonempty `TEAMCITY_VERSION` | `teamcity`: log blocks, live activity messages, warning and error status |
 | [Jenkins](https://www.jenkins.io/doc/book/pipeline/jenkinsfile/#using-environment-variables) | Nonempty `JENKINS_URL` or a `BUILD_TAG` starting with `jenkins-` | `ci`: plain text in the standard build console |
 | Other CI, or more than one runner matches | `CI=true` without a runner match, or multiple runner matches | `ci`: plain text |
 | Local or unrecognized environment | No active signal | `console`: interactive colors when available and warnings and errors on stderr |
@@ -154,11 +154,45 @@ errors. Use `--log-format=console` to keep the original stdout/stderr split in a
 CI job. The `--isuptodate` result line stays `Up to date: True` or
 `Up to date: False` on stdout in every format.
 
+Native formats group setup, grate structure, versioning, each nonempty migration
+folder, and finalization. Titles include icons such as ⚙️, 📂 and 🏁. Groups are
+sequential, so GitHub does not need nested group support. Internal bootstrap
+migrations stay inside the grate-structure group; their existing verbosity
+filtering still applies. Groups close when the next enabled log leaves the
+activity, or when the CLI completes, fails, or disposes its logger.
+
+| Format | Native presentation |
+| --- | --- |
+| `github` | [`group` / `endgroup`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines) around each activity. GitHub has no workflow command for percentage progress. |
+| `azure-devops` | [`group` / `endgroup` and `task.setprogress`](https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops). Progress counts configured folders checked, including skipped or missing folders, plus one unit for finalization. It estimates progress through folders, not elapsed time or the proportion of SQL statements executed. |
+| `teamcity` | [`blockOpened` / `blockClosed` and `progressStart` / `progressFinish`](https://www.jetbrains.com/help/teamcity/service-messages.html#Reporting+Build+Progress), showing the current activity in the build UI. Each progress start has a matching finish, including on failure. |
+
+At information verbosity, native formats finish with `✅ Migration completed.`,
+`✅ Preview completed.` for `--dryrun`, or `✅ Baseline completed.` for `--baseline`.
+A failure after activities start ends with `❌ Migration failed.` and the existing
+error annotations. Azure reaches 100% only after the migrator returns successfully,
+including transaction completion and version bookkeeping. These messages do not
+set the enclosing task or build result. `--verbosity=Warning` (or higher) suppresses
+groups, progress and these informational status lines. `--isuptodate` also omits
+them. `console` and plain `ci` keep their existing text output.
+
 A warning does not change grate's exit code. A failed migration exits nonzero.
 A runner may also act on native errors independently of the process exit code,
 for example when TeamCity's [fail-on-error-message setting](https://www.jetbrains.com/help/teamcity/build-failure-conditions.html#Fail+Build+on+Error+Message)
 is enabled. Use `--log-format=ci` if the job needs plain logs and relies on the
 process exit code.
+
+The reusable [SQLite smoke example](../../examples/ci-logging/smoke.ps1) runs a
+successful migration with a warning and then an intentional failure. Run it
+directly on a runner to inspect groups, progress and error rendering:
+
+```powershell
+./examples/ci-logging/smoke.ps1 -Grate /path/to/grate
+```
+
+To inspect a particular command format locally, pass it after the executable:
+`./examples/ci-logging/smoke.ps1 -Grate /path/to/grate --log-format=teamcity`.
+Local stdout shows the service messages; their visual rendering requires that runner.
 
 Docker does not forward runner variables by default. For example, in a GitHub
 Actions job, forward `GITHUB_ACTIONS` to let a grate image with this option

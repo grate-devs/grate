@@ -49,6 +49,8 @@ public static class Program
         try
         {
             await scope.ServiceProvider.GetRequiredService<IGrateMigrator>().Migrate();
+            ciLogger?.Complete(logger, config.DryRun ? "Preview completed."
+                : config.Baseline ? "Baseline completed." : "Migration completed.");
             result = 0;
         }
         catch (Exception ex)

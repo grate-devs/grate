@@ -14,14 +14,11 @@ public record MockGrateLogger : ILogger<GrateMigrator>
         LoggedMessages.Add(message);
     }
 
-    public bool IsEnabled(LogLevel logLevel)
-    {
-        throw new NotImplementedException();
-    }
+    public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull
     {
-        throw new NotImplementedException();
+        return null;
     }
 
     public IList<string> LoggedMessages { get; } = new List<string>();

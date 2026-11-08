@@ -145,6 +145,16 @@ public sealed class CliCiLoggingTests : IDisposable
         foreach (var line in lines)
         {
             var payload = line == error ? line[prefix.Length..] : line;
+            var activityPrefix = new[]
+            {
+                "##vso[task.setprogress ", "##[group]", "##[endgroup]",
+                "##teamcity[blockOpened ", "##teamcity[blockClosed ",
+                "##teamcity[progressStart ", "##teamcity[progressFinish "
+            }.FirstOrDefault(candidate => payload.StartsWith(candidate, StringComparison.Ordinal));
+            if (activityPrefix is not null)
+            {
+                payload = payload[activityPrefix.Length..];
+            }
             Assert.DoesNotContain("##vso[", payload);
             Assert.DoesNotContain("##teamcity[", payload);
             Assert.DoesNotContain("##[", payload);

@@ -16,6 +16,8 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
     private readonly object _gate = new();
 #endif
     private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();
+    private MigrationLogActivity? _activity;
+    private bool _activitiesStarted;
 
     public CiMigrationLoggerProvider(MigrationLogFormat format, TextWriter stdout)
     {
@@ -27,11 +29,25 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
 
     public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopes = scopeProvider;
 
+    public void Complete(ILogger logger, string message = "Migration completed.")
+    {
+        lock (_gate)
+        {
+            FinishActivity();
+            FlushScriptErrors();
+            if (_activitiesStarted && logger.IsEnabled(LogLevel.Information))
+            {
+                _output.Complete(message);
+            }
+        }
+    }
+
     public void ReportFailure(ILogger logger, Exception exception)
     {
         var reportTerminalErrors = logger.IsEnabled(LogLevel.Error);
         lock (_gate)
         {
+            FinishActivity();
             if (!reportTerminalErrors)
             {
                 FlushScriptErrors();
@@ -64,6 +80,10 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
             {
                 _output.Write(LogLevel.Error, message);
             }
+            if (_activitiesStarted && logger.IsEnabled(LogLevel.Information))
+            {
+                _output.Write(LogLevel.Information, "❌ Migration failed.");
+            }
         }
     }
 
@@ -87,19 +107,33 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
     private void Write(LogLevel level, string category, string message, Exception? exception)
     {
         ScriptFailureDiagnostic? scriptFailure = null;
-        if (level == LogLevel.Error)
+        MigrationLogActivity? activity = null;
+        _scopes.ForEachScope((scope, _) =>
         {
-            _scopes.ForEachScope((scope, _) =>
+            if (scope is MigrationLogActivity migrationActivity)
             {
-                if (scope is ScriptFailureDiagnostic diagnostic)
-                {
-                    scriptFailure = diagnostic;
-                }
-            }, 0);
-        }
+                activity = migrationActivity;
+            }
+            else if (level == LogLevel.Error && scope is ScriptFailureDiagnostic diagnostic)
+            {
+                scriptFailure = diagnostic;
+            }
+        }, 0);
 
         lock (_gate)
         {
+            if (_output.SupportsActivities && !ReferenceEquals(_activity, activity))
+            {
+                FinishActivity();
+                // Warnings and errors remain visible at quiet verbosity without
+                // introducing progress UI whose information logs were filtered out.
+                if (activity is not null && level <= LogLevel.Information)
+                {
+                    _activity = activity;
+                    _activitiesStarted = true;
+                    _output.StartActivity(activity);
+                }
+            }
             if (scriptFailure is not null)
             {
                 _scriptErrors.Add(new ScriptError(scriptFailure.Failure, message));
@@ -137,10 +171,20 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
         _scriptErrors.Clear();
     }
 
+    private void FinishActivity()
+    {
+        if (_activity is not null)
+        {
+            _output.FinishActivity(_activity);
+            _activity = null;
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)
         {
+            FinishActivity();
             FlushScriptErrors();
         }
     }
