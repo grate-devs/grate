@@ -40,5 +40,9 @@ Now let's get started with your terminal (any Linux dist, MacOS or WSL2):
 
 ## Notes
 
+The small `script/migrate.sh` runtime launcher remains in POSIX shell because
+the application container does not include PowerShell. Host-side development
+and CI automation use PowerShell 7.
+
 - Curious how it works, see the `Dockerfile` and `Dockerfile-db`.
 

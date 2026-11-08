@@ -5,9 +5,9 @@ on:
     paths:
       - '.github/workflows/docker-*.yml'
       - '.github/workflows/build.yml'
-      - 'build-docker-local.sh'
+      - 'build-docker-local.ps1'
       - 'installers/docker/**'
-      - 'scripts/release/*docker*.py'
+      - 'scripts/release/**'
   workflow_dispatch:
     inputs:
       local_registry_check:
@@ -27,16 +27,27 @@ jobs:
         with:
           persist-credentials: false
       - name: Test Docker tag selection and local build commands
-        run: python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
+        shell: pwsh
+        run: ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
       - name: Test history preservation and release digest verification
-        run: python3 -m unittest discover -s scripts/release -p 'test_*docker*.py' -v
+        shell: pwsh
+        run: ./scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
       - name: Check local helper syntax
-        run: bash -n build-docker-local.sh
-      - name: Verify digest preservation using local files without registry publication
+        shell: pwsh
         run: |
+          $tokens = $null
+          $errors = $null
+          $null = [Management.Automation.Language.Parser]::ParseFile("$PWD/build-docker-local.ps1", [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw ($errors.Message -join '; ') }
+      - name: Verify digest preservation using local files without registry publication
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           sudo apt-get update -qq
           sudo apt-get install --yes --no-install-recommends skopeo
-          python3 scripts/release/check_docker_oci_copy.py
+          ./scripts/release/check_docker_oci_copy.ps1
       - name: Exercise loopback-registry publication only when explicitly requested
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.local_registry_check == true }}
-        run: python3 installers/docker/tests/check_local_registry.py
+        shell: pwsh
+        run: ./installers/docker/tests/check_local_registry.ps1
