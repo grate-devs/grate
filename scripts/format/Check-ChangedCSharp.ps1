@@ -20,7 +20,9 @@ $PSNativeCommandUseErrorActionPreference = $false
 Set-StrictMode -Version Latest
 
 function Invoke-GitPaths {
-    param([string[]] $GitArguments)
+    param(
+        [string[]] $GitArguments
+    )
     # NUL delimiters preserve spaces, Unicode and newlines in file names.
     $output = (& git @GitArguments) -join "`n"
     if ($LASTEXITCODE -ne 0) {

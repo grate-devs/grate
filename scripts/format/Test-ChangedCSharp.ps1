@@ -10,12 +10,21 @@ $utf8Bom = [Text.UTF8Encoding]::new($true)
 $checkCount = 0
 
 function Invoke-FixtureGit {
-    & git @args | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Fixture git failed: $args" }
+    param(
+        [string[]] $GitArguments
+    )
+    & git @GitArguments | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Fixture git failed: $GitArguments"
+    }
 }
 
 function Assert-Check {
-    param([int] $ExpectedExitCode, [string] $ExpectedOutput, [string[]] $CheckArguments = @('-BaseRef', 'main'))
+    param(
+        [int] $ExpectedExitCode,
+        [string] $ExpectedOutput,
+        [string[]] $CheckArguments = @('-BaseRef', 'main')
+    )
     $output = (& pwsh -NoProfile -File './scripts/format/Check-ChangedCSharp.ps1' @CheckArguments 2>&1) -join "`n"
     if ($LASTEXITCODE -ne $ExpectedExitCode -or $output -notmatch $ExpectedOutput) {
         throw "Expected exit $ExpectedExitCode and '$ExpectedOutput', got exit ${LASTEXITCODE}:`n$output"
@@ -31,20 +40,20 @@ try {
     [IO.File]::WriteAllText("$fixtureRoot/src/Good.cs", "public class Good`n{`n}`n", $utf8Bom)
     Push-Location $fixtureRoot
     try {
-        Invoke-FixtureGit init -b main
-        Invoke-FixtureGit config user.name 'Formatter fixture'
-        Invoke-FixtureGit config user.email 'formatter@example.invalid'
-        Invoke-FixtureGit add .
-        Invoke-FixtureGit commit -m baseline
+        Invoke-FixtureGit -GitArguments @('init', '-b', 'main')
+        Invoke-FixtureGit -GitArguments @('config', 'user.name', 'Formatter fixture')
+        Invoke-FixtureGit -GitArguments @('config', 'user.email', 'formatter@example.invalid')
+        Invoke-FixtureGit -GitArguments @('add', '.')
+        Invoke-FixtureGit -GitArguments @('commit', '-m', 'baseline')
 
         # Existing debt is outside the changed-file check.
         Assert-Check 0 'No changed C# files'
         [IO.File]::AppendAllText("$fixtureRoot/src/Legacy.cs", "`n")
         Assert-Check 2 'WHITESPACE'
-        Invoke-FixtureGit restore src/Legacy.cs
+        Invoke-FixtureGit -GitArguments @('restore', 'src/Legacy.cs')
 
         [IO.File]::AppendAllText("$fixtureRoot/src/Good.cs", "// A staged change.`n")
-        Invoke-FixtureGit add src/Good.cs
+        Invoke-FixtureGit -GitArguments @('add', 'src/Good.cs')
         Assert-Check 0 'Checking whitespace and encoding in 1 C# files'
 
         # An untracked name with spaces and Unicode must remain one argument.
@@ -55,9 +64,9 @@ try {
         # Deleted files must never reach the formatter.
         Remove-Item "$fixtureRoot/src/Legacy.cs"
         Assert-Check 0 'Checking whitespace and encoding in 1 C# files'
-        Invoke-FixtureGit restore src/Legacy.cs
+        Invoke-FixtureGit -GitArguments @('restore', 'src/Legacy.cs')
 
-        Invoke-FixtureGit mv src/Good.cs 'src/Good renamed æ.cs'
+        Invoke-FixtureGit -GitArguments @('mv', 'src/Good.cs', 'src/Good renamed æ.cs')
         Assert-Check 0 'Checking whitespace and encoding in 1 C# files'
         Assert-Check 2 'WHITESPACE' @('-All')
 
@@ -65,7 +74,9 @@ try {
         Assert-Check 2 'checking all tracked C# files'
         Assert-Check 1 'Cannot find merge base' @('-BaseRef', 'missing-base')
     }
-    finally { Pop-Location }
+    finally {
+        Pop-Location
+    }
     Write-Host "Passed $checkCount formatter integration checks."
 }
 finally {
