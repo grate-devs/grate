@@ -1,0 +1,48 @@
+name: macOS SDK extraction investigation
+on:
+  push:
+    branches: [investigate/macos-arm64-extraction]
+permissions:
+  contents: read
+jobs:
+  extraction:
+    runs-on: macos-15-arm64
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Compare extraction modes with the same archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'sdk.tar.gz'
+          Invoke-WebRequest 'https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100-rc.3.26522.148/dotnet-sdk-11.0.100-rc.3.26522.148-osx-arm64.tar.gz' -OutFile $archive
+          Get-FileHash $archive -Algorithm SHA512
+          & sw_vers
+          & tar --version
+          & locale
+          Get-ChildItem Env: | Where-Object Name -Match 'COPYFILE|TAR|LANG|LC_'
+          foreach ($mode in @('default', 'copyfile-disabled', 'c-locale', 'no-hfs-compression')) {
+              $destination = Join-Path $env:RUNNER_TEMP "extract-$mode"
+              New-Item -ItemType Directory -Path $destination | Out-Null
+              $arguments = @('-xzf', $archive, '-C', $destination)
+              if ($mode -eq 'copyfile-disabled') {
+                  $env:COPYFILE_DISABLE = '1'
+              }
+              if ($mode -eq 'c-locale') {
+                  $env:LC_ALL = 'C'
+              }
+              if ($mode -eq 'no-hfs-compression') {
+                  $arguments += '--no-hfsCompression'
+              }
+              & /usr/bin/tar @arguments 2>&1 | Tee-Object -FilePath "$destination.log"
+              $result = $LASTEXITCODE
+              Write-Output "EXTRACTION $mode exit=$result"
+              if ($result -eq 0) {
+                  & "$destination/dotnet" --version
+              }
+              Remove-Item Env:COPYFILE_DISABLE -ErrorAction SilentlyContinue
+              Remove-Item Env:LC_ALL -ErrorAction SilentlyContinue
+              Remove-Item -LiteralPath $destination -Recurse -Force
+          }
