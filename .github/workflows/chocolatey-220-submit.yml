@@ -1,4 +1,4 @@
-name: Submit the tested grate 2.2.0 Chocolatey package
+name: Archive · Chocolatey 2.2.0 submission
 
 on:
   push:
