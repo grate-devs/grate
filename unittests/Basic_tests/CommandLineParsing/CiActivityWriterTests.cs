@@ -14,7 +14,7 @@ public sealed class CiActivityWriterTests
         string format, string start, string finish, string escapedTitle, int expectedLines)
     {
         using var output = new StringWriter();
-        var provider = new CiMigrationLoggerProvider(Enum.Parse<MigrationLogFormat>(format), output);
+        var provider = new MigrationLoggerProvider(Enum.Parse<MigrationLogFormat>(format), output);
         var logger = provider.CreateLogger("Grate.Migration");
         using (logger.BeginScope(new MigrationLogActivity(
                    "25% | [x]; 'title'\r\n::endgroup:: ##vso[task.complete] ##teamcity[buildProblem] ##[endgroup]\u001b\u2028")))
@@ -53,7 +53,7 @@ public sealed class CiActivityWriterTests
     public void Filtered_information_does_not_open_groups_or_report_completion(string format)
     {
         using var output = new StringWriter();
-        using var provider = new CiMigrationLoggerProvider(Enum.Parse<MigrationLogFormat>(format), output);
+        using var provider = new MigrationLoggerProvider(Enum.Parse<MigrationLogFormat>(format), output);
         using var factory = LoggerFactory.Create(builder => builder
             .AddProvider(provider)
             .AddFilter("Grate.Migration", LogLevel.Warning));
@@ -76,7 +76,7 @@ public sealed class CiActivityWriterTests
     public void Azure_progress_measures_folder_dispatch_and_reserves_a_unit_for_finalization()
     {
         using var output = new StringWriter();
-        using var provider = new CiMigrationLoggerProvider(MigrationLogFormat.AzureDevOps, output);
+        using var provider = new MigrationLoggerProvider(MigrationLogFormat.AzureDevOps, output);
         var logger = provider.CreateLogger("Grate.Migration");
         using (logger.BeginScope(new MigrationLogActivity("First folder", completedFolders: 1, totalFolders: 3)))
         {

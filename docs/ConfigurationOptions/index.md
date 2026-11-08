@@ -70,7 +70,7 @@ shows how to pass the string at runtime and optionally supply an admin connectio
 | --version <version> | 1.0.0.0 | **Database Version** - specify the version of the current migration directly on the command line. |
 | --isuptodate<br>--uptodatecheck | - | Outputs whether the database is up to date or not (whether any non-everytime scripts would be run) |
 | -v<br>--verbosity &lt;Critical\|<br>Debug\|<br>Error\|<br>Information\|<br>None\|<br>Trace\|Warning&gt; | Information | **Verbosity level** (as defined here: https://docs.microsoft.com/dotnet/api/Microsoft.Extensions.Logging.LogLevel) |
-| --log-format &lt;auto\|console\|ci\|github\|azure-devops\|teamcity&gt; | auto | Selects how the CLI writes migration logs. See [Migration logs in CI](#migration-logs-in-ci). |
+| --log-format &lt;auto\|console\|terminal\|ci\|github\|azure-devops\|teamcity&gt; | auto | Selects how the CLI writes migration logs. See [Migration logs in CI and terminals](#migration-logs-in-ci). |
 | --createdatabase<br>--create | true | **Create** - Instructs grate to create the target database if it does not exist. Set to false to emulate the `--donotcreatedatabase` flag in roundhouse. |
 | -?<br>-h<br>--help | - |  Show help and usage information | 
 
@@ -144,7 +144,7 @@ Set `--log-format` explicitly to override detection. `azure` and `devops` are al
 | [TeamCity](https://www.jetbrains.com/help/teamcity/predefined-build-parameters.html) | Nonempty `TEAMCITY_VERSION` | `teamcity`: log blocks, live activity messages, warning and error status |
 | [Jenkins](https://www.jenkins.io/doc/book/pipeline/jenkinsfile/#using-environment-variables) | Nonempty `JENKINS_URL` or a `BUILD_TAG` starting with `jenkins-` | `ci`: plain text in the standard build console |
 | Other CI, or more than one runner matches | `CI=true` without a runner match, or multiple runner matches | `ci`: plain text |
-| Local or unrecognized environment | No active signal | `console`: interactive colors when available and warnings and errors on stderr |
+| Local or unrecognized environment | No active CI signal | `terminal` in a capable interactive terminal; otherwise `console` with the existing text output |
 
 Boolean signals match `true` regardless of case. Unset, empty and false values
 do not activate them. All CI formats write migration logs to stdout without
@@ -193,6 +193,29 @@ directly on a runner to inspect groups, progress and error rendering:
 To inspect a particular command format locally, pass it after the executable:
 `./examples/ci-logging/smoke.ps1 -Grate /path/to/grate --log-format=teamcity`.
 Local stdout shows the service messages; their visual rendering requires that runner.
+
+### Interactive terminals
+
+With `auto`, a capable terminal gets colored phase headings with icons and a
+single live progress bar showing the percentage and configured folders checked.
+The CLI clears this line before writing durable logs, then redraws it. Warnings
+and errors stay on stderr. The progress measure is the same as Azure's: configured
+folders plus finalization, with success reported after the migrator returns.
+The ordinary console's separator lines are omitted in this view.
+
+This follows the idea of the [.NET Terminal Logger](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-9/sdk#terminal-logger)
+with a small display for one migration. Terminal headings remain in scrollback;
+they are not collapsible CI groups. Live progress lines use ASCII and fit within the
+current terminal width. Narrow terminals retain headings and diagnostics without
+live progress.
+
+Automatic terminal selection requires both stdout and stderr to be attached to
+a terminal, a nonempty `TERM` on Unix or `WT_SESSION` on Windows, no `TERM=dumb`,
+and no nonempty `NO_COLOR`. CI detection takes precedence. Redirection, pipes and
+unsupported terminals keep ordinary console output without live cursor updates.
+`--log-format=terminal` explicitly requests this view with the same capability
+checks; `--log-format=console` always selects the old console view.
+`--isuptodate` keeps its exact result line and omits headings and progress.
 
 Docker does not forward runner variables by default. For example, in a GitHub
 Actions job, forward `GITHUB_ACTIONS` to let a grate image with this option

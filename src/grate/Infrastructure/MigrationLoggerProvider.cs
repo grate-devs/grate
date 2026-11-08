@@ -4,11 +4,11 @@ using Microsoft.Extensions.Logging;
 
 namespace grate.Infrastructure;
 
-internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExternalScope
+internal sealed class MigrationLoggerProvider : ILoggerProvider, ISupportExternalScope
 {
     private const string UpToDateCategory = "Grate.Migration.IsUpToDate";
     private readonly TextWriter _stdout;
-    private readonly CiLogWriter _output;
+    private readonly IMigrationLogWriter _output;
     private readonly List<ScriptError> _scriptErrors = [];
 #if NET9_0_OR_GREATER
     private readonly System.Threading.Lock _gate = new();
@@ -19,13 +19,16 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
     private MigrationLogActivity? _activity;
     private bool _activitiesStarted;
 
-    public CiMigrationLoggerProvider(MigrationLogFormat format, TextWriter stdout)
+    public MigrationLoggerProvider(MigrationLogFormat format, TextWriter stdout,
+        TextWriter? stderr = null, Func<int>? getWindowWidth = null)
     {
         _stdout = stdout;
-        _output = new CiLogWriter(format, stdout);
+        _output = format == MigrationLogFormat.Terminal
+            ? new TerminalLogWriter(stdout, stderr ?? Console.Error, getWindowWidth ?? (() => Console.WindowWidth))
+            : new CiLogWriter(format, stdout);
     }
 
-    public ILogger CreateLogger(string categoryName) => new CiLogger(this, categoryName);
+    public ILogger CreateLogger(string categoryName) => new MigrationLogger(this, categoryName);
 
     public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopes = scopeProvider;
 
@@ -104,7 +107,7 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
         return false;
     }
 
-    private void Write(LogLevel level, string category, string message, Exception? exception)
+    private void Write(LogLevel level, string category, string message, Exception? exception, EventId eventId)
     {
         ScriptFailureDiagnostic? scriptFailure = null;
         MigrationLogActivity? activity = null;
@@ -157,7 +160,7 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
                         message += Environment.NewLine + exception.Message;
                     }
                 }
-                _output.Write(level, message);
+                _output.Write(level, message, eventId);
             }
         }
     }
@@ -191,7 +194,7 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
 
     private sealed record ScriptError(Exception Failure, string Message, bool Matched = false);
 
-    private sealed class CiLogger(CiMigrationLoggerProvider provider, string categoryName) : ILogger
+    private sealed class MigrationLogger(MigrationLoggerProvider provider, string categoryName) : ILogger
     {
         public IDisposable BeginScope<TState>(TState state) where TState : notnull => provider._scopes.Push(state);
         public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
@@ -201,7 +204,7 @@ internal sealed class CiMigrationLoggerProvider : ILoggerProvider, ISupportExter
         {
             if (IsEnabled(logLevel))
             {
-                provider.Write(logLevel, categoryName, formatter(state, exception), exception);
+                provider.Write(logLevel, categoryName, formatter(state, exception), exception, eventId);
             }
         }
     }

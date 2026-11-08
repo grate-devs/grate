@@ -271,6 +271,7 @@ internal record GrateMigrator : IGrateMigrator
         }
 
         using var finalizationActivity = BeginLogActivity("🏁 Finalizing migration", knownFolders.Count);
+        Separator(' ');
         if (!config.DryRun)
         {
             //If we get here this means no exceptions are thrown above, so we can conclude the migration was successful!
@@ -305,8 +306,6 @@ internal record GrateMigrator : IGrateMigrator
             dbMigrator.Database.DatabaseName,
             newVersion,
             changeDropFolder);
-
-        Separator(' ');
     }
 
     private async Task EnsureConnectionIsOpen(ConnectionType connectionType)
@@ -581,7 +580,7 @@ internal record GrateMigrator : IGrateMigrator
 
     // ReSharper disable once TemplateIsNotCompileTimeConstantProblem
 #pragma warning disable CA2254 // Template should be a static expression.
-    private void Separator(char c) => _logger.LogInformation(new string(c, 80));
+    private void Separator(char c) => _logger.LogInformation(MigrationLogEvents.Separator, new string(c, 80));
 #pragma warning restore CA2254 // Template should be a static expression
 
     private static void CreateChangeDropFolder(string folder)

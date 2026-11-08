@@ -143,7 +143,7 @@ internal sealed class MigrateCommand : RootCommand
         {
             Description = "Format migration logs for a terminal or CI runner.",
             DefaultValueFactory = _ => "auto"
-        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure-devops", "teamcity", "azure", "devops");
+        }.AcceptOnlyFromAmong("auto", "console", "terminal", "ci", "github", "azure-devops", "teamcity", "azure", "devops");
 
     //REQUIRED OPTIONS
     private readonly Option<string> ConnectionString =

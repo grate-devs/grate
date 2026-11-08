@@ -1,10 +1,9 @@
-﻿using System.Text;
-using grate.Configuration;
+﻿using grate.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace grate.Infrastructure;
 
-internal sealed class CiLogWriter(MigrationLogFormat format, TextWriter output)
+internal sealed class CiLogWriter(MigrationLogFormat format, TextWriter output) : IMigrationLogWriter
 {
     public bool SupportsActivities => format is MigrationLogFormat.GitHub or MigrationLogFormat.AzureDevOps or MigrationLogFormat.TeamCity;
 
@@ -60,7 +59,7 @@ internal sealed class CiLogWriter(MigrationLogFormat format, TextWriter output)
         Write(LogLevel.Information, "✅ " + message);
     }
 
-    public void Write(LogLevel level, string message)
+    public void Write(LogLevel level, string message, EventId eventId = default)
     {
         var text = SafeText(message);
         if (format != MigrationLogFormat.Ci && level is LogLevel.Warning or LogLevel.Error or LogLevel.Critical)
@@ -89,7 +88,7 @@ internal sealed class CiLogWriter(MigrationLogFormat format, TextWriter output)
         output.Flush();
     }
 
-    private static string SafeText(string text) => NeutralizeCommands(ShowControlCharacters(text));
+    private static string SafeText(string text) => NeutralizeCommands(LogText.ShowControlCharacters(text));
 
     // These markers can be recognized even in the middle of a line. Escape them
     // in every CI format because ambiguous runners fall back to plain CI output.
@@ -120,23 +119,4 @@ internal sealed class CiLogWriter(MigrationLogFormat format, TextWriter output)
         .Replace("\r", "|r", StringComparison.Ordinal)
         .Replace("\n", "|n", StringComparison.Ordinal);
 
-    private static string ShowControlCharacters(string text)
-    {
-        StringBuilder? safe = null;
-        for (var index = 0; index < text.Length; index++)
-        {
-            var character = text[index];
-            if (character is '\u2028' or '\u2029' ||
-                (char.IsControl(character) && character is not ('\r' or '\n' or '\t')))
-            {
-                safe ??= new StringBuilder(text.Length).Append(text, 0, index);
-                safe.Append($@"\u{(int)character:X4}");
-            }
-            else
-            {
-                safe?.Append(character);
-            }
-        }
-        return safe?.ToString() ?? text;
-    }
 }

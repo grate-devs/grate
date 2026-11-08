@@ -75,6 +75,7 @@ public sealed class CliCiLoggingTests : IDisposable
 
     [Theory]
     [InlineData("console", null)]
+    [InlineData("terminal", null)]
     [InlineData("ci", "[WARNING]")]
     [InlineData("github", "::warning::")]
     [InlineData("azure-devops", "##vso[task.logissue type=warning;]")]

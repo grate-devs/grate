@@ -40,8 +40,8 @@ public static class Program
         }
 
         var format = MigrationLogFormatSelection.Resolve(config.LogFormat);
-        using var ciLogger = format == MigrationLogFormat.Console ? null : new CiMigrationLoggerProvider(format, Console.Out);
-        await using var serviceProvider = BuildServiceProvider(config, ciLogger);
+        using var migrationLogger = format == MigrationLogFormat.Console ? null : new MigrationLoggerProvider(format, Console.Out);
+        await using var serviceProvider = BuildServiceProvider(config, migrationLogger);
         await using var scope = serviceProvider.CreateAsyncScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<GrateMigrator>>();
 
@@ -49,25 +49,25 @@ public static class Program
         try
         {
             await scope.ServiceProvider.GetRequiredService<IGrateMigrator>().Migrate();
-            ciLogger?.Complete(logger, config.DryRun ? "Preview completed."
+            migrationLogger?.Complete(logger, config.DryRun ? "Preview completed."
                 : config.Baseline ? "Baseline completed." : "Migration completed.");
             result = 0;
         }
         catch (Exception ex)
         {
-            if (ciLogger is null)
+            if (migrationLogger is null)
             {
                 result = ExceptionHandler(ex, invocationConfiguration, logger);
             }
             else
             {
                 logger.LogDebug(ex, "{ErrorMessage}", ex.Message);
-                ciLogger.ReportFailure(logger, ex);
+                migrationLogger.ReportFailure(logger, ex);
                 result = 1;
             }
         }
 
-        if (ciLogger is null)
+        if (migrationLogger is null)
         {
             await WaitForLoggerToFinish();
         }
@@ -116,7 +116,7 @@ public static class Program
     }
 
     private static ServiceProvider BuildServiceProvider(
-        CommandLineGrateConfiguration config, CiMigrationLoggerProvider? ciLogger)
+        CommandLineGrateConfiguration config, MigrationLoggerProvider? migrationLogger)
     {
         IServiceCollection services = new ServiceCollection();
 
@@ -126,9 +126,9 @@ public static class Program
                 .AddFilter("Grate.Migration.IsUpToDate", LogLevel.Information)
                 .SetMinimumLevel(config.Verbosity);
 
-            if (ciLogger is not null)
+            if (migrationLogger is not null)
             {
-                logging.AddProvider(ciLogger);
+                logging.AddProvider(migrationLogger);
             }
             else
             {
