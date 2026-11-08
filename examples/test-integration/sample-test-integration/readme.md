@@ -2,9 +2,10 @@
 
 A simplified example of one way to use `grate` in your automated tests.
 
-The solution targets .NET 8 and uses xUnit v2 with VSTest. Install the .NET 8
-runtime and a stable .NET SDK 8.0.100 or newer, plus Docker with support for the
-SQL Server Linux image. The local `global.json` allows newer stable SDKs.
+The solution targets .NET 10 and uses xUnit v2 with VSTest. Install the .NET 10
+runtime and a stable .NET 10 SDK (10.0.100 or a newer feature band), plus Docker
+with support for the SQL Server Linux image. The local `global.json` allows newer
+stable .NET 10 SDK feature bands.
 
 Package versions are explicit so the whole `sample-test-integration` directory
 can be copied into another repository without grate's development build settings
