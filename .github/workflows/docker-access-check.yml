@@ -20,7 +20,8 @@ jobs:
         with:
           persist-credentials: false
       - name: Test access-check behavior
-        run: python3 -m unittest discover -s scripts/release -p 'test_check_docker_access.py' -v
+        shell: pwsh
+        run: ./scripts/release/test_check_docker_access.ps1
       - name: Require configured organization connection
         env:
           CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
@@ -39,7 +40,8 @@ jobs:
         env:
           DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-        run: python3 scripts/release/check_docker_access.py --canonical-authfile "$DOCKER_CONFIG/config.json" --report docker-access.json
+        shell: pwsh
+        run: ./scripts/release/check_docker_access.ps1 -CanonicalAuthfile "$env:DOCKER_CONFIG/config.json" -Report docker-access.json
       - name: Retain sanitized grant evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
