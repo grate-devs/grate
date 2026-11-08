@@ -53,8 +53,10 @@ do not make its check or approval a merge requirement during the pilot.
    reviews are disabled. A same-repository draft configuration PR can instead use
    the isolated `@coderabbitai review --preview-config` command (post it alone).
    Ready PRs targeting the default branch receive an automatic review, and pushes
-   receive incremental reviews. No opt-in keyword is needed. Use manual commands
-   when another complete review is warranted; avoid duplicating an active review.
+   receive incremental reviews. Automatic review pauses after five reviewed
+   commits. Use `@coderabbitai review` for a manual review or `@coderabbitai resume`
+   to resume automatic reviews. No opt-in keyword is needed. Request a full review
+   when warranted; avoid duplicating an active review.
    See the [command reference](https://docs.coderabbit.ai/reference/review-commands).
 3. Inspect the summary's **Additional context used → Code guidelines**. Require
    the four configured files above to be listed; inspect skipped-source and
