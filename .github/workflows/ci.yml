@@ -170,10 +170,12 @@ jobs:
         # the remaining languages, including native MSI code and workflows.
         languages: csharp, c-cpp, actions
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v4.39.2
+    # Autobuild can choose an example .sln instead of the maintained root .slnx.
+    - name: Build .NET solution for CodeQL
+      shell: pwsh
+      run: dotnet build grate.slnx --configuration Release --no-incremental -p:UseSharedCompilation=false
 
-    # Autobuild selects C#; trace the Windows-only MSI action explicitly too.
+    # Trace the Windows-only MSI action as well as the complete .NET solution.
     - name: Build native MSI upgrade action for CodeQL
       shell: pwsh
       run: ./installers/msi/native/Build-UpgradeActions.ps1 -Architecture x64 -OutputDirectory "$env:RUNNER_TEMP/codeql-msi-upgrade-actions"
