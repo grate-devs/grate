@@ -9,13 +9,13 @@ coordinates index creation and HTTPS hosting.
 | `New-SingletonManifests.ps1` | Converts the fixture catalog into standalone manifests for index construction. |
 | `Test-SingletonManifests.Tests.ps1` | Checks conversion, old/new identity selection and duplicate rejection. |
 | `WinGetIndex.cs` | Calls the pinned WinGet index APIs to build the SQLite package index. |
-| `server.py` | Serves the generated source package and fixture assets through loopback HTTPS. |
-| `test_server.py` | Checks source-package responses, assets and path isolation. |
+| `server.ps1` | Serves the generated source package and fixture assets through loopback HTTPS. |
+| `test_server.ps1` | Checks source-package responses, assets and path isolation. |
 
-Run the Python checks from the repository root:
+Run the PowerShell checks from the repository root:
 
-```sh
-python3 -m unittest discover -s installers/winget/tests/source/preindexed -p 'test_*.py' -v
+```powershell
+pwsh -NoProfile -File installers/winget/tests/source/preindexed/test_server.ps1
 ```
 
 Windows source registration and installation remain part of the real lifecycle

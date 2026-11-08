@@ -14,7 +14,7 @@ public static class RegistrationExtensions
         services.TryAddTransient<IDatabase, OracleDatabase>();
         return services;
     }
-    
+
     public static IServiceCollection AddGrateWithOracle(this IServiceCollection services, GrateConfiguration? config = null) =>
         services
             .AddGrate(config ?? GrateConfiguration.Default)

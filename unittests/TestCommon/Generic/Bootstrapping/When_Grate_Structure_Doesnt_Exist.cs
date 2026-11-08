@@ -8,7 +8,7 @@ using static grate.Configuration.KnownFolderKeys;
 
 namespace TestCommon.Generic.Bootstrapping;
 
-public abstract class When_Grate_structure_does_not_exist(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class When_Grate_structure_does_not_exist(IGrateTestContext context, ITestOutputHelper testOutput)
 : MigrationsScriptsBase(context, testOutput)
 {
     [Fact]
@@ -18,11 +18,11 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
         {
             return;
         }
-        
+
         var db = TestConfig.RandomDatabase();
         var schemaName = Random.Shared.GetString(15);
         var parent = CreateRandomTempDirectory();
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSchema(schemaName)
@@ -45,7 +45,7 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
         }
 
         Assert.Equal(schemaName, schema);
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -63,20 +63,21 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
             .WithFolders(FoldersConfiguration.Default())
             .WithSqlFilesDirectory(parent)
             .Build()
-            with {ScriptsRunTableName = scriptsRunTableName};
+            with
+        { ScriptsRunTableName = scriptsRunTableName };
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await RunMigration(migrator);
 
-        var scriptsRunTable= await migrator.GetDbMigrator().Database.ExistingTable(schemaName, scriptsRunTableName);
+        var scriptsRunTable = await migrator.GetDbMigrator().Database.ExistingTable(schemaName, scriptsRunTableName);
         Assert.NotNull(scriptsRunTable);
 
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
         Assert.Equal(scriptsRunTable.ToUpper(), scriptsRunTable!.ToUpper());
-        
+
         //await Context.DropDatabase(db);
     }
-    
+
     [Fact]
     public async Task ScriptsRunError_Table_Is_Created()
     {
@@ -91,21 +92,22 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
                 .WithFolders(FoldersConfiguration.Default())
                 .WithSqlFilesDirectory(parent)
                 .Build()
-            with {ScriptsRunErrorsTableName = scriptsErrorTableName};
+            with
+        { ScriptsRunErrorsTableName = scriptsErrorTableName };
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await RunMigration(migrator);
-        
+
         var scriptsErrorTable = await migrator.GetDbMigrator().Database.ExistingTable(schemaName, scriptsErrorTableName);
         Assert.NotNull(scriptsErrorTable);
 
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
         Assert.Equal(scriptsErrorTableName.ToUpper(), scriptsErrorTable!.ToUpper());
-        
+
         //await Context.DropDatabase(db);
     }
-    
-     
+
+
     [Fact]
     public async Task Version_Table_Is_Created()
     {
@@ -120,7 +122,8 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
                 .WithFolders(FoldersConfiguration.Default())
                 .WithSqlFilesDirectory(parent)
                 .Build()
-            with {VersionTableName = versionTableName};
+            with
+        { VersionTableName = versionTableName };
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await RunMigration(migrator);
@@ -130,11 +133,11 @@ public abstract class When_Grate_structure_does_not_exist(IGrateTestContext cont
 
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
         Assert.Equal(versionTable.ToUpper(), versionTable!.ToUpper());
-        
+
         //await Context.DropDatabase(db);
     }
-    
-    
+
+
     private async Task RunMigration(IGrateMigrator migrator)
     {
         var config = migrator.Configuration;

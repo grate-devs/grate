@@ -28,7 +28,7 @@ public record MigrationsFolder(
         TransactionHandling transactionHandling = TransactionHandling.Default)
         : this(name, name, path, type, connectionType, transactionHandling)
     { }
-    
+
     public MigrationsFolder(
         string name,
         MigrationType type = MigrationType.Once,
@@ -37,6 +37,6 @@ public record MigrationsFolder(
         : this(name, name, name, type, connectionType, transactionHandling)
     { }
 
-    public override string ToString() => 
+    public override string ToString() =>
         $"{Key}=name:{Name},path:{Path},type:{Type},connectionType:{ConnectionType},transactionHandling:{TransactionHandling}";
 }

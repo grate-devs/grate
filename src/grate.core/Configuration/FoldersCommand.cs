@@ -67,7 +67,7 @@ internal static class FoldersCommand
         foreach ((string key, string config) in configs)
         {
             MigrationsFolder folder;
-            if (foldersConfiguration.CreateDatabase != null && 
+            if (foldersConfiguration.CreateDatabase != null &&
                 key.Equals(KnownFolderKeys.CreateDatabase, StringComparison.InvariantCultureIgnoreCase))
             {
                 folder = foldersConfiguration.CreateDatabase;

@@ -1,4 +1,4 @@
-using PostgreSQL.TestInfrastructure;
+﻿using PostgreSQL.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 namespace PostgreSQL.Running_MigrationScripts;
 

@@ -12,9 +12,9 @@ public class Run_After_Create_Database_scripts(SqliteGrateTestContext testContex
 {
     [Fact(Skip = "Sqlite does not support creating databases using grate")]
     public override Task Are_run_if_the_database_is_created_from_scratch() => Task.CompletedTask;
-    
+
     protected override Task<IEnumerable<string>> GetDatabases() => Context.GetSqliteDatabases();
-    
-    protected override Task CreateDatabaseFromConnectionString(string db, string connectionString) 
+
+    protected override Task CreateDatabaseFromConnectionString(string db, string connectionString)
         => CreateSqliteDatabaseFromConnectionString(connectionString);
 }

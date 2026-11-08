@@ -16,5 +16,5 @@ public class AddGrate
         serviceCollection.AddGrate(config);
         Assert.Single(serviceCollection, s => s.ServiceType == typeof(GrateConfiguration));
     }
-    
+
 }

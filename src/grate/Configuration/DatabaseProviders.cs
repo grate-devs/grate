@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 #if ALL_DATABASES || MARIADB_ONLY
 using grate.mariadb.DependencyInjection;
 #endif

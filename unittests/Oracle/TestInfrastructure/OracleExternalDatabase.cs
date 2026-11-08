@@ -1,4 +1,4 @@
-using Oracle.ManagedDataAccess.Client;
+﻿using Oracle.ManagedDataAccess.Client;
 using TestCommon.TestInfrastructure;
 
 namespace Oraclde.TestInfrastructure;
@@ -26,5 +26,5 @@ public class OracleExternalDatabase(GrateTestConfig grateTestConfig) : ITestData
         };
         return builder.ConnectionString;
     }
-    
+
 }

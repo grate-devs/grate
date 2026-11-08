@@ -40,7 +40,7 @@ Both generators accept a stable numeric version and either that tag or its
   `-outputPath` to override either helper's default destination.
 
 The automated release workflow uses
-[`scripts/release/update_homebrew_cask.py`](../../scripts/release/update_homebrew_cask.py)
+[`scripts/release/update_homebrew_cask.ps1`](../../scripts/release/update_homebrew_cask.ps1)
 to generate the cask update for `erikbra/homebrew-cask`; the PowerShell helper
 supports manual preparation. The workflow publishes the cask only for stable
 releases, after release validation and GitHub publication. Its separate

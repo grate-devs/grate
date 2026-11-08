@@ -8,7 +8,7 @@ namespace TestCommon.Generic.Bootstrapping;
 
 //[TestFixture]
 // ReSharper disable once InconsistentNaming
-public abstract class Grate_Internal_Scripts(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class Grate_Internal_Scripts(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
     [Fact]
@@ -19,13 +19,13 @@ public abstract class Grate_Internal_Scripts(IGrateTestContext context, ITestOut
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Sprocs]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await migrator.Migrate();

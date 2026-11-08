@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using grate.Configuration;
 using grate.Migration;
 using Microsoft.Extensions.Logging;
@@ -30,13 +30,13 @@ public record MockDatabase : IDatabase
     public Task CloseAdminConnection() => Task.CompletedTask;
     public Task CreateDatabase() => Task.CompletedTask;
     public Task RestoreDatabase(string backupPath) => Task.CompletedTask;
-    public void SetLogger(ILogger logger) { } 
+    public void SetLogger(ILogger logger) { }
     public Task DropDatabase() => Task.CompletedTask;
     public Task<bool> DatabaseExists() => Task.FromResult(false);
     public Task<string> GetCurrentVersion() => Task.FromResult(string.Empty);
     public Task<long> VersionTheDatabase(string newVersion) => Task.FromResult(0L);
     public void Rollback() { }
-    
+
     public Task RunSql(string sql, ConnectionType connectionType, TransactionHandling transactionHandling) => Task.CompletedTask;
     public Task<string?> GetCurrentHash(string scriptName) => Task.FromResult(string.Empty)!;
     public Task<bool> HasRun(string scriptName, TransactionHandling transactionHandling) => Task.FromResult(false);
@@ -50,7 +50,7 @@ public record MockDatabase : IDatabase
     public Task<bool> GrateInternalTablesAreProperlyLogged() => Task.FromResult(false);
 
     public Task ChangeVersionStatus(string status, long versionId) => Task.CompletedTask;
-    
+
     public Task DeleteVersionRecord(long versionId) => Task.CompletedTask;
 
     public void SetDefaultConnectionActive() { }
@@ -62,5 +62,5 @@ public record MockDatabase : IDatabase
 
     public IEnumerable<string> GetStatements(string sql) => new List<string>();
     public void ThrowScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception exception) { }
-    
+
 }

@@ -26,7 +26,7 @@ public record PostgreSqlTestContainerDatabase(
             .WithLogger(Logger)
             .Build();
     }
-    
+
     public override string AdminConnectionString =>
         $"Host={Hostname};Port={Port};Database=postgres;Username=postgres;Password={AdminPassword};Include Error Detail=true;Pooling=false";
 
@@ -37,6 +37,6 @@ public record PostgreSqlTestContainerDatabase(
     public override string UserConnectionString(string database) =>
         $"Host={Hostname};Port={Port};Database={database};Username=postgres;Password={AdminPassword};Include Error Detail=true;Pooling=false";
 
-    
+
 }
 

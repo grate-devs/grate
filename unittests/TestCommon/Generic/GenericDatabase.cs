@@ -10,7 +10,7 @@ namespace TestCommon.Generic;
 
 public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelper testOutput)
 {
-    protected GenericDatabase(): this(null!, null!)
+    protected GenericDatabase() : this(null!, null!)
     {
     }
 
@@ -119,7 +119,7 @@ public abstract class GenericDatabase(IGrateTestContext context, ITestOutputHelp
         IEnumerable<string> databases = (await GetDatabases()).ToList();
         Assert.Contains(scriptedDatabase, databases);
         Assert.DoesNotContain(confedDatabase, databases);
-        
+
         await Context.DropDatabase(scriptedDatabase);
     }
 

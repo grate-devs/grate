@@ -68,7 +68,7 @@ is insufficient. The diagnostic requests grants and retains a sanitized report;
 it does not upload an image. Do not weaken environment protections or run the
 release publisher as an access probe.
 
-`scripts/release/migrate_docker_tags.py --copy` performs real registry writes. It
+`pwsh scripts/release/migrate_docker_tags.ps1 -Copy` performs real registry writes. It
 is not an access diagnostic or part of an ordinary release. For an explicitly
 requested history migration, first generate and review a fresh frozen plan,
 preserving digests/platforms and independent verification. Store the plan and

@@ -26,8 +26,21 @@ permissions:
 
   
 jobs:
+  preflight:
+    name: Build-independent checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/preflight
+
   set-version-number:
     name: Set version number
+    needs: preflight
     runs-on: ubuntu-latest
     outputs:
       nuGetVersion: ${{ steps.gitversion.outputs.majorMinorPatch }}
@@ -84,7 +97,8 @@ jobs:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
     - name: Show GitHub Actions annotations for SQLite migrations
-      run: bash examples/ci-logging/smoke.sh "./publish/${{ matrix.arch }}/self-contained/grate"
+      shell: pwsh
+      run: ./examples/ci-logging/smoke.ps1 -Grate "./publish/${{ matrix.arch }}/self-contained/grate"
 
     - name: Upload self-contained ${{ matrix.arch }}
       uses: actions/upload-artifact@v7

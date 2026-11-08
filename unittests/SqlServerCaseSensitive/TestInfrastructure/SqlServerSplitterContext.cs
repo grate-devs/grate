@@ -100,7 +100,7 @@ INSERT [dbo].[Foo] ([Bar]) VALUES (N'Go speed racer, go speed racer, go speed ra
 
 GO";
 
-        public static readonly string[] tsql_statement_scrubbed =[ @"
+        public static readonly string[] tsql_statement_scrubbed = [@"
 BOB1
 ", @"
 

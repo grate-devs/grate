@@ -11,7 +11,7 @@ public class PostgreSqlStatementSplitter_
 
     public PostgreSqlStatementSplitter_()
     {
-        _statementSplitter =  new PostgreSqlStatementSplitter();
+        _statementSplitter = new PostgreSqlStatementSplitter();
     }
 
     [Fact]

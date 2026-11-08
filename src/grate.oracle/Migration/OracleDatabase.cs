@@ -25,7 +25,7 @@ public record OracleDatabase : AnsiSqlDatabase
 
     public override bool SupportsDdlTransactions => false;
     public override bool SupportsSchemas => false;
-    
+
     public static string Type => "oracle";
     public static ISyntax Syntax { get; } = new OracleSyntax();
 
@@ -109,7 +109,7 @@ VALUES(:repositoryPath, :newVersion, :entryDate, :modifiedDate, :enteredBy{(incl
 RETURNING id into :id
 ";
         var repositoryPath = Config?.RepositoryPath;
-        
+
         var parameters = new
         {
             repositoryPath,

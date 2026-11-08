@@ -25,21 +25,14 @@ permissions:
 
 jobs:
   docs:
+    name: docs
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/jekyll-build-pages@v1
-        with:
-          source: docs
-          destination: _site
-      - name: Check published skill and literal SQL tokens
-        run: |
-          test -f _site/skills/use-grate/SKILL.html
-          test -f _site/skills/use-grate/references/authoring.html
-          test -f _site/skills/use-grate/assets/sqlite-example/up/001_create_widgets.sql
-          grep -Fq '{{TokenName}}' _site/skills/use-grate/references/authoring.html
-          grep -Fq 'references/authoring.html' _site/skills/use-grate/SKILL.html
+      - uses: ./.github/actions/preflight
   install:
+    needs: docs
     strategy:
       fail-fast: false
       matrix:
