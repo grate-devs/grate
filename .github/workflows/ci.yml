@@ -74,7 +74,7 @@ jobs:
           10.0.x
     - name: Restore dependencies
       run: |
-       dotnet restore -r linux-x64 grate.sln
+       dotnet restore -r linux-x64 grate.slnx
     - name: Build
       run: dotnet build --no-restore --no-self-contained -r linux-x64 src/grate/grate.csproj -c release
 
