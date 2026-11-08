@@ -1,0 +1,144 @@
+name: libpg_query distribution POC
+on:
+  pull_request:
+    paths:
+      - 'docs/design/libpg-query-distribution-poc/**'
+      - '.github/workflows/libpg-query-distribution-poc.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: libpg-query-poc-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  POC: docs/design/libpg-query-distribution-poc
+jobs:
+  native:
+    name: Native ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, runner: ubuntu-22.04 }
+          - { rid: linux-arm64, runner: ubuntu-22.04-arm }
+          - { rid: linux-musl-x64, runner: ubuntu-24.04 }
+          - { rid: linux-musl-arm64, runner: ubuntu-24.04-arm }
+          - { rid: osx-x64, runner: macos-15-intel }
+          - { rid: osx-arm64, runner: macos-15 }
+          - { rid: win-x64, runner: windows-2025 }
+          - { rid: win-x86, runner: windows-2025 }
+          - { rid: win-arm64, runner: windows-2025 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Get pinned native source
+        shell: bash
+        run: git clone --depth 1 --branch 18.1.0 https://github.com/pganalyze/libpg_query.git "$RUNNER_TEMP/upstream"
+      - name: Build Unix native asset
+        if: runner.os != 'Windows' && !contains(matrix.rid, 'musl')
+        shell: bash
+        run: bash "$POC/native/build-unix.sh" "$RUNNER_TEMP/upstream" '${{ matrix.rid }}' "$RUNNER_TEMP/assets"
+      - name: Build Windows native asset
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '& "$env:POC/native/build-windows.ps1" -SourceDirectory "$env:RUNNER_TEMP/upstream" -Rid "${{ matrix.rid }}" -OutputDirectory "$env:RUNNER_TEMP/assets"'
+      - name: Build musl native asset
+        if: contains(matrix.rid, 'musl')
+        shell: bash
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          docker run --rm -e RID -v "$GITHUB_WORKSPACE:/repo:ro" -v "$RUNNER_TEMP:/work" \
+            --entrypoint /bin/sh mcr.microsoft.com/dotnet/sdk:11.0.100-rc.3-alpine3.24@sha256:f2542b156e7c9eda7783e4a5745efa6c133a162a1940fd4175849aa80fccfd23 \
+            -ec 'apk add --no-cache build-base bash git file; git config --global --add safe.directory /work/upstream; bash /repo/docs/design/libpg-query-distribution-poc/native/build-unix.sh /work/upstream "$RID" /work/assets'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: libpg-native-${{ matrix.rid }}
+          path: ${{ runner.temp }}/assets/
+          if-no-files-found: error
+          retention-days: 7
+
+  pack:
+    name: Pack universal local dependency
+    needs: native
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: libpg-native-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/assets
+      - name: Pack all native RIDs
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: dotnet pack "$GITHUB_WORKSPACE/$POC/managed/Interop/LibPgQuery.Interop.csproj" -c Release -p:NativeAssetsRoot="$RUNNER_TEMP/assets" -o "$RUNNER_TEMP/feed"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: libpg-universal-package
+          path: ${{ runner.temp }}/feed/*.nupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  consume:
+    name: Load and parse ${{ matrix.rid }}
+    needs: pack
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, runner: ubuntu-22.04 }
+          - { rid: linux-arm64, runner: ubuntu-22.04-arm }
+          - { rid: linux-musl-x64, runner: ubuntu-24.04 }
+          - { rid: linux-musl-arm64, runner: ubuntu-24.04-arm }
+          - { rid: osx-x64, runner: macos-15-intel }
+          - { rid: osx-arm64, runner: macos-15 }
+          - { rid: win-x64, runner: windows-2025 }
+          - { rid: win-x86, runner: windows-2025 }
+          - { rid: win-arm64, runner: windows-11-arm }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        if: ${{ !contains(matrix.rid, 'musl') }}
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: libpg-universal-package
+          path: ${{ runner.temp }}/feed
+      - name: Install x86 framework-dependent runtime
+        if: matrix.rid == 'win-x86'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile "$env:RUNNER_TEMP/dotnet-install.ps1"
+          & "$env:RUNNER_TEMP/dotnet-install.ps1" -Runtime dotnet -Version 11.0.0-rc.3.26522.148 -Architecture x86 -InstallDir "$env:RUNNER_TEMP/dotnet-x86"
+          "DOTNET_ROOT_X86=$env:RUNNER_TEMP/dotnet-x86" >> $env:GITHUB_ENV
+      - name: Verify Windows packaged consumer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python "$env:POC/verify-package.py" --feed "$env:RUNNER_TEMP/feed" --rid '${{ matrix.rid }}' --framework net11.0 --complete
+      - name: Verify Unix packaged consumer
+        if: runner.os != 'Windows' && !contains(matrix.rid, 'musl')
+        shell: bash
+        run: python3 "$POC/verify-package.py" --feed "$RUNNER_TEMP/feed" --rid '${{ matrix.rid }}' --framework net11.0 --complete
+      - name: Verify musl packaged consumer
+        if: contains(matrix.rid, 'musl')
+        shell: bash
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          docker run --rm -e RID -v "$GITHUB_WORKSPACE:/repo" -v "$RUNNER_TEMP:/work" \
+            --entrypoint /bin/sh mcr.microsoft.com/dotnet/sdk:11.0.100-rc.3-alpine3.24@sha256:f2542b156e7c9eda7783e4a5745efa6c133a162a1940fd4175849aa80fccfd23 \
+            -ec 'apk add --no-cache python3; python3 /repo/docs/design/libpg-query-distribution-poc/verify-package.py --feed /work/feed --rid "$RID" --framework net11.0 --complete'
