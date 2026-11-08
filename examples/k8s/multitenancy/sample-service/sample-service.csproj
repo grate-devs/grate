@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="grate.sqlserver" Version="2.0.0" />
+    <PackageReference Include="grate.sqlserver" Version="2.0.6" />
   </ItemGroup>
 
 </Project>
