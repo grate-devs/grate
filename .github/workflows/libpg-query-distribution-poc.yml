@@ -1,4 +1,4 @@
-name: libpg_query distribution POC
+name: POC · libpg_query distribution
 on:
   pull_request:
     paths:
