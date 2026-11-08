@@ -12,9 +12,9 @@ internal record GrateMigrator : IGrateMigrator
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
-    
+
     internal IDbMigrator DbMigrator { get; private init; }
-    
+
     private string LogCategory => $"Grate.Migration{(IsInternalMigration() ? ".Internal" : "")}";
 
     public GrateConfiguration Configuration
@@ -53,7 +53,7 @@ internal record GrateMigrator : IGrateMigrator
     }
 
     public IGrateMigrator WithDatabase(IDatabase database) => this with { Database = database };
-    
+
 
     public GrateMigrator(ILoggerFactory loggerFactory, IDbMigrator migrator)
     {
@@ -87,8 +87,8 @@ internal record GrateMigrator : IGrateMigrator
             database.ServerName,
             database.DatabaseName
         );
-        
-        if(config.Baseline)
+
+        if (config.Baseline)
             _logger.LogInformation("Running a baseline run. No scripts will be actually be run, but the scripts will be marked as run.");
 
         _logger.LogInformation("Looking in {UpFolder} for scripts to run.", config.SqlFilesDirectory);
@@ -99,7 +99,7 @@ internal record GrateMigrator : IGrateMigrator
 
         var changeDropFolder = ChangeDropFolder(config, database.ServerName, database.DatabaseName);
         _logger.LogDebug("The change_drop (output) folder is: {ChangeDropFolder}", changeDropFolder);
-        
+
         CreateChangeDropFolder(changeDropFolder);
 
         Separator('=');
@@ -140,6 +140,7 @@ internal record GrateMigrator : IGrateMigrator
         _logger.LogInformation("Migration Scripts");
         Separator('=');
         bool anyScriptRecordedOrRun = false;
+        bool commitRequested = false;
         try
         {
             // Start the transaction, if configured
@@ -154,15 +155,15 @@ internal record GrateMigrator : IGrateMigrator
                 // use command timeout as the max timeout and transaction scope timeout, if greater than current MaximumTimeout
                 var maxTimeout = TransactionManager.MaximumTimeout;
                 var transactionTimeout = config.CommandTimeout > 0
-                    ? new [] {maxTimeout, TimeSpan.FromSeconds(config.CommandTimeout) }.Max()
+                    ? new[] { maxTimeout, TimeSpan.FromSeconds(config.CommandTimeout) }.Max()
                     : maxTimeout;
-                
-                #if NET7_0_OR_GREATER
+
+#if NET7_0_OR_GREATER
                 if (transactionTimeout > maxTimeout)
                 {
                     TransactionManager.MaximumTimeout = transactionTimeout;
                 }
-                #endif
+#endif
                 // TransactionScope defaults to Serializable. On SQL Server that leaves key-range locks on the
                 // ScriptsRun table after we read it, which blocks folders that run outside the transaction
                 // (permissions, afterMigration, ...) from writing their own ScriptsRun rows until we commit (#657).
@@ -221,9 +222,10 @@ internal record GrateMigrator : IGrateMigrator
 
             await dbMigrator.CloseConnection();
 
-            if (!exceptionOccured)
+            if (!exceptionOccured && scope is not null)
             {
-                scope?.Complete();
+                scope.Complete();
+                commitRequested = true;
             }
         }
         finally
@@ -232,7 +234,28 @@ internal record GrateMigrator : IGrateMigrator
             {
                 scope?.Dispose();
             }
-            catch (TransactionAbortedException) { }
+            catch (TransactionAbortedException) when (!commitRequested)
+            {
+                // Preserve the original failure when rolling back an incomplete scope.
+            }
+            catch (TransactionAbortedException ex)
+            {
+                _logger.LogError("The migration transaction failed to commit. {ErrorMessage}", ex.InnerException?.Message ?? ex.Message);
+
+                if (!config.DryRun)
+                {
+                    try
+                    {
+                        await database.ChangeVersionStatus(MigrationStatus.Error, versionId);
+                    }
+                    catch (Exception statusException)
+                    {
+                        _logger.LogWarning(statusException, "Unable to record the transaction failure for version {VersionId}.", versionId);
+                    }
+                }
+
+                throw;
+            }
         }
 
         if (exceptions.Any())
@@ -254,12 +277,12 @@ internal record GrateMigrator : IGrateMigrator
                 await DbMigrator.Database.DeleteVersionRecord(versionId);
             }
         }
-        
+
         // If it's an up-to-date check, we output on the console if it's up-to-date or not.
         if (config.UpToDateCheck)
         {
             var logger = _loggerFactory.CreateLogger(LogCategory + ".IsUpToDate");
-            
+
             logger.LogInformation("Up to date: {IsUpToDate}", MigrationResult.IsUpToDate);
             foreach (var script in MigrationResult.ScriptsRun)
             {
@@ -324,7 +347,7 @@ internal record GrateMigrator : IGrateMigrator
             }
         }
     }
-    
+
     private bool IsInternalMigration() => GrateEnvironment.Internal == this.Configuration?.Environment
                                           || GrateEnvironment.InternalBootstrap == this.Configuration?.Environment;
 
@@ -345,43 +368,36 @@ internal record GrateMigrator : IGrateMigrator
 
     private async Task<bool> CreateDatabaseIfItDoesNotExist(IDbMigrator dbMigrator)
     {
-        bool databaseCreated;
         if (await dbMigrator.DatabaseExists())
         {
-            databaseCreated = false;
+            return false;
         }
-        else
+
+        var config = dbMigrator.Configuration;
+        if (config.Folders?.CreateDatabase is { } folder)
         {
-            var config = dbMigrator.Configuration;
-            var createDatabaseFolder = config.Folders?.CreateDatabase;
-            var database = DbMigrator.Database;
+            var path = Wrap(config.SqlFilesDirectory, folder.Path);
+            var files = path.Exists
+                ? FileSystem.GetFiles(path, "*.sql", config.IgnoreDirectoryNames).OfType<FileInfo>().ToArray()
+                : [];
 
-            var path = Wrap(config.SqlFilesDirectory, createDatabaseFolder?.Path ?? "zz-xx-øø-definitely-does-not-exist");
-
-            if (createDatabaseFolder is not null && path.Exists)
+            if (files.Length > 0)
             {
-                //await LogAndProcess(config.SqlFilesDirectory, folder!, changeDropFolder, versionId, folder!.ConnectionType, folder.TransactionHandling);
+                var database = dbMigrator.Database;
                 var changeDropFolder = ChangeDropFolder(config, database.ServerName, database.DatabaseName);
-                databaseCreated = await ProcessWithoutLogging(
-                    config.SqlFilesDirectory,
-                    createDatabaseFolder,
-                    changeDropFolder,
-                    createDatabaseFolder.ConnectionType,
-                    createDatabaseFolder.TransactionHandling
-                );
+                var databaseCreated = await ProcessWithoutLogging(path, folder, files, changeDropFolder);
 
                 if (databaseCreated && !config.DryRun)
                 {
                     await DatabaseReadiness.Wait(database);
                 }
-            }
-            else
-            {
-                // Include runAfterCreateDatabase scripts in a preview of a new database.
-                databaseCreated = config.DryRun || await dbMigrator.CreateDatabase();
+
+                return databaseCreated;
             }
         }
-        return databaseCreated;
+
+        // Include runAfterCreateDatabase scripts in a preview of a new database.
+        return config.DryRun || await dbMigrator.CreateDatabase();
     }
 
     private static async Task RestoreDatabaseFromPath(string backupPath, IDbMigrator dbMigrator)
@@ -488,15 +504,10 @@ internal record GrateMigrator : IGrateMigrator
 
     }
 
-    private async ValueTask<bool> ProcessWithoutLogging(DirectoryInfo root, MigrationsFolder folder, string changeDropFolder,
-        ConnectionType connectionType, TransactionHandling transactionHandling)
+    private async ValueTask<bool> ProcessWithoutLogging(DirectoryInfo path, MigrationsFolder folder,
+        IEnumerable<FileInfo> files, string changeDropFolder)
     {
-        var path = Wrap(root, folder.Path);
-
-        await EnsureConnectionIsOpen(connectionType);
-
-        var pattern = "*.sql";
-        var files = FileSystem.GetFiles(path, pattern, DbMigrator.Configuration.IgnoreDirectoryNames);
+        await EnsureConnectionIsOpen(folder.ConnectionType);
 
         var anySqlRun = false;
 
@@ -510,7 +521,7 @@ internal record GrateMigrator : IGrateMigrator
             : string.Join('/', Path.GetRelativePath(path.ToString(), file.FullName).Split(Path.DirectorySeparatorChar));
 
             bool theSqlRan = await DbMigrator.RunSqlWithoutLogging(sql, fileNameToLog, DbMigrator.Configuration.Environment,
-                connectionType, transactionHandling);
+                folder.ConnectionType, folder.TransactionHandling);
 
             if (theSqlRan)
             {
@@ -620,7 +631,7 @@ internal record GrateMigrator : IGrateMigrator
 
         return runInTransaction;
     }
-    
+
     private async Task RunInternalMigrations(string internalFolderName)
     {
         // First, make sure we have created the "internal meta tables"
@@ -640,7 +651,7 @@ internal record GrateMigrator : IGrateMigrator
             await migrator2.Migrate();
         }
     }
-    
+
     private async Task<GrateConfiguration> GetBootstrapInternalGrateConfiguration(string internalFolderName)
     {
         var bootstrapInternalGrateConfiguration = await GetInternalGrateConfiguration(internalFolderName, "grate-internal") with
@@ -662,14 +673,14 @@ internal record GrateMigrator : IGrateMigrator
         {
             OutputPath = bootstrapInternalGrateConfiguration.OutputPath.Parent!.CreateSubdirectory("grate-internal-bootstrap")
         };
-        
+
         return bootstrapInternalGrateConfiguration;
     }
 
     private async Task<GrateConfiguration> GetInternalGrateConfiguration(string internalFolderName, string? sqlFolderNamePrefix = null)
     {
         var thisConfig = this.Configuration;
-        
+
         var internalMigrationFolders = await WriteInternalScriptsToTemporaryFolders(internalFolderName, sqlFolderNamePrefix);
 
         // Check if the internal grate tables already exist or not.
@@ -680,7 +691,7 @@ internal record GrateMigrator : IGrateMigrator
         var baseline = internalFolderName == "Baseline"
                        && await this.Database.VersionTableExists()
                        && !(await this.Database.GrateInternalTablesAreProperlyLogged());
-        
+
         // We might consider supporting other sources of the SQL scripts than the file system,
         // but for now, we write the internal scripts to file system before running them 
         //SqlFilesDirectory = new DirectoryInfo("internal embedded resources"),
@@ -693,22 +704,22 @@ internal record GrateMigrator : IGrateMigrator
             CommandTimeout = thisConfig.CommandTimeout,
             AdminCommandTimeout = thisConfig.AdminCommandTimeout,
             OutputPath = thisConfig.OutputPath.CreateSubdirectory("grate-internal"),
-            
+
             Baseline = baseline,
             NonInteractive = true,
             SqlFilesDirectory = new DirectoryInfo(internalMigrationFolders),
             CreateDatabase = false,
             AlterDatabase = false,
             DryRun = false,
-            
+
             Drop = false,
             Restore = null,
-            Transaction = false, 
+            Transaction = false,
             Version = ApplicationInfo.Version,
             ScriptsRunTableName = "GrateScriptsRun",
             ScriptsRunErrorsTableName = "GrateScriptsRunErrors",
             VersionTableName = "GrateVersion",
-            
+
             UserTokens = [
                 $"ScriptsRunTable={thisConfig.ScriptsRunTableName}",
                 $"ScriptsRunErrorsTable={thisConfig.ScriptsRunErrorsTableName}",
@@ -717,7 +728,7 @@ internal record GrateMigrator : IGrateMigrator
                 $"ScriptsRunErrorsTableLowerCase={thisConfig.ScriptsRunErrorsTableName.ToLower()}",
                 $"VersionTableLowerCase={thisConfig.VersionTableName.ToLower()}"
             ],
-            
+
             Environment = GrateEnvironment.Internal,
             /* 
             note for `grate internal migration` only: 
@@ -732,13 +743,13 @@ internal record GrateMigrator : IGrateMigrator
     {
         var internalMigrationFolders = FileSystem.CreateRandomTempDirectory().ToString();
         await Bootstrapping.WriteBootstrapScriptsToFolder(
-            this.Database.GetType(), 
-            internalMigrationFolders, 
+            this.Database.GetType(),
+            internalMigrationFolders,
             internalFolderName,
             sqlFolderNamePrefix);
         return internalMigrationFolders;
     }
-    
+
     private void AddScriptRunToResult(MigrationsFolder folder, string fileNameToLog)
     {
         MigrationResult.AddScriptRun(fileNameToLog);

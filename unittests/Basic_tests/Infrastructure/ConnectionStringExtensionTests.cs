@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.MariaDb.Migration;

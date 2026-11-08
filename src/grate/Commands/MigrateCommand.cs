@@ -44,16 +44,43 @@ internal sealed class MigrateCommand : RootCommand
         Options.Add(RunAllAnyTimeScripts);
         Options.Add(DryRun);
         Options.Add(Restore);
+        Options.Add(RestoreMoves);
         Options.Add(IgnoreDirectoryNames);
         Options.Add(UpToDateCheck);
         Options.Add(Verbosity);
+        Options.Add(LogFormat);
         Subcommands.Add(new SkillsCommand());
 
         // Obsolete options - kept so that grate keeps reporting helpful messages, but not bound.
         Options.Add(Database);
         Options.Add(ServerName);
 
-        SetAction((result, _) => migrate(GetConfiguration(result), result.InvocationConfiguration));
+        SetAction(async (result, _) =>
+        {
+            var folders = result.GetValue(Folders);
+            var config = GetConfiguration(result, folders?.Configuration);
+            var supportsRestoreMoves = config.DatabaseType == Configuration.DatabaseType.SQLServer;
+            var validationMessage = config.ValidateRestoreMoves(supportsRestoreMoves);
+            if (validationMessage is not null)
+            {
+                result.InvocationConfiguration.Error.WriteLine(validationMessage);
+                return 1;
+            }
+            if (folders is { } parsedFolders)
+            {
+                foreach (var (key, folder) in parsedFolders.RequiredFolders)
+                {
+                    var path = Path.Combine(config.SqlFilesDirectory.FullName, folder.Path);
+                    if (!Directory.Exists(path))
+                    {
+                        result.InvocationConfiguration.Error.WriteLine($"Migration folder '{key}' requires an existing directory: '{path}'.");
+                        return 1;
+                    }
+                }
+            }
+
+            return await migrate(config, result.InvocationConfiguration);
+        });
     }
 
     /// <summary>
@@ -61,10 +88,14 @@ internal sealed class MigrateCommand : RootCommand
     /// This is the explicit replacement for the convention-based model binder that used to live in
     /// System.CommandLine.NamingConventionBinder.
     /// </summary>
-    public CommandLineGrateConfiguration GetConfiguration(ParseResult parseResult)
+    public CommandLineGrateConfiguration GetConfiguration(ParseResult parseResult) =>
+        GetConfiguration(parseResult, parseResult.GetValue(Folders)?.Configuration);
+
+    private CommandLineGrateConfiguration GetConfiguration(ParseResult parseResult, IFoldersConfiguration? folders)
     {
         // Preserve configuration defaults for optional values without a default value factory.
         var defaults = new CommandLineGrateConfiguration();
+        var logFormat = parseResult.GetValue(LogFormat) ?? "auto";
 
         return new CommandLineGrateConfiguration
         {
@@ -72,7 +103,7 @@ internal sealed class MigrateCommand : RootCommand
             AdminConnectionString = parseResult.GetValue(AdminConnectionString),
             SqlFilesDirectory = parseResult.GetValue(SqlFilesDirectory)!,
             OutputPath = parseResult.GetValue(OutputPath)!,
-            Folders = parseResult.GetValue(Folders) ?? defaults.Folders,
+            Folders = folders ?? defaults.Folders,
             AccessToken = parseResult.GetValue(AccessToken),
             CommandTimeout = parseResult.GetValue(CommandTimeout),
             AdminCommandTimeout = parseResult.GetValue(CommandTimeoutAdmin),
@@ -94,14 +125,25 @@ internal sealed class MigrateCommand : RootCommand
             RunAllAnyTimeScripts = parseResult.GetValue(RunAllAnyTimeScripts),
             DryRun = parseResult.GetValue(DryRun),
             Restore = parseResult.GetValue(Restore),
+            RestoreMoves = parseResult.GetValue(RestoreMoves) ?? [],
             IgnoreDirectoryNames = parseResult.GetValue(IgnoreDirectoryNames),
             UpToDateCheck = parseResult.GetValue(UpToDateCheck),
+            LogFormat = logFormat.ToLowerInvariant() is "azure-devops" or "azure" or "devops"
+                ? MigrationLogFormat.AzureDevOps
+                : Enum.Parse<MigrationLogFormat>(logFormat, ignoreCase: true),
             // Verbosity has no default value factory; when it isn't supplied keep the record default.
             Verbosity = parseResult.GetResult(Verbosity) is { Implicit: false }
                 ? parseResult.GetValue(Verbosity)
                 : defaults.Verbosity,
         };
     }
+
+    private readonly Option<string> LogFormat =
+        new Option<string>("--log-format")
+        {
+            Description = "Format migration logs for a terminal or CI runner.",
+            DefaultValueFactory = _ => "auto"
+        }.AcceptOnlyFromAmong("auto", "console", "ci", "github", "azure-devops", "teamcity", "azure", "devops");
 
     //REQUIRED OPTIONS
     private readonly Option<string> ConnectionString =
@@ -132,21 +174,24 @@ internal sealed class MigrateCommand : RootCommand
     private readonly Option<DirectoryInfo> OutputPath =
         new("--outputPath", "-o", "--output")
         {
-            Description = "This is where everything related to the migration is stored. This includes any backups, all items that ran, permission dumps, logs, etc.",
+            Description = "Directory for migration artifacts such as copies of executed SQL scripts. To save console logs, redirect stdout and stderr.",
             DefaultValueFactory = _ => new DirectoryInfo(DefaultOutputPath)
         };
 
-    private readonly Option<IFoldersConfiguration?> Folders =
+    private readonly Option<(IFoldersConfiguration Configuration, IReadOnlyDictionary<string, MigrationsFolder> RequiredFolders)?> Folders =
         new("--folders")
         {
             CustomParser = result =>
-                FoldersCommand.Parse(result.Tokens.Count > 0 ? result.Tokens[0].Value : null),
+                FoldersCommand.ParseWithRequiredFolders(result.Tokens.Count > 0 ? result.Tokens[0].Value : null),
             Description =
 @"Folder configuration.
 
 If you wish to override any of the default folder names, supply a semicolon separated list of mappings.
 You can also specify a file name that has the same contents as you would supply on the command line,
 if you find it cumbersome to write all the folders on the command line.
+
+Explicit folder paths and folders in a fully custom configuration must exist.
+Standard folders with no explicit path override are optional.
 
 Example:
 
@@ -331,6 +376,40 @@ the last one will expect the folders to be named 'folder1', 'folder2', and 'fold
         new("--restore")
         {
             Description = " Restore - This instructs grate where to get the backed up database file. Defaults to NULL."
+        };
+
+    private readonly Option<RestoreFileMove[]> RestoreMoves =
+        new("--restore-move")
+        {
+            Description = "SQL Server file mapping for --restore, as logical-name=destination-path. Repeat for each file to move.",
+            Arity = ArgumentArity.OneOrMore,
+            CustomParser = result =>
+            {
+                var moves = new List<RestoreFileMove>();
+                foreach (var token in result.Tokens)
+                {
+                    var separator = token.Value.IndexOf('=');
+                    if (separator < 0)
+                    {
+                        result.AddError("--restore-move expects logical-name=destination-path.");
+                        return [];
+                    }
+
+                    moves.Add(new(token.Value[..separator], token.Value[(separator + 1)..]));
+                }
+
+                return moves.ToArray();
+            },
+            Validators =
+            {
+                result =>
+                {
+                    if (result.IdentifierTokenCount != result.Tokens.Count)
+                    {
+                        result.AddError("Each --restore-move requires one logical-name=destination-path argument.");
+                    }
+                }
+            }
         };
 
     private readonly Option<bool> Silent =

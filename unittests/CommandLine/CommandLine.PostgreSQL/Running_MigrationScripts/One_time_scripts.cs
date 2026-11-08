@@ -49,7 +49,7 @@ public class One_time_scripts(PostgreSqlGrateTestContext testContext, ITestOutpu
 
         Assert.Single(scripts);
         Assert.Equal(Context.Sql.SelectVersion, scripts.First());
-        
+
         //await Context.DropDatabase(db);
     }
 

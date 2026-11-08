@@ -7,13 +7,13 @@ namespace TestCommon.Generic.Running_MigrationScripts;
 
 //[TestFixture]
 // ReSharper disable once InconsistentNaming
-public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
-    protected Everytime_scripts(): this(null!, null!)
+    protected Everytime_scripts() : this(null!, null!)
     {
     }
-    
+
     [Fact]
     public async Task Are_run_every_time_even_when_unchanged()
     {
@@ -22,7 +22,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Permissions]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -52,7 +52,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Permissions]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
@@ -98,7 +98,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
         CreateDummySql(parent, folder);
         CreateEveryTimeScriptFile(parent, folder);
         CreateOtherEveryTimeScriptFile(parent, folder);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -120,7 +120,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
         }
 
         Assert.Equal(7, scripts.Length); // one time script ran once, the two everytime scripts ran every time.
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -131,7 +131,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
 
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
@@ -155,7 +155,7 @@ public abstract class Everytime_scripts(IGrateTestContext context, ITestOutputHe
 
         // but doesn't exist
         await Assert.ThrowsAsync(Context.DbExceptionType, async () => await conn.QueryAsync<string>("select * from grate"));
-        
+
         //await Context.DropDatabase(db);
     }
 

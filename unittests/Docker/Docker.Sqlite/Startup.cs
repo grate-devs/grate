@@ -1,4 +1,4 @@
-using grate.Configuration;
+﻿using grate.Configuration;
 using Sqlite.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
@@ -7,7 +7,7 @@ using TestCommon.TestInfrastructure;
 namespace Docker.Sqlite;
 
 // ReSharper disable once UnusedType.Global
-public class Startup: Docker.Common.Startup<SqliteTestDatabase, SqliteTestDatabase, SqliteGrateTestContext>
+public class Startup : Docker.Common.Startup<SqliteTestDatabase, SqliteTestDatabase, SqliteGrateTestContext>
 {
     protected override DatabaseType DatabaseType => DatabaseType.SQLite;
 }

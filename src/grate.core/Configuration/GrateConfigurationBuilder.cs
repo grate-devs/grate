@@ -34,7 +34,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { OutputPath = outputFolder };
         return this;
     }
-    
+
     /// <summary>
     /// Output folder (logs, backups, etc).
     /// </summary>
@@ -63,7 +63,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { Folders = folders };
         return this;
     }
-    
+
 
     /// <summary>
     /// Specify the schema name to use for the migration. Default 'grate'
@@ -154,7 +154,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { CreateDatabase = false };
         return this;
     }
-    
+
     /// <summary>
     /// Run the migration in a transaction. Note that this is not supported by all databases.
     /// </summary>
@@ -164,7 +164,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { Transaction = runInTransaction };
         return this;
     }
-    
+
     /// <summary>
     /// Set migration environment. This is used to run environment-specific scripts.
     /// </summary>
@@ -178,7 +178,7 @@ public sealed partial class GrateConfigurationBuilder
         }
         return this;
     }
-    
+
     /// <summary>
     /// Do not store the text of the run scripts in the migration history table.
     /// This can save space, in very small environments (e.g. embedded)
@@ -189,7 +189,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { DoNotStoreScriptsRunText = true };
         return this;
     }
-    
+
     /// <summary>
     /// Run all anytime scripts, even if they have not changed
     /// </summary>
@@ -199,7 +199,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { RunAllAnyTimeScripts = true };
         return this;
     }
-    
+
     /// <summary>
     /// Drop the database before running the migration.
     /// </summary>
@@ -209,7 +209,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { Drop = true };
         return this;
     }
-    
+
     /// <summary>
     /// Do not run the migration, just print what would be run.
     /// </summary>
@@ -219,7 +219,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { DryRun = true };
         return this;
     }
-    
+
     /// <summary>
     /// Run in baseline mode. This will not run any scripts, just store the current version as the baseline.
     /// </summary>
@@ -229,7 +229,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { Baseline = true };
         return this;
     }
-      
+
     /// <summary>
     /// Set the command timeout for the migration. Default is 30 seconds. 
     /// </summary>
@@ -239,7 +239,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { CommandTimeout = commandTimeout };
         return this;
     }
-    
+
     /// <summary>
     /// Set the admin command timeout for the migration. Default is 30 seconds. 
     /// </summary>
@@ -249,7 +249,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { AdminCommandTimeout = timeout };
         return this;
     }
-    
+
     /// <summary>
     /// Only warn if a one-time script has changed between runs.
     /// The default is to fail the migration if a one-time script has changed.
@@ -260,7 +260,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { WarnOnOneTimeScriptChanges = warn };
         return this;
     }
-    
+
     /// <summary>
     /// Only warn if a one-time script has changed between runs, and IGNORE the script (do not run it).
     /// Update the hash in the database to match the current script, so it will not be run again.
@@ -271,7 +271,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { WarnAndIgnoreOnOneTimeScriptChanges = warn };
         return this;
     }
-    
+
     /// <summary>
     /// Set the user tokens to use for the migration. This is used to replace tokens in the migration scripts.
     /// provide a list of tokens in the form "token=value".
@@ -282,7 +282,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { UserTokens = tokens };
         return this;
     }
-    
+
     /// <summary>
     /// Set the user tokens to use for the migration. This is used to replace tokens in the migration scripts.
     /// provide a key-value pair of tokens.
@@ -294,7 +294,7 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { UserTokens = tokenStrings };
         return this;
     }
-    
+
     /// <summary>
     /// Restore the database from a backup before running the migration.
     /// </summary>
@@ -304,5 +304,15 @@ public sealed partial class GrateConfigurationBuilder
         _grateConfiguration = _grateConfiguration with { Restore = backupPath };
         return this;
     }
-    
+
+    /// <summary>
+    /// Set the optional SQL Server file mappings for the backup specified by <see cref="RestoreFrom"/>.
+    /// </summary>
+    public GrateConfigurationBuilder WithRestoreMoves(params RestoreFileMove[] moves)
+    {
+        ArgumentNullException.ThrowIfNull(moves);
+        _grateConfiguration = _grateConfiguration with { RestoreMoves = Array.AsReadOnly(moves.ToArray()) };
+        return this;
+    }
+
 }

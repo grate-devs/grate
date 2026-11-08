@@ -34,8 +34,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
     
     static SqlServerFixture()
     {
-        SqlServer = new MsSqlBuilder()
-            .WithImage("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04") // TestContainers recommend running a pinned image for repeatability
+        SqlServer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04") // TestContainers recommend running a pinned image for repeatability
             
             // See https://github.com/testcontainers/testcontainers-dotnet/issues/1220#issuecomment-2248455959
             .WithWaitStrategy(Wait.ForUnixContainer().UntilCommandIsCompleted("/opt/mssql-tools18/bin/sqlcmd", "-C", "-Q", "SELECT 1;") )
@@ -71,11 +70,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
         migration.StartInfo.Arguments = $"--files=./db --env=IntegrationTest --connstring=\"{SysAdminConnString}\" --version=1.0 --silent ";
 
-#if Linux
-            migration.StartInfo.FileName = "grate";
-#elif Windows
-            migration.StartInfo.FileName = "grate.exe";
-#endif
+        migration.StartInfo.FileName = OperatingSystem.IsWindows() ? "grate.exe" : "grate";
 
         migration.Start();
 

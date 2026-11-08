@@ -28,8 +28,11 @@ If context is missing, prepare a clearly marked draft with the missing facts and
 
 ## Author and review
 
-- Put **one independently tracked DML statement or DDL operation per one-time migration file**. Separate table creation, each index, each constraint change, and each seed insert into ordered files. A procedure definition remains one DDL operation even with several body statements. A single set-based DML statement may affect many rows.
-- grate can execute SQL batches. Semicolons and provider batch separators such as SQL Server's `GO` do **not** create separate migration-history entries. File boundaries provide independently tracked success, not guaranteed atomicity.
+For a review-only request, limit the work to inspection and findings. Include file edits or migration runs only when the request also covers them.
+
+- Follow the project's established authoring conventions. The default is **one independently tracked DML statement or DDL operation per one-time migration file**. Separate independent table, index, constraint and seed operations into ordered files. A procedure definition remains one DDL operation even with several body statements. A single set-based DML statement may affect many rows.
+- grate records success per file execution, even when the file contains several statements or batch separators such as SQL Server's `GO`.
+- Preserve required business atomicity across file boundaries. If operations must commit together, verify that the actual provider, connection and folder settings support a transaction spanning them, then test rollback. If no such transaction is available, use staged, resumable changes only where intermediate states are acceptable. Define checkpoints and verify the required invariants at each stage. See [transactions and recovery](references/operations.md).
 - Keep applied one-time scripts and their tracked names immutable. Add forward migrations. Only split or rename drafts after establishing they have not reached any shared target. Never silently rewrite applied SQL, delete history, or enable change-warning/hash-bypass options to make a run pass.
 - Respect configured lifecycles and folder order. `up` is one-time by default; `indexes` is anytime, so ordinary one-time `CREATE INDEX` operations belong with ordered one-time changes. Anytime definitions must tolerate re-execution; everytime scripts must be safe on every invocation.
 - Check the combined migration set across parallel branches for duplicate tracked names and dependency order. Reconcile unpublished names before applying; do not renumber deployed history.
@@ -38,7 +41,7 @@ The [SQLite table/index/seed example](assets/sqlite-example/up/index.md) demonst
 
 ## Run and recover
 
-Identify the authorized target and effective transaction behavior, including autonomous folders, admin connections, and provider restrictions. Reuse authorization already given for that target/operation. Preparing SQL and running isolated disposable tests need no additional approval ritual; they do not authorize a shared or production deployment.
+Identify the target and effective transaction behavior, including autonomous folders, admin connections, and provider restrictions. Run against a shared target only with authorization for that target and operation. Reuse authorization already given.
 
 Use the project's credential mechanism without printing connection strings, tokens, or expanded secret-bearing commands. SQL text, response files, history, copied scripts, and output/error logs can expose sensitive values; inspect and redact artifacts before sharing.
 

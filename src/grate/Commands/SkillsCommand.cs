@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using grate.Skills;
 
 namespace grate.Commands;

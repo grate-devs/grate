@@ -1,4 +1,4 @@
-using Basic_tests.Infrastructure;
+﻿using Basic_tests.Infrastructure;
 using grate.Configuration;
 using grate.Infrastructure;
 using grate.Migration;

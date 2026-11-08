@@ -21,6 +21,12 @@ Do not infer tested provider compatibility from this source table. Follow the [v
 
 For runner setup, response files, and adopting an existing RoundhousE history, read [Consumer workflows](consumer-workflows.md). Confirm the SQL root, provider, target and tracking schema from the full invocation before selecting scripts. A successful run against a different database or a new history schema is not an upgrade-path check.
 
+## Coordinate runs and rollout
+
+Use the project's coordination mechanism to serialize migration runs per database across CI pipelines and manual invocations. Treat migration history as an execution record. Verify that the coordination mechanism covers every entry point for the full run.
+
+Coordinate schema changes with the application rollout. If old and new application versions can overlap, expand the schema compatibly, migrate data as needed, deploy the application change, and remove obsolete schema only after all consumers have moved off it.
+
 ## Success, commit and failure
 
 grate executes the provider's statements/batches for a file, then writes that file's successful history entry. There is no success entry per semicolon or `GO` separator.
@@ -47,7 +53,9 @@ grate does not provide automatic `down` migrations. Setting an earlier `--versio
 
 `--dryrun` skips normal migration SQL and success-history writes while showing selection. It does not prove SQL validity, server permissions, transaction compatibility, or deployment success. Current source has paths outside those guards: database create/drop/restore setup and changed-one-time-script error recording can still have effects; output folders and copied scripts are also produced. Use a disposable target for previews, and do not combine preview with drop/restore. A database read-only credential can enforce a boundary, but some preview/error paths may then fail.
 
-Use the project's secret injection and logging controls. Do not echo expanded connection strings or enable shell tracing around them. SQL text is stored by default, and even suppressing successful script text does not guarantee secrets disappear from error statements, logs or copied source files. Inspect before publishing CI artifacts.
+Use the project's approved secret injection and an identity scoped to the selected operation, including any required history and schema privileges. Check admin privileges separately when the operation uses an admin connection. Expanding a secret from an environment variable into a command-line argument can expose it in process listings. Keep shell tracing off around secret-bearing commands.
+
+SQL text is stored by default. Error statements, logs and copied scripts can still contain sensitive values when successful script text storage is disabled. Redact artifacts before sharing and restrict their access and retention.
 
 ## Source map
 

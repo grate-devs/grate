@@ -1,4 +1,4 @@
-using SqlServer.TestInfrastructure;
+﻿using SqlServer.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
 namespace SqlServer.Running_MigrationScripts;

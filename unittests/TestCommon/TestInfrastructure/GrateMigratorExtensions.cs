@@ -1,4 +1,4 @@
-using grate.Migration;
+﻿using grate.Migration;
 
 namespace TestCommon.TestInfrastructure;
 

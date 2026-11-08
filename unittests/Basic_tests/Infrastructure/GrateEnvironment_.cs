@@ -41,12 +41,12 @@ public class GrateEnvironment_
 
         Assert.True(env.ShouldRun(file));
     }
-    
+
     [Fact]
     public void Supports_multiple_environments()
     {
         var env = new GrateEnvironment("BOOYA", "FOOYA");
-        
+
         var file1 = FullPath("a_file.ENV.with.BOOYA.sql");
         var file2 = FullPath("a_file.ENV.with.FOOYA.sql");
         Assert.True(env.ShouldRun(file1));

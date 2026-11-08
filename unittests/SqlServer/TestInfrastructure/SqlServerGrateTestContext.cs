@@ -16,19 +16,19 @@ public record SqlServerGrateTestContext : GrateTestContext
 {
     private SqlServerGrateTestContext(
         IGrateMigrator migrator,
-        string serverCollation, 
+        string serverCollation,
         ITestDatabase testDatabase) : base(migrator, testDatabase)
     {
         ServerCollation = serverCollation;
     }
-    
+
     // ReSharper disable once UnusedMember.Global
     public SqlServerGrateTestContext(
-        IGrateMigrator migrator, 
-        ITestDatabase testDatabase): this(migrator, "Danish_Norwegian_CI_AS", testDatabase)
+        IGrateMigrator migrator,
+        ITestDatabase testDatabase) : this(migrator, "Danish_Norwegian_CI_AS", testDatabase)
     {
     }
-  
+
     public override IDbConnection GetDbConnection(string connectionString) => new SqlConnection(connectionString);
 
     public override ISyntax Syntax { get; } = new SqlServerSyntax();
@@ -51,13 +51,13 @@ public record SqlServerGrateTestContext : GrateTestContext
                 WAITFOR DELAY '00:00:00.100';
             END;
             """,
-        CreateUser = (db, user, password) => 
+        CreateUser = (db, user, password) =>
 $"""
     USE {db};
     CREATE LOGIN {user} WITH PASSWORD = '{password}';
     CREATE USER {user} FOR LOGIN {user};
 """,
-        GrantAccess = (db, user) => 
+        GrantAccess = (db, user) =>
 $"""
     USE {db};
     ALTER ROLE db_owner ADD MEMBER {user};

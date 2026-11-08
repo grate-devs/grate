@@ -18,10 +18,17 @@ Run on a matching native Docker engine:
 ```
 
 Use PowerShell 7 and `amd64` on the x64 CI runner. The host-side PowerShell wrapper
-rejects a different Docker engine architecture, runs an isolated Ubuntu container
-with an eight-minute execution limit, and removes only its own container. Package
-installation never runs on the host. `Verify-PackageLifecycle.sh` is container-side
-implementation and refuses direct execution on the host.
+rejects a different Docker engine architecture and starts a uniquely named,
+ownership-labeled Ubuntu container. `Verify-PackageLifecycle.ps1` runs on the host
+and executes all package, application and SQLite commands through bounded
+`docker exec` calls. The container needs no PowerShell installation. The verifier
+checks ownership before executing any commands; package installation never runs
+on the host.
+
+The verifier has an eight-minute work deadline. The container has a ten-minute
+watchdog so failure diagnostics have time to finish, and the wrapper supervises
+the verifier process for at most ten minutes. The wrapper removes only its own
+container on success, failure or timeout.
 
 The test installs package dependencies, checks dpkg registration, architecture,
 version and payload, runs help and bundled-skill installation, and inspects real
@@ -32,3 +39,13 @@ package-owned files are gone while the database and installed skill remain.
 Retain the diagnostics directory as a CI artifact even on failure. It contains
 the complete container/apt/application log, final package inventory and the
 disposable migration database when available. No generated package is published.
+
+Run the focused orchestration and assertion checks without installing packages:
+
+```powershell
+pwsh -NoProfile -File installers/deb/Test-PackageLifecycle.Tests.ps1
+```
+
+These use a simulated Docker boundary to check lifecycle assertions, failure
+diagnostics, ownership, native architecture and cleanup. They complement the real
+package lifecycle command above; they do not prove actual dpkg/SQLite behavior.

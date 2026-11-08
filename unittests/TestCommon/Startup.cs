@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using DotNet.Testcontainers.Builders;
 using grate.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -18,7 +18,7 @@ public abstract class Startup
         hostBuilder
             .ConfigureHostConfiguration(builder => builder.AddEnvironmentVariables())
             .ConfigureAppConfiguration((context, builder) => { });
-    
+
     // ReSharper disable once UnusedMember.Global
     public void ConfigureServices(IServiceCollection services, HostBuilderContext context)
     {
@@ -34,25 +34,25 @@ public abstract class Startup
                     .AddConsoleFormatter<GrateConsoleFormatter, SimpleConsoleFormatterOptions>()
                     .SetMinimumLevel(TestConfig.GetLogLevel())
             );
-        
+
         // SQLite and isolated provider tests do not need Docker.
         services.AddSingleton(_ => new NetworkBuilder()
             .WithName(Guid.NewGuid().ToString("D"))
             .Build());
-        
+
         ConfigureExtraServices(services, context);
-        
+
         services.TryAddSingleton(TestContextType);
         RegisterTestDatabase(services, context.Configuration);
     }
-    
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] 
+
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     protected abstract Type TestContainerDatabaseType { get; }
-    
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] 
+
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     protected abstract Type ExternalTestDatabaseType { get; }
-    
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] 
+
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     protected abstract Type TestContextType { get; }
 
     // ReSharper disable once UnassignedGetOnlyAutoProperty
@@ -74,7 +74,7 @@ public abstract class Startup
             services.TryAddSingleton(typeof(ITestDatabase), TestContainerDatabaseType);
         }
     }
-    
+
     protected virtual void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context) { }
-    
+
 }

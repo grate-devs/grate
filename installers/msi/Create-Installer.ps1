@@ -41,7 +41,21 @@ if (!(Test-Path -LiteralPath $upgradeActions)) { throw 'The native MSI upgrade a
 # WiX 3.14 supports ARM64 MSI packages; 3.11's candle only supports ARM32.
 $wixZip = 'https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip'
 $localZip = Join-Path $tmpDir 'wix314-binaries.zip'
-Invoke-WebRequest -Uri $wixZip -OutFile $localZip
+# Retry release-asset HTTP failures and client timeouts without retrying checksum failures.
+$maximumDownloadAttempts = 4
+for ($attempt = 1; $attempt -le $maximumDownloadAttempts; $attempt++) {
+    try {
+        Invoke-WebRequest -Uri $wixZip -OutFile $localZip -TimeoutSec 60
+        break
+    }
+    catch {
+        if ($attempt -eq $maximumDownloadAttempts) {
+            throw
+        }
+        Write-Warning "WiX download attempt $attempt of $maximumDownloadAttempts failed; retrying in 5 seconds."
+        Start-Sleep -Seconds 5
+    }
+}
 $expectedHash = '6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31'
 if ((Get-FileHash -LiteralPath $localZip -Algorithm SHA256).Hash -ne $expectedHash) {
     throw 'WiX archive checksum does not match the pinned release.'

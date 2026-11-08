@@ -9,7 +9,7 @@ namespace Sqlite.Running_MigrationScripts;
 public class Failing_Scripts(SqliteGrateTestContext testContext, ITestOutputHelper testOutput)
     : TestCommon.Generic.Running_MigrationScripts.Failing_Scripts(testContext, testOutput)
 {
-    protected override string ExpectedStartOfErrorMessageForInvalidSql => 
+    protected override string ExpectedStartOfErrorMessageForInvalidSql =>
         """
         Update ("up"):
         --------------------------------------------------------------------------------

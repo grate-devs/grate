@@ -43,7 +43,7 @@ Scripts in grate are considered to be one of three types:
 These are scripts that are run **exactly once** per database, and never again.  More info [here](ScriptTypes/OneTimeScripts.md).
 
 **Anytime Scripts**
-These scripts are run **any time they're changed**.  More info [here](ScriptTypes/AnytimeScripts.md).
+These scripts run when they are new or have changed. See [Anytime scripts](ScriptTypes/AnytimeScripts.md).
 
 **Everytime Scripts**
 These scripts are run (you guessed it) **every time** grate executes :)  More info [here](ScriptTypes/EverytimeScripts.md)
@@ -55,22 +55,18 @@ As of grate 1.4, the folder structure is [fully customisable](ConfigurationOptio
 if you don't have any special requirements (e.g. an existing set of SQL scripts in an existing, set folder structure),
 we would recommend you going with the defaults.
 
-The default folders are run in the following order:
+Database setup comes first. When grate needs to create the database, scripts in `createDatabase` can replace the provider's default creation logic. See [Default folder configuration](ConfigurationOptions/FolderConfiguration.md#default-folder-configuration) for how grate handles creation and `--drop`.
 
-### -1. dropDatabase (Anytime scripts)
-If you have the need for a custom `DROP DATABASE` script (used with the `--drop` command-line flag)
-
-### 0. createDatabase (Anytime scripts)
-If you have the need for a custom `CREATE DATABASE` script, put it here, and it will be used instead of the default.
+After setup, grate processes the default migration folders in this order.
 
 ### 1. beforeMigration (Everytime scripts)
-If you have particular tasks you want to perform prior to any database migrations (custom logging? database backups? disable replication?) you can do it here.
+Use this folder for tasks that run before the other migration folders, such as logging or taking a backup.
 
 ### 2. alterDatabase (Anytime scripts)
 If you have scripts that need to alter the database config itself (rather than the _contents_ of the database) this is the place to do it.  For example setting recovery modes, enabling query stores, etc etc
 
-### 3. runAfterCreateDatabase (Anytime scripts).
-This directory is only processed if the database was created from scratch by grate.  Maybe you need to add user accounts or similar?
+### 3. runAfterCreateDatabase (Anytime scripts)
+Grate processes this folder only on the run that creates the database. A dry run that previews database creation also includes this folder.
 
 ### 4. runBeforeUp (Anytime scripts)
 
@@ -79,8 +75,8 @@ This is where the bulk of your 'migration' scripts end up, eg adding tables, rem
 
 Note that there's no `down`!  If you've dropped a column in your `up` scripts, how do you possibly script an undo for that operation?  grate has support for running the migration inside a transaction, and will rollback on script failure.
 
-### 6. runFirstAfterUp (One-time scripts)
-Scripts run prior to other anytime folders are found here. This folder exists to allow you to put sql files in when you need to run out of order, say a stored procecure prior to a function. It is not a normal occurrence to have many files in here or any for that matter.
+### 6. runFirstAfterUp (Anytime scripts)
+Use this folder for scripts that need to run immediately after `up`, ahead of folders such as `functions` and `sprocs`.
 
 ### 7. functions (Anytime scripts)
 If you have any functions that need to run prior to others, make sure they are alphabetically first before the dependent scripts.
@@ -103,7 +99,7 @@ If you have any that need to run prior to others, make sure they are alphabetica
 Permissions may contain auto-wiring of permissions, so they are run every time regardless of changes in the files.
 
 ### 14. afterMigration (Everytime scripts)
-If you have particular tasks you want to perform prior to any database migrations (custom logging? database backups?) you can do it here.
+Use this folder for tasks that run after the other migration folders, such as logging.
 
 ### Notes
 - You are not required to have every one of these folders...i.e. if you don't use triggers there's no need to have an empty `triggers` directory.

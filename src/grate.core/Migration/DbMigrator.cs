@@ -29,7 +29,20 @@ internal record DbMigrator : IDbMigrator
         Database = database;
     }
 
-    public Task InitializeConnections() => Database.InitializeConnections(Configuration);
+    public Task InitializeConnections()
+    {
+        if (Configuration.RestoreMoves is not { Count: 0 })
+        {
+            var supportsRestoreMoves = string.Equals(Database.DatabaseType, "sqlserver", StringComparison.OrdinalIgnoreCase);
+            var validationMessage = Configuration.ValidateRestoreMoves(supportsRestoreMoves);
+            if (validationMessage is not null)
+            {
+                throw new ArgumentException(validationMessage, nameof(Configuration));
+            }
+        }
+
+        return Database.InitializeConnections(Configuration);
+    }
 
     public IDatabase Database { get; set; }
 
@@ -275,6 +288,7 @@ internal record DbMigrator : IDbMigrator
         ConnectionType connectionType,
         TransactionHandling transactionHandling)
     {
+        using var script = (Database as AnsiSqlDatabase)?.BeginScript(scriptName);
         foreach (var statement in GetStatements(sql))
         {
             try
@@ -283,7 +297,7 @@ internal record DbMigrator : IDbMigrator
             }
             catch (Exception ex)
             {
-                Logger.LogError("{ScriptName}: {ErrorMessage}", scriptName, ex.Message);
+                LogScriptFailure(scriptName, ex.Message, ex);
 
                 if (Transaction.Current is not null)
                 {
@@ -314,6 +328,7 @@ internal record DbMigrator : IDbMigrator
         ConnectionType connectionType,
         TransactionHandling transactionHandling)
     {
+        using var script = (Database as AnsiSqlDatabase)?.BeginScript(scriptName);
         foreach (var statement in GetStatements(sql))
         {
             try
@@ -322,7 +337,7 @@ internal record DbMigrator : IDbMigrator
             }
             catch (Exception ex)
             {
-                Logger.LogError("{ScriptName}: {ErrorMessage}", scriptName, ex.Message);
+                LogScriptFailure(scriptName, ex.Message, ex);
 
                 if (Transaction.Current is not null)
                 {
@@ -336,6 +351,12 @@ internal record DbMigrator : IDbMigrator
         }
     }
 
+
+    private void LogScriptFailure(string scriptName, string message, Exception failure)
+    {
+        using var scope = Logger.BeginScope(new ScriptFailureDiagnostic(failure));
+        Logger.LogError("{ScriptName}: {ErrorMessage}", scriptName, message);
+    }
 
     private IEnumerable<string> GetStatements(string sql) => Database.GetStatements(sql);
 
@@ -356,13 +377,13 @@ internal record DbMigrator : IDbMigrator
     /// <exception cref="Exceptions.OneTimeScriptChanged"></exception>
     private async Task OneTimeScriptChanged(MigrationsFolder folder, string sql, string scriptName, long versionId)
     {
-        Logger.LogError("{ScriptName}: {ErrorMessage}", scriptName, "One time script changed");
-
         const string errorMessage = "Script has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set WarnOnOneTimeScriptChanges to true and run again. Stopping execution.";
+        var failure = new OneTimeScriptChanged(folder, scriptName, errorMessage);
+        LogScriptFailure(scriptName, "One time script changed", failure);
 
         if (Configuration.DryRun)
         {
-            throw new OneTimeScriptChanged(folder, scriptName, errorMessage);
+            throw failure;
         }
 
         Database.Rollback();
@@ -379,7 +400,7 @@ internal record DbMigrator : IDbMigrator
         }
         SetDefaultConnectionActive();
 
-        throw new OneTimeScriptChanged(folder, scriptName, errorMessage);
+        throw failure;
     }
 
     private Task RecordScriptInScriptsRunTable(string scriptName, string sql, MigrationType migrationType,
@@ -419,5 +440,5 @@ internal record DbMigrator : IDbMigrator
         GC.SuppressFinalize(this);
     }
 
-    object ICloneable.Clone() => this with { Database = (IDatabase) Database.Clone(), _tokens = null };
+    object ICloneable.Clone() => this with { Database = (IDatabase)Database.Clone(), _tokens = null };
 }

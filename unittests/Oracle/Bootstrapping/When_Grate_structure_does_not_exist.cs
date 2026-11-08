@@ -5,6 +5,6 @@ namespace Oracle.Bootstrapping;
 [Collection(nameof(OracleGrateTestContext))]
 // ReSharper disable once InconsistentNaming
 // ReSharper disable once UnusedType.Global
-public class When_Grate_structure_does_not_exist(OracleGrateTestContext context, ITestOutputHelper testOutput) 
+public class When_Grate_structure_does_not_exist(OracleGrateTestContext context, ITestOutputHelper testOutput)
     : TestCommon.Generic.Bootstrapping.When_Grate_structure_does_not_exist(context, testOutput);
 

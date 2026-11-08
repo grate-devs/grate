@@ -250,6 +250,94 @@ external data preservation, strict exact-ID uninstall and cleanup. `grate
 probe. Artifacts retain raw MSI/WinGet logs, native inventories, commands,
 manifests, exports and results for seven days.
 
+## Submit a published release
+
+Download the original release run's candidate and Windows assets into a fresh
+staging directory. Match the artifact's run, attempt, source commit and tag to
+the published release. If the artifact has expired, regenerate it on Windows
+from that tag with `Create-Installer.ps1 -PrepareMigration` as shown above.
+
+```powershell
+$version = '<stable-version>'
+$releaseRunId = '<release-run-id>'
+$staging = Join-Path ([IO.Path]::GetTempPath()) ("grate-winget-" + [guid]::NewGuid())
+gh run download $releaseRunId --repo grate-devs/grate --name "winget-migration-candidate-$version" --dir "$staging/candidate"
+if ($LASTEXITCODE -ne 0) { throw 'Could not download the release candidate.' }
+gh release download $version --repo grate-devs/grate --pattern 'grate-win-*.zip' --pattern 'grate-msi-win-*.msi' --pattern checksums.sha256 --pattern release-manifest.json --dir "$staging/assets"
+if ($LASTEXITCODE -ne 0) { throw 'Could not download the published Windows assets.' }
+$manifest = Join-Path $staging "candidate/manifests/g/grate-devs/grate/$version"
+```
+
+Compare the actual SHA-256 of each of the five files with `checksums.sha256`,
+`release-manifest.json`, and the corresponding `InstallerSha256`. Check the
+file sizes against the release inventory. Review the exact URLs, ZIP architecture
+and executable path, and the MSI architecture and product/upgrade codes against
+the payloads. Use the [current upstream PR checklist] and [schema guidance].
+If the candidate schema differs, update the schema references and
+`ManifestVersion` in all three YAML files after checking compatibility.
+Revalidate the exact files going into the PR.
+
+Enable local manifests on clean, disposable Windows machines and run
+[Microsoft's validation and install checks]. Test ZIP on x86 (or x86 on x64),
+x64 and native ARM64, and MSI on x64 and native ARM64. Use `zip` or `wix`
+with the appropriate architecture. Repeat each install and uninstall on a
+clean machine or snapshot.
+
+```powershell
+winget validate --manifest $manifest
+winget settings --enable LocalManifestFiles
+# MSI x64 example:
+winget install --manifest $manifest --architecture x64 --installer-type wix --silent
+winget uninstall --manifest $manifest --silent
+# ZIP x64 example:
+winget install --manifest $manifest --architecture x64 --installer-type zip --scope user --silent
+$arp = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall'
+$entry = @(Get-ItemProperty "$arp/*" | Where-Object {
+    $_.WinGetPackageIdentifier -ceq 'grate-devs.grate' -and $_.DisplayVersion -ceq $version
+})
+if ($entry.Count -ne 1) { throw 'Expected one local portable registration.' }
+winget uninstall --product-code $entry[0].PSChildName --silent
+```
+
+WinGet 1.29.380 can fail to find a local portable install via
+`uninstall --manifest`. The product-code lookup above selects the installed
+per-user ZIP registration. Use exact-ID uninstall for source-based tests.
+
+Check that each install runs `grate --help`, deploys the expected executable
+and leaves no registration or executable after uninstall. For migration before
+submission, install the historical package from the public source and use an
+isolated candidate source for the new ID so WinGet can track both IDs.
+Use the supported transition above, substituting the candidate source for
+`winget` on new-ID commands. Verify the installed payload, exact-ID list and
+export, SQLite data preservation, and uninstall. The fixture workflow in the
+previous section covers further lifecycle behavior such as a subsequent
+upgrade. Record which test used final release bytes.
+
+Check for an existing PR for the ID and version. Fork
+`microsoft/winget-pkgs` and create a branch based on upstream `master`.
+Copy only the three validated YAML files to
+`manifests/g/grate-devs/grate/<version>/`. For a first submission, use the title
+`New package: grate-devs.grate version <version>` and complete the upstream
+checklist with links to the Windows evidence. Track the PR's automated checks
+and moderator approval. Record PR merge and catalog availability separately.
+
+After the PR merges, use a clean Windows system with the default `winget`
+source. Pin the submitted version for each architecture and installer type.
+Once the exact version resolves, repeat the installation and correlation
+checks against the public source.
+
+```powershell
+winget source update --name winget
+winget show --id grate-devs.grate --exact --source winget --version $version
+winget install --id grate-devs.grate --exact --source winget --version $version --architecture x64 --installer-type wix --silent
+winget list --id grate-devs.grate --exact --source winget
+winget uninstall --id grate-devs.grate --exact --source winget --silent
+```
+
+[current upstream PR checklist]: https://github.com/microsoft/winget-pkgs/blob/master/.github/PULL_REQUEST_TEMPLATE.md
+[schema guidance]: https://github.com/microsoft/winget-pkgs/blob/master/doc/manifest/README.md
+[Microsoft's validation and install checks]: https://learn.microsoft.com/en-us/windows/package-manager/package/winget-validation
+
 ## Acceptance and coverage
 
 Require successful results for all selected ZIP/MSI architectures and source

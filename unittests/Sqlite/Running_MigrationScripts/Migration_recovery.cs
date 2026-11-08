@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using grate.Configuration;
 using grate.Exceptions;
 using Sqlite.TestInfrastructure;
@@ -127,13 +127,13 @@ public sealed class Migration_recovery(SqliteGrateTestContext context) : IDispos
     }
 
     private GrateConfiguration Configuration() => GrateConfigurationBuilder.Create(new GrateConfiguration
-        {
-            ConnectionString = $"Data Source={Path.Combine(_root.FullName, "migration.db")};Pooling=False",
-            CreateDatabase = false,
-            NonInteractive = true,
-            Version = "1.0.0",
-            OutputPath = new DirectoryInfo(Path.Combine(_root.FullName, "output"))
-        })
+    {
+        ConnectionString = $"Data Source={Path.Combine(_root.FullName, "migration.db")};Pooling=False",
+        CreateDatabase = false,
+        NonInteractive = true,
+        Version = "1.0.0",
+        OutputPath = new DirectoryInfo(Path.Combine(_root.FullName, "output"))
+    })
         .WithSqlFilesDirectory(_root)
         .Build();
 
