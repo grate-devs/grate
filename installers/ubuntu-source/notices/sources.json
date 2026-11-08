@@ -1,0 +1,370 @@
+{
+  "Dapper/2.1.89": {
+    "repositoryCommit": "eb47546a408bbf6c178bda4f04dc205bc51ffbfe",
+    "sourceRevision": "eb47546a408bbf6c178bda4f04dc205bc51ffbfe",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/DapperLib/Dapper/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/License.txt",
+        "file": "text/9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9.txt",
+        "sha256": "9148ebecf47ce49421b0adc69192384b0619bcdc22c67b8bb30d26882b8a7db9"
+      },
+      {
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ]
+  },
+  "MySqlConnector/2.6.2": {
+    "repositoryCommit": "775689bb3e1ab55d16171e0795264fa746e364c4",
+    "sourceRevision": "775689bb3e1ab55d16171e0795264fa746e364c4",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/mysql-net/MySqlConnector/775689bb3e1ab55d16171e0795264fa746e364c4/LICENSE",
+        "file": "text/8b976f3fbc2575d2b3456ae02c8c438e12e39ba31056d26538b1820dffcbce33.txt",
+        "sha256": "8b976f3fbc2575d2b3456ae02c8c438e12e39ba31056d26538b1820dffcbce33"
+      }
+    ]
+  },
+  "System.CommandLine/2.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration.Abstractions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration.Json/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Diagnostics.Abstractions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration.FileExtensions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Options.ConfigurationExtensions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging.EventLog/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration.CommandLine/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging.Abstractions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration.UserSecrets/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Hosting/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.NET.ILLink.Tasks/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging.Debug/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.DependencyInjection/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Primitives/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.FileSystemGlobbing/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration.Binder/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Diagnostics/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging.Console/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Hosting.Abstractions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.FileProviders.Abstractions/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Options/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Configuration.EnvironmentVariables/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "System.Diagnostics.EventLog/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging.EventSource/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.CodeAnalysis.NetAnalyzers/10.0.114": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.FileProviders.Physical/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging.Configuration/10.0.14": {
+    "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  }
+}
