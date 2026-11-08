@@ -1,5 +1,7 @@
 # grate
 
+SQL scripts migration runner
+
 **Database migrations in plain SQL.**
 
 Keep your database changes alongside your application code. grate runs your SQL

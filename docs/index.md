@@ -5,14 +5,16 @@ nav_order: 1
 
 # grate
 
+SQL scripts migration runner
+
 **Database migrations in plain SQL.**
 
 ## What is grate?
 
-grate runs SQL scripts in a predictable order and records what has been applied
-to each database. Keep schema changes, views, stored procedures, and deployment
-scripts alongside your application code, using your database's SQL dialect and
-features without a migration DSL or an ORM.
+grate is a SQL scripts migration runner, using plain, old SQL for migrations. No meta-language, no code, no config,
+no EF migrations. It gives you full flexibility, and full control of your migrations, and lets you use
+all the fancy features of you particular database system. You are not constrained to any lowest common
+feature set of all supported databases.
 
 Use it from the command line, in CI/CD, in a container, or through its .NET
 libraries. Start with [getting started](GettingStarted.md) or choose an
