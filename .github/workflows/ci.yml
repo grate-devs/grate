@@ -1,5 +1,5 @@
 # Build, security analysis, and the full database/runtime test matrix for PRs.
-name: CI
+name: CI · Build and tests
 
 on:
   # PR updates already include branch pushes. Running both events doubles the

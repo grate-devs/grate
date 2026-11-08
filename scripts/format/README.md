@@ -13,7 +13,7 @@ committed, staged, unstaged and untracked changes under `src/` and `unittests/`,
 including renamed files. Deleted and ignored files are excluded. A missing base
 fails the check. No changed C# files is a successful no-op.
 
-The `C# formatting` workflow calls this same script for pull requests and pushes
+The `CI · C# formatting` workflow calls this same script for pull requests and pushes
 to `main`, using the PR base commit or previous push commit. Manual runs use
 `-All`. Changes to `.editorconfig` or `global.json` also check all tracked C# files.
 The workflow always starts, including for documentation changes; it is not yet a

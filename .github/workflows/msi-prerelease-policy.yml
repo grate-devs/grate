@@ -1,4 +1,4 @@
-name: MSI prerelease policy
+name: CI · MSI prerelease policy
 
 on:
   workflow_dispatch:

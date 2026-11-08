@@ -1,4 +1,4 @@
-name: C# formatting
+name: CI · C# formatting
 
 on:
   pull_request:

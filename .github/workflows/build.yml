@@ -1,5 +1,5 @@
 # Build every release format. Publishing is enabled only for a GitHub release.
-name: Build release artifacts
+name: Release · Build artifacts
 
 on:
   push:

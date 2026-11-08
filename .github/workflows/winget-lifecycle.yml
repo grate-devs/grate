@@ -1,4 +1,4 @@
-name: WinGet Windows lifecycle
+name: CI · WinGet Windows lifecycle
 
 on:
   workflow_dispatch:

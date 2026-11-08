@@ -1,4 +1,4 @@
-name: Check Docker OIDC and compatibility permissions (no publication)
+name: Diagnostics · Docker OIDC and permissions
 
 on:
   workflow_dispatch:
