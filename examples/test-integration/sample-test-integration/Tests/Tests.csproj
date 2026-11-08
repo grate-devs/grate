@@ -9,8 +9,8 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.89" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
-    <!-- Preserve the patched net8.0 Pkcs version when this example is copied outside the repository. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
+    <!-- Pkcs 10 supports net8.0; keep the patched version when this example is copied outside the repository. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="Testcontainers.MsSql" Version="4.16.0"/>
     <PackageReference Include="xunit" Version="2.9.3"/>
