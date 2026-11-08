@@ -2,11 +2,16 @@
 name: CI · Build and tests
 
 on:
-  # PR updates already include branch pushes. Running both events doubles the
-  # database suites and CodeQL work; use workflow_dispatch for pre-PR checks.
+  # Feature branches are validated through PRs; main also needs a CodeQL baseline.
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
+  schedule:
+    # Refresh the main baseline with new queries without rerunning the test matrix.
+    - cron: '23 5 * * 1'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -136,6 +141,9 @@ jobs:
   analyze:
     name: Analyze Code Security
     needs: [build-code, fast-tests, validation-policy]
+    # PR/manual analysis keeps the staged gates; main/schedule refreshes its
+    # baseline even though those build/test producers are intentionally skipped.
+    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
     runs-on: windows-latest
     permissions:
       actions: read
@@ -315,7 +323,7 @@ jobs:
      runs-on: ubuntu-latest
      name: Create test report
      needs: [fast-tests, test]
-     if: always()
+     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
 
      steps:
       - name: Download XML test reports
@@ -569,7 +577,7 @@ jobs:
     # A skipped dependent job can look green in isolation. Only this aggregate
     # represents complete CI, including early failures and cancellations.
     needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy, pr-validation]
-    if: always()
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v7
       - name: Require successful results from every CI phase
