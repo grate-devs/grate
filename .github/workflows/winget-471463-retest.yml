@@ -1,4 +1,4 @@
-name: Reproduce Microsoft WinGet validation findings
+name: Archive · WinGet 471463 validation retest
 on:
   push:
     branches: [verify/winget-471463-retest]
