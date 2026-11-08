@@ -101,7 +101,7 @@ $prepare = ($action.runs.steps | Where-Object id -CEQ 'prepare').run
 $verify = ($action.runs.steps | Where-Object name -CEQ 'Verify the selected Arm64 .NET host').run
 Assert-True ($verify.Contains('& $dotnet --version')) 'Run the selected executable for SDK resolution.'
 Assert-True ($verify.Contains('& $dotnet --info')) 'Run the selected executable for architecture verification.'
-$verifyFixture = $verify.Replace('(Get-Command dotnet -CommandType Application).Source', '$script:ResolvedDotnet')
+$verifyFixture = $verify.Replace('Get-Command dotnet', '$script:ResolvedCommand')
 $verifyFixture = $verifyFixture.Replace('& $dotnet --version', "Invoke-DotnetFixture `$dotnet '--version'")
 $verifyFixture = $verifyFixture.Replace('& $dotnet --info', "Invoke-DotnetFixture `$dotnet '--info'")
 
@@ -121,7 +121,7 @@ function Invoke-DotnetFixture {
 }
 
 $savedEnvironment = @{}
-foreach ($key in @('RUNNER_TEMP', 'GITHUB_OUTPUT', 'FIRST_OUTCOME', 'RETRY_OUTCOME', 'INSTALL_ROOT', 'DOTNET_ROOT', 'GLOBAL_JSON_FILE', 'GITHUB_STEP_SUMMARY')) {
+foreach ($key in @('RUNNER_TEMP', 'GITHUB_OUTPUT', 'FIRST_OUTCOME', 'RETRY_OUTCOME', 'INSTALL_ROOT', 'DOTNET_ROOT', 'GLOBAL_JSON_FILE', 'GITHUB_STEP_SUMMARY', 'PATH')) {
     $savedEnvironment[$key] = [Environment]::GetEnvironmentVariable($key)
 }
 $directory = New-TestDirectory
@@ -158,7 +158,10 @@ try {
                 'success'
             }
             $env:DOTNET_ROOT = "$env:INSTALL_ROOT/$attempt/install"
-            $script:ResolvedDotnet = Join-Path $env:DOTNET_ROOT 'dotnet'
+            $script:ResolvedCommand = @{
+                CommandType = [Management.Automation.CommandTypes]::Application
+                Source = Join-Path $env:DOTNET_ROOT 'dotnet'
+            }
             & $verifyScript
         }
     }
@@ -167,9 +170,12 @@ try {
         $env:DOTNET_ROOT = "$env:INSTALL_ROOT/first/install"
         Assert-Throws { & $verifyScript } '*DOTNET_ROOT*'
         $env:DOTNET_ROOT = "$env:INSTALL_ROOT/retry/install"
-        $script:ResolvedDotnet = '/usr/local/share/dotnet/dotnet'
+        $script:ResolvedCommand.Source = '/usr/local/share/dotnet/dotnet'
         Assert-Throws { & $verifyScript } '*PATH*'
-        $script:ResolvedDotnet = Join-Path $env:DOTNET_ROOT 'dotnet'
+        $script:ResolvedCommand.Source = Join-Path $env:DOTNET_ROOT 'dotnet'
+        $script:ResolvedCommand.CommandType = [Management.Automation.CommandTypes]::Function
+        Assert-Throws { & $verifyScript } '*resolves to Function*'
+        $script:ResolvedCommand.CommandType = [Management.Automation.CommandTypes]::Application
         $script:VersionExitCode = 145
         Assert-Throws { & $verifyScript } '*SDK failed with exit code 145*'
         $script:VersionExitCode = 0
@@ -184,6 +190,40 @@ try {
         $script:ReportedArchitecture = 'arm64'
         $env:RETRY_OUTCOME = 'failure'
         Assert-Throws { & $verifyScript } '*Neither isolated*'
+    }
+
+    Invoke-Test 'real command lookup selects one executable despite multiple native PATH candidates' {
+        $fixtureName = if ($IsWindows) {
+            'dotnet.exe'
+        }
+        else {
+            'dotnet'
+        }
+        foreach ($attempt in @('first', 'retry')) {
+            $fixturePath = "$env:INSTALL_ROOT/$attempt/install/$fixtureName"
+            Copy-Item -LiteralPath (Get-Process -Id $PID).Path -Destination $fixturePath
+        }
+        # Exercise the actual selection gate with real executable files, without
+        # launching the copied host or depending on an installed .NET SDK.
+        $pathGate = $verify.Substring($verify.IndexOf('$resolvedCommand = Get-Command dotnet'))
+        $pathGate = $pathGate.Substring(0, $pathGate.IndexOf('$version = & $dotnet --version'))
+        $pathGateScript = [scriptblock]::Create($pathGate)
+        $dotnet = "$env:INSTALL_ROOT/retry/install/$fixtureName"
+        $env:PATH = @("$env:INSTALL_ROOT/retry/install", "$env:INSTALL_ROOT/first/install", $savedEnvironment.PATH) -join [IO.Path]::PathSeparator
+        Assert-True (@(Get-Command dotnet -CommandType Application).Count -ge 2) 'Require multiple native PATH candidates.'
+        & $pathGateScript
+
+        $allMatches = [scriptblock]::Create($pathGate.Replace('Get-Command dotnet', 'Get-Command dotnet -CommandType Application'))
+        Assert-Throws { & $allMatches } '*PATH selects*'
+        $env:PATH = @("$env:INSTALL_ROOT/first/install", "$env:INSTALL_ROOT/retry/install", $savedEnvironment.PATH) -join [IO.Path]::PathSeparator
+        Assert-Throws { & $pathGateScript } '*PATH selects*first/install/*expected*retry/install/*'
+        Set-Alias -Name dotnet -Value Get-Date
+        try {
+            Assert-Throws { & $pathGateScript } '*resolves to Alias*'
+        }
+        finally {
+            Remove-Item -LiteralPath Alias:dotnet
+        }
     }
 
     Invoke-Test 'failed diagnostic writes and native commands cannot prevent the clean retry' {

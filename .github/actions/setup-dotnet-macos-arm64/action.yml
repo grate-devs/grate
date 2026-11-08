@@ -89,11 +89,18 @@ runs:
         }
         $expectedRoot = [IO.Path]::GetFullPath("$env:INSTALL_ROOT/$attempt/install")
         if (!$env:DOTNET_ROOT -or [IO.Path]::GetFullPath($env:DOTNET_ROOT) -cne $expectedRoot) {
-            throw 'DOTNET_ROOT does not select the successful isolated installation.'
+            throw "DOTNET_ROOT selects '$env:DOTNET_ROOT'; expected '$expectedRoot'."
         }
         $dotnet = Join-Path $expectedRoot 'dotnet'
-        if ([IO.Path]::GetFullPath((Get-Command dotnet -CommandType Application).Source) -cne $dotnet) {
-            throw 'PATH does not select the successful isolated installation.'
+        # -CommandType Application returns every PATH match. Resolve the command
+        # that PowerShell would actually invoke, including any alias/function.
+        $resolvedCommand = Get-Command dotnet
+        if ($resolvedCommand.CommandType -ne [Management.Automation.CommandTypes]::Application) {
+            throw "dotnet resolves to $($resolvedCommand.CommandType), expected application '$dotnet'."
+        }
+        $resolvedDotnet = [IO.Path]::GetFullPath($resolvedCommand.Source)
+        if ($resolvedDotnet -cne $dotnet) {
+            throw "PATH selects '$resolvedDotnet'; expected '$dotnet'."
         }
         $version = & $dotnet --version
         if ($LASTEXITCODE -ne 0) {
