@@ -44,6 +44,30 @@ The second command runs the test executable directly because the repository's
 `global.json` also selects the test runner. This workflow covers `net10.0` only;
 building and testing `net11.0` still requires the pinned SDK.
 
+### Solution and package configuration
+
+Open `grate.slnx` in your IDE or use `dotnet build grate.slnx`. The XML solution
+uses the same projects and build configurations as the former `.sln` file.
+The `CoreTests.slnf` and `UnitTests.slnf` filters select subsets of this solution.
+SLNX requires .NET SDK 9.0.200 or newer; the pinned SDK and stable .NET 10 fallback
+both support it.
+
+Define package versions in `Directory.Packages.props` and add versionless
+`PackageReference` entries to projects. Central transitive pinning remains enabled:
+centrally listed versions also constrain transitive dependencies, and pinned
+dependencies can become explicit dependencies of packed libraries. Per-project
+`VersionOverride` entries are disabled so package updates have one source of truth.
+See [Central Package Management](https://learn.microsoft.com/nuget/consume-packages/central-package-management).
+
+`NuGet.Config` selects nuget.org for packages and vulnerability data, including in
+Docker builds. `Directory.Build.props` enables audit of direct and transitive
+dependencies at every severity and package pruning, including when building only
+`net8.0` or `net9.0`. Pruning removes packages already supplied by the target
+framework. Audit warnings fail the build through the existing warnings-as-errors
+policy; fix the dependency rather than disabling audit.
+See [NuGet Audit](https://learn.microsoft.com/nuget/concepts/auditing-packages)
+and [package pruning](https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#pruning-packagereference-dependencies).
+
 ## Get (buy, borrow, rent, or whatever) a computer with an operating system on it
 
 .NET 8+ runs on Windows, macOS or Linux. You choose what you like to use for development.
