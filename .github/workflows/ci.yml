@@ -105,6 +105,10 @@ jobs:
             8.0.x
             9.0.x
             10.0.x
+      - name: Test container diagnostic monitor contracts
+        if: runner.os == 'Linux'
+        shell: pwsh
+        run: ./.github/scripts/monitor-test-containers.Tests.ps1
       - name: Test on ${{ runner.os }}
         shell: pwsh
         env:
@@ -139,7 +143,7 @@ jobs:
 
   analyze:
     name: Analyze Code Security
-    needs: [build-code, fast-tests]
+    needs: [build-code, fast-tests, validation-policy]
     runs-on: windows-latest
     permissions:
       actions: read
@@ -183,7 +187,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
     timeout-minutes: ${{ matrix.category == 'Oracle' && 45 || 30 }}
-    needs: [build-code, fast-tests]
+    needs: [build-code, fast-tests, validation-policy]
 
     strategy:
       fail-fast: false
@@ -233,10 +237,6 @@ jobs:
           8.0.x
           9.0.x
           10.0.x
-    - name: Test container diagnostic monitor contracts
-      if: runner.os == 'Linux' && matrix.category == 'Basic_tests'
-      shell: pwsh
-      run: ./.github/scripts/monitor-test-containers.Tests.ps1
     - name: Test on Linux
       if: runner.os == 'Linux'
       shell: bash
@@ -406,7 +406,7 @@ jobs:
 
   packages:
     name: NuGet libraries and installed tool
-    needs: [build-code, fast-tests]
+    needs: [build-code, fast-tests, validation-policy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -434,7 +434,7 @@ jobs:
 
   standalone:
     name: CLI ${{ matrix.rid }}
-    needs: [build-code, fast-tests]
+    needs: [build-code, fast-tests, validation-policy]
     timeout-minutes: 30
     env:
       # Publish and package the same fixture identity; MSI rejects mismatched payloads.
@@ -518,7 +518,7 @@ jobs:
 
   docker:
     name: Alpine ${{ matrix.arch }}
-    needs: [build-code, fast-tests]
+    needs: [build-code, fast-tests, validation-policy]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -574,7 +574,7 @@ jobs:
     timeout-minutes: 5
     # A skipped dependent job can look green in isolation. Only this aggregate
     # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker]
+    needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy, pr-validation]
     if: always()
     steps:
       - uses: actions/checkout@v7

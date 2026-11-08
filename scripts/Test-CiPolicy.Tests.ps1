@@ -8,7 +8,7 @@ Set-StrictMode -Version Latest
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $workflow = Get-Content -LiteralPath "$repositoryRoot/.github/workflows/ci.yml" -Raw
 $aggregate = Join-Path $PSScriptRoot 'Assert-CiResults.ps1'
-$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'report', 'packages', 'standalone', 'docker')
+$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
 $expensiveJobs = @('analyze', 'test', 'packages', 'standalone', 'docker')
 
 function Assert-WorkflowPolicy {
@@ -24,8 +24,8 @@ function Assert-WorkflowPolicy {
     }
 
     foreach ($job in $expensiveJobs) {
-        if (!$jobs.ContainsKey($job) -or $jobs[$job] -notmatch '(?m)^    needs: \[build-code, fast-tests\]\r?$') {
-            throw "Expensive job $job must depend on Build and both isolated test lanes."
+        if (!$jobs.ContainsKey($job) -or $jobs[$job] -notmatch '(?m)^    needs: \[build-code, fast-tests, validation-policy\]\r?$') {
+            throw "Expensive job $job must depend on Build, validation policy and both isolated test lanes."
         }
         if ($jobs[$job] -match '(?m)^    (if|continue-on-error):') {
             throw "Expensive job $job must preserve the default success-only dependency condition."
@@ -45,6 +45,9 @@ function Assert-WorkflowPolicy {
     }
     if ($jobs['test'] -match 'category: Basic_tests' -or ([regex]::Matches($jobs['fast-tests'], 'category: Basic_tests')).Count -ne 2) {
         throw 'Linux and Windows isolated tests must run once in the first tier.'
+    }
+    if (!$jobs['fast-tests'].Contains('run: ./.github/scripts/monitor-test-containers.Tests.ps1') -or $jobs['test'].Contains('run: ./.github/scripts/monitor-test-containers.Tests.ps1')) {
+        throw 'Container monitor regressions must run in the Linux isolated-test lane.'
     }
 }
 
@@ -106,11 +109,15 @@ Assert-Rejected -Action { & $aggregate -NeedsJson '{}' } -ExpectedMessage 'missi
 Assert-Rejected -Action { & $aggregate -NeedsJson '[]' } -ExpectedMessage 'must be an object'
 
 # These mutations must be rejected even if every remaining job would be green.
-$bypassedDependency = $workflow.Replace('needs: [build-code, fast-tests]', 'needs: [build-code]')
+$bypassedDependency = $workflow.Replace('needs: [build-code, fast-tests, validation-policy]', 'needs: [build-code]')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $bypassedDependency } -ExpectedMessage 'must depend'
+$bypassedPolicy = $workflow.Replace('needs: [build-code, fast-tests, validation-policy]', 'needs: [build-code, fast-tests]')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $bypassedPolicy } -ExpectedMessage 'must depend'
 $skippedAggregate = $workflow.Replace('    if: always()', '    if: success()')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $skippedAggregate } -ExpectedMessage 'must always evaluate'
-$missingProducer = $workflow.Replace('needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker]', 'needs: [build-code, fast-tests, analyze, test, report, packages, standalone]')
+$missingProducer = $workflow.Replace('needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy, pr-validation]', 'needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy]')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $missingProducer } -ExpectedMessage 'must always evaluate'
+$missingMonitorTests = $workflow.Replace('run: ./.github/scripts/monitor-test-containers.Tests.ps1', 'run: Write-Host skipped')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $missingMonitorTests } -ExpectedMessage 'Container monitor regressions must run'
 
 Write-Host "PASS: staged wiring, all-success aggregate, $rejectionCount per-job rejection cases, empty input and scheduling mutations."

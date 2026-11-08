@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'report', 'packages', 'standalone', 'docker')
+$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
 $results = ConvertFrom-Json -InputObject $NeedsJson -AsHashtable
 if ($results -isnot [System.Collections.IDictionary]) {
     throw 'CI results must be an object containing every required job.'
@@ -28,4 +28,4 @@ if ($unsuccessfulJobs.Count -gt 0) {
     throw "CI did not complete successfully: $($unsuccessfulJobs -join '; ')."
 }
 
-Write-Host 'PASS: build, isolated tests, security analysis, database tests, reports and package checks succeeded.'
+Write-Host 'PASS: build, tests, security analysis, reports, package checks and PR validation succeeded.'
