@@ -124,6 +124,29 @@ When automatic image building is disabled, prepare it explicitly:
 docker build -f installers/docker/Dockerfile -t grate-local:tests .
 ```
 
+## CI scheduling
+
+PR CI first runs `Build`, `PR validation policy` and the Linux/Windows
+`Basic_tests` lanes in parallel.
+The database matrix, CodeQL analysis, NuGet/tool validation, standalone packages
+and Alpine checks start only after all four first-tier jobs succeed. Each suite
+still runs all supported target frameworks; isolated tests are not repeated in
+the database tier. Superseded PR runs are cancelled by workflow concurrency.
+
+This saves runner time on early failures at the cost of delaying expensive checks
+on successful runs. Test artifacts and the combined report cover both test tiers.
+`CI result` succeeds only when every CI phase succeeds, including reporting and
+the `PR validation` policy/inventory checks. A failed, cancelled, missing or
+unexpectedly skipped phase fails the aggregate.
+This phase summary complements the `PR validation` matrix-inventory check added
+in #913. Its main-protection ruleset remains a separate proposal; workflow changes
+do not themselves configure repository branch protection.
+
+Run scheduling/gate regressions locally with
+`pwsh -NoProfile -File scripts/Test-CiPolicy.Tests.ps1` and validate workflow syntax
+with `actionlint .github/workflows/ci.yml`. Separate integration and
+release-artifact workflows retain their own triggers and trust boundaries.
+
 ## Build a self-contained executable (if you want)
 
 Grate is set up to build in the whole .NET framework in the executable when built in release mode, so the executable is a bit bigger than you 
