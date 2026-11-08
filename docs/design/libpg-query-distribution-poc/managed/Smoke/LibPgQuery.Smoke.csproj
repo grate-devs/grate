@@ -11,6 +11,7 @@
     <ToolCommandName>pg-query-native-smoke</ToolCommandName>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <PublishSingleFile Condition="'$(SelfContained)' == 'true'">true</PublishSingleFile>
     <PublishReadyToRun>false</PublishReadyToRun>
     <TrimMode>partial</TrimMode>

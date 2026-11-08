@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'docs/design/libpg-query-distribution-poc/**'
+      - '!docs/design/libpg-query-distribution-poc/README.md'
       - '.github/workflows/libpg-query-distribution-poc.yml'
   workflow_dispatch:
 permissions:

@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import shutil
 import tempfile
+import xml.etree.ElementTree as ET
 import zipfile
 
 
@@ -63,11 +64,22 @@ def verify(feed, rid, framework, complete):
         consumer = temporary / "consumer"
         shutil.copytree(ROOT / "managed/Smoke", consumer, ignore=shutil.ignore_patterns("bin", "obj"))
         project = consumer / "LibPgQuery.Smoke.csproj"
+        configuration = ET.Element("configuration")
+        sources = ET.SubElement(configuration, "packageSources")
+        ET.SubElement(sources, "clear")
+        ET.SubElement(sources, "add", key="local", value=str(feed))
+        ET.SubElement(sources, "add", key="nuget", value="https://api.nuget.org/v3/index.json")
+        config_file = temporary / "NuGet.config"
+        ET.ElementTree(configuration).write(config_file, encoding="utf-8", xml_declaration=True)
 
-        def run(command):
+        def run(command, missing_native=False):
             result = subprocess.run(command, cwd=temporary, env=environment,
                                     capture_output=True, text=True, timeout=600)
-            if result.returncode:
+            if missing_native:
+                require(result.returncode != 0 and "DllNotFoundException" in result.stderr
+                        and "PASS " not in result.stdout,
+                        "Missing-native control did not fail at native loading:\n" + result.stdout + result.stderr)
+            elif result.returncode:
                 raise RuntimeError(" ".join(map(str, command)) + "\n" + result.stdout + result.stderr)
             return result.stdout
 
@@ -80,7 +92,7 @@ def verify(feed, rid, framework, complete):
             if not single_file:
                 properties.append("-p:PublishTrimmed=false")
             run(["dotnet", "restore", str(project), "-r", rid, *properties,
-                 "--source", str(feed), "--source", "https://api.nuget.org/v3/index.json", "--nologo"])
+                 "--configfile", str(config_file), "--nologo"])
             run(["dotnet", "publish", str(project), "--no-restore", "-c", "Release", "-f", framework,
                  "-r", rid, *properties, "-o", str(output), "--nologo"])
             filename = native_name(rid)
@@ -105,6 +117,14 @@ def verify(feed, rid, framework, complete):
                 verify_notices(extraction)
             else:
                 verify_notices(output)
+                withheld = temporary / "withheld" / filename
+                withheld.parent.mkdir()
+                adjacent.rename(withheld)
+                try:
+                    run([str(executable)], missing_native=True)
+                finally:
+                    withheld.rename(adjacent)
+                print(f"{rid} missing-native control: expected DllNotFoundException.")
             print(f"{rid} {framework} {mode}: {result.strip()}")
     print(f"Verified package notices and native SHA256 {expected_hash}")
 

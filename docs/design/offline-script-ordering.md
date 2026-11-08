@@ -62,6 +62,10 @@ The [PostgreSQL experiment](postgresql-script-ordering-poc/README.md) compares
 libpg_query and SqlParserCS against shared dependency scenarios and a disposable
 PostgreSQL database. Its parser-specific adapters feed one shared planner.
 
+The [native distribution experiment](libpg-query-distribution-poc/README.md)
+builds libpg_query for grate's nine native RIDs and exercises one local NuGet
+package through published .NET consumers.
+
 ## Verification before implementation is ready
 
 - Run the planner with networking disabled and no SQL Server configuration. The three files above must produce the same order and explain both dependencies across the folder boundary.
