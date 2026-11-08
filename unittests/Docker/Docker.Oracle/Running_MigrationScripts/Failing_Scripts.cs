@@ -12,7 +12,7 @@ public class Failing_Scripts(OracleGrateTestContext testContext, ITestOutputHelp
 
     [Fact(Skip = "Cannot check on the exact error message when running the command line tool. The error message is not available.")]
     public override Task Aborts_the_run_giving_an_error_message() => Task.CompletedTask;
-    
+
     [Fact(Skip = "Cannot check on the exact error details when running the command line tool. The error details are not available.")]
     public override Task Exception_includes_details_on_the_failed_script() => Task.CompletedTask;
 

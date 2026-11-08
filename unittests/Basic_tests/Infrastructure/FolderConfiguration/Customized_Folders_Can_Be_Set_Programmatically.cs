@@ -88,7 +88,7 @@ public class Customized_Folders_Can_Be_Set_Programmatically
             Assert.Equal("projections", items[2].Value!.Path);
         });
     }
-    
+
     [Fact]
     public void From_multiple_string_arguments()
     {
@@ -108,7 +108,7 @@ public class Customized_Folders_Can_Be_Set_Programmatically
             Assert.Equal("projections", items[2].Value!.Path);
         });
     }
-    
-    
+
+
 
 }

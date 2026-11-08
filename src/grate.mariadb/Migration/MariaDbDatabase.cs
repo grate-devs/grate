@@ -19,7 +19,7 @@ public record MariaDbDatabase : AnsiSqlDatabase
 
     public override bool SupportsDdlTransactions => false;
     public override bool SupportsSchemas => false;
-    
+
     public static string Type => "mariadb";
     public static ISyntax Syntax { get; } = new MariaDbSyntax();
 

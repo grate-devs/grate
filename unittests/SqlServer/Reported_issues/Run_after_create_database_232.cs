@@ -40,15 +40,15 @@ ALTER DATABASE {{DatabaseName}} SET READ_COMMITTED_SNAPSHOT ON";
 
         var parent = CreateRandomTempDirectory();
         var knownFolders = FoldersConfiguration.Default();
-        
+
         // Use autonomous transactions for the RunAfterCreateDatabase folder makes this work without having to 
         // disable connection pooling
         knownFolders[RunAfterCreateDatabase] = knownFolders[RunAfterCreateDatabase]! with { TransactionHandling = TransactionHandling.Autonomous };
-        
+
         var path = new DirectoryInfo(Path.Combine(parent.ToString(), knownFolders[RunAfterCreateDatabase]?.Path ?? throw new Exception("Config Fail")));
 
         WriteSql(path, "token.sql", Bug232Sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -59,7 +59,7 @@ ALTER DATABASE {{DatabaseName}} SET READ_COMMITTED_SNAPSHOT ON";
         {
             await migrator.Migrate();
         }
-        
+
         // Now drop it and do it again
         config = config with
         {
@@ -70,8 +70,8 @@ ALTER DATABASE {{DatabaseName}} SET READ_COMMITTED_SNAPSHOT ON";
         {
             await migrator.Migrate();
         }
-        
+
         //await Context.DropDatabase(db);
     }
-    
+
 }

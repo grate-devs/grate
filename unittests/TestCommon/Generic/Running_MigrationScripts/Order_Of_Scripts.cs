@@ -7,13 +7,13 @@ using static grate.Configuration.KnownFolderKeys;
 namespace TestCommon.Generic.Running_MigrationScripts;
 
 // ReSharper disable once InconsistentNaming
-public abstract class Order_Of_Scripts(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class Order_Of_Scripts(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
-    protected Order_Of_Scripts(): this(null!, null!)
+    protected Order_Of_Scripts() : this(null!, null!)
     {
     }
-    
+
     [Fact]
     public async Task Is_as_expected()
     {

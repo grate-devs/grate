@@ -1,4 +1,4 @@
-using grate.DependencyInjection;
+﻿using grate.DependencyInjection;
 using grate.sqlite.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -10,7 +10,7 @@ using TestCommon.TestInfrastructure;
 namespace Sqlite;
 
 // ReSharper disable once UnusedType.Global
-public class Startup: TestCommon.Startup<SqliteTestDatabase, SqliteTestDatabase, SqliteGrateTestContext>
+public class Startup : TestCommon.Startup<SqliteTestDatabase, SqliteTestDatabase, SqliteGrateTestContext>
 {
     protected override void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context)
     {

@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using grate.Configuration;
 using grate.Migration;
 using grate.sqlite.DependencyInjection;
@@ -106,7 +106,8 @@ public sealed class WithConfiguration : IDisposable
 
     private string ConnectionString(string database) => new SqliteConnectionStringBuilder
     {
-        DataSource = Path.Combine(_root, database + ".db"), Pooling = false
+        DataSource = Path.Combine(_root, database + ".db"),
+        Pooling = false
     }.ToString();
 
     private async Task<string[]> Rows(string database, string sql)

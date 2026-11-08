@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Dapper;
 using grate.Configuration;
 using grate.Exceptions;
@@ -36,33 +36,33 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
         var knownFolders = Folders.Default;
         var filename = "1_script_with_utf_characters.sql";
         WriteSql(Wrap(parent, knownFolders[KnownFolderKeys.Up]!.Path), filename, _sql);
-        
-       var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
-            .WithConnectionString(Context.ConnectionString(db))
-            .WithFolders(knownFolders)
-            .WithSqlFilesDirectory(parent)
-            .WithRepositoryPath(repositoryPath)
-            .Build();
-        
-       await using (var migrator = Context.Migrator.WithConfiguration(config))
-       {
-           await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
-       }
 
-       string[] repositoryPaths;
-       string selectSql = $"SELECT repository_path FROM {Context.Syntax.TableWithSchema("grate", "ScriptsRunErrors")}";
+        var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
+             .WithConnectionString(Context.ConnectionString(db))
+             .WithFolders(knownFolders)
+             .WithSqlFilesDirectory(parent)
+             .WithRepositoryPath(repositoryPath)
+             .Build();
 
-       using (var conn = Context.CreateDbConnection(db))
-       {
-           repositoryPaths = (await conn.QueryAsync<string>(selectSql)).ToArray();
-       }
+        await using (var migrator = Context.Migrator.WithConfiguration(config))
+        {
+            await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
+        }
 
-       Assert.Single(repositoryPaths);
-       Assert.Equal(repositoryPath, repositoryPaths.First());
-        
-       //await Context.DropDatabase(db);
+        string[] repositoryPaths;
+        string selectSql = $"SELECT repository_path FROM {Context.Syntax.TableWithSchema("grate", "ScriptsRunErrors")}";
+
+        using (var conn = Context.CreateDbConnection(db))
+        {
+            repositoryPaths = (await conn.QueryAsync<string>(selectSql)).ToArray();
+        }
+
+        Assert.Single(repositoryPaths);
+        Assert.Equal(repositoryPath, repositoryPaths.First());
+
+        //await Context.DropDatabase(db);
     }
-    
+
     [Theory]
     [InlineData("Værsjooon ein")]
     [InlineData("الأول")]
@@ -75,14 +75,14 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
         var knownFolders = Folders.Default;
         var filename = "1_a_script.sql";
         WriteSql(Wrap(parent, knownFolders[KnownFolderKeys.Up]!.Path), filename, _sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .WithVersion(version)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
@@ -98,11 +98,11 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
 
         Assert.Single(versions);
         Assert.Equal(version, versions.First());
-        
+
         //await Context.DropDatabase(db);
     }
-    
-    
+
+
     [Theory]
     [InlineData("det_første.sql")]
     [InlineData("الأول.sql")]
@@ -118,13 +118,13 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
         var knownFolders = Folders.Default;
         var filename = scriptName;
         WriteSql(Wrap(parent, knownFolders[KnownFolderKeys.Up]!.Path), filename, _sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
@@ -140,10 +140,10 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
 
         Assert.Single(scriptNames);
         Assert.Equal(scriptName, scriptNames.First());
-        
+
         //await Context.DropDatabase(db);
     }
-    
+
     [Theory]
     [InlineData("Blåbærkake")]
     [InlineData("لا أحب الطقس الممطر")]
@@ -158,20 +158,20 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
                    {Context.Sql.LineComment} This is a comment: {characters}
                    {Context.Sql.SelectVersion}
                    """;
-        
+
         var db = TestConfig.RandomDatabase();
 
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         var filename = "1_script_with_utf_characters.sql";
         WriteSql(Wrap(parent, knownFolders[KnownFolderKeys.Up]!.Path), filename, sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
@@ -188,10 +188,10 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
         Assert.Single(scripts);
         Assert.Equal(sql, scripts.First());
         Assert.Contains(characters, scripts.First());
-        
+
         //await Context.DropDatabase(db);
     }
-    
+
     [Theory]
     [InlineData("Blåbærkake")]
     [InlineData("لا أحب الطقس الممطر")]
@@ -205,20 +205,20 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
                    {characters}
                    {Context.Sql.SelectVersion}
                    """;
-        
+
         var db = TestConfig.RandomDatabase();
 
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         var filename = "1_script_with_utf_characters.sql";
         WriteSql(Wrap(parent, knownFolders[KnownFolderKeys.Up]!.Path), filename, sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
@@ -234,11 +234,11 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
 
         Assert.Single(errors);
         Assert.Contains(characters, errors.First());
-        
+
         //await Context.DropDatabase(db);
     }
-    
-    
+
+
     [Theory]
     [InlineData("Blåbærkake")]
     [InlineData("لا أحب الطقس الممطر")]
@@ -252,20 +252,20 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
                    {characters}!
                    {Context.Sql.SelectVersion}
                    """;
-        
+
         var db = TestConfig.RandomDatabase();
 
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         var filename = "1_script_with_utf_characters.sql";
         WriteSql(Wrap(parent, knownFolders[KnownFolderKeys.Up]!.Path), filename, sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
@@ -282,11 +282,11 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
         Assert.Single(errors);
         // This doesn't work well for MariaDb with 🎉 and 👍, they are only '?' in the actual error message from the DB 
         //errors.First().Should().Contain(characters);
-        
+
         //await Context.DropDatabase(db);
     }
-    
-    
+
+
     [Theory]
     [InlineData("JanBanan")]
     [InlineData("Blåbærkake")]
@@ -301,14 +301,14 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
                    {enteredBy}
                    {Context.Sql.SelectVersion}
                    """;
-        
+
         var db = TestConfig.RandomDatabase();
 
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         var filename = "1_script_with_utf_characters.sql";
         WriteSql(Wrap(parent, knownFolders[KnownFolderKeys.Up]!.Path), filename, sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -316,8 +316,8 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
             .Build();
 
         Thread.CurrentPrincipal =
-            new ClaimsPrincipal(new[] { new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, enteredBy) }) }); 
-        
+            new ClaimsPrincipal(new[] { new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, enteredBy) }) });
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await Assert.ThrowsAnyAsync<MigrationFailed>(() => migrator.Migrate());
@@ -333,7 +333,7 @@ public abstract class ScriptsRunErrorsTable : MigrationsScriptsBase
 
         Assert.Single(user);
         Assert.Contains(enteredBy, user.First());
-        
+
         //await Context.DropDatabase(db);
     }
 

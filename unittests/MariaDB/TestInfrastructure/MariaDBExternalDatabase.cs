@@ -1,4 +1,4 @@
-using MySqlConnector;
+﻿using MySqlConnector;
 using TestCommon.TestInfrastructure;
 
 namespace MariaDB.TestInfrastructure;
@@ -26,7 +26,7 @@ public class MariaDBExternalDatabase(GrateTestConfig grateTestConfig) : ITestDat
             Password = "batmanZZ5",
             ConnectionTimeout = 5
         };
-         return builder.ConnectionString;
+        return builder.ConnectionString;
     }
-    
+
 }

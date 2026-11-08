@@ -8,6 +8,7 @@ using grate.Sqlite.Infrastructure;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 namespace grate.Sqlite.Migration;
+
 public record SqliteDatabase : AnsiSqlDatabase
 {
     public override string MasterDatabaseName => "master";
@@ -17,7 +18,7 @@ public record SqliteDatabase : AnsiSqlDatabase
     public SqliteDatabase(ILogger<SqliteDatabase> logger)
         : base(logger, Syntax)
     { }
-    
+
     public static string Type => "sqlite";
     public static ISyntax Syntax { get; } = new SqliteSyntax();
 

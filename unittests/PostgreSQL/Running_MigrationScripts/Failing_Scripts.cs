@@ -8,8 +8,8 @@ namespace PostgreSQL.Running_MigrationScripts;
 public class Failing_Scripts(PostgreSqlGrateTestContext testContext, ITestOutputHelper testOutput)
     : TestCommon.Generic.Running_MigrationScripts.Failing_Scripts(testContext, testOutput)
 {
-    
-    protected override string ExpectedStartOfErrorMessageForInvalidSql => 
+
+    protected override string ExpectedStartOfErrorMessageForInvalidSql =>
         """
         Update ("up"):
         --------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ public class Failing_Scripts(PostgreSqlGrateTestContext testContext, ITestOutput
         (0,8): SELECT TOP
                       ^ 42703: column "top" does not exist
         """;
-    
+
 
     protected override IDictionary<string, object?> ExpectedErrorDetails => new Dictionary<string, object?>
     {

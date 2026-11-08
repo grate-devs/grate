@@ -8,14 +8,14 @@ namespace TestCommon.Generic.Running_MigrationScripts;
 
 //[TestFixture]
 // ReSharper disable once InconsistentNaming
-public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
-    protected Anytime_scripts(): this(null!, null!)
+    protected Anytime_scripts() : this(null!, null!)
     {
     }
-  
-    
+
+
     [Fact]
     public async Task Are_not_run_more_than_once_when_unchanged()
     {
@@ -24,13 +24,13 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Sprocs]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await migrator.Migrate();
@@ -67,7 +67,7 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await migrator.Migrate();
@@ -106,7 +106,7 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Sprocs]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
@@ -128,7 +128,7 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
 
         Assert.Single(scripts);
         Assert.Null(scripts.Single());
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -142,7 +142,7 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Sprocs]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
@@ -163,7 +163,7 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
 
         Assert.Single(scripts);
         Assert.Equal(Context.Sql.SelectVersion, scripts.Single());
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -177,7 +177,7 @@ public abstract class Anytime_scripts(IGrateTestContext context, ITestOutputHelp
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Sprocs]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(parent)
