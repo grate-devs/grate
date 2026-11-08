@@ -30,11 +30,22 @@ if (Test-Path -LiteralPath $OutputDirectory) {
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $fixtures = New-BenchmarkFixtures -Root "$OutputDirectory/fixtures" -SmallScriptCount 5 -LargeRowCount 50
 $publishDirectory = Split-Path -Parent $Executable
+$containerUserId = & id -u
+if ($LASTEXITCODE -ne 0) {
+    throw 'Cannot determine the host user ID for bind-mounted evidence.'
+}
+$containerGroupId = & id -g
+if ($LASTEXITCODE -ne 0) {
+    throw 'Cannot determine the host group ID for bind-mounted evidence.'
+}
 $dockerArguments = @(
     'run', '--rm', '--network', 'none', '--platform', $platform,
+    '--user', "${containerUserId}:${containerGroupId}",
     '--mount', "type=bind,source=$publishDirectory,target=/app,readonly",
     '--mount', "type=bind,source=$OutputDirectory,target=/work",
-    '--env', 'DOTNET_BUNDLE_EXTRACT_BASE_DIR=/work/extraction',
+    # Extraction is not measured here. Keep dependency bytes in the temporary
+    # container rather than leaving private bundle directories in uploaded evidence.
+    '--env', 'DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp/grate-bundle-extraction',
     '--entrypoint', '/bin/sh', $Image, '-c',
     'if command -v dotnet >/dev/null 2>&1 || [ -d /usr/share/dotnet ]; then exit 90; fi; exec "$@"',
     'grate', ('/app/' + [IO.Path]::GetFileName($Executable))
@@ -91,6 +102,9 @@ try {
     if (!(Test-Path -LiteralPath "$OutputDirectory/skill/.agents/skills/use-grate/SKILL.md")) {
         throw 'The packaged binary did not install its bundled skill.'
     }
+    # Upload globbing may visit excluded directories too. Verify that the invoking
+    # user can traverse every retained path before reporting successful evidence.
+    Get-ChildItem -LiteralPath $OutputDirectory -Recurse -Force | Out-Null
     $report.complete = $true
     Write-Host 'Packaged CLI passed help, SQLite migration/rerun/failure and bundled skill checks without an installed .NET runtime.'
 }
