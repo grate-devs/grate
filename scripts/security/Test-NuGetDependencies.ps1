@@ -1,5 +1,5 @@
 param(
-    [string] $Project = (Join-Path $PSScriptRoot '../../grate.sln')
+    [string] $Project = (Join-Path $PSScriptRoot '../../grate.slnx')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 # Keep low/moderate findings visible; high/critical and unavailable audit data fail.
 $restoreArgs = @(
     'restore', $Project,
-    '--configfile', (Join-Path $PSScriptRoot 'nuget.config'),
+    '--configfile', (Join-Path $PSScriptRoot '../../NuGet.Config'),
     '--force-evaluate',
     '-p:NuGetAudit=true',
     '-p:NuGetAuditMode=all',

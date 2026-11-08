@@ -5,25 +5,25 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace grate.oracle.Infrastructure;
 
-public class OracleScriptFailed: ScriptFailed
+public class OracleScriptFailed : ScriptFailed
 {
-    public OracleScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception cause) 
+    public OracleScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception cause)
         : base(folder, file, scriptText, cause)
     {
     }
 
     protected override IDictionary<string, object?> GetDbScriptErrors()
         => GatherDetails(this.DbException as OracleException);
-    
+
     protected override int Position => this.DbException is OracleException oracleException
         ? oracleException.Errors[0]?.ParseErrorOffset ?? 0
         : 0;
-    
+
 
     private IDictionary<string, object?> GatherDetails(OracleException? ex)
     {
-        return ex is null 
-            ? new Dictionary<string, object?>() 
+        return ex is null
+            ? new Dictionary<string, object?>()
             : new Dictionary<string, object?>()
             {
                 { nameof(OracleException.Message), ex.Message },
@@ -39,5 +39,5 @@ public class OracleScriptFailed: ScriptFailed
                 { nameof(OracleException.StackTrace), ex.StackTrace }
             };
     }
-    
+
 }

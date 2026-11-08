@@ -41,6 +41,7 @@ concurrency:
 jobs:
   set-version-number:
     name: Resolve release context
+    needs: validate-release-policy
     runs-on: ubuntu-latest
     outputs:
       nuGetVersion: ${{ steps.release-context.outputs.core_version }}
@@ -80,7 +81,8 @@ jobs:
         MANUAL_PUBLISH: ${{ inputs.publish }}
         GITVERSION_SEMVER: ${{ steps.gitversion.outputs.semVer }}
         GH_TOKEN: ${{ github.token }}
-      run: python3 scripts/release/resolve_release_context.py
+      shell: pwsh
+      run: ./scripts/release/resolve_release_context.ps1
     # Keep the event ref/cache scope and executed source together. Inputs never select a checkout.
     - name: Verify release tag identifies the event commit
       env:
@@ -98,16 +100,14 @@ jobs:
 
   validate-release-policy:
     name: Test release policy without publishing
-    needs: set-version-number
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
       with:
         ref: ${{ github.sha }}
         persist-credentials: false
-    - run: python3 -m pip install -r scripts/release/requirements-workflow-tests.txt
-    - run: python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
-    - run: python3 -m unittest discover -s installers/docker/tests -p 'test_*.py' -v
+    - name: Check build-independent contracts
+      uses: ./.github/actions/preflight
 
   build-netcore-tool:
     needs: set-version-number
@@ -457,21 +457,19 @@ jobs:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
         PUBLISH: ${{ needs.set-version-number.outputs.is-release }}
         PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
-      shell: bash
+      shell: pwsh
       run: |
-        set -euo pipefail
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
         sudo apt-get update -qq
         sudo apt-get install --yes --no-install-recommends skopeo
-        mode=--verify-only
-        if [[ "$PUBLISH" == true ]]; then
-          args=()
-          if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
-          DOCKER_TAGS=$(python3 installers/docker/release_tags.py "$VERSION" "${args[@]}")
-          export DOCKER_TAGS
+        $mode = @{ VerifyOnly = $true }
+        if ($env:PUBLISH -eq 'true') {
+          $env:DOCKER_TAGS = (./installers/docker/release_tags.ps1 -Version $env:VERSION -Prerelease:($env:PRERELEASE -eq 'true')) -join "`n"
           # Fail on an existing conflicting Docker version before any GitHub assets change.
-          mode=--preflight-only
-        fi
-        python3 scripts/release/publish_docker_archive.py "$mode" --archive "$RUNNER_TEMP/grate-image.tar" --report "$RUNNER_TEMP/docker-archive-validation.json"
+          $mode = @{ PreflightOnly = $true }
+        }
+        ./scripts/release/publish_docker_archive.ps1 @mode -Archive "$env:RUNNER_TEMP/grate-image.tar" -Report "$env:RUNNER_TEMP/docker-archive-validation.json"
     - name: Retain the exact Docker artifact for gated publication
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
@@ -690,9 +688,10 @@ jobs:
         echo "DOCKER_CONFIG=$RUNNER_TEMP/grate-oidc-docker" >> "$GITHUB_ENV"
 
     - name: Check Docker release policy
+      shell: pwsh
       run: |
-        python3 -m unittest discover -s installers/docker/tests -p 'test_*.py'
-        python3 -m unittest discover -s scripts/release -p 'test_*docker*.py'
+        ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
+        ./scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
 
     - name: Select identical tags for canonical and compatibility names
       id: tags
@@ -700,11 +699,9 @@ jobs:
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
         PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
-      shell: bash
+      shell: pwsh
       run: |
-        args=()
-        if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
-        python3 installers/docker/release_tags.py "$VERSION" "${args[@]}" --github-output "$GITHUB_OUTPUT"
+        ./installers/docker/release_tags.ps1 -Version $env:VERSION -Prerelease:($env:PRERELEASE -eq 'true') -GithubOutput $env:GITHUB_OUTPUT
 
     - name: Download the verified Docker OCI archive
       uses: actions/download-artifact@v8
@@ -738,14 +735,16 @@ jobs:
       env:
         DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
         DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-      run: python3 scripts/release/check_docker_access.py --canonical-authfile "$DOCKER_CONFIG/config.json" --report docker-access.json
+      shell: pwsh
+      run: ./scripts/release/check_docker_access.ps1 -CanonicalAuthfile "$env:DOCKER_CONFIG/config.json" -Report docker-access.json
 
     - name: Publish the verified archive to the canonical repository without rebuilding
       id: image
       env:
         DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
         EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
-      run: python3 scripts/release/publish_docker_archive.py --archive docker-artifact/grate-image.tar --authfile "$DOCKER_CONFIG/config.json" --report docker-canonical.json
+      shell: pwsh
+      run: ./scripts/release/publish_docker_archive.ps1 -Archive docker-artifact/grate-image.tar -Authfile "$env:DOCKER_CONFIG/config.json" -Report docker-canonical.json
 
     - name: Copy the built digest to the compatibility repository
       id: compatibility
@@ -754,7 +753,8 @@ jobs:
         EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
         DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
         DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-      run: python3 scripts/release/copy_docker_release.py --source-authfile "$DOCKER_CONFIG/config.json" --report docker-compatibility.json
+      shell: pwsh
+      run: ./scripts/release/copy_docker_release.ps1 -SourceAuthfile "$env:DOCKER_CONFIG/config.json" -Report docker-compatibility.json
 
     - name: Verify every published tag against the built digest
       if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' && steps.tags.outputs.tags != '' }}
@@ -763,7 +763,8 @@ jobs:
         EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
         BUILD_OUTCOME: ${{ steps.image.outcome }}
       # Public read-back deliberately does not use the legacy credential for canonical access.
-      run: python3 scripts/release/verify_docker_release.py --report docker-publication.json
+      shell: pwsh
+      run: ./scripts/release/verify_docker_release.ps1 -Report docker-publication.json
 
     - name: Retain publication results, including partial failures
       if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' }}
@@ -905,22 +906,19 @@ jobs:
           --dir artifacts/homebrew
 
     - name: Update and validate cask
-      shell: bash
+      shell: pwsh
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
       run: |
-        set -euo pipefail
-        arm64_asset="artifacts/homebrew/grate-osx-arm64-self-contained-$VERSION.zip"
-        x64_asset="artifacts/homebrew/grate-osx-x64-self-contained-$VERSION.zip"
-        test -f "$arm64_asset"
-        test -f "$x64_asset"
-
-        python3 scripts/release/update_homebrew_cask.py \
-          --version "$VERSION" \
-          --arm64-sha256 "$(sha256sum "$arm64_asset" | cut -d' ' -f1)" \
-          --x64-sha256 "$(sha256sum "$x64_asset" | cut -d' ' -f1)" \
-          --output homebrew-cask/Casks/grate.rb
-
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        $arm64Asset = "artifacts/homebrew/grate-osx-arm64-self-contained-$env:VERSION.zip"
+        $x64Asset = "artifacts/homebrew/grate-osx-x64-self-contained-$env:VERSION.zip"
+        ./scripts/release/update_homebrew_cask.ps1 `
+          -Version $env:VERSION `
+          -Arm64Sha256 (Get-FileHash -LiteralPath $arm64Asset -Algorithm SHA256).Hash.ToLowerInvariant() `
+          -X64Sha256 (Get-FileHash -LiteralPath $x64Asset -Algorithm SHA256).Hash.ToLowerInvariant() `
+          -Output homebrew-cask/Casks/grate.rb
         ruby -c homebrew-cask/Casks/grate.rb
 
     - name: Publish cask update

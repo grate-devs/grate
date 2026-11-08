@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Basic_tests.Infrastructure;
 
-public class MockDbMigratorLogger: ILogger<DbMigrator>
+public class MockDbMigratorLogger : ILogger<DbMigrator>
 {
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {

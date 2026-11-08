@@ -1,15 +1,17 @@
 # Code and dependency security checks
 
 `CI` keeps the existing Windows `Analyze Code Security` job and its CodeQL
-analysis identity (`.github/workflows/ci.yml:analyze`). Language autodetection
-covers C#, C++, GitHub Actions and Python. C# autobuild and the explicit native
-MSI compilation remain between initialization and analysis. Do not replace this
-with a second overlapping CodeQL workflow or limit extraction to C#.
+analysis identity (`.github/workflows/ci.yml:analyze`). The explicit language list
+covers C#, C++ and GitHub Actions; Python sources were migrated to PowerShell on
+main. The explicit `grate.slnx` build and native MSI compilation remain between
+initialization and analysis. Do not replace this with a second overlapping
+CodeQL workflow or limit extraction to C#.
 
 Every main PR and main push is analyzed. A weekly Monday 05:23 UTC run refreshes
 the main baseline as queries evolve. Main pushes and scheduled runs execute only
-security analysis; PR and manual runs retain the full CI matrix. Schedules use
-the default branch and take effect after merge.
+security analysis; PR and manual analysis waits for preflight, Build and both
+isolated test lanes to succeed before the expensive jobs. Schedules use the
+default branch and take effect after merge.
 
 ## Dependency policy
 
@@ -19,10 +21,11 @@ The `Dependency security` workflow has no PR path filters and needs only
 | Check | Scope and failure policy |
 | --- | --- |
 | `Dependency Review` | New dependency changes in main PRs, as exposed by GitHub's dependency graph. Fail on high or critical known advisories in runtime, development and unknown scopes. |
-| `NuGet dependency audit` | Restore the entire `grate.sln` with the pinned SDK and every declared target framework. Evaluate central and conditional versions and audit direct and transitive packages. High/critical advisories and feed failures fail; low/moderate advisories remain visible warnings. Runs on PRs, main pushes and weekly Monday 05:43 UTC. |
+| `NuGet dependency audit` | Restore the entire `grate.slnx` with the pinned SDK and every declared target framework. Evaluate central and conditional versions and audit direct and transitive packages. High/critical advisories and feed failures fail; low/moderate advisories remain visible warnings. Runs on PRs, main pushes and weekly Monday 05:43 UTC. |
 
-The NuGet check uses an explicit vulnerability feed and fails on NU1900/NU1905
-as well as NU1903/NU1904. It does not suppress advisories. Existing build/pack
+The NuGet check uses the shared root `NuGet.Config` and its explicit vulnerability
+feed, and fails on NU1900/NU1905 as well as NU1903/NU1904. It does not suppress
+advisories. Existing build/pack
 jobs retain their own, possibly stricter, warning policy. Run the same check from
 the checkout with the SDK in `global.json` installed:
 
@@ -36,9 +39,9 @@ updater can propose central-version changes; that does not establish that the
 dependency graph contains resolved CPM versions or transitive packages.
 Do not interpret zero open Dependabot alerts or a green Dependency Review with
 zero changes as proof of complete NuGet coverage. The resolved NuGet audit closes
-that gap for projects in `grate.sln`, including test/build dependencies.
+that gap for projects in `grate.slnx`, including test/build dependencies.
 
-Examples outside the solution, Python tooling, Terraform providers, SDK/runtime
+Examples outside the solution, Terraform providers, SDK/runtime
 servicing, operating-system/container packages and native library payloads require
 their own inventory checks. GitHub Actions advisory detection also has limitations
 for SHA-pinned actions; keep Dependabot version updates and deliberate pin review.

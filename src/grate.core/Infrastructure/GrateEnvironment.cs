@@ -8,12 +8,12 @@ public record GrateEnvironment
     {
         _environments = new[] { environment };
     }
-    
+
     public GrateEnvironment(params string[] environments)
     {
         _environments = environments;
     }
-    
+
     public GrateEnvironment(IEnumerable<string> environments)
     {
         _environments = environments;
@@ -41,7 +41,7 @@ public record GrateEnvironment
     private static string FileName(string path) => new FileInfo(path).Name;
 
     public override string ToString() => Current;
-    
+
     // The names are so difficult to make sure there is a close to zero chance that we collide with any 
     // environment that an actual user might use (which would make things crash badly)
     public static GrateEnvironment Internal { get; } = new("GrateInternal-a01ce6e6-0038-4ebe-959e-7d039f6435bf");

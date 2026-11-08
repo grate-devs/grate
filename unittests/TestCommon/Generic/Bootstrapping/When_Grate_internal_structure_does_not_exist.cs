@@ -8,7 +8,7 @@ using static grate.Configuration.KnownFolderKeys;
 
 namespace TestCommon.Generic.Bootstrapping;
 
-public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestContext context, ITestOutputHelper testOutput)
 : MigrationsScriptsBase(context, testOutput)
 {
     [Fact]
@@ -51,17 +51,17 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await RunMigration(migrator);
-        
+
         var scriptsErrorTable = await migrator.GetDbMigrator().Database.ExistingTable(config.SchemaName, grateScriptsErrorTableName);
         Assert.NotNull(scriptsErrorTable);
 
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
         Assert.Equal(scriptsErrorTable.ToUpper(), scriptsErrorTable!.ToUpper());
-        
+
         //await Context.DropDatabase(db);
     }
-    
-     
+
+
     [Fact]
     public async Task Version_Table_Is_Created()
     {
@@ -83,10 +83,10 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
 
         // Not all databases are case-sensitive, so we can't guarantee the case of the table name
         Assert.Equal(grateVersionTable.ToUpper(), grateVersionTable!.ToUpper());
-        
+
         //await Context.DropDatabase(db);
     }
-    
+
     [Theory]
     [InlineData("02_create_scripts_run_table.sql")]
     [InlineData("03_create_scripts_run_errors_table.sql")]
@@ -119,10 +119,10 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
         // (ScriptsRun, ScriptsRunErrors and Version)
         Assert.Contains(name, scriptNames);
         Assert.Contains($"grate-internal/{name}", scriptNames);
-        
+
         //await Context.DropDatabase(db);
     }
-                
+
     [Fact]
     [Trait("Category", "Versioning")]
     public async Task A_version_with_the_current_application_version_is_inserted_into_the_GrateVersion_table()
@@ -160,7 +160,7 @@ public abstract class When_Grate_internal_structure_does_not_exist(IGrateTestCon
         Assert.Equal(ApplicationInfo.Version, version.version);
         Assert.Equal(MigrationStatus.Finished, version.status);
     }
-    
+
 
     // This  was failing, because the tokens were already replaced before the internal scripts were run,
     // and the tokens were lazily initialized. So we had to clear the tokens when running the internal scripts.

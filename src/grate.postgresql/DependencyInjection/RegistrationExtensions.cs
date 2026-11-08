@@ -15,7 +15,7 @@ public static class RegistrationExtensions
         services.TryAddTransient<IDatabase, PostgreSqlDatabase>();
         return services;
     }
-    
+
     // ReSharper disable once InconsistentNaming
     public static IServiceCollection AddGrateWithPostgreSQL(this IServiceCollection services, GrateConfiguration? config = null) =>
         services

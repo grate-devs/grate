@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using grate.Configuration;
 using SqlServer.TestInfrastructure;
 using TestCommon.Generic.Running_MigrationScripts;
@@ -82,10 +82,10 @@ CREATE USER [myuser] WITHOUT LOGIN";
             .WithSqlFilesDirectory(parent)
             .WithTransaction()
             .Build() with
-            {
-                // Keep a regression short instead of waiting for the default lock timeout
-                CommandTimeout = 10
-            };
+        {
+            // Keep a regression short instead of waiting for the default lock timeout
+            CommandTimeout = 10
+        };
 
     private async Task<string[]> GetScriptsRun(string db)
     {

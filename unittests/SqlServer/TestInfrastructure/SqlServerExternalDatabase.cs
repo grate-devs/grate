@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using TestCommon.TestInfrastructure;
 
 namespace SqlServer.TestInfrastructure;
@@ -19,14 +19,14 @@ public class SqlServerExternalDatabase(GrateTestConfig grateTestConfig) : ITestD
 
     public string UserConnectionString(string database)
     {
-         var builder = new SqlConnectionStringBuilder(AdminConnectionString)
-         {
+        var builder = new SqlConnectionStringBuilder(AdminConnectionString)
+        {
             InitialCatalog = database,
             UserID = "zorro",
             Password = "batmanZZ4",
             ConnectTimeout = 3
-         };
-         return builder.ConnectionString;
+        };
+        return builder.ConnectionString;
     }
-    
+
 }

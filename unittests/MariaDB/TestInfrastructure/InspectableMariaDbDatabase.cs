@@ -7,7 +7,7 @@ namespace MariaDB.TestInfrastructure;
 
 public record InspectableMariaDbDatabase : MariaDbDatabase
 {
-    public InspectableMariaDbDatabase(IServiceProvider serviceProvider) 
+    public InspectableMariaDbDatabase(IServiceProvider serviceProvider)
         : base(serviceProvider.GetRequiredService<ILogger<InspectableMariaDbDatabase>>())
     {
     }

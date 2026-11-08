@@ -3,8 +3,7 @@ param(
     [Parameter(Mandatory)][string]$Catalog,
     [Parameter(Mandatory)][string]$Assets,
     [Parameter(Mandatory)][string]$LogDirectory,
-    [int]$Port=8765,
-    [string]$Python='python'
+    [int]$Port=8765
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
@@ -124,9 +123,9 @@ try {
     Remove-AppxPackage -Package $state.PackageFullName
     @{NuGetPackage='Microsoft.WindowsPackageManager.Utils'; Version=$version; Url=$url; Sha256=$hash; NativeDllSha256=(Get-FileHash $dll).Hash; NativeDllVersion=(Get-Item $dll).VersionInfo.FileVersion; WindowsSdk=$sdk[0].Name; SourceIdentifier=$state.SourceIdentifier; SourceType=$state.SourceType; Manifests=@($manifests | ForEach-Object { @{Name=[IO.Path]::GetFileName($_); Sha256=(Get-FileHash $_).Hash} }); Indexes=$indexes} |
         ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $logs 'preindexed-provenance.json')
-    $arguments=@('-u',"$PSScriptRoot/preindexed/server.py",'--root',$root,'--assets',(Resolve-Path -LiteralPath $Assets).Path,'--certificate',$certificateFile,'--private-key',$privateKeyFile,'--port',"$Port")
+    $arguments=@('-NoLogo','-NoProfile','-File',"$PSScriptRoot/preindexed/server.ps1",'-Root',$root,'-Assets',(Resolve-Path -LiteralPath $Assets).Path,'-Certificate',$certificateFile,'-PrivateKey',$privateKeyFile,'-Port',"$Port")
     $quoted=$arguments | ForEach-Object { '"'+$_.Replace('"','\"')+'"' }
-    $process=Start-Process -FilePath $Python -ArgumentList $quoted -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $logs 'server.stdout.log') -RedirectStandardError (Join-Path $logs 'server.stderr.log')
+    $process=Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') -ArgumentList $quoted -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $logs 'server.stdout.log') -RedirectStandardError (Join-Path $logs 'server.stderr.log')
     $state.Pid=$process.Id
     for ($attempt=0;$attempt -lt 10;$attempt++) {
         if ($process.HasExited) { throw "Preindexed server exited ($($process.ExitCode))." }

@@ -41,15 +41,15 @@ CREATE INDEX CONCURRENTLY IX_column2 ON public.table1
 	  column2
 	);
 ");
-        
-        
+
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .WithTransaction(false)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await migrator.Migrate();
@@ -64,7 +64,7 @@ CREATE INDEX CONCURRENTLY IX_column2 ON public.table1
         }
 
         Assert.Equal(2, scripts.Length);
-        
+
         //await Context.DropDatabase(db);
     }
 }

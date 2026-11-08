@@ -7,7 +7,7 @@
 indent_style = space
 
 # XML project files
-[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj}]
+[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj,slnx}]
 indent_size = 2
 
 # XML config files

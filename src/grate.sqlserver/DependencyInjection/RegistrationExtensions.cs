@@ -15,7 +15,7 @@ public static class RegistrationExtensions
         services.TryAddTransient<IDatabase, SqlServerDatabase>();
         return services;
     }
-    
+
     // ReSharper disable once InconsistentNaming
     public static IServiceCollection AddGrateWithSqlServer(this IServiceCollection services, GrateConfiguration? config = null) =>
         services
