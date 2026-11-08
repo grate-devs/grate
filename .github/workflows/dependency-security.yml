@@ -1,4 +1,4 @@
-name: Dependency security
+name: CI · Dependency security
 
 on:
   pull_request:
