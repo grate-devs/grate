@@ -70,6 +70,9 @@ foreach ($package in $inventory) {
         # Historical example dependency: exact DLL AssemblyInformationalVersion.
         $revision = '01a589e54afe43c85c7607aa05f8605fa6f13bb3'
     }
+    elseif ($key -eq 'Microsoft.Data.SqlClient/5.1.9') {
+        $revision = '96dff8240157a99d47fb2ace4633806e72526fac'
+    }
     elseif ($key -eq 'Microsoft.Data.SqlClient/5.2.2') {
         $revision = 'a98592718693168af42ec4af3eb974d58497373e'
     }

@@ -47,6 +47,22 @@
       }
     ]
   },
+  "Azure.Core/1.41.0": {
+    "repositoryCommit": "08a6829c0a46226cf4535410114ced6c58488750",
+    "sourceRevision": "08a6829c0a46226cf4535410114ced6c58488750",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/08a6829c0a46226cf4535410114ced6c58488750/LICENSE.txt",
+        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/08a6829c0a46226cf4535410114ced6c58488750/NOTICE.txt",
+        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
+      }
+    ]
+  },
   "Azure.Core/1.51.1": {
     "repositoryCommit": "738d40b80fff0ceb8053b2177453c52f6349606a",
     "sourceRevision": "738d40b80fff0ceb8053b2177453c52f6349606a",
@@ -90,6 +106,22 @@
       },
       {
         "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/2856f9a00d6cb96f71b724d29b1ce8ce271c4137/NOTICE.txt",
+        "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
+        "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
+      }
+    ]
+  },
+  "Azure.Identity/1.12.1": {
+    "repositoryCommit": "d01e747362084eb1d1d5542d533cf6e18c7ed35b",
+    "sourceRevision": "d01e747362084eb1d1d5542d533cf6e18c7ed35b",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/d01e747362084eb1d1d5542d533cf6e18c7ed35b/LICENSE.txt",
+        "file": "text/9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa.txt",
+        "sha256": "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/d01e747362084eb1d1d5542d533cf6e18c7ed35b/NOTICE.txt",
         "file": "text/edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210.txt",
         "sha256": "edca5c0353ab7281300dec18793a4eb06d26857e5bf9cb905e4b77543e467210"
       }
@@ -165,6 +197,17 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/erikbra/grate/4b1749ca2d0dea4c7f805e8c3142b4c9ac74630e/LICENSE",
+        "file": "text/8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd.txt",
+        "sha256": "8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd"
+      }
+    ]
+  },
+  "grate.sqlserver/2.2.0": {
+    "repositoryCommit": "38e0d5a18271e43bda675275067871f8bbb2254d",
+    "sourceRevision": "38e0d5a18271e43bda675275067871f8bbb2254d",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/grate-devs/grate/38e0d5a18271e43bda675275067871f8bbb2254d/LICENSE",
         "file": "text/8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd.txt",
         "sha256": "8e39e87db4d52cc59406e7da7be49f7f88161144d5d85966d2754fdd938349fd"
       }
@@ -360,6 +403,22 @@
       }
     ]
   },
+  "Microsoft.Data.SqlClient/5.1.9": {
+    "repositoryCommit": "",
+    "sourceRevision": "96dff8240157a99d47fb2ace4633806e72526fac",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/sqlclient/96dff8240157a99d47fb2ace4633806e72526fac/LICENSE",
+        "file": "text/9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34.txt",
+        "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/sqlclient/96dff8240157a99d47fb2ace4633806e72526fac/NOTICE.txt",
+        "file": "text/008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28.txt",
+        "sha256": "008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28"
+      }
+    ]
+  },
   "Microsoft.Data.SqlClient/5.2.2": {
     "repositoryCommit": "a98592718693168af42ec4af3eb974d58497373e",
     "sourceRevision": "a98592718693168af42ec4af3eb974d58497373e",
@@ -513,6 +572,17 @@
       }
     ]
   },
+  "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.0": {
+    "repositoryCommit": "b0f34d51fccc69fd334253924abd8d6853fad7aa",
+    "sourceRevision": "b0f34d51fccc69fd334253924abd8d6853fad7aa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
   "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.14": {
     "repositoryCommit": "0427b9abbead3fa64c6655eb4290c537397131fa",
     "sourceRevision": "0427b9abbead3fa64c6655eb4290c537397131fa",
@@ -618,6 +688,17 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/dotnet/dotnet/0427b9abbead3fa64c6655eb4290c537397131fa/LICENSE.TXT",
+        "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
+        "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+      }
+    ]
+  },
+  "Microsoft.Extensions.Logging.Abstractions/10.0.0": {
+    "repositoryCommit": "b0f34d51fccc69fd334253924abd8d6853fad7aa",
+    "sourceRevision": "b0f34d51fccc69fd334253924abd8d6853fad7aa",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT",
         "file": "text/ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b.txt",
         "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
       }
@@ -766,6 +847,17 @@
       }
     ]
   },
+  "Microsoft.Identity.Client.Extensions.Msal/4.65.0": {
+    "repositoryCommit": "e8baa99af1726fe40b9a0ba302dfb9f3bde12803",
+    "sourceRevision": "e8baa99af1726fe40b9a0ba302dfb9f3bde12803",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/e8baa99af1726fe40b9a0ba302dfb9f3bde12803/LICENSE",
+        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      }
+    ]
+  },
   "Microsoft.Identity.Client.Extensions.Msal/4.78.0": {
     "repositoryCommit": "d6f9310e2f1073ad2db8ca3bf39827b9bcf26e06",
     "sourceRevision": "d6f9310e2f1073ad2db8ca3bf39827b9bcf26e06",
@@ -794,6 +886,17 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/88df64013795d4e3716e1f677600f8164ffdb542/LICENSE",
+        "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      }
+    ]
+  },
+  "Microsoft.Identity.Client/4.76.0": {
+    "repositoryCommit": "c21e39b9e83f38834c9f6e31947b3ccb5290ea90",
+    "sourceRevision": "c21e39b9e83f38834c9f6e31947b3ccb5290ea90",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/c21e39b9e83f38834c9f6e31947b3ccb5290ea90/LICENSE",
         "file": "text/2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c.txt",
         "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
       }
@@ -1425,6 +1528,22 @@
       }
     ]
   },
+  "xunit.analyzers/1.18.0": {
+    "repositoryCommit": "2620a4ddabcba16ceb64ea9ad19c566252015fe8",
+    "sourceRevision": "2620a4ddabcba16ceb64ea9ad19c566252015fe8",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/xunit/xunit.analyzers/2620a4ddabcba16ceb64ea9ad19c566252015fe8/LICENSE",
+        "file": "text/918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56.txt",
+        "sha256": "918c2d961b0b79dd3aaf50d00afa237940436dac80fee83de1ed646efc599d56"
+      },
+      {
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ]
+  },
   "xunit.analyzers/2.2.0": {
     "repositoryCommit": "5686c9200f788f87fbe0ff3b63d2b821ee63758b",
     "sourceRevision": "5686c9200f788f87fbe0ff3b63d2b821ee63758b",
@@ -1457,12 +1576,44 @@
       }
     ]
   },
+  "xunit.assert/2.9.3": {
+    "repositoryCommit": "9712244020d385955d33136b3fe3e87de43539cd",
+    "sourceRevision": "9712244020d385955d33136b3fe3e87de43539cd",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
+        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
+      },
+      {
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ]
+  },
   "xunit.core/2.9.0": {
     "repositoryCommit": "593e57303e4a21da81c41e0d75658a37dd151b58",
     "sourceRevision": "593e57303e4a21da81c41e0d75658a37dd151b58",
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
+        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
+      },
+      {
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ]
+  },
+  "xunit.core/2.9.3": {
+    "repositoryCommit": "9712244020d385955d33136b3fe3e87de43539cd",
+    "sourceRevision": "9712244020d385955d33136b3fe3e87de43539cd",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
         "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
@@ -1511,12 +1662,44 @@
       }
     ]
   },
+  "xunit.extensibility.core/2.9.3": {
+    "repositoryCommit": "9712244020d385955d33136b3fe3e87de43539cd",
+    "sourceRevision": "9712244020d385955d33136b3fe3e87de43539cd",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
+        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
+      },
+      {
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ]
+  },
   "xunit.extensibility.execution/2.9.0": {
     "repositoryCommit": "593e57303e4a21da81c41e0d75658a37dd151b58",
     "sourceRevision": "593e57303e4a21da81c41e0d75658a37dd151b58",
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
+        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
+      },
+      {
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ]
+  },
+  "xunit.extensibility.execution/2.9.3": {
+    "repositoryCommit": "9712244020d385955d33136b3fe3e87de43539cd",
+    "sourceRevision": "9712244020d385955d33136b3fe3e87de43539cd",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
         "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
@@ -1677,6 +1860,22 @@
     "texts": [
       {
         "url": "https://raw.githubusercontent.com/xunit/xunit/593e57303e4a21da81c41e0d75658a37dd151b58/license.txt",
+        "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
+        "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
+      },
+      {
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "file": "text/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ]
+  },
+  "xunit/2.9.3": {
+    "repositoryCommit": "9712244020d385955d33136b3fe3e87de43539cd",
+    "sourceRevision": "9712244020d385955d33136b3fe3e87de43539cd",
+    "texts": [
+      {
+        "url": "https://raw.githubusercontent.com/xunit/xunit/9712244020d385955d33136b3fe3e87de43539cd/license.txt",
         "file": "text/e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79.txt",
         "sha256": "e9dcf94cc4864ba47aeaaec879cfabaf3feadb813c77af480c3ad14c6de0ed79"
       },
