@@ -1,4 +1,4 @@
-using grate.Oracle.Infrastructure;
+﻿using grate.Oracle.Infrastructure;
 
 namespace Oracle.Basic_tests;
 

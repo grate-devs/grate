@@ -1,4 +1,4 @@
-namespace TestCommon.TestInfrastructure;
+﻿namespace TestCommon.TestInfrastructure;
 
 public class TestDatabaseFixture(ITestDatabase testDatabase) : IAsyncLifetime
 {

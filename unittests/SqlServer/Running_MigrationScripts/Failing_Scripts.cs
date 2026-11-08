@@ -20,7 +20,7 @@ public class Failing_Scripts(SqlServerGrateTestContext testContext, ITestOutputH
 
 
     protected override IDictionary<string, object?> ExpectedErrorDetails => new Dictionary<string, object?>
-    { 
+    {
         { "Message", "Incorrect syntax near \u0027TOP\u0027." },
         { "LineNumber", 1 },
         { "Number", 102 },
@@ -35,6 +35,6 @@ public class Failing_Scripts(SqlServerGrateTestContext testContext, ITestOutputH
         { "IsTransient", false },
         { "HelpLink", null },
         { "HResult", -2146232060 },
-    }; 
+    };
 
 }

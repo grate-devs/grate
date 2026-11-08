@@ -7,13 +7,13 @@ namespace TestCommon.Generic.Running_MigrationScripts;
 
 //[TestFixture]
 // ReSharper disable once InconsistentNaming
-public abstract class Environment_scripts(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class Environment_scripts(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
-    protected Environment_scripts(): this(null!, null!)
+    protected Environment_scripts() : this(null!, null!)
     {
     }
-    
+
     [Fact]
     public async Task Are_not_run_if_not_in_environment()
     {
@@ -23,7 +23,7 @@ public abstract class Environment_scripts(IGrateTestContext context, ITestOutput
         var knownFolders = Folders.Default;
 
         CreateDummySql(parent, knownFolders[Up], "1_.OTHER.filename.ENV.sql");
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -58,13 +58,13 @@ public abstract class Environment_scripts(IGrateTestContext context, ITestOutput
         var knownFolders = Folders.Default;
 
         CreateDummySql(parent, knownFolders[Up], "1_.OTHER.filename.ENV.sql");
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await migrator.Migrate();

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
@@ -51,7 +51,9 @@ public sealed class PublishedSkillInstallationTests(ITestOutputHelper output)
         var start = new ProcessStartInfo(command[0])
         {
             WorkingDirectory = Environment.GetEnvironmentVariable("GRATE_SKILL_TEST_WORKING_DIRECTORY")!,
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         foreach (var argument in command.Skip(1).Concat(["skills", "install"]).Concat(arguments))
             start.ArgumentList.Add(argument);

@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using grate.Configuration;
 using Oracle.TestInfrastructure;
 using TestCommon.TestInfrastructure;

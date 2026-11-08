@@ -261,8 +261,8 @@ whatever";
             var result = _splitter.Split(sql_to_match).ToList();
             Assert.Equal(["jalla /"], result);
         }
-        
-                [Fact]
+
+        [Fact]
         public void slash_with_words_before_and_after_on_the_same_line()
         {
             string sql_to_match = Words_to_check + @" / " + Words_to_check;
@@ -280,7 +280,7 @@ whatever";
             var result = _splitter.Split(sql_to_match).ToList();
             Assert.Equal([sql_to_match], result);
         }
-        
+
         [Fact]
         public void slash_when_slash_is_the_last_part_of_the_last_word_on_a_line()
         {
@@ -566,7 +566,7 @@ whatever";
             Assert.Equal(sql, result[0]);
         }
 
-         [Fact]
+        [Fact]
         public void semicolons_after_a_declare_block_do_split_the_buffer()
         {
             const string sql = "DECLARE\n    value NUMBER := 1;\nBEGIN\n    value := value + 1;\nEND;\nSELECT 1;";
