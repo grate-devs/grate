@@ -20,6 +20,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validation-policy:
+    name: PR validation policy
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Test aggregate decision policy
+      shell: pwsh
+      run: |
+        ./scripts/ci/Test-PRValidation.ps1
+        ./scripts/ci/Test-InvokePRValidation.ps1
+
+  pr-validation:
+    # Keep this name stable: the proposed main ruleset consumes it.
+    name: PR validation
+    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
+    needs: [validation-policy, build-code, test, packages, standalone, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Require every build, test and package producer
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+        NEEDS_JSON: ${{ toJSON(needs) }}
+      run: ./scripts/ci/Invoke-PRValidation.ps1
+
   build-code:
     name: Build
     runs-on: ubuntu-latest
@@ -225,6 +261,8 @@ jobs:
 
 
   report:
+     # Diagnostic output only. PR validation reads test results directly;
+     # successful report generation never overrides a failed test producer.
      runs-on: ubuntu-latest
      name: Create test report
      needs: test
