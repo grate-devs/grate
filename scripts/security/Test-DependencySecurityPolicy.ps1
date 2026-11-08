@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+Import-Module powershell-yaml -RequiredVersion 0.4.12 -ErrorAction Stop
 
 function Assert-Policy {
     param(
@@ -75,14 +76,17 @@ function Assert-StagedCiJobs {
         Assert-Policy ($job -match '(?m)^    needs:') "Keep $producer downstream of PR-only preflight."
     }
 
-    $prEvents = "if: .*github.event_name == 'pull_request'.*github.event_name == 'workflow_dispatch'"
-    foreach ($jobId in @('validation-policy', 'report', 'ci-result')) {
-        $job = Get-WorkflowJob $Workflow $jobId
-        Assert-Policy ($job -match $prEvents) "Keep $jobId limited to PR/manual validation."
+    $prEvents = "github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'"
+    $conditions = @{
+        'validation-policy' = '${{ ' + $prEvents + ' }}'
+        'report' = "always() && ($prEvents)"
+        'ci-result' = "always() && ($prEvents)"
     }
-
-    $report = Get-WorkflowJob $Workflow 'report'
-    Assert-Policy ($report -match 'if: always\(\) &&') 'Retain failure reporting for PR/manual tests.'
+    foreach ($jobId in $conditions.Keys) {
+        $job = Get-WorkflowJob $Workflow $jobId
+        $condition = [regex]::Match($job, '(?m)^ {4,5}if: ([^\r\n]+)\r?$').Groups[1].Value
+        Assert-Policy ($condition -ceq $conditions[$jobId]) "Keep $jobId limited to PR/manual validation."
+    }
 }
 
 function Get-CodeqlCondition {
@@ -156,7 +160,83 @@ function Assert-DependencyReview {
     Assert-Policy ($review -match 'fail-on-severity: high\s') 'Reject new high/critical dependency advisories.'
     Assert-Policy ($review -match 'fail-on-scopes: runtime, development, unknown') 'Include build/test and unknown dependency scopes.'
     Assert-Policy ($review -match 'warn-only: false') 'Dependency Review must fail on findings.'
-    Assert-Policy ($Workflow -notmatch 'contents: write|pull-requests: write|continue-on-error:') 'Security checks need no write token or ignored failures.'
+    Assert-Policy ($Workflow -notmatch 'continue-on-error:') 'Security checks must propagate failures.'
+
+    $configuration = ConvertFrom-Yaml $Workflow
+    Assert-ReadOnlyPermissions $configuration.permissions
+    foreach ($job in $configuration.jobs.Values) {
+        Assert-ReadOnlyPermissions $job.permissions
+    }
+}
+
+function Assert-ReadOnlyPermissions {
+    param(
+        [object] $Permissions
+    )
+
+    if ($null -eq $Permissions) {
+        return
+    }
+    if ($Permissions -is [string]) {
+        Assert-Policy ($Permissions -ceq 'read-all') 'Dependency security permissions must remain read-only.'
+        return
+    }
+
+    foreach ($permission in $Permissions.Values) {
+        Assert-Policy ($permission -in @('read', 'none')) 'Dependency security permissions must remain read-only.'
+    }
+}
+
+function Assert-PolicyRejected {
+    param(
+        [scriptblock] $Action,
+        [string] $ExpectedMessage
+    )
+
+    try {
+        & $Action
+    }
+    catch {
+        Assert-Policy ($_.Exception.Message.Contains($ExpectedMessage)) "Unexpected policy rejection: $_"
+        return
+    }
+    throw "Policy accepted a regression: $ExpectedMessage"
+}
+
+function Assert-SecurityPolicyRegressions {
+    param(
+        [string] $CiWorkflow,
+        [string] $DependencyWorkflow
+    )
+
+    foreach ($jobId in @('validation-policy', 'report', 'ci-result')) {
+        $job = Get-WorkflowJob $CiWorkflow $jobId
+        $condition = [regex]::Match($job, '(?m)^ {4,5}if: ([^\r\n]+)\r?$').Groups[1].Value
+        $broadened = if ($condition.StartsWith('${{')) {
+            $condition.Replace(' }}', ' || true }}')
+        }
+        else {
+            "$condition || true"
+        }
+        $mutatedJob = $job.Replace($condition, $broadened)
+        $mutatedWorkflow = $CiWorkflow.Replace($job, $mutatedJob)
+        Assert-PolicyRejected {
+            Assert-StagedCiJobs $mutatedWorkflow
+        } "Keep $jobId limited to PR/manual validation."
+    }
+
+    $permissionMutations = @(
+        [regex]::Replace($DependencyWorkflow, '(?m)^  contents: read\r?$', "  contents: read`n  issues: write"),
+        [regex]::Replace($DependencyWorkflow, '(?m)^  dependency-review:\r?$', "  dependency-review:`n    permissions:`n      issues: write"),
+        [regex]::Replace($DependencyWorkflow, '(?m)^  dependency-review:\r?$', "  dependency-review:`n    permissions: { issues: 'write' }"),
+        [regex]::Replace($DependencyWorkflow, '(?m)^permissions:\r?\n  contents: read\r?$', 'permissions: write-all')
+    )
+    foreach ($mutation in $permissionMutations) {
+        Assert-Policy ($mutation -cne $DependencyWorkflow) 'Permission regression must change the workflow.'
+        Assert-PolicyRejected {
+            Assert-DependencyReview $mutation
+        } 'permissions must remain read-only'
+    }
 }
 
 function Assert-NugetAuditJob {
@@ -283,4 +363,5 @@ Assert-DependencyReview $dependencies
 Assert-NugetAuditJob $dependencies
 Assert-AuditMockIsolation $RepositoryRoot
 Assert-AuditFeed $RepositoryRoot
+Assert-SecurityPolicyRegressions -CiWorkflow $ci -DependencyWorkflow $dependencies
 Write-Host "Dependency security policy, $schedulingCases scheduling cases and audit command checks passed."

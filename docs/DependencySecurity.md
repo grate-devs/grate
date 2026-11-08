@@ -30,6 +30,7 @@ jobs retain their own, possibly stricter, warning policy. Run the same check fro
 the checkout with the SDK in `global.json` installed:
 
 ```powershell
+./scripts/release/Install-TestDependencies.ps1
 ./scripts/security/Test-DependencySecurityPolicy.ps1
 ./scripts/security/Test-NuGetDependencies.ps1
 ```

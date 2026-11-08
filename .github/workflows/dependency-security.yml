@@ -44,7 +44,9 @@ jobs:
           global-json-file: global.json
       - name: Verify dependency security policy
         shell: pwsh
-        run: ./scripts/security/Test-DependencySecurityPolicy.ps1
+        run: |
+          ./scripts/release/Install-TestDependencies.ps1
+          ./scripts/security/Test-DependencySecurityPolicy.ps1
       - name: Audit resolved direct and transitive NuGet dependencies
         shell: pwsh
         run: ./scripts/security/Test-NuGetDependencies.ps1
