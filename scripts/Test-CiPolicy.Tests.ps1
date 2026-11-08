@@ -11,7 +11,7 @@ $preflightScript = Get-Content -LiteralPath "$repositoryRoot/scripts/ci/Invoke-P
 $aggregate = Join-Path $PSScriptRoot 'Assert-CiResults.ps1'
 $requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
 $expensiveJobs = @('analyze', 'test', 'packages', 'standalone', 'docker')
-$analysisCondition = "`${{ always() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}"
+$analysisCondition = "`${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}"
 $aggregateCondition = "    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')"
 
 function Assert-WorkflowPolicy {

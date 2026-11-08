@@ -143,7 +143,7 @@ jobs:
     needs: [build-code, fast-tests, validation-policy]
     # PR/manual analysis keeps the staged gates; main/schedule refreshes its
     # baseline even though those build/test producers are intentionally skipped.
-    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
+    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
     runs-on: windows-latest
     permissions:
       actions: read
