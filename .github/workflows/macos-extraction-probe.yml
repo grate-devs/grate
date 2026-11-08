@@ -1,4 +1,4 @@
-name: Validate isolated macOS SDK setup
+name: Diagnostics · macOS SDK extraction
 on:
   push:
     branches: [investigate/macos-arm64-extraction]
