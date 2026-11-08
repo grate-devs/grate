@@ -7,11 +7,11 @@ the command `grate`. The PoC installs each into a separate tool directory.
 
 ## Run the comparison
 
-From the repository root, with Bash and Docker available, run the wrapper.
+From the repository root, with PowerShell 7 and Docker available, run the wrapper.
 Choose a fresh repository-relative directory for its artifacts.
 
-```sh
-bash docs/design/slim-distributions-poc/run.sh artifacts/slim-poc
+```powershell
+pwsh docs/design/slim-distributions-poc/run.ps1 -OutputDirectory artifacts/slim-poc -Mode cli
 ```
 
 The wrapper starts disposable SQL Server 2022 and MariaDB 10.4 containers on a
@@ -32,11 +32,11 @@ python3 docs/design/slim-distributions-poc/verify.py --output "$PWD/artifacts/sl
 
 ## Docker and Debian comparison
 
-Run the packaging mode from the repository root with Python 3.9+, Docker and
+Run the packaging mode from the repository root with PowerShell 7, Python 3.9+, Docker and
 a fresh output directory.
 
-```sh
-bash docs/design/slim-distributions-poc/run.sh artifacts/slim-packaging packaging
+```powershell
+pwsh docs/design/slim-distributions-poc/run.ps1 -OutputDirectory artifacts/slim-packaging -Mode packaging
 ```
 
 This builds local Linux amd64 images using the real Alpine Dockerfile and .deb
