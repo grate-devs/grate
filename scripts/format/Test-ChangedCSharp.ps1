@@ -36,6 +36,7 @@ try {
     New-Item -ItemType Directory -Path "$fixtureRoot/scripts/format", "$fixtureRoot/src" -Force | Out-Null
     Copy-Item "$PSScriptRoot/Check-ChangedCSharp.ps1" "$fixtureRoot/scripts/format/"
     Copy-Item "$repositoryRoot/.editorconfig", "$repositoryRoot/global.json" $fixtureRoot
+    # .NET file APIs preserve the exact BOM/no-BOM and newline bytes used by the formatter assertions.
     [IO.File]::WriteAllText("$fixtureRoot/src/Legacy.cs", 'public class Legacy {public int Value=>1;}', $utf8Bom)
     [IO.File]::WriteAllText("$fixtureRoot/src/Good.cs", "public class Good`n{`n}`n", $utf8Bom)
     Push-Location $fixtureRoot
@@ -57,6 +58,7 @@ try {
         Assert-Check 0 'Checking whitespace and encoding in 1 C# files'
 
         # An untracked name with spaces and Unicode must remain one argument.
+        # This overload deliberately writes no BOM, providing a failing CHARSET input.
         [IO.File]::WriteAllText("$fixtureRoot/src/New file æ.cs", 'public class New {public int Value=>1;}')
         Assert-Check 2 'CHARSET'
         Remove-Item -LiteralPath "$fixtureRoot/src/New file æ.cs"
