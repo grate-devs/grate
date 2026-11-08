@@ -15,6 +15,11 @@ Update this cask to 2.2.0 after that release and its Arm64 and Intel archives ar
 published, so existing cask users can upgrade while the core formula is pursued.
 The cask is a separate distribution, not a prerequisite for the formula.
 
+Source publishing generates dependency licenses from the exact restored packages
+using its existing .NET SDK build dependency. No extra PowerShell installation is
+required for publishing. Published notices are retained in `libexec`.
+See [dependency licensing](../../docs/DependencyLicenses.md).
+
 Do not create a new organization-owned cask tap as part of this plan. If acceptance
 in `homebrew/core` is unsuccessful, revisit moving the cask from `erikbra` to
 `grate-devs` as a fallback under [#801](https://github.com/grate-devs/grate/issues/801).

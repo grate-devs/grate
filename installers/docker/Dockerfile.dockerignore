@@ -3,7 +3,12 @@
 **
 !global.json
 !*.props
+!*.targets
+!LICENSE
 !*.ruleset
+!scripts/
+!scripts/licenses/
+!scripts/licenses/**
 !src/
 !src/**
 !docs/

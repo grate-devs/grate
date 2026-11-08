@@ -1,0 +1,45 @@
+
+----------------------------------------------------------------
+Copyright on SQLitePCLRaw
+----------------------------------------------------------------
+
+Version prior to 2.0 were labeled with the copyright owned by
+Zumero.  In 2.0, this changed to SourceGear.  There is no legal
+distinction, as Zumero is simply a dba name for SourceGear.
+
+And in either case, the open source license remains the same,
+Apache v2.
+
+----------------------------------------------------------------
+License for SQLite
+----------------------------------------------------------------
+
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+
+
+----------------------------------------------------------------
+License for MS Open Tech
+----------------------------------------------------------------
+
+// Copyright © Microsoft Open Technologies, Inc.
+// All Rights Reserved
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy
+// of the License at 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY
+// IMPLIED WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+// MERCHANTABLITY OR NON-INFRINGEMENT.
+// 
+// See the Apache 2 License for the specific language governing permissions and
+// limitations under the License.
+
+

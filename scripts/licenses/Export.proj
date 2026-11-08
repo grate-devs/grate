@@ -1,0 +1,14 @@
+<Project DefaultTargets="Export">
+  <Import Project="LicenseTask.targets" />
+  <Target Name="Export">
+    <ReadLinesFromFile File="$(LicenseAssetsListFile)">
+      <Output TaskParameter="Lines" ItemName="_LicenseAssets" />
+    </ReadLinesFromFile>
+    <ReadLinesFromFile File="$(LicenseRootsListFile)">
+      <Output TaskParameter="Lines" ItemName="_LicenseRoots" />
+    </ReadLinesFromFile>
+    <GenerateDependencyNoticesTask AssetsFiles="@(_LicenseAssets)" PackageRoots="@(_LicenseRoots)"
+      OutputDirectory="$(LicenseOutputDirectory)" RepositoryRoot="$(LicenseRepositoryRoot)"
+      SourceDirectory="$(LicenseSourceDirectory)" AllowMissingLicenseEvidence="$(LicenseAllowMissing)" />
+  </Target>
+</Project>

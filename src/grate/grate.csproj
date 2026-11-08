@@ -97,6 +97,13 @@
 
   </PropertyGroup>
 
+  <!-- The tool redistributes dependencies under their original terms. The
+       aggregate license file includes grate's MIT license and those terms. -->
+  <PropertyGroup Condition="'$(PackAsTool)' == 'true'">
+    <PackageLicenseExpression></PackageLicenseExpression>
+    <PackageLicenseFile>THIRD-PARTY-NOTICES.txt</PackageLicenseFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="NuGet.md" Pack="true" PackagePath="\" />
   </ItemGroup>

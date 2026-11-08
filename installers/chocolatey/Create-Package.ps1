@@ -7,8 +7,13 @@ param (
 
 $ErrorActionPreference = 'Stop'
 $grateExe = (Resolve-Path -LiteralPath $grateExe).Path
+$noticeFile = Join-Path (Split-Path -Parent $grateExe) 'THIRD-PARTY-NOTICES.txt'
+if (!(Test-Path -LiteralPath $noticeFile -PathType Leaf)) {
+    throw 'The published payload must include THIRD-PARTY-NOTICES.txt.'
+}
 $toolsDir = Join-Path $PSScriptRoot 'grate/tools'
 Copy-Item -LiteralPath $grateExe -Destination (Join-Path $toolsDir 'grate.exe') -Force
+Copy-Item -LiteralPath $noticeFile -Destination (Join-Path $toolsDir 'THIRD-PARTY-NOTICES.txt') -Force
 
 $hash = (Get-FileHash -LiteralPath $grateExe -Algorithm SHA256).Hash
 $releaseUrl = "https://github.com/grate-devs/grate/releases/download/$version"

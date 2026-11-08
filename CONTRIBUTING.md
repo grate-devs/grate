@@ -28,6 +28,11 @@ image digests, and verify the embedded runtime and native SQLite versions before
 The Docker final stage supplies Alpine and ICU; the .NET runtime is embedded by `dotnet publish` in the build stage.
 MSI and Debian recipes consume those published standalone binaries; framework-dependent tools and libraries use the consumer's runtime.
 
+Publishing and packing collect original dependency licenses and notices through
+the SDK's MSBuild runtime. Keep `THIRD-PARTY-NOTICES.txt` with redistributed binaries;
+see [dependency licensing](docs/DependencyLicenses.md) for the inventory,
+source-text update workflow and unresolved restricted-component obligations.
+
 ### Working with the stable .NET 10 SDK
 
 To work only on the `net10.0` target without installing the .NET 11 prerelease,

@@ -18,6 +18,13 @@ function Assert-Rejected([xml]$Template, [string]$ExpectedMessage) {
 }
 
 try {
+    [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw
+    $namespaces = [System.Xml.XmlNamespaceManager]::new($faulty.NameTable)
+    $namespaces.AddNamespace('w', 'http://schemas.microsoft.com/wix/2006/wi')
+    $notices = $faulty.SelectSingleNode("//w:File[@Id='ThirdPartyNotices']", $namespaces)
+    $null = $notices.ParentNode.RemoveChild($notices)
+    Assert-Rejected $faulty '*must install the exact published third-party notices*'
+
     # Original ICE64 defect: a row named ROOTDIRECTORY still targets the containing
     # INSTALLFOLDER when its Directory attribute is missing.
     [xml]$faulty = Get-Content -LiteralPath $templatePath -Raw

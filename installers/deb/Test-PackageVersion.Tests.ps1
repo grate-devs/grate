@@ -13,6 +13,7 @@ try {
     New-Item -ItemType Directory -Path "$root/payload" -Force | Out-Null
     Copy-Item -LiteralPath "$PSScriptRoot/Create-Package.ps1", "$PSScriptRoot/template" -Destination $root -Recurse
     "#!/bin/sh`nexit 0" | Set-Content "$root/payload/grate"
+    'License fixture for package lifecycle verification.' | Set-Content "$root/payload/THIRD-PARTY-NOTICES.txt"
 
     # Known metadata expectations, independent of the conversion under test.
     $cases = [ordered]@{
@@ -33,6 +34,13 @@ try {
         $actualArchitecture = & dpkg-deb --field $package Architecture
         if ($actualArchitecture -cne $Architecture) { throw "Incorrect Debian Architecture: $actualArchitecture" }
         $versions[$version] = $actual
+        $extracted = Join-Path $root "extracted-$version"
+        & dpkg-deb --extract $package $extracted
+        $installedNotice = Join-Path $extracted 'usr/share/doc/grate/THIRD-PARTY-NOTICES.txt'
+        if (!(Test-Path -LiteralPath $installedNotice) -or
+            (Get-FileHash -LiteralPath $installedNotice).Hash -cne (Get-FileHash -LiteralPath "$root/payload/THIRD-PARTY-NOTICES.txt").Hash) {
+            throw 'The Debian package must retain the exact published third-party notices.'
+        }
     }
 
     # Use Debian's real comparison against metadata from the generated packages.

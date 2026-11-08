@@ -1,0 +1,3 @@
+# Preserve checksummed upstream legal texts byte-for-byte, including original
+# line endings and whitespace. Source code keeps normal whitespace checks.
+scripts/licenses/text/*.txt -text -whitespace
