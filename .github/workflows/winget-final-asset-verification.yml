@@ -1,4 +1,4 @@
-name: Verify published WinGet release assets
+name: Archive · WinGet 2.2.0 release assets
 on:
   push:
     branches: [verify/winget-publication-220]
