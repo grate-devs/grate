@@ -1,0 +1,35 @@
+.TH GRATE 1 "November 2026" "grate" "User Commands"
+.SH NAME
+grate \- SQL script migration runner with the MariaDB provider
+.SH SYNOPSIS
+.B grate
+.RI [ options ]
+.br
+.B grate skills install
+.RI [ options ]
+.SH DESCRIPTION
+Grate executes plain SQL migration scripts and records their history.
+This package compiles only the MariaDB provider. MariaDB is the default database
+type; other provider selections are rejected.
+.SH OPTIONS
+.TP
+.B --help
+Show the complete migration command options for this build.
+.TP
+.B --databasetype mariadb
+Select the MariaDB provider explicitly. Other database types are unavailable.
+.TP
+.BI --connectionstring " connection-string"
+Supply the MariaDB connection string.
+.TP
+.BI --files " directory"
+Select the migration script directory.
+.TP
+.B grate skills install --help
+Show options for installing the bundled agent skill.
+.SH FILES
+.I /usr/share/doc/grate-mariadb/copyright
+.br
+.I /usr/share/doc/grate-mariadb/THIRD-PARTY-NOTICES.txt
+.SH AUTHOR
+Erik A. Brandstadmoen <erik@brandstadmoen.net>

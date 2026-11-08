@@ -125,6 +125,13 @@ container keeps grate's exit code. The example overwrites `grate.log` on each
 start. Use distinct log paths for replicas or attempts that share the mount
 when you need to keep their logs.
 
+## Messages from SQL Server scripts
+
+Use `--verbosity=Debug` (or `Trace`) to see SQL Server `PRINT` output and
+other informational messages from migration scripts. Grate logs them at
+`Debug` with the script name. The default `Information` level keeps these
+messages hidden. SQL errors still fail the migration.
+
 ## Migration logs in CI
 
 `--log-format=auto` selects a format once when the CLI starts a migration.

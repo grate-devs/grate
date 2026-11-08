@@ -1,0 +1,18 @@
+Description: Select the analyzer package source-built by the Ubuntu SDK
+ The archive feed supplies 10.0.114, while upstream pins 10.0.403. Preserve
+ EnableNETAnalyzers and TreatWarningsAsErrors; this is an explicit packaging
+ toolchain adaptation, not a reproduction of the upstream release toolchain.
+Author: Grate maintainers
+Forwarded: not-needed
+
+--- a/Directory.Packages.props
++++ b/Directory.Packages.props
+@@ -8,7 +8,7 @@
+     <!--
+       .net sdk
+     -->
+-    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.403" />
++    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.114" />
+     <PackageVersion Include="Microsoft.Data.SqlClient.Extensions.Azure" Version="7.1.1" />
+     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.14" />
+     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />

@@ -1,0 +1,5 @@
+grate-mariadb (0.0.1-1~poc1) UNRELEASED; urgency=medium
+
+  * Local source-package feasibility recipe; not an archive submission.
+
+ -- Erik A. Brandstadmoen <erik@brandstadmoen.net>  Sun, 08 Nov 2026 00:00:00 +0000

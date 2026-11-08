@@ -6,6 +6,11 @@ then builds the package with `dpkg-deb --root-owner-group`. Run it on Linux with
 PowerShell, `dpkg-deb` with `--root-owner-group` support, `gzip` and the usual Unix
 file utilities installed.
 
+For the separate official Ubuntu archive investigation, use the
+[source-package experiment](../ubuntu-source/README.md) and
+[feasibility assessment](../../docs/design/ubuntu-archive.md). This binary wrapper
+does not perform an offline source build or establish archive acceptance.
+
 From the repository root, pass the executable, Grate version and Debian
 architecture (`amd64` or `arm64`) to `Create-Package.ps1` using `-grateExe`,
 `-version` and `-arch`. The script uses a temporary staging directory and writes

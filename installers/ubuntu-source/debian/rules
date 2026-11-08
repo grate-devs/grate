@@ -1,0 +1,76 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/pkg-info.mk
+
+# Work from / so the source tree's SDK 11 RC global.json does not override the
+# declared Ubuntu SDK 10 build dependency. This is the SDK 10 procedure documented
+# in CONTRIBUTING.md; target-framework selection remains explicit throughout.
+export DOTNET_CLI_TELEMETRY_OPTOUT := 1
+export DOTNET_SKIP_FIRST_TIME_EXPERIENCE := 1
+export DOTNET_CLI_HOME := $(CURDIR)/debian/.dotnet-home
+export NUGET_PACKAGES := $(CURDIR)/debian/.nuget-packages
+export NUGET_HTTP_CACHE_PATH := $(CURDIR)/debian/.nuget-http
+export NUGET_PLUGINS_CACHE_PATH := $(CURDIR)/debian/.nuget-plugins
+
+# Ubuntu's source-built feed supplies distro-specific packs. A portable linux-*
+# RID would request upstream packs that this archive input does not contain.
+RID_amd64 := ubuntu.26.04-x64
+RID_arm64 := ubuntu.26.04-arm64
+RID := $(RID_$(DEB_HOST_ARCH))
+BUILD := $(CURDIR)/debian/.build
+PROJECT := $(CURDIR)/src/grate/grate.csproj
+SOURCE_REVISION := $(shell cat debian/source-revision)
+# This local recipe is deliberately versioned independently of releases.
+GRATE_VERSION := $(shell cat debian/grate-version)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	test -n "$(RID)"
+	mkdir -p "$(BUILD)/feed"
+	# Ubuntu ships a source-built artifact tarball, not a general NuGet mirror.
+	# Extracting it locally does not imply that grate's exact dependencies exist.
+	tar -xzf /usr/lib/dotnet/source-built-artifacts/Private.SourceBuilt.Artifacts.10.*.tar.gz -C "$(BUILD)/feed"
+	printf '%s\n' '<configuration><packageSources><clear/><add key="ubuntu-source-built" value="$(BUILD)/feed"/></packageSources></configuration>' > "$(BUILD)/NuGet.Config"
+	if test -n "$(GRATE_SOURCE_BUILT_FEED)"; then test -d "$(GRATE_SOURCE_BUILT_FEED)"; printf '%s\n' '<configuration><packageSources><clear/><add key="source-built-grate-dependencies" value="$(GRATE_SOURCE_BUILT_FEED)"/><add key="ubuntu-source-built" value="$(BUILD)/feed"/></packageSources></configuration>' > "$(BUILD)/NuGet.Config"; fi
+
+# No ignore-failed-sources and no fallback remote source/cache. The caller must
+# enforce networking isolation (Invoke-OfflineBuild.ps1 does so).
+# Audit fetching is disabled here only because this build has no network; perform
+# current advisory checks separately against the exact resolved inventory.
+# Both restore and publish keep the project's embedded-runtime security floor.
+COMMON = -p:TargetFrameworks=net10.0 -p:GrateDistribution=MariaDB -p:SelfContained=true -p:RuntimeIdentifier=$(RID) -p:NuGetAudit=false -p:Version=$(GRATE_VERSION) -p:SourceRevisionId=$(SOURCE_REVISION)
+
+override_dh_auto_build:
+	cd / && dotnet restore "$(PROJECT)" $(COMMON) --configfile "$(BUILD)/NuGet.Config" --packages "$(NUGET_PACKAGES)"
+	cd / && dotnet publish "$(PROJECT)" $(COMMON) -f net10.0 -c Release --no-restore -o "$(BUILD)/publish"
+	test -f debian/notices/Generate-Notices.proj
+	cd / && dotnet msbuild "$(CURDIR)/debian/notices/Generate-Notices.proj" -p:GrateSourceRoot="$(CURDIR)" -p:GratePackagesRoot="$(NUGET_PACKAGES)" -p:GrateAssetsRoot="$(CURDIR)/src" -p:GrateNoticeOutput="$(BUILD)/notices" -p:GrateRuntimeIdentifier="$(RID)"
+
+override_dh_auto_test:
+	"$(BUILD)/publish/grate" --help
+
+# Stripping a single-file .NET apphost can remove its appended bundle. The
+# upstream publish already disables debug output for this distribution.
+override_dh_strip:
+
+override_dh_dwz:
+
+override_dh_compress:
+	dh_compress -XTHIRD-PARTY-NOTICES.txt -Xdependency-licenses.json
+
+# Generate notices from the actual resolved managed/native/runtime inputs. No
+# caller-supplied placeholder can satisfy these generated-output gates.
+override_dh_auto_install:
+	test -s "$(BUILD)/notices/THIRD-PARTY-NOTICES.txt"
+	test -s "$(BUILD)/notices/dependency-licenses.json"
+	install -Dm755 "$(BUILD)/publish/grate" debian/grate-mariadb/usr/bin/grate
+	install -Dm644 "$(BUILD)/notices/THIRD-PARTY-NOTICES.txt" debian/grate-mariadb/usr/share/doc/grate-mariadb/THIRD-PARTY-NOTICES.txt
+	install -Dm644 "$(BUILD)/notices/dependency-licenses.json" debian/grate-mariadb/usr/share/doc/grate-mariadb/dependency-licenses.json
+	install -Dm644 debian/grate.1 debian/grate-mariadb/usr/share/man/man1/grate.1
+
+override_dh_auto_clean:
+	rm -rf debian/.build debian/.dotnet-home debian/.nuget-packages debian/.nuget-http debian/.nuget-plugins
+	find src -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +

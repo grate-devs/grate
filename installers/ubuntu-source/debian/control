@@ -1,0 +1,25 @@
+Source: grate-mariadb
+Section: devel
+Priority: optional
+Maintainer: Grate maintainers <erik@brandstadmoen.net>
+Build-Depends: debhelper-compat (= 13),
+ dotnet-sdk-10.0 (>= 10.0.114),
+ dotnet-sdk-10.0-source-built-artifacts (>= 10.0.114)
+Standards-Version: 4.7.3
+Rules-Requires-Root: no
+Homepage: https://github.com/grate-devs/grate
+Vcs-Git: https://github.com/grate-devs/grate.git
+Vcs-Browser: https://github.com/grate-devs/grate
+
+Package: grate-mariadb
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends}, ca-certificates,
+ libbrotli1 (>= 0.6.0), libc6 (>= 2.43), libgcc-s1 (>= 3.0),
+ libgssapi-krb5-2, libicu78, liblttng-ust1t64 (>= 2.13.0),
+ libssl3t64 (>= 3.4.0), libstdc++6 (>= 13.1),
+ zlib1g (>= 1:1.2.3.4)
+Conflicts: grate, grate-sqlite, grate-sqlserver, grate-postgresql, grate-free
+Description: SQL script migration runner with the MariaDB provider
+ Executes plain SQL migrations and records their history. This experimental
+ source-package recipe selects only the MariaDB provider and embeds its .NET
+ runtime. It does not require a shared .NET runtime after installation.

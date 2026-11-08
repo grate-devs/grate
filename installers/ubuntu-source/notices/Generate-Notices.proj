@@ -1,0 +1,50 @@
+<Project DefaultTargets="Generate">
+  <Import Project="LicenseTask.targets" />
+  <PropertyGroup>
+    <GrateAssetsRoot Condition="'$(GrateAssetsRoot)' == ''">$(GrateSourceRoot)/src</GrateAssetsRoot>
+    <GrateSourceBuiltFeed Condition="'$(GrateSourceBuiltFeed)' == ''">$(GrateSourceRoot)/debian/.build/feed</GrateSourceBuiltFeed>
+  </PropertyGroup>
+  <UsingTask TaskName="PrepareHostPackNoticesTask" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <Task>
+      <Reference Include="$(_GrateLicenseJsonReference)" />
+      <Code Type="Class" Language="cs" Source="$(MSBuildThisFileDirectory)PrepareHostPackNoticesTask.cs" />
+    </Task>
+  </UsingTask>
+  <Target Name="Generate">
+    <Error Condition="'$(GrateSourceRoot)' == '' or '$(GrateNoticeOutput)' == '' or '$(GrateRuntimeIdentifier)' == ''"
+           Text="GrateSourceRoot, GrateNoticeOutput and GrateRuntimeIdentifier are required." />
+    <ItemGroup>
+      <_GrateNoticeAssets Include="$(GrateAssetsRoot)/**/obj/project.assets.json" />
+      <_GrateNoticeRoots Include="$(GratePackagesRoot)" Condition="'$(GratePackagesRoot)' != ''" />
+    </ItemGroup>
+    <Error Condition="'@(_GrateNoticeAssets)' == ''" Text="Restore the actual source before generating package notices." />
+    <MakeDir Directories="$(GrateNoticeOutput)" />
+    <!-- Query the same target/profile/RID against the selected archive SDK. Packs
+         installed by Ubuntu may be absent from all NuGet assets files. -->
+    <Exec WorkingDirectory="/" Command="dotnet msbuild &quot;$(GrateSourceRoot)/src/grate/grate.csproj&quot; -nologo -t:ResolveFrameworkReferences -p:TargetFrameworks=net10.0 -p:TargetFramework=net10.0 -p:GrateDistribution=MariaDB -p:SelfContained=true -p:RuntimeIdentifier=$(GrateRuntimeIdentifier) -p:NuGetAudit=false -getItem:RuntimePack,AppHostPack,TargetingPack &gt; &quot;$(GrateNoticeOutput)/resolved-sdk-packs.json&quot;" />
+    <PrepareHostPackNoticesTask ResolvedPacksFile="$(GrateNoticeOutput)/resolved-sdk-packs.json"
+      SourceBuiltFeed="$(GrateSourceBuiltFeed)" OutputDirectory="$(GrateNoticeOutput)">
+      <Output TaskParameter="PackFiles" ItemName="_GrateSdkPackFiles" />
+      <Output TaskParameter="PackAssetsFile" ItemName="_GrateNoticeAssets" />
+      <Output TaskParameter="InstalledAppHost" PropertyName="_GrateInstalledAppHost" />
+      <Output TaskParameter="SourcePackAppHost" PropertyName="_GrateSourcePackAppHost" />
+      <Output TaskParameter="DistributionNoticesFile" ItemName="_GrateDistributionNotices" />
+    </PrepareHostPackNoticesTask>
+    <Unzip SourceFiles="%(_GrateSdkPackFiles.Identity)" DestinationFolder="%(_GrateSdkPackFiles.DestinationDirectory)" />
+    <GetFileHash Files="$(_GrateInstalledAppHost)" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="_GrateInstalledAppHostHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(_GrateSourcePackAppHost)" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="_GrateSourcePackAppHostHash" />
+    </GetFileHash>
+    <!-- Ubuntu's installed apphost and the source-built-artifacts package may
+         have different build IDs. Retain both hashes without claiming equality;
+         actual distribution ownership/source/version/notices are also included. -->
+    <Error Condition="'$(_GrateInstalledAppHostHash)' == '' or '$(_GrateSourcePackAppHostHash)' == ''" Text="Both actual installed and supplier-feed apphost hashes are required." />
+    <WriteLinesToFile File="$(GrateNoticeOutput)/apphost-sha256.txt" Lines="installed=$(_GrateInstalledAppHostHash);source-built-feed=$(_GrateSourcePackAppHostHash)" Overwrite="true" />
+    <GenerateDependencyNoticesTask AssetsFiles="@(_GrateNoticeAssets)" PackageRoots="@(_GrateNoticeRoots)"
+      OutputDirectory="$(GrateNoticeOutput)" RepositoryRoot="$(GrateSourceRoot)"
+      SourceDirectory="$(MSBuildThisFileDirectory)" SupplementalLicenseFiles="@(_GrateDistributionNotices)" AllowMissingLicenseEvidence="false" />
+  </Target>
+</Project>
