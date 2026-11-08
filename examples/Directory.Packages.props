@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Keep explicit versions so copied examples and the sample-service Docker contexts restore independently. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

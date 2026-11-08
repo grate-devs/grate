@@ -3,8 +3,7 @@ param (
     [Parameter(Mandatory=$true)] [string]$Catalog,
     [Parameter(Mandatory=$true)] [string]$LogDirectory,
     [string]$Assets,
-    [int]$Port = 8765,
-    [string]$Python = 'python'
+    [int]$Port = 8765
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,15 +56,15 @@ try {
         CertificateExtensions = @($certificate.Extensions | ForEach-Object { @{Oid=$_.Oid.Value; Value=$_.Format($true)} })
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $logs 'test-source.bootstrap.json')
 
-    $arguments = @('-u', (Join-Path $PSScriptRoot 'server.py'), '--catalog', $catalogPath,
-        '--certificate', $certificateFile, '--private-key', $privateKeyFile, '--port', "$Port")
+    $arguments = @('-NoLogo', '-NoProfile', '-File', (Join-Path $PSScriptRoot 'server.ps1'), '-Catalog', $catalogPath,
+        '-Certificate', $certificateFile, '-PrivateKey', $privateKeyFile, '-Port', "$Port")
     if ($Assets) {
-        $arguments += @('--assets', (Resolve-Path -LiteralPath $Assets).Path)
+        $arguments += @('-Assets', (Resolve-Path -LiteralPath $Assets).Path)
     }
     # Start-Process joins ArgumentList into a Windows command line. Quote every
     # argument so checkout/temp paths with spaces retain their boundaries.
     $quotedArguments = $arguments | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }
-    $process = Start-Process -FilePath $Python -ArgumentList $quotedArguments -PassThru -NoNewWindow `
+    $process = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') -ArgumentList $quotedArguments -PassThru -NoNewWindow `
         -RedirectStandardOutput (Join-Path $logs 'test-source.stdout.log') `
         -RedirectStandardError (Join-Path $logs 'test-source.stderr.log')
     $state.Pid = $process.Id

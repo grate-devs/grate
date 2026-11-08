@@ -166,7 +166,7 @@ a valid all-in-one SemVer prerelease tag. Stable releases can update `:sqlite`,
 Keep version parsing separate from tag rendering, and validate complete tags.
 The proposal adds new variants under the canonical repository. The existing
 compatibility-image policy continues to govern the all-in-one image.
-[Tag policy](../../installers/docker/release_tags.py) ·
+[Tag policy](../../installers/docker/release_tags.ps1) ·
 [Digest-preserving publication](../../installers/docker/RELEASE.md)
 
 ### Debian
@@ -186,7 +186,7 @@ Give each package its own `/usr/share/doc/<package>` content. The common binary
 and manpage paths participate in the package-conflict policy. Test install,
 same-variant upgrade, remove and purge with the matching database. Then test a
 variant switch while preserving migration files, database contents and history.
-[Existing lifecycle test](../../installers/deb/Verify-PackageLifecycle.sh)
+[Existing lifecycle test](../../installers/deb/Verify-PackageLifecycle.ps1)
 
 ### MSI, WinGet and Chocolatey
 

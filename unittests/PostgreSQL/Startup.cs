@@ -1,4 +1,4 @@
-using grate.DependencyInjection;
+﻿using grate.DependencyInjection;
 using grate.postgresql.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -10,7 +10,7 @@ using TestCommon.TestInfrastructure;
 namespace PostgreSQL;
 
 // ReSharper disable once UnusedType.Global
-public class Startup: TestCommon.Startup<PostgreSqlTestContainerDatabase, PostgreSqlExternalDatabase, PostgreSqlGrateTestContext>
+public class Startup : TestCommon.Startup<PostgreSqlTestContainerDatabase, PostgreSqlExternalDatabase, PostgreSqlGrateTestContext>
 {
     protected override void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context)
     {

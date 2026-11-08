@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 
@@ -36,8 +36,11 @@ public sealed class MigrationExamplesTests(ITestOutputHelper output) : IDisposab
     {
         var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
         {
-            WorkingDirectory = _root, UseShellExecute = false,
-            RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true
+            WorkingDirectory = _root,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         foreach (var argument in new[]
         {
@@ -69,7 +72,7 @@ public sealed class MigrationExamplesTests(ITestOutputHelper output) : IDisposab
     private static List<string[]> Rows(string database, string sql)
     {
         using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-            { DataSource = database, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+        { DataSource = database, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = sql;

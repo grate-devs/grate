@@ -1,0 +1,35 @@
+name: C# formatting
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    name: Changed C# formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          global-json-file: global.json
+      - name: Check whitespace and encoding
+        shell: pwsh
+        env:
+          FORMAT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if (!$env:FORMAT_BASE_REF -or $env:FORMAT_BASE_REF -match '^0+$') {
+            ./scripts/format/Check-ChangedCSharp.ps1 -All
+          }
+          else {
+            ./scripts/format/Check-ChangedCSharp.ps1 -BaseRef $env:FORMAT_BASE_REF
+          }

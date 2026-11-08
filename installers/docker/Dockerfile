@@ -7,7 +7,7 @@ ARG RUNTIME
 ARG VERSION=1.0.0
 ARG GRATE_DISTRIBUTION=All
 WORKDIR /app
-COPY global.json *.props ./
+COPY global.json NuGet.Config *.props ./
 COPY *.ruleset ./
 COPY src/ ./src/
 COPY docs/skills/use-grate/ ./docs/skills/use-grate/

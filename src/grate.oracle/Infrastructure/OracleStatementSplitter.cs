@@ -156,7 +156,7 @@ public partial class OracleStatementSplitter : IStatementSplitter
             return true;
         }
 
-        while(NextToken())
+        while (NextToken())
         {
             switch (token.Type)
             {
@@ -201,7 +201,9 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     if (inDeclareBlock)
                     {
                         inDeclareBlock = false;
-                    } else {
+                    }
+                    else
+                    {
                         blockDepth++;
                     }
                     break;
@@ -235,19 +237,21 @@ public partial class OracleStatementSplitter : IStatementSplitter
                     }
                     break;
                 case TokenType.StringLiteral:
-                    while(NextToken() && token.Type != TokenType.StringLiteral)
+                    while (NextToken() && token.Type != TokenType.StringLiteral)
                     {
 
                     }
                     break;
                 case TokenType.OpenCustomQuotedLiteral:
                     var closingDelimiter = GetClosingCustomQuoteDelimiter(token.CustomQuoteDelimiter);
-                    while(NextToken()) {
+                    while (NextToken())
+                    {
                         // Custom Delimiters come just before the ' string
                         // literal so check for that.
                         if (token.Type == TokenType.StringLiteral &&
                             sql[..token.Index].EndsWith(closingDelimiter)
-                        ) {
+                        )
+                        {
                             // end of string literal
                             break;
                         }

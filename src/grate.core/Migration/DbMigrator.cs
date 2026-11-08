@@ -288,6 +288,7 @@ internal record DbMigrator : IDbMigrator
         ConnectionType connectionType,
         TransactionHandling transactionHandling)
     {
+        using var script = (Database as AnsiSqlDatabase)?.BeginScript(scriptName);
         foreach (var statement in GetStatements(sql))
         {
             try
@@ -327,6 +328,7 @@ internal record DbMigrator : IDbMigrator
         ConnectionType connectionType,
         TransactionHandling transactionHandling)
     {
+        using var script = (Database as AnsiSqlDatabase)?.BeginScript(scriptName);
         foreach (var statement in GetStatements(sql))
         {
             try
@@ -438,5 +440,5 @@ internal record DbMigrator : IDbMigrator
         GC.SuppressFinalize(this);
     }
 
-    object ICloneable.Clone() => this with { Database = (IDatabase) Database.Clone(), _tokens = null };
+    object ICloneable.Clone() => this with { Database = (IDatabase)Database.Clone(), _tokens = null };
 }

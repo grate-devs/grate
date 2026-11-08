@@ -25,11 +25,12 @@ public abstract record AnsiSqlDatabase : IDatabase
     private DbConnection? _connection;
     private DbConnection? _adminConnection;
     private readonly ISyntax _syntax;
+    private readonly AsyncLocal<string?> _scriptName = new();
 
     public void SetLogger(ILogger logger) => Logger = logger;
 
     private IDictionary<string, string>? _scriptsRunCache;
-    
+
     private readonly List<Func<DbConnection, Task>> _deferredWrites = new();
 
     protected AnsiSqlDatabase(ILogger logger, ISyntax syntax)
@@ -50,20 +51,21 @@ public abstract record AnsiSqlDatabase : IDatabase
         ScriptsRunTableName = original.ScriptsRunTableName;
         ScriptsRunErrorsTableName = original.ScriptsRunErrorsTableName;
 
-        // Copies own their connections, history cache and pending writes.
+        // Copies own their connections, history cache, pending writes and script context.
         _deferredWrites = new();
+        _scriptName = new();
         // The active connection is selected by SetDefaultConnectionActive before use.
         ActiveConnection = default!;
     }
-    
+
     public string ServerName => Connection.DataSource;
     public virtual string DatabaseName => Connection.Database;
     public abstract string MasterDatabaseName { get; }
     public abstract string DatabaseType { get; }
 
     private string? Password => ConnectionString?.Split(";", TrimEntries | RemoveEmptyEntries)
-        .SingleOrDefault(entry => 
-            entry.StartsWith("Password", StringComparison.OrdinalIgnoreCase) || 
+        .SingleOrDefault(entry =>
+            entry.StartsWith("Password", StringComparison.OrdinalIgnoreCase) ||
             entry.StartsWith("Pwd", StringComparison.OrdinalIgnoreCase))?
         .Split("=", TrimEntries | RemoveEmptyEntries).Last();
 
@@ -281,7 +283,7 @@ public abstract record AnsiSqlDatabase : IDatabase
         var prefix = SupportsSchemas ? string.Empty : _syntax.TableWithSchema(schemaName, string.Empty);
         return name?[prefix.Length..];
     }
-   
+
     public async Task<bool> GrateInternalTablesAreProperlyLogged()
     {
         const string tableName = "GrateScriptsRun";
@@ -295,7 +297,7 @@ public abstract record AnsiSqlDatabase : IDatabase
         }
         return false;
     }
-    
+
 
     protected virtual string ExistsSql(string tableSchema, string fullTableName)
     {
@@ -361,7 +363,7 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
 ");
         var repositoryPath = Config?.RepositoryPath;
 
-        var versionId = (long) await ActiveConnection.ExecuteScalarAsync<int>(
+        var versionId = (long)await ActiveConnection.ExecuteScalarAsync<int>(
             sql,
             new
             {
@@ -437,7 +439,7 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
 
         s.Complete();
     }
-    
+
     public virtual async Task DeleteVersionRecord(long versionId)
     {
         var (versionTableName, versionTable) = await ResolveVersionTable();
@@ -447,7 +449,7 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
 
         using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
         await ExecuteAsync(Connection, deleteSql, new { versionId });
-        
+
         // reset the identity column of the table to the previous value
         await ExecuteAsync(Connection, _syntax.ResetIdentity(SchemaName, versionTableName, versionId - 1));
 
@@ -471,9 +473,29 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
         var connection = GetDbConnection(connectionType);
 
         await Open(connection);
-        await ExecuteNonQuery(connection, sql, timeout);
+        await ExecuteScriptBatch(connection, sql, timeout, _scriptName.Value);
     }
 
+    protected virtual Task ExecuteScriptBatch(DbConnection connection, string sql, int? timeout, string? scriptName) =>
+        ExecuteNonQuery(connection, sql, timeout);
+
+    // Keep script context local to execution without changing IDatabase.RunSql dispatch.
+    internal IDisposable BeginScript(string scriptName) => new ScriptNameScope(_scriptName, scriptName);
+
+    private sealed class ScriptNameScope : IDisposable
+    {
+        private readonly AsyncLocal<string?> _scriptName;
+        private readonly string? _previous;
+
+        public ScriptNameScope(AsyncLocal<string?> scriptName, string current)
+        {
+            _scriptName = scriptName;
+            _previous = scriptName.Value;
+            scriptName.Value = current;
+        }
+
+        public void Dispose() => _scriptName.Value = _previous;
+    }
 
     private DbConnection GetDbConnection(ConnectionType connectionType) =>
         connectionType switch
@@ -631,7 +653,7 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
         scriptRunErrors.Add(nameof(errorMessage), errorMessage, DbType.String);
         scriptRunErrors.Add(Now, DateTime.UtcNow);
         scriptRunErrors.Add(User, GetUserName());
-        
+
         if (Config!.DeferWritingToRunTables)
         {
             _deferredWrites.Add(conn => ExecuteAsync(conn, insertSql, scriptRunErrors));
@@ -646,10 +668,10 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
     {
         const int maxNumberOfAttempts = 3;
         var attempts = 0;
-        
+
         // try to close the connection a few times, in case it is in a transient state (e.g. connecting),
         // which will make the close operation fail for some databases.
-        do 
+        do
         {
             try
             {
@@ -707,14 +729,14 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
 
         await cmd.ExecuteNonQueryAsync();
     }
-    
-    
+
+
     private bool DryRunOrBootstrap()
     {
-        return (Config?.DryRun ?? throw new InvalidOperationException("No configuration available.")) 
+        return (Config?.DryRun ?? throw new InvalidOperationException("No configuration available."))
                || Config.Environment == GrateEnvironment.InternalBootstrap;
     }
-    
+
 
     public async ValueTask DisposeAsync()
     {
@@ -730,11 +752,11 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
         await CloseConnection();
         await CloseAdminConnection();
         await Close(ActiveConnection);
-        
+
         GC.SuppressFinalize(this);
     }
 
     public abstract Task RestoreDatabase(string backupPath);
-    
+
     object ICloneable.Clone() => this with { };
 }
