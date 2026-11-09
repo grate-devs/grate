@@ -1,4 +1,4 @@
-name: WinGet manifest preparation
+name: CI · WinGet manifest preparation
 
 on:
   pull_request:

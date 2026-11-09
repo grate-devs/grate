@@ -1,5 +1,5 @@
 # Heavyweight integration tests
-name: Integration tests
+name: CI · Integration tests
 
 on:
   push:

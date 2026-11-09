@@ -1,4 +1,4 @@
-name: Skill installation
+name: CI · Skill installation
 
 on:
   pull_request:

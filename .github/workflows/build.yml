@@ -1,5 +1,5 @@
 # Build every release format. Publishing is enabled only for a GitHub release.
-name: Build release artifacts
+name: Release · Build artifacts
 
 on:
   push:
@@ -12,6 +12,7 @@ on:
       - main
     paths:
       - ".github/workflows/build.yml"
+      - ".github/actions/setup-dotnet-macos-arm64/**"
       - "Directory.*"
       - "GitVersion.yml"
       - "scripts/release/**"
@@ -339,7 +340,7 @@ jobs:
       with:
         ref: ${{ github.sha }}
     - name: Setup .NET 11 RC3 and .NET 10
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
+      uses: ./.github/actions/setup-dotnet-macos-arm64
       with:
         global-json-file: global.json
         dotnet-version: 10.0.x
@@ -723,7 +724,7 @@ jobs:
         skopeo --version >> "$GITHUB_STEP_SUMMARY"
 
     - name: Log in to canonical Docker Hub repository using OIDC
-      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
       env:
         DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
         # Cover the bounded 45-minute build/copy job, including an uncached build.

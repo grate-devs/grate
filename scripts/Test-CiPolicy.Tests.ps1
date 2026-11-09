@@ -11,6 +11,8 @@ $preflightScript = Get-Content -LiteralPath "$repositoryRoot/scripts/ci/Invoke-P
 $aggregate = Join-Path $PSScriptRoot 'Assert-CiResults.ps1'
 $requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distributions', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
 $expensiveJobs = @('analyze', 'test', 'cli-distributions', 'packages', 'standalone', 'docker')
+$analysisCondition = "`${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}"
+$aggregateCondition = "    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')"
 
 function Assert-WorkflowPolicy {
     param(
@@ -29,7 +31,12 @@ function Assert-WorkflowPolicy {
         if (!$jobs.ContainsKey($job) -or $jobs[$job] -notmatch '(?m)^    needs: \[build-code, fast-tests, validation-policy\]\r?$') {
             throw "Expensive job $job must depend on Build, validation policy and both isolated test lanes."
         }
-        if ($jobs[$job] -match '(?m)^    (if|continue-on-error):') {
+        if ($job -eq 'analyze') {
+            if (!$jobs[$job].Contains("    if: $analysisCondition") -or $jobs[$job] -match '(?m)^    continue-on-error:') {
+                throw 'CodeQL must preserve staged PR gates and independent main/schedule baselines.'
+            }
+        }
+        elseif ($jobs[$job] -match '(?m)^    (if|continue-on-error):') {
             throw "Expensive job $job must preserve the default success-only dependency condition."
         }
     }
@@ -48,7 +55,7 @@ function Assert-WorkflowPolicy {
 
     $aggregateJob = $jobs['ci-result']
     $expectedNeeds = '    needs: [' + ($requiredJobs -join ', ') + ']'
-    if (!$aggregateJob -or !$aggregateJob.Contains($expectedNeeds) -or $aggregateJob -notmatch '(?m)^    if: always\(\)\r?$') {
+    if (!$aggregateJob -or !$aggregateJob.Contains($expectedNeeds) -or !$aggregateJob.Contains($aggregateCondition)) {
         throw 'The CI result must always evaluate every required producer.'
     }
     if (!$aggregateJob.Contains('CI_NEEDS_JSON: ${{ toJSON(needs) }}') -or !$aggregateJob.Contains('./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON')) {

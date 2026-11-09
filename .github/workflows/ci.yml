@@ -1,12 +1,17 @@
 # Build, security analysis, and the full database/runtime test matrix for PRs.
-name: CI
+name: CI · Build and tests
 
 on:
-  # PR updates already include branch pushes. Running both events doubles the
-  # database suites and CodeQL work; use workflow_dispatch for pre-PR checks.
+  # Feature branches are validated through PRs; main also needs a CodeQL baseline.
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
+  schedule:
+    # Refresh the main baseline with new queries without rerunning the test matrix.
+    - cron: '23 5 * * 1'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -136,6 +141,9 @@ jobs:
   analyze:
     name: Analyze Code Security
     needs: [build-code, fast-tests, validation-policy]
+    # PR/manual analysis keeps the staged gates; main/schedule refreshes its
+    # baseline even though those build/test producers are intentionally skipped.
+    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
     runs-on: windows-latest
     permissions:
       actions: read
@@ -156,7 +164,7 @@ jobs:
           10.0.x
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4.39.2
+      uses: github/codeql-action/init@v4.39.3
       with:
         # Repository statistics can still list removed Python sources. Select
         # the remaining languages, including native MSI code and workflows.
@@ -173,7 +181,7 @@ jobs:
       run: ./installers/msi/native/Build-UpgradeActions.ps1 -Architecture x64 -OutputDirectory "$env:RUNNER_TEMP/codeql-msi-upgrade-actions"
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4.39.2
+      uses: github/codeql-action/analyze@v4.39.3
 
   test:
     name: Run tests
@@ -371,7 +379,7 @@ jobs:
      runs-on: ubuntu-latest
      name: Create test report
      needs: [fast-tests, test, cli-distributions]
-     if: always()
+     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
 
      steps:
       - name: Download XML test reports
@@ -520,6 +528,8 @@ jobs:
         run: |
           ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
           ./installers/msi/Test-InstallerLifecycle.Assertions.Tests.ps1
+          ./installers/msi/Test-InstallerLifecycle.Process.Tests.ps1
+          ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
@@ -531,7 +541,17 @@ jobs:
       - name: Verify installed MSI, major upgrade and uninstall
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
-        run: ./installers/msi/Test-InstallerLifecycle.ps1 -MsiPath "./installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -PublishedExecutable "${{ runner.temp }}/grate-cli/published/grate.exe" -Architecture ('${{ matrix.rid }}' -replace 'win-', '') -OutputDirectory "${{ runner.temp }}/grate-msi-lifecycle"
+        run: |
+          $parameters = @{
+            MsiPath = "./installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi"
+            PublishedExecutable = "${{ runner.temp }}/grate-cli/published/grate.exe"
+            Architecture = '${{ matrix.rid }}' -replace 'win-', ''
+            OutputDirectory = "${{ runner.temp }}/grate-msi-lifecycle"
+          }
+          # Bound COM calls and inherited output handles as well as child processes.
+          ./installers/msi/tests/support/Invoke-MsiLifecycle.ps1 `
+            -ScriptPath ./installers/msi/Test-InstallerLifecycle.ps1 `
+            -Parameters $parameters -TimeoutSeconds 360
       - name: Build Debian packages from verified Linux binary
         if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
         shell: pwsh
@@ -563,6 +583,7 @@ jobs:
             installers/msi/tmp/*.msi
             installers/deb/*.deb
             ${{ runner.temp }}/grate-msi-lifecycle/
+            ${{ runner.temp }}/grate-msi-lifecycle-supervisor/
             ${{ runner.temp }}/grate-debian-lifecycle/
             !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/
 
@@ -625,7 +646,7 @@ jobs:
     # A skipped dependent job can look green in isolation. Only this aggregate
     # represents complete CI, including early failures and cancellations.
     needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
-    if: always()
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v7
       - name: Require successful results from every CI phase

@@ -5,6 +5,28 @@ Use xUnit v3 assertions and the existing NSubstitute/fixture conventions.
 Use the [test and artifact map](testing.md) to place shared database tests and
 select the relevant library, CLI, NuGet, Docker, native, and platform checks.
 
+## Review the changed behavior
+
+Use the contract and risk map in [AGENTS.md](../../AGENTS.md) and
+[provider guidance](providers.md). Prioritize migration identity/hashes, persisted
+history, run/skip policy, transactions and failure paths, dialect and identifier
+case, upgrades of existing databases, public API compatibility, and tests that
+can distinguish the required behavior from a plausible defect.
+
+Report a substantiated defect at the smallest useful changed file/line range,
+with the triggering condition and observable consequence. Explain the violated
+contract and supporting code or check. Missing evidence is a verification gap,
+not proof of a bug. Do not require a finding quota or fill a review with mechanical
+formatting, naming preferences, or generic advice.
+
+For high-risk changes in these areas, follow AGENTS.md's separate read-only
+critical-review agent workflow when delegation is available. Supply the original
+requirements, final diff, surrounding implementation, and raw verification results.
+[CodeRabbit's advisory pilot](coderabbit.md) can supply additional findings; a bot
+pass or absence of comments does not replace that review or execution evidence.
+
+## Test behavior and sensitivity
+
 - New functionality needs automated coverage of the promised behavior, including
   relevant success, boundary, and failure cases. Bug fixes need focused regression
   coverage. A build or coverage percentage alone does not establish that behavior.

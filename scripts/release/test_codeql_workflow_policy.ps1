@@ -49,7 +49,8 @@ function Assert-CodeQLWorkflowPolicy {
     Assert-Policy $nativeBuildIsOrdered 'Native compilation must run between CodeQL init and analysis.'
 
     Assert-Policy ($job.permissions.'security-events' -ceq 'write') 'CodeQL must be able to publish analysis.'
-    Assert-Policy (!$job.ContainsKey('if') -and !$job.'continue-on-error') 'CodeQL job cannot skip or ignore failures.'
+    $expectedCondition = "`${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}"
+    Assert-Policy ($job.if -ceq $expectedCondition -and !$job.'continue-on-error') 'CodeQL must preserve staged PR gates and independent main/schedule baselines.'
     foreach ($step in $steps) {
         $stepCannotBypassFailures = (
             !$step.ContainsKey('if') -and
