@@ -6,7 +6,7 @@ function Assert-DistributionDependencies {
 
     $providers = @{
         SQLite = @('grate.sqlite', 'Microsoft.Data.Sqlite', 'SQLitePCLRaw.bundle_e_sqlite3', 'SQLite')
-        SQLServer = @('grate.sqlserver', 'Microsoft.Data.SqlClient')
+        SQLServer = @('grate.sqlserver', 'Microsoft.Data.SqlClient', 'Microsoft.Data.SqlClient.Extensions.Azure')
         MariaDB = @('grate.mariadb', 'MySqlConnector')
         PostgreSQL = @('grate.postgresql', 'Npgsql')
         Oracle = @('grate.oracle', 'Oracle.ManagedDataAccess.Core')

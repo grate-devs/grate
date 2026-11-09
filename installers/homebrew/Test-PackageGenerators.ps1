@@ -28,17 +28,20 @@ function Assert-Contains {
 }
 
 function Assert-Rejected {
-    param([scriptblock]$Action)
+    param(
+        [scriptblock]$Action,
+        [string]$ExpectedError
+    )
 
-    $rejected = $false
     try {
         & $Action
     } catch {
-        $rejected = $true
+        if ($_.Exception.Message -notlike $ExpectedError) {
+            throw "Expected '$ExpectedError', received '$($_.Exception.Message)'."
+        }
+        return
     }
-    if (!$rejected) {
-        throw 'Expected invalid generator input to fail.'
-    }
+    throw "Expected generator input to fail with '$ExpectedError'."
 }
 
 try {
@@ -144,15 +147,78 @@ puts "PASS: native Homebrew DSL loaded all six formulae and six casks."
     & $caskGenerator -version '2.2.0' -releaseTag 'v2.2.0' -artifactDirectory $root -Distribution Oracle -outputPath $prefixedCask
     Assert-Contains -Actual (Get-Content -LiteralPath $prefixedFormula -Raw) -Expected '/tags/v2.2.0.tar.gz'
     Assert-Contains -Actual (Get-Content -LiteralPath $prefixedCask -Raw) -Expected '/download/v2.2.0/grate-oracle-osx-'
-    foreach ($invalidVersion in @('2.2.0-rc.1', "2.2.0`n", '2.2.0+build')) {
-        Assert-Rejected { & $formulaGenerator -version $invalidVersion -sourceArchive $sourceArchive }
-        Assert-Rejected { & $caskGenerator -version $invalidVersion -artifactDirectory $root }
+    $generatedHashes = @{}
+    foreach ($path in @(Get-ChildItem -LiteralPath $formulaDirectory, $caskDirectory -Filter '*.rb' -File)) {
+        $generatedHashes[$path.FullName] = (Get-FileHash -LiteralPath $path.FullName).Hash
     }
-    Assert-Rejected { & $formulaGenerator -version '2.2.0' -sourceArchive $sourceArchive -releaseTag 'v2.3.0' }
-    Assert-Rejected { & $caskGenerator -version '2.2.0' -artifactDirectory $root -releaseTag 'v2.3.0' }
-    Assert-Rejected { & $formulaGenerator -version '2.2.0' -sourceArchive $sourceArchive -AllDistributions -Distribution Oracle }
-    Remove-Item -LiteralPath "$root/grate-oracle-osx-x64-self-contained-2.2.0.zip"
-    Assert-Rejected { & $caskGenerator -version '2.2.0' -artifactDirectory $root -AllDistributions }
+    foreach ($invalidVersion in @('2.2.0-rc.1', "2.2.0`n", '2.2.0+build')) {
+        Assert-Rejected -ExpectedError "*validate*parameter 'version'*" -Action {
+            & $formulaGenerator -version $invalidVersion -sourceArchive $sourceArchive
+        }
+        Assert-Rejected -ExpectedError "*validate*parameter 'version'*" -Action {
+            & $caskGenerator -version $invalidVersion -artifactDirectory $root
+        }
+    }
+    foreach ($tag in @('v2.3.0', '../../2.2.0', "v2.2.0`n", '2.2.0"; system("injected")')) {
+        Assert-Rejected -ExpectedError 'releaseTag must be the version or the version prefixed with v.' -Action {
+            & $formulaGenerator -version '2.2.0' -sourceArchive $sourceArchive -releaseTag $tag
+        }
+        Assert-Rejected -ExpectedError 'releaseTag must be the version or the version prefixed with v.' -Action {
+            & $caskGenerator -version '2.2.0' -artifactDirectory $root -releaseTag $tag
+        }
+    }
+    foreach ($generator in @($formulaGenerator, $caskGenerator)) {
+        $parameters = @{
+            version = '2.2.0'
+            AllDistributions = $true
+        }
+        if ($generator -ceq $formulaGenerator) {
+            $parameters.sourceArchive = $sourceArchive
+        } else {
+            $parameters.artifactDirectory = $root
+        }
+        Assert-Rejected -ExpectedError 'Use OutputDirectory and the default Distribution with AllDistributions.' -Action {
+            & $generator @parameters -Distribution Oracle
+        }
+        Assert-Rejected -ExpectedError 'Use OutputDirectory and the default Distribution with AllDistributions.' -Action {
+            & $generator @parameters -outputPath "$root/invalid-all.rb"
+        }
+    }
+
+    $missingFormulaOutput = "$root/missing-source-output"
+    Assert-Rejected -ExpectedError '*Source archive does not exist:*missing.tar.gz' -Action {
+        & $formulaGenerator -version '2.2.0' -sourceArchive "$root/missing.tar.gz" -AllDistributions -OutputDirectory $missingFormulaOutput
+    }
+    if (Test-Path -LiteralPath $missingFormulaOutput) {
+        throw 'A missing source archive created formula output.'
+    }
+    foreach ($extension in @('.zip', '.gz', '.tar', '.tgz', '.tar.gz.zip')) {
+        $wrongExtension = "$root/source$extension"
+        Copy-Item -LiteralPath $sourceArchive -Destination $wrongExtension
+        Assert-Rejected -ExpectedError 'sourceArchive must be the downloaded source .tar.gz archive.' -Action {
+            & $formulaGenerator -version '2.2.0' -sourceArchive $wrongExtension
+        }
+    }
+
+    # The last profile's final input fails after all earlier profiles resolved.
+    # A fresh output root proves no partial AllDistributions result was written.
+    $missingCaskArchive = "$root/grate-oracle-osx-x64-self-contained-2.2.0.zip"
+    Move-Item -LiteralPath $missingCaskArchive -Destination "$missingCaskArchive.wrong-name"
+    $missingCaskOutput = "$root/missing-cask-output"
+    Assert-Rejected -ExpectedError '*find*grate-oracle-osx-x64-self-contained-2.2.0.zip*' -Action {
+        & $caskGenerator -version '2.2.0' -artifactDirectory $root -AllDistributions -OutputDirectory $missingCaskOutput
+    }
+    if (Test-Path -LiteralPath $missingCaskOutput) {
+        throw 'A missing final archive created a partial cask set.'
+    }
+    Assert-Rejected -ExpectedError '*find*grate-oracle-osx-x64-self-contained-2.2.0.zip*' -Action {
+        & $caskGenerator -version '2.2.0' -artifactDirectory $root -AllDistributions
+    }
+    foreach ($path in $generatedHashes.Keys) {
+        if ((Get-FileHash -LiteralPath $path).Hash -cne $generatedHashes[$path]) {
+            throw "Rejected input overwrote a valid manifest: $path"
+        }
+    }
     if ((Get-Content -LiteralPath "$formulaDirectory/grate.rb" -Raw) -cne $publishedFormula -or
         (Get-Content -LiteralPath "$caskDirectory/grate.rb" -Raw) -cne $publishedCask) {
         throw 'Rejected input overwrote a valid manifest.'

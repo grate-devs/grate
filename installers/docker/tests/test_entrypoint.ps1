@@ -10,7 +10,7 @@ $savedDirectory = [Environment]::CurrentDirectory
 $savedEnvironment = @{}
 foreach ($name in @('DATABASE_TYPE', 'VERSION', 'CREATE_DATABASE', 'ENVIRONMENT', 'TRANSACTION', 'APP_CONNSTRING')) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
-    [Environment]::SetEnvironmentVariable($name, $null)
+    [Environment]::SetEnvironmentVariable($name, [NullString]::Value)
 }
 try {
     New-Item -ItemType Directory -Path $directory | Out-Null
@@ -24,8 +24,10 @@ try {
     $env:APP_CONNSTRING = 'Data Source=/output/database with spaces.db'
 
     Invoke-Test 'unset or empty database type preserves the compiled default' {
-        foreach ($value in @($null, '')) {
+        foreach ($value in @([NullString]::Value, '')) {
             [Environment]::SetEnvironmentVariable('DATABASE_TYPE', $value)
+            $expectedPresence = $value -isnot [NullString]
+            Assert-Equal $expectedPresence ([Environment]::GetEnvironmentVariables().Contains('DATABASE_TYPE')) 'Unset and empty fixtures must be distinct process environment states.'
             $result = Invoke-ReleaseProcess '/bin/sh' @($entrypoint) 10
             Assert-Equal 0 $result.ExitCode $result.ErrorText
             $arguments = @($result.Text | ConvertFrom-Json)
@@ -60,8 +62,17 @@ try {
 } finally {
     [Environment]::CurrentDirectory = $savedDirectory
     foreach ($name in $savedEnvironment.Keys) {
-        [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name])
+        $savedValue = $savedEnvironment[$name]
+        if ($null -eq $savedValue) {
+            $savedValue = [NullString]::Value
+        }
+        [Environment]::SetEnvironmentVariable($name, $savedValue)
     }
     Remove-Item -LiteralPath (Split-Path $directory -Parent) -Recurse -Force
+}
+foreach ($name in $savedEnvironment.Keys) {
+    $restored = [Environment]::GetEnvironmentVariable($name)
+    Assert-True ($restored -ceq $savedEnvironment[$name]) "Environment variable $name must be restored exactly."
+    Assert-Equal ($null -ne $savedEnvironment[$name]) ([Environment]::GetEnvironmentVariables().Contains($name)) "Restore the original presence of $name."
 }
 Write-Host "PASS: $script:TestCount POSIX launcher scenarios."

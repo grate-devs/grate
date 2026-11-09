@@ -171,7 +171,7 @@ empty. The packaging checks exercise these defaults, environment overrides,
 argument forwarding and unsupported database selections.
 [Entrypoint](../../installers/docker/entrypoint.sh)
 
-Use profile-prefixed tags such as `sqlite-<version>`, `sqlserver-<version>`
+Use profile-prefixed tags such as `sqlite-<version>`, `sqlserver-<version>`,
 `mariadb-<version>`, `postgresql-<version>` and `oracle-<version>`. A suffix such as `<version>-sqlite` can collide with
 a valid all-in-one SemVer prerelease tag. Stable releases can update `:sqlite`,
 `:sqlserver`, `:mariadb`, `:postgresql` and `:oracle`. Prereleases publish only their versioned tags.
@@ -253,8 +253,9 @@ its existing publish command and expose `grate` from the formula's own
 Separate slim formulae require upstream acceptance. Their placement should be
 agreed with the channel maintainers alongside the current source-formula work.
 All/SQLite formula tests run SQLite migrations; server profiles check help and
-unsupported-provider rejection. Server migrations through a source-built formula
-remain a native verification gap. [Formula template](../../installers/homebrew/grate.rb.in) ·
+unsupported-provider rejection. Validate server migrations through the installed
+source-built formula before claiming Homebrew migration coverage.
+[Formula template](../../installers/homebrew/grate.rb.in) ·
 [Homebrew channel plan](../../installers/homebrew/README.md) ·
 [Formula conflicts](https://docs.brew.sh/Formula-Cookbook#specifying-conflicts-with-other-formulae)
 
@@ -287,7 +288,7 @@ plus checksum and manifest files. Measure installer and image download sizes in
 MB independently. The Linux glibc ZIP measurements do not establish Alpine
 image sizes or Windows/macOS installer savings.
 
-Native Windows CI exercises MSI installation, same-profile upgrade, uninstall,
+The Windows MSI lifecycle fixture checks installation, same-profile upgrade, uninstall,
 payload identity, provider selection and skills for every profile on x64/Arm64.
 Its local database migration fixture covers All/SQLite; server migrations run
 through the Linux standalone/tool suites. Complete native package-manager

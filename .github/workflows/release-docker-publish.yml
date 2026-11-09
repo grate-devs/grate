@@ -57,6 +57,7 @@ jobs:
     - name: Check Docker release policy
       shell: pwsh
       run: |
+        ./scripts/release/Install-TestDependencies.ps1
         ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
         ./scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+#Requires -Version 7.0
 param(
     [switch]$Check,
     [string]$OutputPath = (Join-Path $PSScriptRoot '../../docs/distribution-catalog.md')
@@ -7,7 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . "$repository/scripts/release/distribution_profiles.ps1"
-$profiles = @(Get-GrateDistributionNames | ForEach-Object { Get-GrateDistribution -Name $_ })
+$distributions = @(Get-GrateDistributionNames | ForEach-Object { Get-GrateDistribution -Name $_ })
 $assets = @(Get-GrateReleaseAssets -Version '<version>')
 [xml]$properties = Get-Content -LiteralPath "$repository/Directory.Build.props" -Raw
 $frameworks = (@($properties.Project.PropertyGroup.TargetFrameworks | Where-Object { $_ }) -join ', ').Replace(';', ', ')
@@ -34,21 +35,21 @@ function Add-CatalogTable {
 
 function New-CatalogRow {
     param(
-        [string]$Profile,
+        [string]$Distribution,
         [string]$Platform,
         [string]$Artifact
     )
 
-    '| ' + $Profile + ' | `' + $Platform + '` | `' + $Artifact + '` | [workflow runs][release-runs] |'
+    '| ' + $Distribution + ' | `' + $Platform + '` | `' + $Artifact + '` | [workflow runs][release-runs] |'
 }
 
 function Get-ProfileAssets {
     param(
-        [object]$Profile,
+        [object]$Distribution,
         [string]$Extension
     )
 
-    $prefix = [regex]::Escape($Profile.PackageId)
+    $prefix = [regex]::Escape($Distribution.PackageId)
     $assets | Where-Object {
         $_ -cmatch "^$prefix(?:-win-|-linux-|-osx-|-msi-|_)" -and $_.EndsWith($Extension, [StringComparison]::Ordinal)
     }
@@ -86,14 +87,14 @@ Shared preflight runs the generator with `-Check` and rejects stale content. Edi
 
 foreach ($format in @('ZIP', 'MSI', 'Debian')) {
     $extension = @{ ZIP = '.zip'; MSI = '.msi'; Debian = '.deb' }[$format]
-    $rows = @(foreach ($profile in $profiles) {
-        foreach ($asset in Get-ProfileAssets -Profile $profile -Extension $extension) {
+    $rows = @(foreach ($distribution in $distributions) {
+        foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension $extension) {
             $platform = switch ($format) {
-                ZIP { $asset.Substring($profile.PackageId.Length + 1).Split('-self-contained-')[0] }
-                MSI { $asset.Substring($profile.PackageId.Length + 5).Split('-<version>')[0] }
+                ZIP { $asset.Substring($distribution.PackageId.Length + 1).Split('-self-contained-')[0] }
+                MSI { $asset.Substring($distribution.PackageId.Length + 5).Split('-<version>')[0] }
                 Debian { 'linux-' + ($asset -split '_')[-1].Replace('.deb', '') }
             }
-            New-CatalogRow -Profile $profile.Name -Platform $platform -Artifact $asset
+            New-CatalogRow -Distribution $distribution.Name -Platform $platform -Artifact $asset
         }
     })
     $description = switch ($format) {
@@ -104,58 +105,58 @@ foreach ($format in @('ZIP', 'MSI', 'Debian')) {
     Add-CatalogTable -Title "$format ($($rows.Count) release files)" -Description $description -Rows $rows
 }
 
-$rows = @(foreach ($profile in $profiles) {
-    New-CatalogRow -Profile $profile.Name -Platform $frameworks -Artifact "$($profile.PackageId).<version>.nupkg"
+$rows = @(foreach ($distribution in $distributions) {
+    New-CatalogRow -Distribution $distribution.Name -Platform $frameworks -Artifact "$($distribution.PackageId).<version>.nupkg"
 })
 Add-CatalogTable -Title "NuGet tools ($($rows.Count) package identities)" -Description 'Each framework-dependent package contains all supported framework payloads. These are NuGet tools with command grate; they are distinct from the similarly named Chocolatey packages.' -Rows $rows
 
-$rows = @(foreach ($profile in $profiles) {
-    $tag = if ($profile.Name -eq 'All') { '<version>' } else { $profile.Name.ToLowerInvariant() + '-<version>' }
+$rows = @(foreach ($distribution in $distributions) {
+    $tag = if ($distribution.Name -eq 'All') { '<version>' } else { $distribution.Name.ToLowerInvariant() + '-<version>' }
     foreach ($platform in @('linux/amd64', 'linux/arm64')) {
-        New-CatalogRow -Profile $profile.Name -Platform $platform -Artifact "gratedevs/grate:$tag"
+        New-CatalogRow -Distribution $distribution.Name -Platform $platform -Artifact "gratedevs/grate:$tag"
     }
 })
-Add-CatalogTable -Title "Docker ($($profiles.Count) images, $($rows.Count) platform variants)" -Description 'Each profile is a two-platform Alpine/musl image. Versioned tags also support prereleases; moving aliases below are stable-only.' -Rows $rows
-$aliases = foreach ($profile in $profiles) {
-    $alias = if ($profile.Name -eq 'All') { 'latest' } else { $profile.Name.ToLowerInvariant() }
+Add-CatalogTable -Title "Docker ($($distributions.Count) images, $($rows.Count) platform variants)" -Description 'Each profile is a two-platform Alpine/musl image. Versioned tags also support prereleases; moving aliases below are stable-only.' -Rows $rows
+$aliases = foreach ($distribution in $distributions) {
+    $alias = if ($distribution.Name -eq 'All') { 'latest' } else { $distribution.Name.ToLowerInvariant() }
     '`gratedevs/grate:' + $alias + '`'
 }
 $lines.Add('Stable aliases: ' + ($aliases -join ', ') + '. All also retains digest-identical `erikbra/grate:<version>` / `erikbra/grate:latest` compatibility copies. Slim images use the canonical repository.')
 $lines.Add('')
 
-$rows = @(foreach ($profile in $profiles) {
-    $identifier = if ($profile.Name -eq 'All') { 'grate-devs.grate' } else { 'grate-devs.grate.' + $profile.Name }
-    foreach ($asset in Get-ProfileAssets -Profile $profile -Extension '.msi') {
-        $architecture = $asset.Substring($profile.PackageId.Length + 5).Split('-<version>')[0]
-        New-CatalogRow -Profile $profile.Name -Platform "$architecture MSI" -Artifact "$identifier → $asset"
+$rows = @(foreach ($distribution in $distributions) {
+    $identifier = if ($distribution.Name -eq 'All') { 'grate-devs.grate' } else { 'grate-devs.grate.' + $distribution.Name }
+    foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension '.msi') {
+        $architecture = $asset.Substring($distribution.PackageId.Length + 5).Split('-<version>')[0]
+        New-CatalogRow -Distribution $distribution.Name -Platform "$architecture MSI" -Artifact "$identifier → $asset"
     }
-    foreach ($asset in Get-ProfileAssets -Profile $profile -Extension '.zip' | Where-Object { $_.Contains('-win-') }) {
-        $architecture = $asset.Substring($profile.PackageId.Length + 1).Split('-self-contained-')[0]
-        New-CatalogRow -Profile $profile.Name -Platform "$architecture portable ZIP" -Artifact "$identifier → $asset"
+    foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension '.zip' | Where-Object { $_.Contains('-win-') }) {
+        $architecture = $asset.Substring($distribution.PackageId.Length + 1).Split('-self-contained-')[0]
+        New-CatalogRow -Distribution $distribution.Name -Platform "$architecture portable ZIP" -Artifact "$identifier → $asset"
     }
 })
-Add-CatalogTable -Title "WinGet ($($profiles.Count) candidate identities, $($rows.Count) installer selections)" -Description 'Stable-release manifest candidates reference the final assets above. Each identity has version/installer/en-US locale manifests. Upstream submission and public acceptance remain separate.' -Rows $rows
+Add-CatalogTable -Title "WinGet ($($distributions.Count) candidate identities, $($rows.Count) installer selections)" -Description 'Stable-release manifest candidates reference the final assets above. Each identity has version/installer/en-US locale manifests. Upstream submission and public acceptance remain separate.' -Rows $rows
 
-$rows = @(foreach ($profile in $profiles) {
-    New-CatalogRow -Profile $profile.Name -Platform 'win-x64' -Artifact "$($profile.PackageId).<version>.nupkg"
+$rows = @(foreach ($distribution in $distributions) {
+    New-CatalogRow -Distribution $distribution.Name -Platform 'win-x64' -Artifact "$($distribution.PackageId).<version>.nupkg"
 })
 Add-CatalogTable -Title "Chocolatey ($($rows.Count) package candidates)" -Description 'These Windows x64 packages embed the matching self-contained executable. The build retains candidates without submitting them to the Chocolatey feed.' -Rows $rows
 
-$rows = @(foreach ($profile in $profiles) {
-    foreach ($asset in Get-ProfileAssets -Profile $profile -Extension '.zip' | Where-Object { $_.Contains('-osx-') }) {
-        $architecture = $asset.Substring($profile.PackageId.Length + 1).Split('-self-contained-')[0]
-        New-CatalogRow -Profile $profile.Name -Platform $architecture -Artifact "erikbra/cask/$($profile.PackageId) → $asset"
+$rows = @(foreach ($distribution in $distributions) {
+    foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension '.zip' | Where-Object { $_.Contains('-osx-') }) {
+        $architecture = $asset.Substring($distribution.PackageId.Length + 1).Split('-self-contained-')[0]
+        New-CatalogRow -Distribution $distribution.Name -Platform $architecture -Artifact "erikbra/cask/$($distribution.PackageId) → $asset"
     }
 })
-Add-CatalogTable -Title "Homebrew casks ($($profiles.Count) recipes, $($rows.Count) architecture selections)" -Description 'The existing erikbra/homebrew-cask tap receives stable-release cask updates. New casks become publicly installable after those updates are published.' -Rows $rows
+Add-CatalogTable -Title "Homebrew casks ($($distributions.Count) recipes, $($rows.Count) architecture selections)" -Description 'The existing erikbra/homebrew-cask tap receives stable-release cask updates. New casks become publicly installable after those updates are published.' -Rows $rows
 
-$rows = @(foreach ($profile in $profiles) {
-    New-CatalogRow -Profile $profile.Name -Platform 'Homebrew macOS/Linux source build' -Artifact "$($profile.PackageId).rb"
+$rows = @(foreach ($distribution in $distributions) {
+    New-CatalogRow -Distribution $distribution.Name -Platform 'Homebrew macOS/Linux source build' -Artifact "$($distribution.PackageId).rb"
 })
 Add-CatalogTable -Title "Homebrew source formulas ($($rows.Count) candidates)" -Description 'Stable and HEAD source builds select the matching database profile and Homebrew dotnet dependency. These are source recipes, with no prebuilt bottle/RID matrix. Placement/submission/acceptance are separate.' -Rows $rows
 
 $rows = @(foreach ($id in Get-GrateLibraryIds) {
-    New-CatalogRow -Profile $id -Platform $frameworks -Artifact "$id.<version>.nupkg + $id.<version>.snupkg"
+    New-CatalogRow -Distribution $id -Platform $frameworks -Artifact "$id.<version>.nupkg + $id.<version>.snupkg"
 })
 Add-CatalogTable -Title "NuGet libraries ($($rows.Count) existing APIs plus symbol packages)" -Description 'These library APIs remain alongside the CLI distributions; they are not extra All/slim executable profiles.' -Rows $rows
 $zipCount = @($assets | Where-Object { $_.EndsWith('.zip') }).Count

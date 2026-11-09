@@ -59,13 +59,17 @@ if (($buildProfiles -join ',') -cne 'All,MariaDB,Oracle,PostgreSQL,SQLite,SQLSer
 
 function Assert-Rejected {
     param(
-        [scriptblock]$Action
+        [scriptblock]$Action,
+        [string]$MessagePattern = '.'
     )
 
     $rejected = $false
     try {
         & $Action
     } catch {
+        if ($_.Exception.Message -notmatch $MessagePattern) {
+            throw
+        }
         $rejected = $true
     }
     if (!$rejected) {
@@ -77,7 +81,7 @@ function Assert-Rejected {
 # omitted clients, including an All artifact substituted into a slim lane.
 $libraries = @{
     SQLite = @('grate.sqlite/1', 'Microsoft.Data.Sqlite/1', 'SQLitePCLRaw.bundle_e_sqlite3/1', 'SQLite/1')
-    SQLServer = @('grate.sqlserver/1', 'Microsoft.Data.SqlClient/1')
+    SQLServer = @('grate.sqlserver/1', 'Microsoft.Data.SqlClient/1', 'Microsoft.Data.SqlClient.Extensions.Azure/1')
     MariaDB = @('grate.mariadb/1', 'MySqlConnector/1')
     PostgreSQL = @('grate.postgresql/1', 'Npgsql/1')
     Oracle = @('grate.oracle/1', 'Oracle.ManagedDataAccess.Core/1')
@@ -99,12 +103,27 @@ foreach ($profile in $libraries.Keys) {
     $other = if ($profile -eq 'Oracle') { 'grate.sqlite/1' } else { 'Oracle.ManagedDataAccess.Core/1' }
     $leaked[$other] = @{}
     Assert-Rejected { Assert-DistributionDependencies -Distribution $profile -Dependencies @{ libraries = $leaked } }
+    if ($profile -ne 'SQLServer') {
+        $leakedAzure = $fixture.Clone()
+        $leakedAzure['Microsoft.Data.SqlClient.Extensions.Azure/1'] = @{}
+        Assert-Rejected -MessagePattern 'dependency mismatch for Microsoft\.Data\.SqlClient\.Extensions\.Azure ' -Action {
+            Assert-DistributionDependencies -Distribution $profile -Dependencies @{ libraries = $leakedAzure }
+        }
+    }
 }
 Assert-DistributionDependencies -Distribution All -Dependencies @{ libraries = $all }
+$missingAzure = $all.Clone()
+$missingAzure.Remove('Microsoft.Data.SqlClient.Extensions.Azure/1')
+Assert-Rejected -MessagePattern 'dependency mismatch for Microsoft\.Data\.SqlClient\.Extensions\.Azure ' -Action {
+    Assert-DistributionDependencies -Distribution All -Dependencies @{ libraries = $missingAzure }
+}
 foreach ($profile in $libraries.Keys) {
     Assert-Rejected { Assert-DistributionDependencies -Distribution $profile -Dependencies @{ libraries = $all } }
 }
-Assert-Rejected {
+Assert-Rejected -MessagePattern '^The Oracle suite cannot validate a SQLite distribution\.$' -Action {
     & "$PSScriptRoot/Invoke-DistributionTests.ps1" -Distribution SQLite -Database Oracle -OutputDirectory ([IO.Path]::GetTempPath())
+}
+Assert-Rejected -MessagePattern '^Use a fresh output directory' -Action {
+    & "$PSScriptRoot/Invoke-DistributionTests.ps1" -Distribution SQLite -Database Sqlite -OutputDirectory ([IO.Path]::GetTempPath())
 }
 Write-Host 'PASS: required All/slim database lanes, version-matrix mapping, missing/leaked clients and wrong suite rejection.'

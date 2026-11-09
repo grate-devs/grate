@@ -440,6 +440,9 @@ jobs:
           '--coverage', '--coverage-output-format', 'xml', '--coverage-output', 'coverage.xml'
         )
         dotnet @testArguments
+        if ($LASTEXITCODE -ne 0) {
+          throw "CommandLine tests failed with exit code $LASTEXITCODE."
+        }
       env:
         LogLevel: Information
         GrateExecutablePath: ${{ github.workspace }}/executables/linux-x64/grate

@@ -17,40 +17,45 @@ public class One_time_scripts(SqlServerCaseSensitiveGrateTestContext testContext
     {
         var db = TestConfig.RandomDatabase();
 
-        var parent = CreateRandomTempDirectory();
-        var knownFolders = Folders.Default;
-        CreateDummySql(parent, knownFolders[Up]);
-
-        var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
-            .WithConnectionString(Context.ConnectionString(db))
-            .WithFolders(knownFolders)
-            .WithSqlFilesDirectory(parent)
-            .Build();
-
-        await using (var migrator = Context.Migrator.WithConfiguration(config))
+        try
         {
-            await migrator.Migrate();
+            var parent = CreateRandomTempDirectory();
+            var knownFolders = Folders.Default;
+            CreateDummySql(parent, knownFolders[Up]);
+
+            var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
+                .WithConnectionString(Context.ConnectionString(db))
+                .WithFolders(knownFolders)
+                .WithSqlFilesDirectory(parent)
+                .Build();
+
+            await using (var migrator = Context.Migrator.WithConfiguration(config))
+            {
+                await migrator.Migrate();
+            }
+
+            WriteSomeOtherSql(parent, knownFolders[Up]);
+
+            await using (var migrator = Context.Migrator.WithConfiguration(config))
+            {
+                await Assert.ThrowsAsync<MigrationFailed>(() => migrator.Migrate());
+            }
+
+            string[] scripts;
+            string sql = $"SELECT text_of_script FROM {Context.Syntax.TableWithSchema("grate", "ScriptsRun")}";
+
+            using (var conn = Context.CreateDbConnection(db))
+            {
+                scripts = (await conn.QueryAsync<string>(sql)).ToArray();
+            }
+
+            Assert.Single(scripts);
+            Assert.Equal(Context.Sql.SelectVersion, scripts.First());
         }
-
-        WriteSomeOtherSql(parent, knownFolders[Up]);
-
-        await using (var migrator = Context.Migrator.WithConfiguration(config))
+        finally
         {
-            var ex = await Assert.ThrowsAsync<MigrationFailed>(() => migrator.Migrate());
+            await Context.DropDatabase(db);
         }
-
-        string[] scripts;
-        string sql = $"SELECT text_of_script FROM {Context.Syntax.TableWithSchema("grate", "ScriptsRun")}";
-
-        using (var conn = Context.CreateDbConnection(db))
-        {
-            scripts = (await conn.QueryAsync<string>(sql)).ToArray();
-        }
-
-        Assert.Single(scripts);
-        Assert.Equal(Context.Sql.SelectVersion, scripts.First());
-
-        //await Context.DropDatabase(db);
     }
 
 }
