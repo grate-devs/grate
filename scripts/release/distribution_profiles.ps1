@@ -24,6 +24,14 @@ function Assert-GrateSourceTag {
     }
 }
 
+function Get-GrateDistributionNames {
+    @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')
+}
+
+function Get-GrateLibraryIds {
+    @('grate.core', 'grate.sqlite', 'grate.sqlserver', 'grate.mariadb', 'grate.postgresql', 'grate.oracle')
+}
+
 function Get-GrateDistribution {
     param(
         [Parameter(Mandatory)]
@@ -48,7 +56,7 @@ function Get-GrateReleaseAssets {
         [string]$Version
     )
 
-    foreach ($name in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+    foreach ($name in Get-GrateDistributionNames) {
         $profile = Get-GrateDistribution -Name $name
         foreach ($rid in @('win-x64', 'win-x86', 'win-arm64', 'linux-musl-x64', 'linux-musl-arm64', 'linux-x64', 'linux-arm64', 'osx-x64', 'osx-arm64')) {
             "$($profile.PackageId)-$rid-self-contained-$Version.zip"
@@ -108,10 +116,7 @@ function Get-GrateReleaseNugetPackages {
         [string]$Version
     )
 
-    $expectedIds = @(
-        'grate', 'grate-sqlite', 'grate-sqlserver', 'grate-mariadb', 'grate-postgresql', 'grate-oracle',
-        'grate.core', 'grate.sqlite', 'grate.sqlserver', 'grate.mariadb', 'grate.postgresql', 'grate.oracle'
-    )
+    $expectedIds = @(Get-GrateDistributionNames | ForEach-Object { (Get-GrateDistribution -Name $_).PackageId }) + @(Get-GrateLibraryIds)
     $packages = @(Get-ChildItem -LiteralPath $Directory -Filter '*.nupkg' -File -Recurse | Sort-Object FullName)
     if ($packages.Count -ne $expectedIds.Count) {
         throw "Expected exactly $($expectedIds.Count) NuGet packages, found $($packages.Count)."

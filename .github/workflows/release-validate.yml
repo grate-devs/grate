@@ -1,0 +1,79 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · validate
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      release-tag:
+        type: string
+        required: true
+      required-results:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: Release contract ready
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Reject failed, cancelled or unexpectedly skipped prerequisites
+      env:
+        REQUIRED_RESULTS: ${{ inputs.required-results }}
+      run: jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$REQUIRED_RESULTS"
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - name: Download release assets
+      uses: actions/download-artifact@v8
+      with:
+        pattern: release-grate*
+        path: artifacts/release
+        merge-multiple: true
+    - name: Download the complete NuGet candidate set
+      uses: actions/download-artifact@v8
+      with:
+        pattern: nuget-*-${{ inputs.version }}
+        path: artifacts/nuget
+        merge-multiple: true
+    - name: Validate all NuGet identities before release publication
+      shell: pwsh
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        Get-GrateReleaseNugetPackages -Directory artifacts/nuget -Version $env:VERSION | Out-Null
+
+    - name: Summarize release contract
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        {
+          echo "## Release contract ready"
+          echo
+          echo "All NuGet packages, standalone archives, MSI installers, Debian packages, and the Docker build completed for \`$VERSION\`."
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Validate release assets and generate manifest
+      shell: pwsh
+      env:
+        RELEASE_TAG: ${{ inputs.release-tag }}
+        VERSION: ${{ inputs.version }}
+      run: ./scripts/release/New-ReleaseManifest.ps1 -Directory artifacts/release -Version $env:VERSION -Tag $env:RELEASE_TAG -Repository $env:GITHUB_REPOSITORY
+
+    - name: Upload validated release contract
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-contract-${{ inputs.version }}
+        path: artifacts/release/*
+        if-no-files-found: error

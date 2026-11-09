@@ -59,6 +59,49 @@ $requiredJobs = @(
     'CLI database Oracle / Oracle'
 )
 
+function Get-RequiredApiJobName {
+    param(
+        [string]$Name
+    )
+
+    # Reusable leaves have the caller's name as a prefix. Only these specific
+    # caller/producer pairs count; another caller's green leaf cannot replace one.
+    $caller = switch -CaseSensitive -Regex ($Name) {
+        '^Build$' {
+            'Build'
+            break
+        }
+        '^NuGet libraries and installed tool$' {
+            'Packages'
+            break
+        }
+        '^Run tests \((?:ubuntu|windows)-latest, Basic_tests\)$' {
+            'Isolated tests'
+            break
+        }
+        '^Run tests \(' {
+            'Database tests'
+            break
+        }
+        '^CLI database ' {
+            'CLI distributions'
+            break
+        }
+        '^CLI ' {
+            'Standalone CLI'
+            break
+        }
+        '^Alpine ' {
+            'Docker'
+            break
+        }
+    }
+    if ($caller) {
+        return "$caller / $Name"
+    }
+    return $Name
+}
+
 $needs = ConvertFrom-Json -InputObject $NeedsJson -AsHashtable
 $jobs = ConvertFrom-Json -InputObject $JobsJson -AsHashtable -NoEnumerate
 if ($needs -isnot [System.Collections.IDictionary]) { throw 'Expected a needs object.' }
@@ -86,7 +129,8 @@ foreach ($job in $jobs) {
 }
 
 foreach ($name in $requiredJobs) {
-    $matches = @($jobs | Where-Object { $_.name -ceq $name })
+    $apiName = Get-RequiredApiJobName -Name $name
+    $matches = @($jobs | Where-Object { $_.name -ceq $apiName })
     if ($matches.Count -eq 0) {
         $problems.Add("Missing required job '$name'.")
         continue

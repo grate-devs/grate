@@ -18,6 +18,8 @@ Every channel supports `All`, `SQLite`, `SQLServer`, `MariaDB`, `PostgreSQL` and
 and share command `grate`. New WinGet, Chocolatey and source-formula candidates
 require separate channel publication/acceptance. See the
 [profile and channel matrix](../docs/distributions.md).
+The generated [distribution catalog](../docs/distribution-catalog.md) contains
+all package/platform permutations and links to workflow results.
 
 Build entrypoints remain at the top of each installer folder. Larger folders
 separate reusable helpers, native code, configuration and tests. The release

@@ -12,6 +12,7 @@ on:
       - main
     paths:
       - ".github/workflows/build.yml"
+      - ".github/workflows/release-*.yml"
       - ".github/actions/setup-dotnet-macos-arm64/**"
       - "Directory.*"
       - "GitVersion.yml"
@@ -113,80 +114,22 @@ jobs:
       uses: ./.github/actions/preflight
 
   build-netcore-tool:
-    needs: set-version-number
     name: Build .NET Core (global) tool
-
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-    - name: Setup .NET 11 RC3 and .NET 10
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
-      with:
-        global-json-file: global.json
-        dotnet-version: 10.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      shell: pwsh
-      run: dotnet pack ./src/grate/grate.csproj -c Release -p:SelfContained=false -p:PackAsTool=true -p:GrateDistribution=${{ matrix.distribution }} -p:ArtifactsPath=/tmp/grate/build -p:PackageOutputPath=/tmp/grate/nupkg -p:Version=${{ needs.set-version-number.outputs.semVer }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }}
-
-    - name: Upload published tool artifact
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ matrix.distribution == 'All' && format('nuget-grate-tool-{0}', needs.set-version-number.outputs.semVer) || format('nuget-grate-tool-{0}-{1}', matrix.distribution, needs.set-version-number.outputs.semVer) }}
-        path: /tmp/grate/nupkg/*
-        if-no-files-found: error
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-tools.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
 
   build-nuget-package:
-    needs: set-version-number
     name: Build Nuget
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-libraries.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      core-version: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package: [
-                "grate.core",
-                "grate.mariadb",
-                "grate.oracle",
-                "grate.postgresql",
-                "grate.sqlite",
-                "grate.sqlserver"
-              ]
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-
-    - name: Setup .NET 11 RC3 and earlier
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
-      with:
-         global-json-file: global.json
-         dotnet-version: |
-          8.0.x
-          9.0.x
-          10.0.x
-
-    - name: Restore dependencies
-      run: dotnet restore
-
-    - name: Pack Nuget package ${{ matrix.package }}
-      run: dotnet pack ./src/${{ matrix.package }} -c Release --include-symbols -o /tmp/grate/nupkg /p:Version=${{ env.VERSION }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }}
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
-
-    - name: Upload NuGet package ${{ matrix.package }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: nuget-${{ matrix.package }}-${{ needs.set-version-number.outputs.semVer }}
-        path: /tmp/grate/nupkg/*
-        if-no-files-found: error
-
+  # Keep the NuGet credential job here: its trusted-publisher policy identifies
+  # build.yml via job_workflow_ref. Reusable publishers would change that claim.
   publish-nuget:
     name: Publish NuGet packages
     needs:
@@ -248,984 +191,152 @@ jobs:
         }
 
   build-standalone:
-    name: Build cli
-    needs: set-version-number
-
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-        arch: [ "win-x64", "win-x86", "win-arm64",
-                "linux-musl-x64", "linux-musl-arm64", "linux-x64", "linux-arm64",
-                "osx-x64"
-              ]
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-    - name: Setup .NET 11 RC3 and .NET 10
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
-      with:
-        global-json-file: global.json
-        dotnet-version: 10.0.x
-
-    - name: Publish self-contained ${{ matrix.arch }}
-      shell: pwsh
-      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.semVer }}' -OutputDirectory './publish/${{ matrix.arch }}'
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        TargetFramework: net11.0
-
-
-    - name: Select distribution identity
-      id: distribution
-      shell: pwsh
-      run: |
-        . ./scripts/release/distribution_profiles.ps1
-        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
-        "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-    - name: Upload self-contained ${{ matrix.arch }}
-      #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
-        path: ./publish/${{ matrix.arch }}/published/*
-        if-no-files-found: error
-
-    - name: Package release archive ${{ matrix.arch }}
-      shell: pwsh
-      run: |
-        $PSNativeCommandUseErrorActionPreference = $true
-        $name = '${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip'
-        $files = @(Get-ChildItem -LiteralPath './publish/${{ matrix.arch }}/published' -File | Select-Object -ExpandProperty FullName)
-        zip -j $name @files
-
-    - name: Upload release archive ${{ matrix.arch }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: release-${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        path: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        if-no-files-found: error
-
+    name: Build CLI archives
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-cli.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      runner: ubuntu-latest
+      runtime-identifiers: '["win-x64","win-x86","win-arm64","linux-musl-x64","linux-musl-arm64","linux-x64","linux-arm64","osx-x64"]'
+      native-arm-sdk: false
 
   build-standalone-mac-arm64:
-    name: Build cli
-    needs: set-version-number
-
-    # Use macos-15 to build osx-arm64, it runs on M1, see
-    # https://github.blog/changelog/2024-01-30-github-actions-introducing-the-new-m1-macos-runner-available-to-open-source/
-    #
-    # I've earlier had problems with that the trimmed, self-contained binary for osx-arm64 that was built on Linux
-    # did not work when opened on an actual mac with arm64.
-
-    runs-on: macos-15
-    strategy:
-      matrix:
-        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-        arch: [ "osx-arm64" ]
-
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-    - name: Setup .NET 11 RC3 and .NET 10
-      uses: ./.github/actions/setup-dotnet-macos-arm64
-      with:
-        global-json-file: global.json
-        dotnet-version: 10.0.x
-
-    - name: Publish self-contained ${{ matrix.arch }}
-      shell: pwsh
-      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.semVer }}' -OutputDirectory './publish/${{ matrix.arch }}'
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        TargetFramework: net11.0
-
-    - name: Select distribution identity
-      id: distribution
-      shell: pwsh
-      run: |
-        . ./scripts/release/distribution_profiles.ps1
-        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
-        "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-    - name: Upload self-contained ${{ matrix.arch }}
-      #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
-        path: ./publish/${{ matrix.arch }}/published/*
-        if-no-files-found: error
-
-    - name: Package release archive ${{ matrix.arch }}
-      shell: pwsh
-      run: |
-        $PSNativeCommandUseErrorActionPreference = $true
-        $name = '${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip'
-        $files = @(Get-ChildItem -LiteralPath './publish/${{ matrix.arch }}/published' -File | Select-Object -ExpandProperty FullName)
-        zip -j $name @files
-
-    - name: Upload release archive ${{ matrix.arch }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: release-${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        path: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        if-no-files-found: error
+    name: Build CLI archives
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-cli.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      runner: macos-15
+      runtime-identifiers: '["osx-arm64"]'
+      native-arm-sdk: true
 
   build-msi:
-    name: Build MSI (${{ matrix.distribution }}, ${{ matrix.arch }})
-    needs:
-     - set-version-number
-     - build-standalone
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-        arch: [ "win-x64", "win-arm64" ]
-
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-    - name: Select MSI distribution identity
-      id: distribution
-      shell: pwsh
-      run: |
-        . ./scripts/release/distribution_profiles.ps1
-        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
-        "package-id=$($profile.PackageId)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-    - uses: actions/download-artifact@v8
-      with:
-        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
-        path: ${{ matrix.arch }}/
-
-    - name: Test WinGet preparation and MSI identity contracts
-      shell: pwsh
-      run: |
-        ./installers/winget/tests/Test-CreateInstaller.Tests.ps1
-        ./installers/winget/tests/Test-InstallerCorrelation.Tests.ps1
-        ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
-        ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
-
-    - name: Create msi
-      run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -ReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -Distribution '${{ matrix.distribution }}' -arch ("${{ matrix.arch }}" -replace "win-", "")
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
-
-    - name: Prepare MSI release asset ${{ matrix.arch }}
-      shell: pwsh
-      run: |
-        $name = '${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi'
-        $source = './installers/msi/tmp/${{ steps.distribution.outputs.package-id }}-${{ needs.set-version-number.outputs.nuGetVersion }}.msi'
-        Copy-Item -LiteralPath $source -Destination $name
-        ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -Distribution '${{ matrix.distribution }}' -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
-
-    - name: Upload MSI release asset ${{ matrix.arch }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: release-${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi
-        path: ${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi
-        if-no-files-found: error
-
+    name: Build MSI
+    needs: [set-version-number, build-standalone]
+    uses: ./.github/workflows/release-msi.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      core-version: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
   build-docker-image:
     name: Build and verify Docker OCI archive without publishing
-    needs: set-version-number
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    outputs:
-      digest: ${{ steps.image.outputs.digest }}
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-    - name: Build current source into a local archive
-      id: image
-      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-      with:
-        file: ./installers/docker/Dockerfile
-        context: .
-        platforms: linux/amd64,linux/arm64
-        pull: true
-        push: false
-        outputs: type=oci,dest=${{ runner.temp }}/grate-image.tar
-        tags: gratedevs/grate:${{ needs.set-version-number.outputs.semVer }}
-        labels: |
-          org.opencontainers.image.source=https://github.com/grate-devs/grate
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.version=${{ needs.set-version-number.outputs.semVer }}
-        build-args: |
-          VERSION=${{ needs.set-version-number.outputs.semVer }}
-    - name: Verify OCI archive and preflight intended publication before the release gate
-      env:
-        EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        PUBLISH: ${{ needs.set-version-number.outputs.is-release }}
-        PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
-      shell: pwsh
-      run: |
-        $ErrorActionPreference = 'Stop'
-        $PSNativeCommandUseErrorActionPreference = $true
-        sudo apt-get update -qq
-        sudo apt-get install --yes --no-install-recommends skopeo
-        $mode = @{ VerifyOnly = $true }
-        if ($env:PUBLISH -eq 'true') {
-          $env:DOCKER_TAGS = (./installers/docker/release_tags.ps1 -Version $env:VERSION -Prerelease:($env:PRERELEASE -eq 'true')) -join "`n"
-          # Fail on an existing conflicting Docker version before any GitHub assets change.
-          $mode = @{ PreflightOnly = $true }
-        }
-        ./scripts/release/publish_docker_archive.ps1 @mode -Archive "$env:RUNNER_TEMP/grate-image.tar" -Report "$env:RUNNER_TEMP/docker-archive-validation.json"
-    - name: Retain the exact Docker artifact for gated publication
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-      with:
-        name: grate-docker-oci-${{ needs.set-version-number.outputs.semVer }}
-        path: |
-          ${{ runner.temp }}/grate-image.tar
-          ${{ runner.temp }}/docker-archive-validation.json
-        if-no-files-found: error
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-docker-build.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
 
   build-chocolatey:
-    name: Build ${{ matrix.distribution }} Chocolatey package
+    name: Build Chocolatey package
     needs: [set-version-number, build-standalone]
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Select the profile package identity
-        id: profile
-        shell: pwsh
-        run: |
-          . ./scripts/release/distribution_profiles.ps1
-          $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
-          "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-      - name: Download the matching Windows payload
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ steps.profile.outputs.package-id }}-win-x64-self-contained-${{ needs.set-version-number.outputs.semVer }}
-          path: chocolatey-payload
-      - name: Check and build the profile package
-        shell: pwsh
-        env:
-          VERSION: ${{ needs.set-version-number.outputs.semVer }}
-          RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          $tag = if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { $env:VERSION }
-          ./installers/chocolatey/Create-Package.ps1 -grateExe chocolatey-payload/grate.exe -version $env:VERSION -ReleaseTag $tag -Distribution '${{ matrix.distribution }}' -OutputDirectory "$env:RUNNER_TEMP/chocolatey-packages"
-      - name: Retain the exact package for Chocolatey submission
-        uses: actions/upload-artifact@v7
-        with:
-          name: chocolatey-${{ steps.profile.outputs.package-id }}-${{ needs.set-version-number.outputs.semVer }}
-          path: ${{ runner.temp }}/chocolatey-packages/*.nupkg
-          if-no-files-found: error
+    uses: ./.github/workflows/release-chocolatey.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
 
   build-slim-docker-images:
-    name: Build and verify ${{ matrix.distribution }} Docker archive
-    needs: set-version-number
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        distribution: [SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-      - name: Build the selected profile into a retained OCI archive
-        id: image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          file: ./installers/docker/Dockerfile
-          context: .
-          platforms: linux/amd64,linux/arm64
-          pull: true
-          push: false
-          outputs: type=oci,dest=${{ runner.temp }}/grate-image.tar
-          tags: gratedevs/grate:build-${{ matrix.distribution }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/grate-devs/grate
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ needs.set-version-number.outputs.semVer }}
-            org.opencontainers.image.flavor=${{ matrix.distribution }}
-          build-args: |
-            VERSION=${{ needs.set-version-number.outputs.semVer }}
-            GRATE_DISTRIBUTION=${{ matrix.distribution }}
-      - name: Bind and preflight the profile archive before the release gate
-        shell: pwsh
-        env:
-          DISTRIBUTION: ${{ matrix.distribution }}
-          VERSION: ${{ needs.set-version-number.outputs.semVer }}
-          SOURCE_COMMIT: ${{ github.sha }}
-          EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
-          PUBLISH: ${{ needs.set-version-number.outputs.is-release }}
-          PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          sudo apt-get update -qq
-          sudo apt-get install --yes --no-install-recommends skopeo
-          $parameters = @{
-            Distribution = $env:DISTRIBUTION
-            Version = $env:VERSION
-            SourceCommit = $env:SOURCE_COMMIT
-            ExpectedDigest = $env:EXPECTED_DIGEST
-            Archive = "$env:RUNNER_TEMP/grate-image.tar"
-            Report = "$env:RUNNER_TEMP/slim-archive-validation.json"
-            Mode = $(if ($env:PUBLISH -eq 'true') { 'Preflight' } else { 'Verify' })
-            Prerelease = $env:PRERELEASE -eq 'true'
-          }
-          ./scripts/release/publish_slim_docker_archive.ps1 @parameters
-      - name: Retain the profile archive and its verified identity
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: grate-docker-${{ matrix.distribution }}-oci-${{ needs.set-version-number.outputs.semVer }}
-          path: |
-            ${{ runner.temp }}/grate-image.tar
-            ${{ runner.temp }}/slim-archive-validation.json
-          if-no-files-found: error
+    name: Build and verify Docker archive
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-docker-slim-build.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
 
   build-deb:
     name: Build Debian package
-    needs:
-     - set-version-number
-     - build-standalone
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-        arch: [ "linux-arm64", "linux-x64" ]
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-    - name: Select distribution identity
-      id: distribution
-      shell: pwsh
-      run: |
-        . ./scripts/release/distribution_profiles.ps1
-        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
-        "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-    - uses: actions/download-artifact@v8
-      with:
-        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
-        path: ${{ matrix.arch }}/
-
-    - id: get-arch
-      name: Get architecture
-      run: |
-        arch=$(echo ${{ matrix.arch }} | cut -d- -f2 | sed 's/x64/amd64/')
-        echo "arch=$arch" >> "$GITHUB_OUTPUT"
-
-    - name: Verify Debian prerelease package ordering
-      shell: pwsh
-      run: ./installers/deb/Test-PackageVersion.Tests.ps1 -Architecture ${{ steps.get-arch.outputs.arch }}
-
-    - name: Create dpkg # Linux with powershell script? really? YES! :D
-      shell: pwsh
-      run: ./installers/deb/Create-Package.ps1 -grateExe ./${{ matrix.arch }}/grate -Version "${{ needs.set-version-number.outputs.semVer }}" -arch ${{ steps.get-arch.outputs.arch}} -Distribution ${{ matrix.distribution }}
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-
-    - name: Prepare Debian release asset ${{ steps.get-arch.outputs.arch }}
-      shell: pwsh
-      run: |
-        $oldName = './installers/deb/${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}-1_${{ steps.get-arch.outputs.arch }}.deb'
-        $releaseName = '${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb'
-        Move-Item -LiteralPath $oldName -Destination $releaseName
-
-    - name: Upload Debian release asset ${{ steps.get-arch.outputs.arch }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: release-${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb
-        path: ${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb
-        if-no-files-found: error
+    needs: [set-version-number, build-standalone]
+    uses: ./.github/workflows/release-debian.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
 
   release-ready:
     name: Release contract ready
+    needs: [set-version-number, validate-release-policy, build-netcore-tool, build-nuget-package, build-standalone, build-standalone-mac-arm64, build-msi, build-docker-image, build-slim-docker-images, build-chocolatey, build-deb]
     if: ${{ always() }}
-    needs:
-      - set-version-number
-      - validate-release-policy
-      - build-netcore-tool
-      - build-nuget-package
-      - build-standalone
-      - build-standalone-mac-arm64
-      - build-msi
-      - build-docker-image
-      - build-slim-docker-images
-      - build-chocolatey
-      - build-deb
-    runs-on: ubuntu-latest
     permissions:
       contents: read
-
-    steps:
-    - name: Reject failed, cancelled or unexpectedly skipped prerequisites
-      env:
-        REQUIRED_RESULTS: ${{ toJSON(needs) }}
-      run: jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$REQUIRED_RESULTS"
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-    - name: Download release assets
-      uses: actions/download-artifact@v8
-      with:
-        pattern: release-grate*
-        path: artifacts/release
-        merge-multiple: true
-    - name: Download the complete NuGet candidate set
-      uses: actions/download-artifact@v8
-      with:
-        pattern: nuget-*-${{ needs.set-version-number.outputs.semVer }}
-        path: artifacts/nuget
-        merge-multiple: true
-    - name: Validate all NuGet identities before release publication
-      shell: pwsh
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-      run: |
-        . ./scripts/release/distribution_profiles.ps1
-        Get-GrateReleaseNugetPackages -Directory artifacts/nuget -Version $env:VERSION | Out-Null
-
-    - name: Summarize release contract
-      shell: bash
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-      run: |
-        {
-          echo "## Release contract ready"
-          echo
-          echo "All NuGet packages, standalone archives, MSI installers, Debian packages, and the Docker build completed for \`$VERSION\`."
-        } >> "$GITHUB_STEP_SUMMARY"
-
-    - name: Validate release assets and generate manifest
-      shell: pwsh
-      env:
-        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-      run: ./scripts/release/New-ReleaseManifest.ps1 -Directory artifacts/release -Version $env:VERSION -Tag $env:RELEASE_TAG -Repository $env:GITHUB_REPOSITORY
-
-    - name: Upload validated release contract
-      uses: actions/upload-artifact@v7
-      with:
-        name: release-contract-${{ needs.set-version-number.outputs.semVer }}
-        path: artifacts/release/*
-        if-no-files-found: error
+    uses: ./.github/workflows/release-validate.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
+      required-results: ${{ toJSON(needs) }}
 
   publish-github-release:
     name: Publish assets to the existing GitHub release
     needs: [set-version-number, release-ready]
     if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-    runs-on: ubuntu-latest
     permissions:
       contents: write
-    steps:
-    - uses: actions/download-artifact@v8
-      with:
-        name: release-contract-${{ needs.set-version-number.outputs.semVer }}
-        path: artifacts/release
-    - name: Publish GitHub release assets
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-      run: |
-        set -euo pipefail
-        gh release upload "$RELEASE_TAG" \
-          artifacts/release/* \
-          --repo "$GITHUB_REPOSITORY" \
-          --clobber
+    uses: ./.github/workflows/release-github.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
 
   publish-docker:
     name: Publish canonical Docker image and compatibility digest
+    needs: [set-version-number, build-docker-image, release-ready, publish-github-release]
     if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-    environment: docker-hub
-    needs:
-      - set-version-number
-      - build-docker-image
-      - release-ready
-      - publish-github-release
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
     permissions:
-      contents: read
       id-token: write
-    # Serialize version/latest publication across release runs.
-    concurrency:
-      group: docker-publication
-      cancel-in-progress: false
-
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-
-    - name: Configure isolated canonical Docker credentials
-      shell: bash
-      run: |
-        mkdir -p "$RUNNER_TEMP/grate-oidc-docker"
-        chmod 700 "$RUNNER_TEMP/grate-oidc-docker"
-        echo "DOCKER_CONFIG=$RUNNER_TEMP/grate-oidc-docker" >> "$GITHUB_ENV"
-
-    - name: Check Docker release policy
-      shell: pwsh
-      run: |
-        ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
-        ./scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
-
-    - name: Select identical tags for canonical and compatibility names
-      id: tags
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
-      shell: pwsh
-      run: |
-        ./installers/docker/release_tags.ps1 -Version $env:VERSION -Prerelease:($env:PRERELEASE -eq 'true') -GithubOutput $env:GITHUB_OUTPUT
-
-    - name: Download the verified Docker OCI archive
-      uses: actions/download-artifact@v8
-      with:
-        name: grate-docker-oci-${{ needs.set-version-number.outputs.semVer }}
-        path: docker-artifact
-
-    - name: Prepare canonical OIDC login and digest-preserving copy tool
-      env:
-        CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        test -n "$CONNECTION_ID" || { echo '::error::DOCKERHUB_OIDC_CONNECTIONID must be configured in docker-hub.'; exit 1; }
-        mkdir -p "$DOCKER_CONFIG"
-        chmod 700 "$DOCKER_CONFIG"
-        sudo apt-get update -qq
-        sudo apt-get install --yes --no-install-recommends skopeo
-        skopeo --version >> "$GITHUB_STEP_SUMMARY"
-
-    - name: Log in to canonical Docker Hub repository using OIDC
-      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-      env:
-        DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
-        # Cover the bounded 45-minute build/copy job, including an uncached build.
-        DOCKERHUB_OIDC_EXPIREIN: '3600'
-      with:
-        username: gratedevs
-
-    - name: Verify separate publishing identities without registry writes
-      env:
-        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
-        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-      shell: pwsh
-      run: ./scripts/release/check_docker_access.ps1 -CanonicalAuthfile "$env:DOCKER_CONFIG/config.json" -Report docker-access.json
-
-    - name: Publish the verified archive to the canonical repository without rebuilding
-      id: image
-      env:
-        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
-        EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
-      shell: pwsh
-      run: ./scripts/release/publish_docker_archive.ps1 -Archive docker-artifact/grate-image.tar -Authfile "$env:DOCKER_CONFIG/config.json" -Report docker-canonical.json
-
-    - name: Copy the built digest to the compatibility repository
-      id: compatibility
-      env:
-        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
-        EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
-        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
-        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-      shell: pwsh
-      run: ./scripts/release/copy_docker_release.ps1 -SourceAuthfile "$env:DOCKER_CONFIG/config.json" -Report docker-compatibility.json
-
-    - name: Verify every published tag against the built digest
-      if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' && steps.tags.outputs.tags != '' }}
-      env:
-        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
-        EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
-        BUILD_OUTCOME: ${{ steps.image.outcome }}
-      # Public read-back deliberately does not use the legacy credential for canonical access.
-      shell: pwsh
-      run: ./scripts/release/verify_docker_release.ps1 -Report docker-publication.json
-
-    - name: Retain publication results, including partial failures
-      if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' }}
-      env:
-        BUILD_OUTCOME: ${{ steps.image.outcome }}
-        COPY_OUTCOME: ${{ steps.compatibility.outcome }}
-        EXPECTED_DIGEST: ${{ needs.build-docker-image.outputs.digest }}
-      shell: bash
-      run: |
-        echo "Canonical build/push: $BUILD_OUTCOME; compatibility copy: $COPY_OUTCOME; built digest: $EXPECTED_DIGEST" >> "$GITHUB_STEP_SUMMARY"
-        if [[ ! -f docker-publication.json ]]; then
-          echo 'Publication did not reach verification. Some registry tags may already have changed; inspect both repositories before retrying.' >> "$GITHUB_STEP_SUMMARY"
-        fi
-
-    - name: Upload Docker publication evidence
-      if: ${{ always() && needs.set-version-number.outputs.is-release == 'true' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-      with:
-        name: docker-publication-${{ github.run_id }}-${{ github.run_attempt }}
-        path: docker-*.json
-        if-no-files-found: warn
+      contents: read
+    uses: ./.github/workflows/release-docker-publish.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
+      expected-digest: ${{ needs.build-docker-image.outputs.digest }}
+    secrets:
+      DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
 
   publish-slim-docker:
-    name: Publish verified ${{ matrix.distribution }} Docker archive
-    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-    environment: docker-hub
+    name: Publish verified Docker archive
     needs: [set-version-number, build-slim-docker-images, release-ready, publish-github-release]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
     permissions:
-      contents: read
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        distribution: [SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-    concurrency:
-      group: docker-publication-${{ matrix.distribution }}
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Download this profile's verified source artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: grate-docker-${{ matrix.distribution }}-oci-${{ needs.set-version-number.outputs.semVer }}
-          path: slim-docker-artifact
-      - name: Configure isolated canonical Docker credentials and copy tool
-        shell: pwsh
-        env:
-          CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          if (!$env:CONNECTION_ID) {
-            throw 'DOCKERHUB_OIDC_CONNECTIONID must be configured in docker-hub.'
-          }
-          $directory = "$env:RUNNER_TEMP/slim-docker-auth"
-          New-Item -ItemType Directory -Path $directory | Out-Null
-          chmod 700 $directory
-          "DOCKER_CONFIG=$directory" | Add-Content -LiteralPath $env:GITHUB_ENV
-          sudo apt-get update -qq
-          sudo apt-get install --yes --no-install-recommends skopeo
-      - name: Log in to canonical Docker Hub repository using OIDC
-        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        env:
-          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
-          DOCKERHUB_OIDC_EXPIREIN: '3600'
-        with:
-          username: gratedevs
-      - name: Publish and read back the exact verified profile digest
-        shell: pwsh
-        env:
-          DISTRIBUTION: ${{ matrix.distribution }}
-          VERSION: ${{ needs.set-version-number.outputs.semVer }}
-          SOURCE_COMMIT: ${{ github.sha }}
-          PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $verification = Get-Content -LiteralPath slim-docker-artifact/slim-archive-validation.json -Raw | ConvertFrom-Json
-          $parameters = @{
-            Distribution = $env:DISTRIBUTION
-            Version = $env:VERSION
-            SourceCommit = $env:SOURCE_COMMIT
-            ExpectedDigest = $verification.expected_digest
-            Archive = 'slim-docker-artifact/grate-image.tar'
-            VerificationReport = 'slim-docker-artifact/slim-archive-validation.json'
-            Authfile = "$env:DOCKER_CONFIG/config.json"
-            Report = 'docker-slim-publication.json'
-            Mode = 'Publish'
-            Prerelease = $env:PRERELEASE -eq 'true'
-          }
-          ./scripts/release/publish_slim_docker_archive.ps1 @parameters
-      - name: Retain profile publication results including partial failures
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: docker-publication-${{ matrix.distribution }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: docker-slim-publication.json
-          if-no-files-found: warn
+      contents: read
+    uses: ./.github/workflows/release-docker-slim-publish.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
 
   prepare-winget:
-    name: Prepare WinGet ${{ matrix.distribution }} candidate (no submission)
-    needs:
-      - set-version-number
-      - release-ready
-      - publish-github-release
+    name: Prepare WinGet candidates (no submission)
+    needs: [set-version-number, release-ready, publish-github-release]
     if: ${{ needs.set-version-number.outputs.is-release == 'true' && needs.set-version-number.outputs.is-prerelease != 'true' }}
-    runs-on: windows-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
     permissions:
       contents: read
-
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-    - name: Select WinGet candidate identity
-      id: profile
-      shell: pwsh
-      run: |
-        $identifier = 'grate-devs.grate'
-        $path = 'grate'
-        $artifact = 'winget-migration-candidate-${{ needs.set-version-number.outputs.semVer }}'
-        if ('${{ matrix.distribution }}' -ne 'All') {
-          $identifier += '.${{ matrix.distribution }}'
-          $path += '/${{ matrix.distribution }}'
-          $artifact = 'winget-${{ matrix.distribution }}-candidate-${{ needs.set-version-number.outputs.semVer }}'
-        }
-        "WINGET_PACKAGE_ID=$identifier" | Out-File -FilePath $env:GITHUB_ENV -Append
-        "WINGET_PACKAGE_PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Append
-        "artifact-name=$artifact" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-    - name: Prepare new-ID manifests from the final published assets
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ github.token }}
-        WINGET_CREATE_GITHUB_TOKEN: ${{ github.token }}
-        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-      run: |
-        $ErrorActionPreference = 'Stop'
-        $tool = Join-Path $env:RUNNER_TEMP 'wingetcreate.exe'
-        Invoke-WebRequest 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $tool
-        if ((Get-FileHash $tool -Algorithm SHA256).Hash -ne '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA') {
-          throw 'wingetcreate checksum does not match the pinned release.'
-        }
-        ./installers/winget/Create-Installer.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -Distribution '${{ matrix.distribution }}' -wingetCreate $tool -PrepareMigration -outputDirectory "$env:RUNNER_TEMP/winget-candidate"
-        @'
-        ## WinGet migration candidate
-
-        Prepared the ${{ matrix.distribution }} candidate from the matching published stable release assets.
-        No manifest was submitted. Historical erikbra.grate versions stay unchanged.
-        Schema validation follows in this job. Installation of the final files, upstream acceptance,
-        and verification through the public winget source remain separate #800 steps.
-        See installers/winget/MIGRATION.md for the supported MSI and portable transitions.
-        '@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-    - name: Schema-validate the complete new-ID candidate
-      shell: pwsh
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        SOURCE_COMMIT: ${{ github.sha }}
-        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-      run: |
-        $ErrorActionPreference = 'Stop'
-        $winget = ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
-        $candidate = "$env:RUNNER_TEMP/winget-candidate"
-        & $winget validate --manifest "$candidate/manifests/g/grate-devs/$env:WINGET_PACKAGE_PATH/$env:VERSION" --disable-interactivity *>&1 | Tee-Object -FilePath "$candidate/schema.log"
-        if ($LASTEXITCODE -ne 0) { throw 'Final WinGet migration candidate failed schema validation.' }
-        @{
-          SourceCommit=$env:SOURCE_COMMIT; Version=$env:VERSION; ReleaseTag=$env:RELEASE_TAG
-          RunId=$env:GITHUB_RUN_ID; RunAttempt=$env:GITHUB_RUN_ATTEMPT
-          PackageIdentifier=$env:WINGET_PACKAGE_ID; Distribution='${{ matrix.distribution }}'; Submitted=$false; SchemaValidated=$true
-          WingetVersion='1.29.380'; WingetCreateVersion='1.12.13.0'
-          WingetCreateSha256=(Get-FileHash "$env:RUNNER_TEMP/wingetcreate.exe" -Algorithm SHA256).Hash
-        } | ConvertTo-Json | Set-Content "$candidate/provenance.json"
-    - name: Retain WinGet candidate for review
-      if: ${{ always() }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-      with:
-        name: ${{ steps.profile.outputs.artifact-name }}
-        path: ${{ runner.temp }}/winget-candidate/
-        if-no-files-found: error
+    uses: ./.github/workflows/release-winget.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
 
   publish-homebrew:
     name: Update all Homebrew casks and retain formula candidates
-    needs:
-      - set-version-number
-      - release-ready
-      - publish-github-release
+    needs: [set-version-number, release-ready, publish-github-release]
     if: ${{ needs.set-version-number.outputs.is-release == 'true' && needs.set-version-number.outputs.is-prerelease != 'true' }}
-    runs-on: ubuntu-latest
-    environment: homebrew-cask
     permissions:
       contents: read
-
-    steps:
-    - name: Validate Homebrew publishing identity
-      shell: bash
-      env:
-        HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-      run: |
-        set -euo pipefail
-        if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
-          echo "::error::HOMEBREW_TAP_TOKEN needs contents write access to erikbra/homebrew-cask."
-          exit 1
-        fi
-
-    - name: Checkout grate release tooling
-      uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-
-    - name: Checkout Homebrew tap
-      uses: actions/checkout@v7
-      with:
-        repository: erikbra/homebrew-cask
-        ref: main
-        path: homebrew-cask
-        token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-
-    - name: Download macOS release assets
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-      run: |
-        set -euo pipefail
-        mkdir -p artifacts/homebrew
-        gh release download "$RELEASE_TAG" \
-          --repo "$GITHUB_REPOSITORY" \
-          --pattern 'grate*-osx-*-self-contained-*.zip' \
-          --dir artifacts/homebrew
-
-    - name: Update and validate cask
-      shell: pwsh
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-      run: |
-        $ErrorActionPreference = 'Stop'
-        $PSNativeCommandUseErrorActionPreference = $true
-        . ./scripts/release/distribution_profiles.ps1
-        $candidates = @(foreach ($name in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
-          $profile = Get-GrateDistribution -Name $name
-          $arm64Asset = "artifacts/homebrew/$($profile.PackageId)-osx-arm64-self-contained-$env:VERSION.zip"
-          $x64Asset = "artifacts/homebrew/$($profile.PackageId)-osx-x64-self-contained-$env:VERSION.zip"
-          @{
-            Version = $env:VERSION
-            ReleaseTag = $env:RELEASE_TAG
-            Distribution = $name
-            Arm64Sha256 = (Get-FileHash -LiteralPath $arm64Asset -Algorithm SHA256).Hash.ToLowerInvariant()
-            X64Sha256 = (Get-FileHash -LiteralPath $x64Asset -Algorithm SHA256).Hash.ToLowerInvariant()
-            Output = "homebrew-cask/Casks/$($profile.PackageId).rb"
-          }
-        })
-        foreach ($candidate in $candidates) {
-          ./scripts/release/update_homebrew_cask.ps1 @candidate
-          ruby -c $candidate.Output
-        }
-
-    - name: Generate all source formula candidates from the final tagged archive
-      shell: pwsh
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
-        SOURCE_COMMIT: ${{ github.sha }}
-      run: |
-        $ErrorActionPreference = 'Stop'
-        $PSNativeCommandUseErrorActionPreference = $true
-        . ./scripts/release/distribution_profiles.ps1
-        $archive = "$env:RUNNER_TEMP/grate-source.tar.gz"
-        Assert-GrateSourceTag -Tag $env:RELEASE_TAG -SourceCommit $env:SOURCE_COMMIT
-        Invoke-WebRequest "https://github.com/grate-devs/grate/archive/refs/tags/$($env:RELEASE_TAG).tar.gz" -OutFile $archive
-        Assert-GrateSourceTag -Tag $env:RELEASE_TAG -SourceCommit $env:SOURCE_COMMIT
-        ./installers/homebrew/Create-Formula.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -sourceArchive $archive -AllDistributions -OutputDirectory artifacts/homebrew-formulas
-        foreach ($candidate in Get-ChildItem -LiteralPath artifacts/homebrew-formulas -Filter '*.rb') {
-          ruby -c $candidate.FullName
-        }
-
-    - name: Retain all Homebrew cask and formula candidates
-      uses: actions/upload-artifact@v7
-      with:
-        name: homebrew-candidates-${{ needs.set-version-number.outputs.semVer }}
-        path: |
-          homebrew-cask/Casks/grate*.rb
-          artifacts/homebrew-formulas/*.rb
-        if-no-files-found: error
-
-    - name: Publish cask update
-      working-directory: homebrew-cask
-      shell: pwsh
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.semVer }}
-      run: |
-        $ErrorActionPreference = 'Stop'
-        $PSNativeCommandUseErrorActionPreference = $true
-        $paths = @('grate', 'grate-sqlite', 'grate-sqlserver', 'grate-mariadb', 'grate-postgresql', 'grate-oracle') | ForEach-Object { "Casks/$_.rb" }
-        git config user.name "grate release workflow"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add -- @paths
-        try {
-          $PSNativeCommandUseErrorActionPreference = $false
-          git diff --cached --quiet -- @paths
-          $difference = $LASTEXITCODE
-        } finally {
-          $PSNativeCommandUseErrorActionPreference = $true
-        }
-        if ($difference -eq 0) {
-          'Homebrew casks already match this release.' | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
-          exit 0
-        }
-        if ($difference -ne 1) { throw 'Could not inspect staged Homebrew candidates.' }
-        git commit -m "Update all grate casks to $env:VERSION"
-        git push origin HEAD:main
+    uses: ./.github/workflows/release-homebrew.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
+    secrets:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
   test:
     name: Run tests
-    needs: set-version-number
-
-    runs-on: ubuntu-latest
+    needs: [set-version-number]
     if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish != true) }}
-    strategy:
-      fail-fast: false
-      matrix:
-        category: [ "Basic_tests", "SqlServer", "PostgreSQL", "MariaDB", "Sqlite", "Oracle"  ]
-
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ github.sha }}
-    - name: Setup .NET 11 RC3 and earlier
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
-      with:
-         global-json-file: global.json
-         dotnet-version: |
-          8.0.x
-          9.0.x
-          10.0.x
-    - name: Test
-      run: |
-        dotnet test \
-        --project "$PWD/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
-        --max-parallel-test-modules 1 \
-        --report-xunit-junit \
-        --results-directory /tmp/test-results/${{ matrix.category }} \
-        --coverage \
-        --coverage-output-format xml \
-        --coverage-output /tmp/test-results/${{ matrix.category }}.xml
-      env:
-        LogLevel: Warning
-        TZ: UTC
-
-    - name: Retain test results even on failure
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: test-results-${{ matrix.category }}
-        path: /tmp/test-results/
-        if-no-files-found: warn
+    uses: ./.github/workflows/release-tests.yml

@@ -301,6 +301,12 @@ Generating a candidate does not establish public availability or native installa
 
 ## Release contract
 
+The generated [distribution catalog](../distribution-catalog.md) expands every
+channel/profile/platform combination and links to build results. Its source is
+the shared release-asset/profile catalog and build target frameworks; shared
+preflight rejects stale generated content. Workflow badges report main's workflow
+status, while individual matrix-job results remain in the linked Actions run.
+
 The release workflow builds all six profiles with distinct Actions artifacts and
 the version from `set-version-number`. `release-ready` requires all producers,
 and the complete expected ZIP/Debian/MSI inventory is validated before checksums

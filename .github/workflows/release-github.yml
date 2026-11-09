@@ -1,0 +1,43 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · github
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      publish:
+        type: string
+        required: true
+      release-tag:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    if: ${{ startsWith(github.workflow_ref, format('{0}/.github/workflows/build.yml@', github.repository)) && inputs.publish == 'true' }}
+    name: Publish assets to the existing GitHub release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/download-artifact@v8
+      with:
+        name: release-contract-${{ inputs.version }}
+        path: artifacts/release
+    - name: Publish GitHub release assets
+      if: ${{ inputs.publish == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        set -euo pipefail
+        gh release upload "$RELEASE_TAG" \
+          artifacts/release/* \
+          --repo "$GITHUB_REPOSITORY" \
+          --clobber

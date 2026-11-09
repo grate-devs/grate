@@ -43,6 +43,8 @@ CLI ZIP, MSI, Debian and Docker outputs cover All, SQLite, SQLServer, MariaDB,
 PostgreSQL and Oracle. Names use `grate` for All and `grate-<database>` for slim
 profiles; see [distribution identities](distributions.md). All variants expose
 `grate`; uninstall the existing package before switching profiles.
+The generated [distribution catalog](distribution-catalog.md) lists every
+platform/package permutation with release filenames and build-result links.
 
 Debian package metadata maps a SemVer prerelease such as `2.2.0-rc.1` to
 `2.2.0~rc.1-1`, so Debian orders it before the final `2.2.0-1` package.

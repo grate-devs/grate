@@ -79,9 +79,58 @@ function New-Fixture {
     return @{ needs = $needs; jobs = $jobs }
 }
 
-function Invoke-Gate($Fixture, [int] $Attempt = 1) {
+function ConvertTo-ApiJobFixture {
+    param(
+        [object[]]$Jobs
+    )
+
+    # Expected API names are independent of the production mapping.
+    foreach ($job in $Jobs) {
+        $copy = $job.Clone()
+        $prefix = switch -CaseSensitive -Regex ($job.name) {
+            '^Build$' {
+                'Build'
+                break
+            }
+            '^NuGet libraries and installed tool$' {
+                'Packages'
+                break
+            }
+            '^Run tests \((ubuntu|windows)-latest, Basic_tests\)$' {
+                'Isolated tests'
+                break
+            }
+            '^Run tests \(' {
+                'Database tests'
+                break
+            }
+            '^CLI database ' {
+                'CLI distributions'
+                break
+            }
+            '^CLI ' {
+                'Standalone CLI'
+                break
+            }
+            '^Alpine ' {
+                'Docker'
+                break
+            }
+        }
+        if ($prefix) {
+            $copy.name = "$prefix / $($job.name)"
+        }
+        $copy
+    }
+}
+
+function Invoke-Gate($Fixture, [int] $Attempt = 1, [switch]$RawJobEvidence) {
+    $jobs = $Fixture.jobs
+    if (!$RawJobEvidence) {
+        $jobs = @(ConvertTo-ApiJobFixture -Jobs $Fixture.jobs)
+    }
     & $gate -NeedsJson (ConvertTo-Json -InputObject $Fixture.needs -Depth 10 -Compress) `
-        -JobsJson (ConvertTo-Json -InputObject $Fixture.jobs -Depth 10 -Compress) -RunId 123 -RunAttempt $Attempt
+        -JobsJson (ConvertTo-Json -InputObject $jobs -Depth 10 -Compress) -RunId 123 -RunAttempt $Attempt
 }
 
 function Assert-Rejected([string] $Name, [scriptblock] $Action, [string] $Message) {
@@ -97,7 +146,19 @@ $fixture = New-Fixture
 Invoke-Gate $fixture
 $script:passed++
 
+# Reject bare historical names and success from another reusable caller.
+foreach ($apiName in @((ConvertTo-ApiJobFixture -Jobs (New-Fixture).jobs).name | Where-Object { $_ -cne 'PR validation policy' })) {
+    $leafName = $apiName.Substring($apiName.IndexOf(' / ') + 3)
+    foreach ($wrongName in @($leafName, "Unexpected / $leafName", "Extra / $apiName")) {
+        $fixture = New-Fixture
+        $fixture.jobs = @(ConvertTo-ApiJobFixture -Jobs $fixture.jobs)
+        ($fixture.jobs | Where-Object name -CEQ $apiName).name = $wrongName
+        Assert-Rejected "wrong reusable caller $wrongName" { Invoke-Gate $fixture -RawJobEvidence } 'Missing required job'
+    }
+}
+
 # Optional reports and security analysis do not replace any required producer.
+$fixture = New-Fixture
 $fixture.jobs += @{ name = 'Create test report'; status = 'completed'; conclusion = 'success'; run_id = 123; run_attempt = 1 }
 $fixture.jobs += @{ name = 'Analyze Code Security'; status = 'completed'; conclusion = 'failure'; run_id = 123; run_attempt = 1 }
 Invoke-Gate $fixture

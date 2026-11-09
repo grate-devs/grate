@@ -20,6 +20,10 @@ NuGet tools include net8.0, net9.0, net10.0 and net11.0 assets.
 Debian packages cover amd64/arm64; Docker images cover linux/amd64 and linux/arm64.
 The all-in-one package and asset names remain unchanged.
 
+The generated [distribution catalog](distribution-catalog.md) lists every
+package/platform permutation, release filename and package-manager identity,
+with links to build results and workflow status badges.
+
 Every profile also has Windows x64/Arm64 MSI installers, a WinGet candidate,
 a Windows x64 Chocolatey package, a macOS Intel/Arm64 Homebrew cask and a
 source-built Homebrew formula candidate. These changes are available in this

@@ -1,0 +1,155 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · docker publish
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      publish:
+        type: string
+        required: true
+      prerelease:
+        type: string
+        required: true
+      expected-digest:
+        type: string
+        required: true
+    # The leaf environment may supply these values; existing credential checks reject empties.
+    secrets:
+      DOCKER_HUB_TOKEN:
+        required: false
+      DOCKER_HUB_USER:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    if: ${{ startsWith(github.workflow_ref, format('{0}/.github/workflows/build.yml@', github.repository)) && inputs.publish == 'true' }}
+    name: Publish canonical Docker image and compatibility digest
+    environment: docker-hub
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    # Serialize version/latest publication across release runs.
+    concurrency:
+      group: docker-publication
+      cancel-in-progress: false
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+
+    - name: Configure isolated canonical Docker credentials
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/grate-oidc-docker"
+        chmod 700 "$RUNNER_TEMP/grate-oidc-docker"
+        echo "DOCKER_CONFIG=$RUNNER_TEMP/grate-oidc-docker" >> "$GITHUB_ENV"
+
+    - name: Check Docker release policy
+      shell: pwsh
+      run: |
+        ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
+        ./scripts/release/Run-Tests.ps1 -Filter 'test_*docker*.ps1'
+
+    - name: Select identical tags for canonical and compatibility names
+      id: tags
+      if: ${{ inputs.publish == 'true' }}
+      env:
+        VERSION: ${{ inputs.version }}
+        PRERELEASE: ${{ inputs.prerelease }}
+      shell: pwsh
+      run: |
+        ./installers/docker/release_tags.ps1 -Version $env:VERSION -Prerelease:($env:PRERELEASE -eq 'true') -GithubOutput $env:GITHUB_OUTPUT
+
+    - name: Download the verified Docker OCI archive
+      uses: actions/download-artifact@v8
+      with:
+        name: grate-docker-oci-${{ inputs.version }}
+        path: docker-artifact
+
+    - name: Prepare canonical OIDC login and digest-preserving copy tool
+      env:
+        CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -n "$CONNECTION_ID" || { echo '::error::DOCKERHUB_OIDC_CONNECTIONID must be configured in docker-hub.'; exit 1; }
+        mkdir -p "$DOCKER_CONFIG"
+        chmod 700 "$DOCKER_CONFIG"
+        sudo apt-get update -qq
+        sudo apt-get install --yes --no-install-recommends skopeo
+        skopeo --version >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Log in to canonical Docker Hub repository using OIDC
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+      env:
+        DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        # Cover the bounded 45-minute build/copy job, including an uncached build.
+        DOCKERHUB_OIDC_EXPIREIN: '3600'
+      with:
+        username: gratedevs
+
+    - name: Verify separate publishing identities without registry writes
+      env:
+        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      shell: pwsh
+      run: ./scripts/release/check_docker_access.ps1 -CanonicalAuthfile "$env:DOCKER_CONFIG/config.json" -Report docker-access.json
+
+    - name: Publish the verified archive to the canonical repository without rebuilding
+      id: image
+      env:
+        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
+        EXPECTED_DIGEST: ${{ inputs.expected-digest }}
+      shell: pwsh
+      run: ./scripts/release/publish_docker_archive.ps1 -Archive docker-artifact/grate-image.tar -Authfile "$env:DOCKER_CONFIG/config.json" -Report docker-canonical.json
+
+    - name: Copy the built digest to the compatibility repository
+      id: compatibility
+      env:
+        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
+        EXPECTED_DIGEST: ${{ inputs.expected-digest }}
+        DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      shell: pwsh
+      run: ./scripts/release/copy_docker_release.ps1 -SourceAuthfile "$env:DOCKER_CONFIG/config.json" -Report docker-compatibility.json
+
+    - name: Verify every published tag against the built digest
+      if: ${{ always() && inputs.publish == 'true' && steps.tags.outputs.tags != '' }}
+      env:
+        DOCKER_TAGS: ${{ steps.tags.outputs.tags }}
+        EXPECTED_DIGEST: ${{ inputs.expected-digest }}
+        BUILD_OUTCOME: ${{ steps.image.outcome }}
+      # Public read-back deliberately does not use the legacy credential for canonical access.
+      shell: pwsh
+      run: ./scripts/release/verify_docker_release.ps1 -Report docker-publication.json
+
+    - name: Retain publication results, including partial failures
+      if: ${{ always() && inputs.publish == 'true' }}
+      env:
+        BUILD_OUTCOME: ${{ steps.image.outcome }}
+        COPY_OUTCOME: ${{ steps.compatibility.outcome }}
+        EXPECTED_DIGEST: ${{ inputs.expected-digest }}
+      shell: bash
+      run: |
+        echo "Canonical build/push: $BUILD_OUTCOME; compatibility copy: $COPY_OUTCOME; built digest: $EXPECTED_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+        if [[ ! -f docker-publication.json ]]; then
+          echo 'Publication did not reach verification. Some registry tags may already have changed; inspect both repositories before retrying.' >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Upload Docker publication evidence
+      if: ${{ always() && inputs.publish == 'true' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      with:
+        name: docker-publication-${{ github.run_id }}-${{ github.run_attempt }}
+        path: docker-*.json
+        if-no-files-found: warn

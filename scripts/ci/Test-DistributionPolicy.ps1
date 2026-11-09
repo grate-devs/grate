@@ -2,8 +2,9 @@
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/Distribution.Common.ps1"
 Import-Module powershell-yaml -RequiredVersion 0.4.12
+. "$PSScriptRoot/../release/workflow_test_helpers.ps1"
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$workflow = Get-Content -LiteralPath "$repository/.github/workflows/ci.yml" -Raw | ConvertFrom-Yaml
+$workflow = Read-Workflow 'ci.yml'
 $integration = Get-Content -LiteralPath "$repository/.github/workflows/integration-tests.yml" -Raw | ConvertFrom-Yaml
 $expected = @{
     Sqlite = 'SQLite'
