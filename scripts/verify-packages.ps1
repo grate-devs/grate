@@ -3,11 +3,14 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$RuntimeIdentifier,
     [string]$StandaloneVersion = '0.0.1',
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
     [switch]$RunSmokeTest
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot/ci/Distribution.Common.ps1"
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
 $frameworks = @(((dotnet msbuild src/grate/grate.csproj -nologo -getProperty:TargetFrameworks).Trim() -split ';') | Where-Object { $_ })
@@ -45,10 +48,21 @@ function Test-Migration([string]$Executable, [string]$Directory) {
 if ($Kind -eq 'Standalone') {
     if (!$RuntimeIdentifier) { throw '-RuntimeIdentifier is required for Standalone verification.' }
     $published = "$OutputDirectory/published"
-    dotnet publish src/grate/grate.csproj -c Release -f $targetFramework -r $RuntimeIdentifier --self-contained -p:SelfContained=true "-p:TargetFrameworks=$targetFramework" "-p:Version=$StandaloneVersion" -o $published
+    $buildRoot = "$OutputDirectory/build"
+    $publishArguments = @(
+        'publish', 'src/grate/grate.csproj', '-c', 'Release', '-f', $targetFramework,
+        '-r', $RuntimeIdentifier, '--self-contained', '-p:SelfContained=true',
+        "-p:TargetFrameworks=$targetFramework", "-p:Version=$StandaloneVersion",
+        "-p:GrateDistribution=$Distribution", "-p:ArtifactsPath=$buildRoot", '-o', $published
+    )
+    dotnet @publishArguments
     # These files are the inputs embedded by the single-file bundler. Inspecting
     # them proves the runtime version even when the final archive contains one file.
-    $buildDirectory = "src/grate/bin/Release/$targetFramework/$RuntimeIdentifier"
+    $runtimeConfigs = @(Get-ChildItem -LiteralPath "$buildRoot/bin/grate" -Filter grate.runtimeconfig.json -File -Recurse)
+    if ($runtimeConfigs.Count -ne 1) {
+        throw 'Expected exactly one standalone runtime configuration in this build.'
+    }
+    $buildDirectory = $runtimeConfigs[0].DirectoryName
     $runtimeConfig = Get-Content "$buildDirectory/grate.runtimeconfig.json" -Raw | ConvertFrom-Json
     $runtime = @($runtimeConfig.runtimeOptions.includedFrameworks | Where-Object name -eq 'Microsoft.NETCore.App')
     if ($runtime.Count -ne 1 -or $runtime[0].version -notlike "$($targetFramework.Substring(3)).*" -or
@@ -60,12 +74,21 @@ if ($Kind -eq 'Standalone') {
     if (!$deps.libraries.ContainsKey("runtimepack.Microsoft.NETCore.App.Runtime.$RuntimeIdentifier/$bundledRuntime")) {
         throw "Self-contained $RuntimeIdentifier does not reference the expected runtime pack."
     }
+    Assert-DistributionDependencies -Dependencies $deps -Distribution $Distribution
     Copy-Item "$buildDirectory/grate.runtimeconfig.json", "$buildDirectory/grate.deps.json" $OutputDirectory
     if ($RunSmokeTest) {
         $executable = Join-Path $published $(if ($RuntimeIdentifier.StartsWith('win-')) { 'grate.exe' } else { 'grate' })
-        Test-Migration $executable "$OutputDirectory/smoke"
+        Assert-DistributionExecutable -Executable $executable -Distribution $Distribution
+        if ($Distribution -in @('All', 'SQLite')) {
+            Test-Migration $executable "$OutputDirectory/smoke"
+        } else {
+            & $executable skills install --local --path "$OutputDirectory/skill"
+            if (!(Test-Path -LiteralPath "$OutputDirectory/skill/.agents/skills/use-grate/SKILL.md")) {
+                throw 'The standalone CLI did not install its bundled skill.'
+            }
+        }
     }
-    Write-Host "Verified $RuntimeIdentifier bundles $bundledRuntime; native execution: $RunSmokeTest"
+    Write-Host "Verified $Distribution $RuntimeIdentifier bundles $bundledRuntime; native execution: $RunSmokeTest"
     return
 }
 

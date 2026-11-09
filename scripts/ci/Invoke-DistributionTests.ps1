@@ -15,6 +15,165 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/Distribution.Common.ps1"
 
+function Publish-DistributionCli {
+    param(
+        [string]$Distribution,
+        [string]$Framework,
+        [string]$RuntimeIdentifier,
+        [string]$Version,
+        [string]$OutputDirectory
+    )
+
+    $publishArguments = @(
+        'publish', 'src/grate/grate.csproj', '-c', 'Release', '-f', $Framework,
+        '-r', $RuntimeIdentifier, '--self-contained', 'true',
+        "-p:TargetFrameworks=$Framework", "-p:GrateDistribution=$Distribution",
+        "-p:ArtifactsPath=$OutputDirectory/cli-build", "-p:Version=$Version",
+        '-o', "$OutputDirectory/standalone"
+    )
+    dotnet @publishArguments
+
+    $dependencyFiles = @(Get-ChildItem -LiteralPath "$OutputDirectory/cli-build/bin/grate" -Filter grate.deps.json -Recurse)
+    if ($dependencyFiles.Count -ne 1) {
+        throw 'Expected exactly one self-contained CLI dependency manifest.'
+    }
+    $dependencies = Get-Content -LiteralPath $dependencyFiles[0].FullName -Raw | ConvertFrom-Json -AsHashtable
+    Assert-DistributionDependencies -Dependencies $dependencies -Distribution $Distribution
+    Copy-Item -LiteralPath $dependencyFiles[0].FullName -Destination "$OutputDirectory/grate.deps.json"
+}
+
+function Assert-DistributionToolPackage {
+    param(
+        [string]$PackagePath,
+        [string[]]$Frameworks,
+        [string]$Distribution
+    )
+
+    $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
+    try {
+        foreach ($framework in $Frameworks) {
+            $prefix = "tools/$framework/any"
+            $dependencyEntry = $archive.GetEntry("$prefix/grate.deps.json")
+            $settingsEntry = $archive.GetEntry("$prefix/DotnetToolSettings.xml")
+            if (!$dependencyEntry -or !$settingsEntry) {
+                throw "Missing $framework tool payload."
+            }
+            $reader = [IO.StreamReader]::new($dependencyEntry.Open())
+            try {
+                $dependencies = $reader.ReadToEnd() | ConvertFrom-Json -AsHashtable
+                Assert-DistributionDependencies -Dependencies $dependencies -Distribution $Distribution
+            } finally {
+                $reader.Dispose()
+            }
+            $reader = [IO.StreamReader]::new($settingsEntry.Open())
+            try {
+                [xml]$settings = $reader.ReadToEnd()
+                if ($settings.DotNetCliTool.Commands.Command.Name -cne 'grate') {
+                    throw 'Every distribution must expose the command grate.'
+                }
+            } finally {
+                $reader.Dispose()
+            }
+        }
+    } finally {
+        $archive.Dispose()
+    }
+}
+
+function Build-DistributionTool {
+    param(
+        [string]$Distribution,
+        [string[]]$Frameworks,
+        [string]$Version,
+        [string]$PackageId,
+        [string]$OutputDirectory
+    )
+
+    $packArguments = @(
+        'pack', 'src/grate/grate.csproj', '-c', 'Release',
+        '-p:PackAsTool=true', '-p:SelfContained=false',
+        "-p:GrateDistribution=$Distribution", "-p:ArtifactsPath=$OutputDirectory/tool-build",
+        "-p:PackageVersion=$Version", '-o', "$OutputDirectory/packages"
+    )
+    dotnet @packArguments
+    $packageParameters = @{
+        PackagePath = "$OutputDirectory/packages/$PackageId.$Version.nupkg"
+        Frameworks = $Frameworks
+        Distribution = $Distribution
+    }
+    Assert-DistributionToolPackage @packageParameters
+}
+
+function Install-DistributionTool {
+    param(
+        [string]$PackageId,
+        [string]$Version,
+        [string]$Framework,
+        [string]$OutputDirectory
+    )
+
+    # Only the freshly built package may satisfy this installation.
+    $feed = [Security.SecurityElement]::Escape("$OutputDirectory/packages")
+    "<configuration><packageSources><clear/><add key=`"local`" value=`"$feed`"/></packageSources></configuration>" |
+        Set-Content -LiteralPath "$OutputDirectory/NuGet.Config" -Encoding utf8NoBOM
+    $savedPackages = $env:NUGET_PACKAGES
+    try {
+        $env:NUGET_PACKAGES = "$OutputDirectory/tool-cache"
+        $installArguments = @(
+            'tool', 'install', $PackageId, '--version', $Version, '--framework', $Framework,
+            '--tool-path', "$OutputDirectory/tool", '--configfile', "$OutputDirectory/NuGet.Config"
+        )
+        dotnet @installArguments
+    } finally {
+        $env:NUGET_PACKAGES = $savedPackages
+    }
+}
+
+function Build-DistributionTests {
+    param(
+        [string]$Database,
+        [string]$Framework,
+        [string]$OutputDirectory
+    )
+
+    # Tests retain normal All references; only the explicitly selected executable is slim.
+    $buildArguments = @(
+        'build', "unittests/CommandLine/CommandLine.$Database/CommandLine.$Database.csproj",
+        '-c', 'Release', "-p:TargetFrameworks=$Framework", "-p:ArtifactsPath=$OutputDirectory/test-build"
+    )
+    dotnet @buildArguments
+}
+
+function Invoke-DistributionSuites {
+    param(
+        [string]$Distribution,
+        [string]$Database,
+        [string]$Framework,
+        [string]$RuntimeIdentifier,
+        [string]$OutputDirectory
+    )
+
+    $testAssembly = "$OutputDirectory/test-build/bin/CommandLine.$Database/release_$Framework/CommandLine.$Database.dll"
+    if (!(Test-Path -LiteralPath $testAssembly)) {
+        throw "Missing built test assembly: $testAssembly"
+    }
+    $executableName = if ($RuntimeIdentifier.StartsWith('win-')) { 'grate.exe' } else { 'grate' }
+    foreach ($form in @('standalone', 'tool')) {
+        $env:GrateExecutablePath = "$OutputDirectory/$form/$executableName"
+        Assert-DistributionExecutable -Executable $env:GrateExecutablePath -Distribution $Distribution
+        & $env:GrateExecutablePath skills install --local --path "$OutputDirectory/skills-$form"
+        if (!(Test-Path -LiteralPath "$OutputDirectory/skills-$form/.agents/skills/use-grate/SKILL.md")) {
+            throw "$Distribution $form did not install its bundled skill."
+        }
+        $testArguments = @(
+            $testAssembly, '--minimum-expected-tests', '1', '--long-running', '60', '--timeout', '20m',
+            '--results-directory', "$OutputDirectory/results/$form", '--report-xunit-trx'
+        )
+        dotnet @testArguments
+    }
+    Write-Host "PASS: $Distribution standalone and installed tool passed CommandLine.$Database on $Framework."
+}
+
 $databaseDistributions = @{
     Sqlite = 'SQLite'
     SqlServer = 'SQLServer'
@@ -39,88 +198,34 @@ try {
     $framework = $frameworks[-1]
     $version = '0.0.0-ci.' + [Guid]::NewGuid().ToString('N')
     $packageId = if ($Distribution -eq 'All') { 'grate' } else { 'grate-' + $Distribution.ToLowerInvariant() }
-    $publishArguments = @(
-        'publish', 'src/grate/grate.csproj', '-c', 'Release', '-f', $framework,
-        '-r', $RuntimeIdentifier, '--self-contained', 'true',
-        "-p:TargetFrameworks=$framework", "-p:GrateDistribution=$Distribution",
-        "-p:ArtifactsPath=$output/cli-build", "-p:Version=$version", '-o', "$output/standalone"
-    )
-    dotnet @publishArguments
-    $dependencyFiles = @(Get-ChildItem -LiteralPath "$output/cli-build/bin/grate" -Filter grate.deps.json -Recurse)
-    if ($dependencyFiles.Count -ne 1) {
-        throw 'Expected exactly one self-contained CLI dependency manifest.'
+    $publishParameters = @{
+        Distribution = $Distribution
+        Framework = $framework
+        RuntimeIdentifier = $RuntimeIdentifier
+        Version = $version
+        OutputDirectory = $output
     }
-    $dependencies = Get-Content -LiteralPath $dependencyFiles[0].FullName -Raw | ConvertFrom-Json -AsHashtable
-    Assert-DistributionDependencies -Dependencies $dependencies -Distribution $Distribution
-    Copy-Item -LiteralPath $dependencyFiles[0].FullName -Destination "$output/grate.deps.json"
+    Publish-DistributionCli @publishParameters
 
-    $packArguments = @(
-        'pack', 'src/grate/grate.csproj', '-c', 'Release', '-p:PackAsTool=true', '-p:SelfContained=false',
-        "-p:GrateDistribution=$Distribution", "-p:ArtifactsPath=$output/tool-build",
-        "-p:PackageVersion=$version", '-o', "$output/packages"
-    )
-    dotnet @packArguments
-    $package = "$output/packages/$packageId.$version.nupkg"
-    $archive = [IO.Compression.ZipFile]::OpenRead($package)
-    try {
-        foreach ($toolFramework in $frameworks) {
-            $prefix = "tools/$toolFramework/any"
-            $dependencyEntry = $archive.GetEntry("$prefix/grate.deps.json")
-            $settingsEntry = $archive.GetEntry("$prefix/DotnetToolSettings.xml")
-            if (!$dependencyEntry -or !$settingsEntry) {
-                throw "Missing $toolFramework tool payload."
-            }
-            $reader = [IO.StreamReader]::new($dependencyEntry.Open())
-            try {
-                $toolDependencies = $reader.ReadToEnd() | ConvertFrom-Json -AsHashtable
-                Assert-DistributionDependencies -Dependencies $toolDependencies -Distribution $Distribution
-            } finally {
-                $reader.Dispose()
-            }
-            $reader = [IO.StreamReader]::new($settingsEntry.Open())
-            try {
-                [xml]$settings = $reader.ReadToEnd()
-                if ($settings.DotNetCliTool.Commands.Command.Name -cne 'grate') {
-                    throw 'Every distribution must expose the command grate.'
-                }
-            } finally {
-                $reader.Dispose()
-            }
-        }
-    } finally {
-        $archive.Dispose()
+    $toolParameters = @{
+        Distribution = $Distribution
+        Frameworks = $frameworks
+        Version = $version
+        PackageId = $packageId
+        OutputDirectory = $output
     }
+    Build-DistributionTool @toolParameters
+    Install-DistributionTool -PackageId $packageId -Version $version -Framework $framework -OutputDirectory $output
+    Build-DistributionTests -Database $Database -Framework $framework -OutputDirectory $output
 
-    # Install only the freshly built package, with no global cache or remote feed.
-    $feed = [Security.SecurityElement]::Escape("$output/packages")
-    "<configuration><packageSources><clear/><add key=`"local`" value=`"$feed`"/></packageSources></configuration>" |
-        Set-Content -LiteralPath "$output/NuGet.Config" -Encoding utf8NoBOM
-    $env:NUGET_PACKAGES = "$output/tool-cache"
-    dotnet tool install $packageId --version $version --framework $framework --tool-path "$output/tool" --configfile "$output/NuGet.Config"
-
-    # Test references remain All; only the explicitly selected executable is slim.
-    $env:NUGET_PACKAGES = $savedPackages
-    $testProject = "unittests/CommandLine/CommandLine.$Database/CommandLine.$Database.csproj"
-    dotnet build $testProject -c Release "-p:TargetFrameworks=$framework" "-p:ArtifactsPath=$output/test-build"
-    $testAssembly = "$output/test-build/bin/CommandLine.$Database/release_$framework/CommandLine.$Database.dll"
-    if (!(Test-Path -LiteralPath $testAssembly)) {
-        throw "Missing built test assembly: $testAssembly"
+    $suiteParameters = @{
+        Distribution = $Distribution
+        Database = $Database
+        Framework = $framework
+        RuntimeIdentifier = $RuntimeIdentifier
+        OutputDirectory = $output
     }
-    $executableName = if ($RuntimeIdentifier.StartsWith('win-')) { 'grate.exe' } else { 'grate' }
-    foreach ($form in @('standalone', 'tool')) {
-        $env:GrateExecutablePath = "$output/$form/$executableName"
-        Assert-DistributionExecutable -Executable $env:GrateExecutablePath -Distribution $Distribution
-        & $env:GrateExecutablePath skills install --local --path "$output/skills-$form"
-        if (!(Test-Path -LiteralPath "$output/skills-$form/.agents/skills/use-grate/SKILL.md")) {
-            throw "$Distribution $form did not install its bundled skill."
-        }
-        $testArguments = @(
-            $testAssembly, '--minimum-expected-tests', '1', '--long-running', '60', '--timeout', '20m',
-            '--results-directory', "$output/results/$form", '--report-xunit-trx'
-        )
-        dotnet @testArguments
-    }
-    Write-Host "PASS: $Distribution standalone and installed tool passed CommandLine.$Database on $framework."
+    Invoke-DistributionSuites @suiteParameters
 } finally {
     $env:GrateExecutablePath = $savedExecutable
     $env:NUGET_PACKAGES = $savedPackages

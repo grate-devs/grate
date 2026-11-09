@@ -16,6 +16,8 @@ on:
       - "Directory.*"
       - "GitVersion.yml"
       - "scripts/release/**"
+      - "scripts/verify-packages.ps1"
+      - "scripts/ci/Distribution.Common.ps1"
       - "installers/**"
       - "src/**"
   release:
@@ -115,6 +117,9 @@ jobs:
     name: Build .NET Core (global) tool
 
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
 
     steps:
     - uses: actions/checkout@v7
@@ -128,12 +133,13 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet pack ./src/grate/grate.csproj -p:SelfContained=false -p:PackAsTool=true -p:PackageOutputPath=/tmp/grate/nupkg -p:version=${{ needs.set-version-number.outputs.nuGetVersion }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }} # Preserve per-framework tool assets; RID packaging remains disabled for #714
+      shell: pwsh
+      run: dotnet pack ./src/grate/grate.csproj -c Release -p:SelfContained=false -p:PackAsTool=true -p:GrateDistribution=${{ matrix.distribution }} -p:ArtifactsPath=/tmp/grate/build -p:PackageOutputPath=/tmp/grate/nupkg -p:Version=${{ needs.set-version-number.outputs.nuGetVersion }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }}
 
     - name: Upload published tool artifact
       uses: actions/upload-artifact@v7
       with:
-        name: nuget-grate-tool-${{ needs.set-version-number.outputs.semVer }}
+        name: ${{ matrix.distribution == 'All' && format('nuget-grate-tool-{0}', needs.set-version-number.outputs.semVer) || format('nuget-grate-tool-{0}-{1}', matrix.distribution, needs.set-version-number.outputs.semVer) }}
         path: /tmp/grate/nupkg/*
         if-no-files-found: error
 
@@ -228,48 +234,18 @@ jobs:
         user: ${{ secrets.NUGET_USER }}
 
     - name: Push packages to NuGet.org
-      shell: bash
+      shell: pwsh
       env:
         NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
       run: |
-        set -euo pipefail
-        mapfile -d '' packages < <(
-          find artifacts/nuget -type f -name '*.nupkg' ! -name '*.snupkg' -print0 | sort -z
-        )
-        if [ "${#packages[@]}" -ne 7 ]; then
-          echo "::error::Expected exactly seven NuGet packages, found ${#packages[@]}."
-          exit 1
-        fi
-
-        declare -A expected_ids=(
-          [grate]=1
-          [grate.core]=1
-          [grate.mariadb]=1
-          [grate.oracle]=1
-          [grate.postgresql]=1
-          [grate.sqlite]=1
-          [grate.sqlserver]=1
-        )
-        for package in "${packages[@]}"; do
-          nuspec="$(unzip -p "$package" '*.nuspec')"
-          package_id="$(sed -n 's:.*<id>\([^<]*\)</id>.*:\1:p' <<< "$nuspec" | head -n 1)"
-          package_version="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' <<< "$nuspec" | head -n 1)"
-          if [ -z "${expected_ids[$package_id]+present}" ] || [ "${expected_ids[$package_id]}" -ne 1 ]; then
-            echo "::error::Unexpected or duplicate NuGet package ID '$package_id' in $package."
-            exit 1
-          fi
-          if [ "$package_version" != "$VERSION" ]; then
-            echo "::error::$package contains version '$package_version', expected '$VERSION'."
-            exit 1
-          fi
-          expected_ids[$package_id]=0
-
-          dotnet nuget push "$package" \
-            --source https://api.nuget.org/v3/index.json \
-            --api-key "$NUGET_API_KEY" \
-            --skip-duplicate
-        done
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        . ./scripts/release/distribution_profiles.ps1
+        $packages = @(Get-GrateReleaseNugetPackages -Directory artifacts/nuget -Version $env:VERSION)
+        foreach ($package in $packages) {
+          dotnet nuget push $package --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY --skip-duplicate
+        }
 
   build-standalone:
     name: Build cli
@@ -278,6 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
         arch: [ "win-x64", "win-x86", "win-arm64",
                 "linux-musl-x64", "linux-musl-arm64", "linux-x64", "linux-arm64",
                 "osx-x64"
@@ -293,30 +270,41 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish ./src/grate/grate.csproj --framework net11.0 -p:TargetFrameworks=net11.0 -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      shell: pwsh
+      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.nuGetVersion }}' -OutputDirectory './publish/${{ matrix.arch }}'
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
         TargetFramework: net11.0
 
 
+    - name: Select distribution identity
+      id: distribution
+      shell: pwsh
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+        "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
     - name: Upload self-contained ${{ matrix.arch }}
       #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
       uses: actions/upload-artifact@v7
       with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
-        path: ./publish/${{ matrix.arch }}/self-contained/*
+        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
+        path: ./publish/${{ matrix.arch }}/published/*
         if-no-files-found: error
 
     - name: Package release archive ${{ matrix.arch }}
+      shell: pwsh
       run: |
-        name=grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        zip -j "$name" ./publish/${{ matrix.arch }}/self-contained/*
+        $PSNativeCommandUseErrorActionPreference = $true
+        $name = '${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip'
+        $files = @(Get-ChildItem -LiteralPath './publish/${{ matrix.arch }}/published' -File | Select-Object -ExpandProperty FullName)
+        zip -j $name @files
 
     - name: Upload release archive ${{ matrix.arch }}
       uses: actions/upload-artifact@v7
       with:
-        name: release-grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        path: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
+        name: release-${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
+        path: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
         if-no-files-found: error
 
 
@@ -333,6 +321,7 @@ jobs:
     runs-on: macos-15
     strategy:
       matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
         arch: [ "osx-arm64" ]
 
     steps:
@@ -346,29 +335,40 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish ./src/grate/grate.csproj --framework net11.0 -p:TargetFrameworks=net11.0 -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      shell: pwsh
+      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.nuGetVersion }}' -OutputDirectory './publish/${{ matrix.arch }}'
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
         TargetFramework: net11.0
 
+    - name: Select distribution identity
+      id: distribution
+      shell: pwsh
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+        "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
     - name: Upload self-contained ${{ matrix.arch }}
       #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
       uses: actions/upload-artifact@v7
       with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
-        path: ./publish/${{ matrix.arch }}/self-contained/*
+        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
+        path: ./publish/${{ matrix.arch }}/published/*
         if-no-files-found: error
 
     - name: Package release archive ${{ matrix.arch }}
+      shell: pwsh
       run: |
-        name=grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        zip -j "$name" ./publish/${{ matrix.arch }}/self-contained/*
+        $PSNativeCommandUseErrorActionPreference = $true
+        $name = '${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip'
+        $files = @(Get-ChildItem -LiteralPath './publish/${{ matrix.arch }}/published' -File | Select-Object -ExpandProperty FullName)
+        zip -j $name @files
 
     - name: Upload release archive ${{ matrix.arch }}
       uses: actions/upload-artifact@v7
       with:
-        name: release-grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
-        path: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
+        name: release-${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
+        path: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}.zip
         if-no-files-found: error
 
   build-msi:
@@ -480,6 +480,75 @@ jobs:
           ${{ runner.temp }}/docker-archive-validation.json
         if-no-files-found: error
 
+  build-slim-docker-images:
+    name: Build and verify ${{ matrix.distribution }} Docker archive
+    needs: set-version-number
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Build the selected profile into a retained OCI archive
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          file: ./installers/docker/Dockerfile
+          context: .
+          platforms: linux/amd64,linux/arm64
+          pull: true
+          push: false
+          outputs: type=oci,dest=${{ runner.temp }}/grate-image.tar
+          tags: gratedevs/grate:build-${{ matrix.distribution }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/grate-devs/grate
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.set-version-number.outputs.semVer }}
+            org.opencontainers.image.flavor=${{ matrix.distribution }}
+          build-args: |
+            VERSION=${{ needs.set-version-number.outputs.semVer }}
+            GRATE_DISTRIBUTION=${{ matrix.distribution }}
+      - name: Bind and preflight the profile archive before the release gate
+        shell: pwsh
+        env:
+          DISTRIBUTION: ${{ matrix.distribution }}
+          VERSION: ${{ needs.set-version-number.outputs.semVer }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
+          PUBLISH: ${{ needs.set-version-number.outputs.is-release }}
+          PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends skopeo
+          $parameters = @{
+            Distribution = $env:DISTRIBUTION
+            Version = $env:VERSION
+            SourceCommit = $env:SOURCE_COMMIT
+            ExpectedDigest = $env:EXPECTED_DIGEST
+            Archive = "$env:RUNNER_TEMP/grate-image.tar"
+            Report = "$env:RUNNER_TEMP/slim-archive-validation.json"
+            Mode = $(if ($env:PUBLISH -eq 'true') { 'Preflight' } else { 'Verify' })
+            Prerelease = $env:PRERELEASE -eq 'true'
+          }
+          ./scripts/release/publish_slim_docker_archive.ps1 @parameters
+      - name: Retain the profile archive and its verified identity
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: grate-docker-${{ matrix.distribution }}-oci-${{ needs.set-version-number.outputs.semVer }}
+          path: |
+            ${{ runner.temp }}/grate-image.tar
+            ${{ runner.temp }}/slim-archive-validation.json
+          if-no-files-found: error
+
   build-deb:
     name: Build Debian package
     needs:
@@ -488,14 +557,22 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
         arch: [ "linux-arm64", "linux-x64" ]
     steps:
     - uses: actions/checkout@v7
       with:
         ref: ${{ github.sha }}
+    - name: Select distribution identity
+      id: distribution
+      shell: pwsh
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+        "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
     - uses: actions/download-artifact@v8
       with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
+        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
         path: ${{ matrix.arch }}/
 
     - id: get-arch
@@ -509,21 +586,23 @@ jobs:
       run: ./installers/deb/Test-PackageVersion.Tests.ps1 -Architecture ${{ steps.get-arch.outputs.arch }}
 
     - name: Create dpkg # Linux with powershell script? really? YES! :D
-      run: ./installers/deb/Create-Package.ps1 -grateExe ./${{ matrix.arch }}/grate -Version "${{ needs.set-version-number.outputs.semVer }}" -arch ${{ steps.get-arch.outputs.arch}}
+      shell: pwsh
+      run: ./installers/deb/Create-Package.ps1 -grateExe ./${{ matrix.arch }}/grate -Version "${{ needs.set-version-number.outputs.semVer }}" -arch ${{ steps.get-arch.outputs.arch}} -Distribution ${{ matrix.distribution }}
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
 
     - name: Prepare Debian release asset ${{ steps.get-arch.outputs.arch }}
+      shell: pwsh
       run: |
-        old_name=./installers/deb/grate_${{ needs.set-version-number.outputs.semVer }}-1_${{ steps.get-arch.outputs.arch }}.deb
-        release_name=grate_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb
-        mv "$old_name" "$release_name"
+        $oldName = './installers/deb/${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}-1_${{ steps.get-arch.outputs.arch }}.deb'
+        $releaseName = '${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb'
+        Move-Item -LiteralPath $oldName -Destination $releaseName
 
     - name: Upload Debian release asset ${{ steps.get-arch.outputs.arch }}
       uses: actions/upload-artifact@v7
       with:
-        name: release-grate_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb
-        path: grate_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb
+        name: release-${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb
+        path: ${{ steps.distribution.outputs.package-id }}_${{ needs.set-version-number.outputs.semVer }}_${{ steps.get-arch.outputs.arch }}.deb
         if-no-files-found: error
 
   release-ready:
@@ -538,6 +617,7 @@ jobs:
       - build-standalone-mac-arm64
       - build-msi
       - build-docker-image
+      - build-slim-docker-images
       - build-deb
     runs-on: ubuntu-latest
     permissions:
@@ -548,12 +628,29 @@ jobs:
       env:
         REQUIRED_RESULTS: ${{ toJSON(needs) }}
       run: jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$REQUIRED_RESULTS"
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
     - name: Download release assets
       uses: actions/download-artifact@v8
       with:
         pattern: release-grate*
         path: artifacts/release
         merge-multiple: true
+    - name: Download the complete NuGet candidate set
+      uses: actions/download-artifact@v8
+      with:
+        pattern: nuget-*-${{ needs.set-version-number.outputs.semVer }}
+        path: artifacts/nuget
+        merge-multiple: true
+    - name: Validate all NuGet identities before release publication
+      shell: pwsh
+      env:
+        VERSION: ${{ needs.set-version-number.outputs.semVer }}
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        Get-GrateReleaseNugetPackages -Directory artifacts/nuget -Version $env:VERSION | Out-Null
 
     - name: Summarize release contract
       shell: bash
@@ -567,62 +664,11 @@ jobs:
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Validate release assets and generate manifest
-      shell: bash
+      shell: pwsh
       env:
         RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
-      run: |
-        set -euo pipefail
-        expected_assets=(
-          "grate-linux-arm64-self-contained-$VERSION.zip"
-          "grate-linux-musl-arm64-self-contained-$VERSION.zip"
-          "grate-linux-musl-x64-self-contained-$VERSION.zip"
-          "grate-linux-x64-self-contained-$VERSION.zip"
-          "grate-msi-win-arm64-$VERSION.msi"
-          "grate-msi-win-x64-$VERSION.msi"
-          "grate-osx-arm64-self-contained-$VERSION.zip"
-          "grate-osx-x64-self-contained-$VERSION.zip"
-          "grate-win-arm64-self-contained-$VERSION.zip"
-          "grate-win-x64-self-contained-$VERSION.zip"
-          "grate-win-x86-self-contained-$VERSION.zip"
-          "grate_${VERSION}_amd64.deb"
-          "grate_${VERSION}_arm64.deb"
-        )
-        actual_count="$(find artifacts/release -maxdepth 1 -type f | wc -l | tr -d ' ')"
-        if [ "$actual_count" -ne "${#expected_assets[@]}" ]; then
-          echo "::error::Expected ${#expected_assets[@]} release assets, found $actual_count."
-          find artifacts/release -maxdepth 1 -type f -print
-          exit 1
-        fi
-        for asset in "${expected_assets[@]}"; do
-          if [ ! -f "artifacts/release/$asset" ]; then
-            echo "::error::Missing release asset: $asset"
-            exit 1
-          fi
-        done
-
-        (
-          cd artifacts/release
-          sha256sum "${expected_assets[@]}" > checksums.sha256
-
-          assets_json="$({
-            for asset in "${expected_assets[@]}"; do
-              jq -n \
-                --arg name "$asset" \
-                --arg sha256 "$(sha256sum "$asset" | cut -d' ' -f1)" \
-                --argjson size "$(stat -c '%s' "$asset")" \
-                '{name: $name, sha256: $sha256, size: $size}'
-            done
-          } | jq -s .)"
-
-          jq -n \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg tag "$RELEASE_TAG" \
-            --arg version "$VERSION" \
-            --argjson assets "$assets_json" \
-            '{repository: $repository, tag: $tag, version: $version, assets: $assets}' \
-            > release-manifest.json
-        )
+      run: ./scripts/release/New-ReleaseManifest.ps1 -Directory artifacts/release -Version $env:VERSION -Tag $env:RELEASE_TAG -Repository $env:GITHUB_REPOSITORY
 
     - name: Upload validated release contract
       uses: actions/upload-artifact@v7
@@ -787,6 +833,87 @@ jobs:
         name: docker-publication-${{ github.run_id }}-${{ github.run_attempt }}
         path: docker-*.json
         if-no-files-found: warn
+
+  publish-slim-docker:
+    name: Publish verified ${{ matrix.distribution }} Docker archive
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
+    environment: docker-hub
+    needs: [set-version-number, build-slim-docker-images, release-ready, publish-github-release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+    concurrency:
+      group: docker-publication-${{ matrix.distribution }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download this profile's verified source artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: grate-docker-${{ matrix.distribution }}-oci-${{ needs.set-version-number.outputs.semVer }}
+          path: slim-docker-artifact
+      - name: Configure isolated canonical Docker credentials and copy tool
+        shell: pwsh
+        env:
+          CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (!$env:CONNECTION_ID) {
+            throw 'DOCKERHUB_OIDC_CONNECTIONID must be configured in docker-hub.'
+          }
+          $directory = "$env:RUNNER_TEMP/slim-docker-auth"
+          New-Item -ItemType Directory -Path $directory | Out-Null
+          chmod 700 $directory
+          "DOCKER_CONFIG=$directory" | Add-Content -LiteralPath $env:GITHUB_ENV
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends skopeo
+      - name: Log in to canonical Docker Hub repository using OIDC
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+          DOCKERHUB_OIDC_EXPIREIN: '3600'
+        with:
+          username: gratedevs
+      - name: Publish and read back the exact verified profile digest
+        shell: pwsh
+        env:
+          DISTRIBUTION: ${{ matrix.distribution }}
+          VERSION: ${{ needs.set-version-number.outputs.semVer }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          PRERELEASE: ${{ needs.set-version-number.outputs.is-prerelease }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $verification = Get-Content -LiteralPath slim-docker-artifact/slim-archive-validation.json -Raw | ConvertFrom-Json
+          $parameters = @{
+            Distribution = $env:DISTRIBUTION
+            Version = $env:VERSION
+            SourceCommit = $env:SOURCE_COMMIT
+            ExpectedDigest = $verification.expected_digest
+            Archive = 'slim-docker-artifact/grate-image.tar'
+            VerificationReport = 'slim-docker-artifact/slim-archive-validation.json'
+            Authfile = "$env:DOCKER_CONFIG/config.json"
+            Report = 'docker-slim-publication.json'
+            Mode = 'Publish'
+            Prerelease = $env:PRERELEASE -eq 'true'
+          }
+          ./scripts/release/publish_slim_docker_archive.ps1 @parameters
+      - name: Retain profile publication results including partial failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: docker-publication-${{ matrix.distribution }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: docker-slim-publication.json
+          if-no-files-found: warn
 
   prepare-winget:
     name: Prepare WinGet migration candidate (no submission)

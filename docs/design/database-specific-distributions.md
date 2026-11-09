@@ -7,11 +7,11 @@ in #909, and the broader provider architecture has its own discussion.
 [Architecture issue #891](https://github.com/grate-devs/grate/issues/891)
 
 The checkout supports `All`, `SQLite`, `SQLServer`, `MariaDB`, `PostgreSQL` and
-`Oracle` build profiles. The original Linux x64 comparison builds the first four,
-installs the tools from local packages, runs migrations against the respective databases
-and compares artifact sizes. Packaging mode also builds Linux amd64 Docker
-images and Debian packages and exercises their normal entry points.
-[Run the PoC](slim-distributions-poc/README.md)
+`Oracle` build profiles. All six are included in the standalone platform matrix,
+NuGet tool packages, Docker images and Debian packages. Validation runs the
+matching database suite against standalone and installed tools. The size comparison
+builds all six profiles for the selected RID.
+[Build, validate and compare distributions](../distributions.md)
 
 ## Existing release build
 
@@ -26,7 +26,7 @@ images and Debian packages and exercises their normal entry points.
   [Framework targets](../../Directory.Build.props)
 - The release workflow validates its expected GitHub asset list before generating
   `checksums.sha256` and `release-manifest.json`. The NuGet publisher validates
-  seven package IDs at the release version. CI exercises standalone and installed
+  twelve package IDs at the release version. CI exercises standalone and installed
   tool builds. [CI workflow](../../.github/workflows/ci.yml) ·
   [Package verification script](../../scripts/verify-packages.ps1)
 
@@ -53,7 +53,7 @@ grate --connectionstring "Server=localhost;Database=example;User ID=example;Pass
 
 A global tool installation or a project tool manifest selects one variant.
 Switching a global installation requires uninstalling the current package before
-installing another variant with the same command name. The PoC uses separate
+installing another variant with the same command name. Validation uses separate
 tool paths to verify every package. [.NET tool packaging](https://learn.microsoft.com/en-us/dotnet/core/tools/global-tools-how-to-create)
 
 Each slim build accepts explicit selection of its database as well as its default.
@@ -81,10 +81,10 @@ artifact roots keep the variants' restore and build outputs isolated.
 [MSBuild artifact layout](https://learn.microsoft.com/en-us/dotnet/core/sdk/artifacts-output)
 
 These commands build the SQL Server variant using a local candidate version.
-CI would use the existing version outputs and SDK pin.
+CI uses the existing version outputs and SDK pin for every profile.
 
 ```sh
-out="$PWD/artifacts/sqlserver-pilot"
+out="$PWD/artifacts/sqlserver-build"
 
 dotnet publish src/grate/grate.csproj -c Release -f net11.0 -r linux-x64 \
   --self-contained -p:TargetFrameworks=net11.0 -p:GrateDistribution=SQLServer \
@@ -92,17 +92,16 @@ dotnet publish src/grate/grate.csproj -c Release -f net11.0 -r linux-x64 \
 
 dotnet pack src/grate/grate.csproj -c Release \
   -p:PackAsTool=true -p:SelfContained=false -p:GrateDistribution=SQLServer \
-  -p:Version=0.0.1 -p:PackageVersion=0.0.1-pilot \
+  -p:Version=0.0.1 -p:PackageVersion=0.0.1 \
   -p:ArtifactsPath="$out/tool-build" -o "$out/feed"
 ```
 
 ## Verification and size comparison
 
-The original comparison exercises SQLite, SQL Server and MariaDB extracted ZIPs
-and installed tools against their databases, then reruns the migration with explicit provider selection. A
-separate direct-client program queries data, script hashes/history and migration
-errors after both invocations. The all-in-one packages exercise all three
-databases using the same fixture and checks.
+Validation exercises all five database-specific standalone CLIs and installed
+tools, plus All against every database. The matching CommandLine suites query
+data, migration history and errors after migrations and reruns. SQL Server also
+has a case-sensitive database lane with a direct collation assertion.
 
 Each tool framework's metadata must declare command `grate`. Dependency checks
 require the selected provider and client libraries, and exclude other provider
@@ -112,9 +111,8 @@ match the local build. Bundled skill installation is exercised as well.
 Executable, ZIP and NuGet package sizes are compared using matching versions,
 SDK, frameworks and compression. Standalone ZIPs include .NET, while tool
 packages include four framework targets and their runtime assets. Measurements
-and execution limits belong in the PR verification record. The runnable checks
-and reproduction instructions are in the PoC directory.
-[PoC verification](slim-distributions-poc/README.md)
+and execution limits belong in the PR verification record.
+[Reproduce validation and measurements](../distributions.md)
 
 PR CI requires the corresponding CommandLine suite against each slim profile and
 All, including SQL Server's case-sensitive fixture. Both the self-contained CLI
@@ -129,7 +127,7 @@ propagated rather than allowed to pass the workflow.
 The same six profiles can feed the other channels. The proposed names below
 show SQLite as the example. SQL Server, MariaDB, PostgreSQL and Oracle use
 `sqlserver`, `mariadb`, `postgresql` and `oracle` identifiers. These are channel design proposals for
-#909. The executable PoC covers Linux x64 ZIPs, NuGet tools, Linux amd64
+#909. Standalone ZIPs cover every current RID, with matching NuGet tools,
 Docker images and Debian packages.
 
 | Channel | Existing all-in-one identity | Proposed SQLite selection | Installed command |
@@ -154,16 +152,17 @@ mixing installation methods.
 
 Extend standalone publishing with the distribution dimension and reuse the
 matching verified output in downstream installers. Match the current RID
-support explicitly. The Linux x64 PoC provides execution evidence for that RID.
+support explicitly. Execution evidence identifies the exact RID and source in
+the PR and release verification records.
 Each additional Windows, macOS, Arm64 and musl build needs its own packaged
 checks. Release downloads should group assets by provider and platform so users
 can find one artifact without scanning the complete matrix.
 
 Docker uses Alpine and musl builds for amd64/arm64. The Dockerfile accepts
 `GRATE_DISTRIBUTION` and passes `GrateDistribution` to `dotnet publish`. The
-release proposal would keep one checked OCI archive
-and multi-platform digest per profile. Add a distribution label so verification
-can match the selected profile to its payload and expected platforms.
+release workflow keeps one checked OCI archive and multi-platform digest per
+profile, with a distribution label. The retained verification report binds
+profile, version, source commit and digest before publication.
 [Docker build](../../installers/docker/Dockerfile)
 
 The entrypoint supplies `--databasetype` only when `DATABASE_TYPE` has a value.
@@ -177,9 +176,10 @@ Use profile-prefixed tags such as `sqlite-<version>`, `sqlserver-<version>`
 a valid all-in-one SemVer prerelease tag. Stable releases can update `:sqlite`,
 `:sqlserver`, `:mariadb`, `:postgresql` and `:oracle`. Prereleases publish only their versioned tags.
 Keep version parsing separate from tag rendering, and validate complete tags.
-The proposal adds new variants under the canonical repository. The existing
+New variants are added under the canonical repository. The existing
 compatibility-image policy continues to govern the all-in-one image.
 [Tag policy](../../installers/docker/release_tags.ps1) ·
+[Profile publication](../../scripts/release/publish_slim_docker_archive.ps1) ·
 [Digest-preserving publication](../../installers/docker/RELEASE.md)
 
 ### Debian
@@ -265,18 +265,18 @@ binary from that run. Docker musl and Homebrew source builds retain their own
 build and verification paths. Record the profile in artifact metadata so a
 correct filename alone cannot select an all-in-one payload for a slim package.
 
-If all six profiles covered every current platform, the primary output counts
-would grow as follows. This is a planning comparison for choosing coverage.
+All six profiles cover every current standalone platform. The output inventory
+and remaining installer-channel work are:
 
-| Output | All-in-one today | Six profiles at current coverage |
+| Output | All-in-one | Current profile coverage |
 | --- | ---: | ---: |
 | Standalone ZIPs, nine RIDs | 9 | 54 |
-| MSI, x64/Arm64 | 2 | 12 |
+| MSI, x64/Arm64 | 2 | 2; profile-specific installer identities are a separate channel change |
 | Debian, amd64/Arm64 | 2 | 12 |
 | NuGet tools | 1 | 6 |
 | Docker multi-platform images | 1 | 6 |
 
-The ZIP/MSI/Debian release inventory would therefore grow from 13 to 78 files,
+The ZIP/MSI/Debian release inventory contains 54 ZIPs, 2 MSI files and 12 Debian packages,
 plus checksum and manifest files. Measure installer and image download sizes in
 MB independently. The Linux glibc ZIP measurements do not establish Alpine
 image sizes or Windows/macOS installer savings.
@@ -288,32 +288,27 @@ point, unsupported-provider rejection, bundled-skill verification, and clean
 upgrade/uninstall behavior. Bind those checks to the artifacts being released.
 [Package lifecycle checks](../Packaging.md#package-lifecycle-checks-in-ci)
 
-The original packaging comparison exercises Docker musl-x64 and installed Debian
-amd64 packages for SQLite, SQL Server and MariaDB. Additional architectures, the
-Windows installer/identity
-chain and macOS Homebrew validation require their own runner coverage. Select
-which channels and profiles should ship through #909.
+Docker builds cover both supported Linux architectures for every profile.
+Windows installer identities and package-manager wrappers retain their separate
+channel requirements; a portable Windows CLI is available for every profile.
 
-## Add selected variants to the release contract
+## Release contract
 
-Once the released variants and platform coverage are agreed in #909, add them to
-the existing release workflow with distinct Actions artifacts and the version
-from `set-version-number`. Run the packaged checks against the candidates
-that will be uploaded, and have `release-ready` require their successful results.
-Add the ZIPs to the expected asset list so checksums and the manifest cover them.
+The release workflow builds all six profiles with distinct Actions artifacts and
+the version from `set-version-number`. `release-ready` requires all producers,
+and the complete expected ZIP/Debian/MSI inventory is validated before checksums
+and the release manifest are generated. All asset names remain compatible.
 
-Expand the NuGet allowlist to include the selected tool IDs. Shipping all five
-slim tools would produce twelve packages with the existing six libraries and
-all-in-one tool. Validate the complete set and versions before publication.
+The NuGet allowlist includes all five slim tool IDs, the six existing libraries
+and the all-in-one tool: twelve packages. The complete set and versions are
+validated before publication.
 Confirm availability of the new package IDs and that the NuGet trusted-publishing
 policy permits their creation and subsequent versions.
 [Release configuration](../ReleaseConfiguration.md) ·
 [NuGet trusted publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
 
-## Decisions for #909
+## Decisions recorded from #909
 
-- Which of the demonstrated variants should ship, and on which RIDs? The PoC
-  covers Linux x64. Windows x64 and macOS Arm64 would extend the native test
-  matrix and release asset list.
-- Do the download savings justify maintaining more packages? Use the measurements
-  to decide which providers and additional distribution channels warrant variants.
+- Ship all five database-specific profiles alongside All on every existing CLI RID.
+- Keep the extra packages: the measured download savings justify the distribution
+  variants. The command remains `grate` in every profile.

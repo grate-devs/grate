@@ -177,14 +177,15 @@ gh run watch "$RUN_ID" --repo grate-devs/grate --exit-status
 | --- | --- |
 | Resolve release context | Correct tag, source SHA, version and prerelease setting |
 | Build and validate | CLI archives, MSI, Debian, NuGet and Docker OCI archive succeed |
-| Release contract ready | Every required packaging/policy job succeeds; all 13 payload files exist |
+| Release contract ready | Every required packaging/policy job succeeds; all 68 payload files exist |
 | GitHub and NuGet publication | Files attached to the release; exact NuGet versions published in a separate job |
 | Docker, Homebrew and WinGet handoff | Docker digest promotion/copy; stable cask update; stable WinGet candidate retained |
 
-Docker is built once per run into an amd64/arm64 OCI archive and verified before
-publication. Its publication job promotes that retained archive, then copies the
-same digest to the compatibility repository. It does not rebuild the image in
-the publishing job or promote an archive from an earlier PR run.
+Each Docker profile is built once per run into an amd64/arm64 OCI archive and
+verified before publication. Publication promotes that profile's retained
+archive, bound to its version, source and digest. All also copies its digest to
+the compatibility repository. Publishing does not rebuild an image or promote
+an archive from an earlier PR run.
 
 The application-test job is intentionally skipped in a release or publishing
 recovery run. Use the separate test evidence collected before publication.
@@ -202,7 +203,7 @@ upload. Do not announce that every channel is updated until it is observable.
 
 ### GitHub files and checksums
 
-Expect **15 uploaded files**: nine CLI ZIPs, two MSIs, two Debian packages,
+Expect **70 uploaded files**: 54 CLI ZIPs, two MSIs, twelve Debian packages,
 `checksums.sha256` and `release-manifest.json`. GitHub's automatically generated
 source ZIP/tarball are additional downloads, outside this count.
 
@@ -220,15 +221,17 @@ gh release download "$RELEASE_TAG" --repo grate-devs/grate --dir "$RELEASE_DIR"
 (cd "$RELEASE_DIR" && shasum -a 256 --check checksums.sha256)
 ```
 
-Use a fresh directory for each inspection. All 13 payload files should report
+Use a fresh directory for each inspection. All 68 payload files should report
 `OK`. Check the manifest's `version`, `tag` and asset names/sizes as well. On
 Windows, use `Get-FileHash -Algorithm SHA256` to compare downloaded files with
 the checksum list or manifest. Matching filenames alone are not verification.
 
 ### NuGet and native package smoke checks
 
-Check the exact version on NuGet for `grate`, `grate.core`, `grate.mariadb`,
-`grate.oracle`, `grate.postgresql`, `grate.sqlite` and `grate.sqlserver`.
+Check the exact version on NuGet for the six tools (`grate`, `grate-sqlite`,
+`grate-sqlserver`, `grate-mariadb`, `grate-postgresql`, `grate-oracle`) and the
+six libraries (`grate.core`, `grate.mariadb`, `grate.oracle`, `grate.postgresql`,
+`grate.sqlite`, `grate.sqlserver`).
 The tool can be installed into a fresh local path to avoid replacing your normal
 installation:
 

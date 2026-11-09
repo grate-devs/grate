@@ -32,10 +32,29 @@ ConvertTo-Json -InputObject @($args) | Set-Content 'publish-args.json'
 if ($env:GRATE_MOCK_PUBLISH_EXIT) { exit ([int]$env:GRATE_MOCK_PUBLISH_EXIT) }
 $rid = $args[[Array]::IndexOf($args, '-r') + 1]
 $output = $args[[Array]::IndexOf($args, '-o') + 1]
-$build = "src/grate/bin/Release/net11.0/$rid"
+$artifactArgument = @($args | Where-Object { $_.StartsWith('-p:ArtifactsPath=') })[0]
+$artifactRoot = $artifactArgument.Substring('-p:ArtifactsPath='.Length)
+$profileArgument = @($args | Where-Object { $_.StartsWith('-p:GrateDistribution=') })[0]
+$profile = $profileArgument.Substring('-p:GrateDistribution='.Length)
+$build = "$artifactRoot/bin/grate/release_net11.0_$rid"
 New-Item -ItemType Directory -Path $output, $build -Force | Out-Null
 '{"runtimeOptions":{"includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"11.0.0-rc.3.26522.148"}]}}' | Set-Content "$build/grate.runtimeconfig.json"
-@{ libraries = @{ "runtimepack.Microsoft.NETCore.App.Runtime.$rid/11.0.0-rc.3.26522.148" = @{} } } | ConvertTo-Json -Depth 5 | Set-Content "$build/grate.deps.json"
+$libraries = @{ "runtimepack.Microsoft.NETCore.App.Runtime.$rid/11.0.0-rc.3.26522.148" = @{} }
+$providers = @{
+    SQLite = @('grate.sqlite', 'Microsoft.Data.Sqlite', 'SQLitePCLRaw.bundle_e_sqlite3', 'SQLite')
+    SQLServer = @('grate.sqlserver', 'Microsoft.Data.SqlClient', 'Microsoft.Data.SqlClient.Extensions.Azure')
+    MariaDB = @('grate.mariadb', 'MySqlConnector')
+    PostgreSQL = @('grate.postgresql', 'Npgsql')
+    Oracle = @('grate.oracle', 'Oracle.ManagedDataAccess.Core')
+}
+foreach ($provider in $providers.Keys) {
+    if ($profile -eq 'All' -or $profile -eq $provider) {
+        foreach ($dependency in $providers[$provider]) {
+            $libraries["$dependency/1.0.0"] = @{}
+        }
+    }
+}
+@{ libraries = $libraries } | ConvertTo-Json -Depth 5 | Set-Content "$build/grate.deps.json"
 '@
     $mock | Set-Content "$root/bin/mock.ps1"
     if ($IsWindows) {
@@ -48,12 +67,26 @@ New-Item -ItemType Directory -Path $output, $build -Force | Out-Null
     $env:GRATE_MOCK_PUBLISH_EXIT = $null
     Push-Location $root
     try {
-        foreach ($version in @('0.0.1', '2.3.4')) {
-            & $verify -Kind Standalone -RuntimeIdentifier win-x64 -StandaloneVersion $version -OutputDirectory "$root/output-$version"
+        $cases = @(
+            @{ Version = '0.0.1'; Distribution = 'All' }
+            @{ Version = '2.3.4'; Distribution = 'All' }
+            @{ Version = '0.0.1'; Distribution = 'SQLite' }
+            @{ Version = '0.0.1'; Distribution = 'SQLServer' }
+            @{ Version = '0.0.1'; Distribution = 'MariaDB' }
+            @{ Version = '0.0.1'; Distribution = 'PostgreSQL' }
+            @{ Version = '0.0.1'; Distribution = 'Oracle' }
+        )
+        foreach ($case in $cases) {
+            $version = $case.Version
+            $distribution = $case.Distribution
+            $output = "$root/output-$distribution-$version"
+            & $verify -Kind Standalone -Distribution $distribution -RuntimeIdentifier win-x64 -StandaloneVersion $version -OutputDirectory $output
             $publishArgs = Get-Content 'publish-args.json' -Raw | ConvertFrom-Json
             if ($publishArgs -cnotcontains "-p:Version=$version") { throw "Standalone publish did not receive fixture version $version." }
             if ($publishArgs -cnotcontains '-p:SelfContained=true' -or $publishArgs -cnotcontains '-p:TargetFrameworks=net11.0') { throw 'Standalone verification lost its selected publish form/framework.' }
-            if (!(Test-Path "$root/output-$version/grate.runtimeconfig.json")) { throw 'Successful verification did not preserve runtime evidence.' }
+            if ($publishArgs -cnotcontains "-p:GrateDistribution=$distribution") { throw 'Publish lost its selected distribution.' }
+            if ($publishArgs -cnotcontains "-p:ArtifactsPath=$output/build") { throw 'Publish outputs must be isolated per invocation.' }
+            if (!(Test-Path "$output/grate.runtimeconfig.json")) { throw 'Successful verification did not preserve runtime evidence.' }
         }
         $env:GRATE_MOCK_PUBLISH_EXIT = '42'
         $rejected = $false

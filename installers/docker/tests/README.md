@@ -8,13 +8,12 @@ pwsh -File scripts/release/Run-Tests.ps1 -Path installers/docker/tests
 
 | File | Purpose |
 | --- | --- |
-| `test_entrypoint.py` | Runs the real entrypoint with a fixture executable to check compiled defaults, environment values and argument forwarding |
+| `test_entrypoint.ps1` | Runs the POSIX entrypoint on a Unix host with a PowerShell fixture executable to check compiled defaults, environment values and argument forwarding |
 | `test_release_tags.ps1` | Checks stable/prerelease tag selection and CLI outputs |
 | `test_local_build.ps1` | Exercises `build-docker-local.ps1` with fake Docker/GitVersion commands, including invocation outside the checkout |
 | `check_local_registry.ps1` | Optional real Buildx check using synthetic images and a temporary loopback registry |
 
 The unit tests use temporary fixtures and PowerShell command shims and do not need a Docker daemon.
-The PoC's `test_entrypoint.py` exercises the shell launcher separately from this PowerShell suite.
 `pwsh -File installers/docker/tests/check_local_registry.ps1` requires Docker and
 Buildx, creates local registry/builder/network resources and removes them on
 exit. It does not authenticate to or publish to Docker Hub.

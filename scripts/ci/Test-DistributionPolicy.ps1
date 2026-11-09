@@ -26,6 +26,14 @@ foreach ($database in $expected.Keys) {
     }
 }
 $cliJob = $workflow.jobs.'cli-distributions'
+$setup = $cliJob.steps | Where-Object { $_.uses -like 'actions/setup-dotnet@*' }
+$sdk = (Get-Content -LiteralPath "$repository/global.json" -Raw | ConvertFrom-Json).sdk.version
+$sdkVersions = @($setup.with.'dotnet-version' -split '\r?\n' | ForEach-Object { $_.Trim() })
+foreach ($required in @('8.0.x', '9.0.x', '10.0.x', $sdk)) {
+    if ($sdkVersions -cnotcontains $required) {
+        throw "Missing explicit supported SDK $required in the CLI database job."
+    }
+}
 if ($cliJob.Contains('continue-on-error') -or $cliJob.Contains('if')) {
     throw 'Distribution tests must not be optional.'
 }
@@ -34,7 +42,7 @@ if ($testStep.Count -ne 1 -or !$testStep[0].run.Contains('-Distribution ''${{ ma
     !$testStep[0].run.Contains('-Database ''${{ matrix.database }}''')) {
     throw 'The database suite must receive its matrix distribution and database.'
 }
-$integrationJob = $integration.jobs.'docker-integration-tests'
+$integrationJob = $integration.jobs.'cli-database-integration-tests'
 if ($integrationJob.Contains('continue-on-error') -or @($integrationJob.strategy.matrix.variant).Count -ne 2) {
     throw 'All and slim version-matrix tests must propagate failures.'
 }

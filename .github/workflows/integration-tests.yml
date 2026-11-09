@@ -288,7 +288,9 @@ jobs:
             echo EOFAAA
           } >> "$GITHUB_OUTPUT"
 
-  docker-integration-tests:
+  cli-database-integration-tests:
+    # These are published CLI tests against database containers. Image execution
+    # is covered by the native Alpine profile jobs in ci.yml.
     name: ${{ matrix.variant }} CLI / ${{ matrix.database.name }}
     timeout-minutes: 25
 
@@ -610,7 +612,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Create test report
     #needs: integration-test
-    needs: docker-integration-tests
+    needs: cli-database-integration-tests
     if: always()
 
     steps:

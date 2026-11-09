@@ -14,10 +14,21 @@ function New-Fixture {
     foreach ($category in @('SqlServer', 'SqlServerCaseSensitive', 'MariaDB', 'Oracle')) {
         $names += "Run tests (windows-latest, $category, $category.Basic_tests.*)"
     }
-    foreach ($rid in @('win-x64', 'win-x86', 'win-arm64', 'linux-x64', 'linux-arm64', 'linux-musl-x64', 'linux-musl-arm64', 'osx-x64', 'osx-arm64')) {
-        $names += "CLI $rid"
+    foreach ($distribution in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+        foreach ($rid in @('win-x64', 'win-x86', 'win-arm64', 'linux-x64', 'linux-arm64', 'linux-musl-x64', 'linux-musl-arm64', 'osx-x64', 'osx-arm64')) {
+            if ($distribution -eq 'All') {
+                $names += "CLI $rid"
+            } else {
+                $names += "CLI $distribution $rid"
+            }
+        }
     }
     $names += 'Alpine amd64', 'Alpine arm64'
+    foreach ($distribution in @('SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+        foreach ($architecture in @('amd64', 'arm64')) {
+            $names += "Alpine $distribution $architecture"
+        }
+    }
     foreach ($database in @('Sqlite', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Oracle')) {
         $slim = switch ($database) {
             Sqlite { 'SQLite' }
@@ -27,7 +38,7 @@ function New-Fixture {
         }
         $names += "CLI database All / $database", "CLI database $slim / $database"
     }
-    if ($names.Count -ne 39) { throw 'Fixture must contain 39 required jobs.' }
+    if ($names.Count -ne 94) { throw 'Fixture must contain 94 required jobs.' }
     $needs = @{}
     foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
         $needs[$group] = @{ result = 'success' }
@@ -52,8 +63,16 @@ function New-Fixture {
             $stepNames += @('Build Debian packages from verified Linux binary', 'Verify Debian installation, package upgrade and purge')
         }
         if ($job.name.StartsWith('Alpine ')) {
-            $stepNames = @('Build native image for verification', 'Verify Alpine globalization, migration and bundled skill',
-                'Ensure SQLite client for entrypoint verification', 'Verify default image entrypoint')
+            $stepNames = @('Build native image for verification')
+            if ($job.name -cin @('Alpine amd64', 'Alpine arm64')) {
+                $stepNames += @('Verify Alpine globalization, migration and bundled skill',
+                    'Ensure SQLite client for entrypoint verification', 'Verify default image entrypoint')
+            } else {
+                $stepNames += 'Verify selected profile and bundled skill'
+                if ($job.name.StartsWith('Alpine SQLite ')) {
+                    $stepNames += 'Verify Alpine globalization, migration and bundled skill'
+                }
+            }
         }
         $job.steps = @($stepNames | ForEach-Object { @{ name = $_; status = 'completed'; conclusion = 'success' } })
     }
