@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'InstallerLifecycle.Assertions.ps1')
+. (Join-Path $PSScriptRoot 'InstallerLifecycle.Process.ps1')
 if (!$IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'MSI lifecycle verification requires a disposable GitHub-hosted Windows runner.'
 }
@@ -55,28 +56,8 @@ function Product-Info([string]$Name) { Invoke-ComMember $installer 'ProductInfo'
 function Marker-Present { $null -ne (Get-ItemProperty -LiteralPath $marker -Name installed -ErrorAction SilentlyContinue) }
 
 function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0)) {
-    $start = [Diagnostics.ProcessStartInfo]::new($Executable)
-    $start.UseShellExecute = $false
-    $start.RedirectStandardOutput = $true
-    $start.RedirectStandardError = $true
-    foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $start
-    try {
-        [void]$process.Start()
-        $stdout = $process.StandardOutput.ReadToEndAsync()
-        $stderr = $process.StandardError.ReadToEndAsync()
-        $timedOut = !$process.WaitForExit(180000)
-        if ($timedOut) {
-            $process.Kill($true)
-            $process.WaitForExit()
-        }
-        ($stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()) | Set-Content (Join-Path $OutputDirectory "$Name.output.log")
-        @{ executable = $Executable; arguments = $Arguments; exitCode = $process.ExitCode; timedOut = $timedOut } | ConvertTo-Json -Depth 4 |
-            Set-Content (Join-Path $OutputDirectory "$Name.command.json")
-        if ($timedOut) { throw "$Name exceeded its three-minute process timeout. See $OutputDirectory." }
-        if ($process.ExitCode -notin $AllowedExitCodes) { throw "$Name failed with exit code $($process.ExitCode). See $OutputDirectory." }
-    } finally { $process.Dispose() }
+    Invoke-InstallerLifecycleProcess -Executable $Executable -Arguments $Arguments -Name $Name `
+        -AllowedExitCodes $AllowedExitCodes -OutputDirectory $OutputDirectory
 }
 
 function Run-Msi([string[]]$Arguments, [string]$Name) {

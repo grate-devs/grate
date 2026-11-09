@@ -13,7 +13,7 @@ public sealed class CiLogWriterTests
     public void Native_formats_report_critical_logs_as_errors(string format, string annotation)
     {
         using var output = new StringWriter();
-        using var provider = new CiMigrationLoggerProvider(Enum.Parse<MigrationLogFormat>(format), output);
+        using var provider = new MigrationLoggerProvider(Enum.Parse<MigrationLogFormat>(format), output);
 
         provider.CreateLogger("Migration").LogCritical("Critical diagnostic");
 

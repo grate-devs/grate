@@ -1,9 +1,12 @@
-﻿namespace grate.Configuration;
+﻿using grate.Infrastructure;
+
+namespace grate.Configuration;
 
 internal enum MigrationLogFormat
 {
     Auto,
     Console,
+    Terminal,
     Ci,
     GitHub,
     AzureDevOps,
@@ -16,7 +19,8 @@ internal static class MigrationLogFormatSelection
     {
         if (configured != MigrationLogFormat.Auto)
         {
-            return configured;
+            return configured == MigrationLogFormat.Terminal && !TerminalCapabilities.IsSupported()
+                ? MigrationLogFormat.Console : configured;
         }
 
         // Jenkins uses plain CI output, whether or not another provider is detected.
@@ -45,7 +49,12 @@ internal static class MigrationLogFormatSelection
             return nativeFormats[0];
         }
 
-        return nativeFormats.Count > 1 || IsTrue("CI") ? MigrationLogFormat.Ci : MigrationLogFormat.Console;
+        if (nativeFormats.Count > 1 || IsTrue("CI"))
+        {
+            return MigrationLogFormat.Ci;
+        }
+
+        return TerminalCapabilities.IsSupported() ? MigrationLogFormat.Terminal : MigrationLogFormat.Console;
     }
 
     private static bool IsTrue(string name) =>

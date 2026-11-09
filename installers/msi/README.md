@@ -20,6 +20,7 @@ build tools. These are generated output, not source.
 | `Create-Installer.ps1` | Build entrypoint; checks the payload and assembles the package. |
 | `grate.wxs` | WiX template for the per-user installation, PATH entry and transactional upgrade. |
 | `identity-contract.json` | Stable identity namespace, architecture families and legacy product identity. |
+| `InstallerLifecycle.Process.ps1` | Bounded lifecycle subprocesses, output draining and command evidence. |
 | [helpers/](helpers/README.md) | Version/identity calculation, read-only metadata readers and authoring validation. |
 | [native/](native/README.md) | C++ custom action and its Windows build script. |
 | [tests/](tests/README.md) | Policy, metadata, assertion and native lifecycle checks. |
@@ -28,3 +29,8 @@ Full SemVer distinguishes ProductCodes, while MSI ordering uses the numeric
 version. Same-core prerelease/final replacements require explicit uninstall and
 reinstall. See the [WinGet migration contract](../winget/MIGRATION.md) for upgrade
 and package-identity behavior.
+
+CI runs `Test-InstallerLifecycle.ps1` through the existing lifecycle supervisor
+with a six-minute limit and retains both lifecycle and supervisor artifacts.
+This also bounds COM calls outside individual subprocesses. Run the portable
+process regressions with `pwsh -NoProfile -File installers/msi/Test-InstallerLifecycle.Process.Tests.ps1`.

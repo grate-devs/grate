@@ -472,6 +472,8 @@ jobs:
         run: |
           ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
           ./installers/msi/Test-InstallerLifecycle.Assertions.Tests.ps1
+          ./installers/msi/Test-InstallerLifecycle.Process.Tests.ps1
+          ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
@@ -483,7 +485,17 @@ jobs:
       - name: Verify installed MSI, major upgrade and uninstall
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
         shell: pwsh
-        run: ./installers/msi/Test-InstallerLifecycle.ps1 -MsiPath "./installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi" -PublishedExecutable "${{ runner.temp }}/grate-cli/published/grate.exe" -Architecture ('${{ matrix.rid }}' -replace 'win-', '') -OutputDirectory "${{ runner.temp }}/grate-msi-lifecycle"
+        run: |
+          $parameters = @{
+            MsiPath = "./installers/msi/tmp/grate-$env:STANDALONE_VERSION.msi"
+            PublishedExecutable = "${{ runner.temp }}/grate-cli/published/grate.exe"
+            Architecture = '${{ matrix.rid }}' -replace 'win-', ''
+            OutputDirectory = "${{ runner.temp }}/grate-msi-lifecycle"
+          }
+          # Bound COM calls and inherited output handles as well as child processes.
+          ./installers/msi/tests/support/Invoke-MsiLifecycle.ps1 `
+            -ScriptPath ./installers/msi/Test-InstallerLifecycle.ps1 `
+            -Parameters $parameters -TimeoutSeconds 360
       - name: Build Debian packages from verified Linux binary
         if: matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64'
         shell: pwsh
@@ -515,6 +527,7 @@ jobs:
             installers/msi/tmp/*.msi
             installers/deb/*.deb
             ${{ runner.temp }}/grate-msi-lifecycle/
+            ${{ runner.temp }}/grate-msi-lifecycle-supervisor/
             ${{ runner.temp }}/grate-debian-lifecycle/
             !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/
 
