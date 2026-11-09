@@ -3,11 +3,15 @@ param(
     [Parameter(Mandatory)][string]$MsiPath,
     [Parameter(Mandatory)][string]$PublishedExecutable,
     [Parameter(Mandatory)][ValidateSet('x64', 'arm64')][string]$Architecture,
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
     [Parameter(Mandatory)][string]$OutputDirectory
 )
 
 $ErrorActionPreference = 'Stop'
+$Distribution = @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle') | Where-Object { $_ -ieq $Distribution }
 . (Join-Path $PSScriptRoot 'InstallerLifecycle.Assertions.ps1')
+. (Join-Path $PSScriptRoot 'InstallerLifecycle.Process.ps1')
 if (!$IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'MSI lifecycle verification requires a disposable GitHub-hosted Windows runner.'
 }
@@ -55,28 +59,8 @@ function Product-Info([string]$Name) { Invoke-ComMember $installer 'ProductInfo'
 function Marker-Present { $null -ne (Get-ItemProperty -LiteralPath $marker -Name installed -ErrorAction SilentlyContinue) }
 
 function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0)) {
-    $start = [Diagnostics.ProcessStartInfo]::new($Executable)
-    $start.UseShellExecute = $false
-    $start.RedirectStandardOutput = $true
-    $start.RedirectStandardError = $true
-    foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $start
-    try {
-        [void]$process.Start()
-        $stdout = $process.StandardOutput.ReadToEndAsync()
-        $stderr = $process.StandardError.ReadToEndAsync()
-        $timedOut = !$process.WaitForExit(180000)
-        if ($timedOut) {
-            $process.Kill($true)
-            $process.WaitForExit()
-        }
-        ($stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()) | Set-Content (Join-Path $OutputDirectory "$Name.output.log")
-        @{ executable = $Executable; arguments = $Arguments; exitCode = $process.ExitCode; timedOut = $timedOut } | ConvertTo-Json -Depth 4 |
-            Set-Content (Join-Path $OutputDirectory "$Name.command.json")
-        if ($timedOut) { throw "$Name exceeded its three-minute process timeout. See $OutputDirectory." }
-        if ($process.ExitCode -notin $AllowedExitCodes) { throw "$Name failed with exit code $($process.ExitCode). See $OutputDirectory." }
-    } finally { $process.Dispose() }
+    Invoke-InstallerLifecycleProcess -Executable $Executable -Arguments $Arguments -Name $Name `
+        -AllowedExitCodes $AllowedExitCodes -OutputDirectory $OutputDirectory
 }
 
 function Run-Msi([string[]]$Arguments, [string]$Name) {
@@ -95,8 +79,40 @@ function Check-Installed([string]$Version, [string]$Payload) {
 
 function Run-Migrations([string]$Name) {
     Run-Process $installedExe @('--help') "$Name-help"
+    if ($Distribution -ne 'All') {
+        $help = Get-Content -LiteralPath (Join-Path $OutputDirectory "$Name-help.output.log") -Raw
+        $expectedDefault = '\[default:\s+' + [regex]::Escape($Distribution) + '\]'
+        if (!$help.Contains("This build supports $Distribution only.") -or $help -notmatch $expectedDefault) {
+            throw 'Installed MSI help/default does not match the selected distribution.'
+        }
+        $unsupported = if ($Distribution -eq 'SQLite') {
+            'postgresql'
+        } else {
+            'sqlite'
+        }
+        Run-Process $installedExe @('--databasetype', $unsupported, '--connectionstring', 'invalid', '--silent') "$Name-unsupported" @(1)
+        $rejection = Get-Content -LiteralPath (Join-Path $OutputDirectory "$Name-unsupported.output.log") -Raw
+        if (!$rejection.Contains("This build supports $Distribution only.")) {
+            throw 'Installed MSI did not reject an unsupported provider before connecting.'
+        }
+    }
+    if ($Distribution -notin @('All', 'SQLite')) {
+        # Exercise the compiled default without a database dependency on Windows.
+        # Actual server migrations are checked by the matching Linux CLI suites.
+        $defaultArguments = @('--connectionstring', 'invalid', '--files', $sql, '--output', (Join-Path $state 'default-output'), '--silent')
+        Run-Process $installedExe $defaultArguments "$Name-default" @(1)
+        $defaultOutput = Get-Content -LiteralPath (Join-Path $OutputDirectory "$Name-default.output.log") -Raw
+        if ($defaultOutput.Contains('This build supports') -or $defaultOutput.Contains('Unknown target database type')) {
+            throw 'The installed server profile did not accept its compiled default provider.'
+        }
+        return
+    }
     foreach ($attempt in 1..2) {
-        Run-Process $installedExe @('--databasetype', 'sqlite', '--connectionstring', "Data Source=$databasePath", '--files', $sql, '--output', (Join-Path $state 'output'), '--silent') "$Name-migration-$attempt"
+        $arguments = @('--connectionstring', "Data Source=$databasePath", '--files', $sql, '--output', (Join-Path $state 'output'), '--silent')
+        if ($Distribution -eq 'All' -or $attempt -eq 2) {
+            $arguments += @('--databasetype', 'sqlite')
+        }
+        Run-Process $installedExe $arguments "$Name-migration-$attempt"
     }
     $archived = @(Get-ChildItem (Join-Path $state 'output') -Filter '001_create.sql' -File -Recurse |
         Where-Object { $_.FullName -match '[\\/]itemsRan[\\/]up[\\/]001_create\.sql$' })
@@ -105,7 +121,7 @@ function Run-Migrations([string]$Name) {
 }
 
 $metadata = Read-MsiMetadata $MsiPath
-$expectedIdentity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $metadata.ProductVersion -Architecture $Architecture
+$expectedIdentity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $metadata.ProductVersion -Architecture $Architecture -Distribution $Distribution
 if ($metadata.ProductCode -ne $expectedIdentity.ProductCode -or $metadata.UpgradeCode -ne $expectedIdentity.UpgradeCode -or $metadata.ProductName -ne $expectedIdentity.ProductName -or $metadata.Platform -ne $Architecture) {
     throw "Unexpected candidate MSI identity/platform: $($metadata | ConvertTo-Json -Compress)"
 }
@@ -113,7 +129,7 @@ $metadata | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'baseline-p
 $installDirectory = Join-Path $env:LOCALAPPDATA 'erikbra/grate'
 $installedExe = Join-Path $installDirectory 'grate.exe'
 $companyDirectory = Split-Path $installDirectory
-$marker = 'HKCU:\Software\Microsoft\erikbra\grate'
+$marker = 'HKCU:\' + $expectedIdentity.RegistryKey
 if ((Product-State) -ne -1 -or (Test-Path $installDirectory) -or (Test-Path $marker)) {
     throw 'Refusing to replace a pre-existing grate product, installation directory or registry key.'
 }
@@ -129,6 +145,11 @@ $unrelatedHash = (Get-FileHash $unrelatedFile -Algorithm SHA256).Hash
 'CREATE TABLE package_smoke(id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES(42);' | Set-Content "$sql/up/001_create.sql"
 $assertData = 'CREATE TEMP TABLE package_assert(value INTEGER CHECK(value = 1)); INSERT INTO package_assert SELECT CASE WHEN COUNT(*) = 1 AND MIN(id) = 42 THEN 1 ELSE 0 END FROM package_smoke; INSERT INTO package_assert SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END FROM grate_ScriptsRun WHERE script_name = ''001_create.sql''; INSERT INTO package_assert SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM grate_ScriptsRunErrors;'
 $assertData | Set-Content "$sql/afterMigration/900_assert.sql"
+if ($Distribution -notin @('All', 'SQLite')) {
+    $databasePath = Join-Path $state 'external-user-data.txt'
+    'Preserve external user data through installation, refused switching, upgrade and uninstall.' |
+        Set-Content -LiteralPath $databasePath
+}
 $attemptedProducts = [Collections.Generic.List[string]]::new()
 $uninstalled = $false
 $failure = $null
@@ -152,18 +173,69 @@ try {
     $frameworks = ((& dotnet msbuild (Join-Path $repository 'src/grate/grate.csproj') -nologo -getProperty:TargetFrameworks).Trim() -split ';')
     if ($LASTEXITCODE -ne 0 -or !$frameworks[-1]) { throw 'Cannot determine the upgrade publish target framework.' }
     $framework = $frameworks[-1]
+
+    # A tiny apphost gives the conflicting MSI a real, correctly labelled PE
+    # payload. It is never executed: native MSI ownership must reject it before
+    # replacing the installed command, registration, marker or user PATH.
+    $conflictingProfile = if ($Distribution -eq 'All') {
+        'SQLite'
+    } else {
+        'All'
+    }
+    $conflictingIdentity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $metadata.ProductVersion -Architecture $Architecture -Distribution $conflictingProfile
+    $probeProductName = if ($conflictingProfile -eq 'All') {
+        'grate database migration'
+    } else {
+        $conflictingIdentity.ProductName
+    }
+    $probe = Join-Path $OutputDirectory 'conflicting-profile-probe'
+    New-Item -ItemType Directory -Path $probe | Out-Null
+    @"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$framework</TargetFramework>
+    <Product>$probeProductName</Product>
+  </PropertyGroup>
+</Project>
+"@ | Set-Content -LiteralPath (Join-Path $probe 'Probe.csproj')
+    'System.Console.WriteLine("Disposable MSI conflict probe; never a release payload.");' |
+        Set-Content -LiteralPath (Join-Path $probe 'Program.cs')
+    $probePayload = Join-Path $probe 'published'
+    $probeArguments = @(
+        'publish', (Join-Path $probe 'Probe.csproj'), '-c', 'Release', '-r', "win-$Architecture",
+        '--self-contained', 'false', "-p:Version=$($metadata.ProductVersion)", '-o', $probePayload
+    )
+    Run-Process 'dotnet' $probeArguments 'publish-conflicting-profile'
+    & (Join-Path $PSScriptRoot 'Create-Installer.ps1') -grateExe (Join-Path $probePayload 'Probe.exe') -version $metadata.ProductVersion -arch $Architecture -Distribution $conflictingProfile
+    Assert-MsiDataPreserved $baselineSource $baselineSourceHash
+    $conflictingMsi = Join-Path $PSScriptRoot "tmp/$($conflictingIdentity.PackageId)-$($metadata.ProductVersion).msi"
+    $conflictingSource = Copy-MsiLifecycleSource $conflictingMsi (Join-Path $OutputDirectory 'conflicting-source')
+    $beforeSwitchPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $attemptedProducts.Add($conflictingIdentity.ProductCode)
+    $conflictArguments = @('/i', $conflictingSource, '/qn', '/norestart', '/l*v', (Join-Path $OutputDirectory 'conflicting-profile.msi.log'))
+    Run-Process (Join-Path $env:SystemRoot 'System32/msiexec.exe') $conflictArguments 'conflicting-profile' @(1603)
+    $conflictLog = Get-Content -LiteralPath (Join-Path $OutputDirectory 'conflicting-profile.msi.log') -Raw
+    if (!$conflictLog.Contains('Another distribution or architecture of grate is already installed') -or
+        (Product-State $conflictingIdentity.ProductCode) -ne -1 -or
+        [Environment]::GetEnvironmentVariable('Path', 'User') -cne $beforeSwitchPath) {
+        throw 'Conflicting MSI was not refused by the ownership guard before changing registration/PATH.'
+    }
+    Check-Installed $metadata.ProductVersion $PublishedExecutable
+    Assert-MsiDataPreserved $databasePath $dataHash
+
     $upgradePayload = Join-Path $OutputDirectory 'upgrade-payload'
-    Run-Process 'dotnet' @('publish', (Join-Path $repository 'src/grate/grate.csproj'), '-c', 'Release', '-f', $framework, '-r', "win-$Architecture", '--self-contained', '-p:SelfContained=true', "-p:TargetFrameworks=$framework", "-p:Version=$upgradeVersion", '-o', $upgradePayload) 'publish-upgrade'
+    Run-Process 'dotnet' @('publish', (Join-Path $repository 'src/grate/grate.csproj'), '-c', 'Release', '-f', $framework, '-r', "win-$Architecture", '--self-contained', '-p:SelfContained=true', "-p:TargetFrameworks=$framework", "-p:GrateDistribution=$Distribution", "-p:Version=$upgradeVersion", '-o', $upgradePayload) 'publish-upgrade'
     $upgradeExe = Join-Path $upgradePayload 'grate.exe'
     if ((Get-FileHash $upgradeExe).Hash -eq (Get-FileHash $PublishedExecutable).Hash) { throw 'Upgrade verification requires a genuinely different published executable.' }
 
     # The initial installation's source must remain available while the builder
     # recreates tmp and Windows Installer resolves the subsequent update source.
-    & (Join-Path $PSScriptRoot 'Create-Installer.ps1') -grateExe $upgradeExe -version $upgradeVersion -arch $Architecture -upgradeCode $metadata.UpgradeCode
+    & (Join-Path $PSScriptRoot 'Create-Installer.ps1') -grateExe $upgradeExe -version $upgradeVersion -arch $Architecture -Distribution $Distribution -upgradeCode $metadata.UpgradeCode
     Assert-MsiDataPreserved $baselineSource $baselineSourceHash
-    $upgradeMsi = Join-Path $PSScriptRoot "tmp/grate-$upgradeVersion.msi"
+    $upgradeMsi = Join-Path $PSScriptRoot "tmp/$($expectedIdentity.PackageId)-$upgradeVersion.msi"
     $updated = Read-MsiMetadata $upgradeMsi
-    $expectedUpgrade = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $upgradeVersion -Architecture $Architecture
+    $expectedUpgrade = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $upgradeVersion -Architecture $Architecture -Distribution $Distribution
     if ($updated.ProductCode -ne $expectedUpgrade.ProductCode -or $updated.ProductCode -eq $metadata.ProductCode -or $updated.UpgradeCode -ne $metadata.UpgradeCode -or $updated.Platform -ne $Architecture -or $updated.ProductVersion -ne $upgradeVersion) {
         throw 'The upgrade MSI must have its per-release ProductCode, the same architecture family and the expected version.'
     }
@@ -189,7 +261,12 @@ try {
     Assert-MsiUninstalled -State (Product-State) -InstallDirectory $installDirectory -MarkerPresent (Marker-Present)
     Assert-MsiDataPreserved $databasePath $dataHash
     Assert-MsiDataPreserved $unrelatedFile $unrelatedHash
-    Write-Host "PASS: native $Architecture per-user MSI install, major upgrade, installed migrations/skill and uninstall."
+    $migrationEvidence = if ($Distribution -in @('All', 'SQLite')) {
+        'SQLite migrations and reruns'
+    } else {
+        'compiled default/rejection checks; server migrations run in Linux provider suites'
+    }
+    Write-Host "PASS: native $Distribution $Architecture MSI install, refused cross-profile switch, major upgrade, bundled skill and uninstall; $migrationEvidence."
 } catch {
     $failure = $_
 } finally {

@@ -46,7 +46,7 @@ Guards such as `SupportsTransaction` and absent `Sql.SleepTwoSeconds` return ear
 in shared tests. These can produce green results without exercising the named
 behavior; record the capability gap, not just the test count.
 
-The five `CommandLine.*` and five `Docker.*` provider projects reuse source via
+The six `CommandLine.*` and five `Docker.*` provider projects reuse source via
 [CommandLine/IncludeTests.targets](../../unittests/CommandLine/IncludeTests.targets)
 and [Docker/IncludeTests.targets](../../unittests/Docker/IncludeTests.targets).
 `ProjectToIncludeTestsFrom` selects the provider. Imports include its migration
@@ -66,7 +66,8 @@ the complete consumer skill. Preserve these resource/copy rules when adding asse
 Commands are from the repository root. Install the SDK selected by
 [global.json](../../global.json), restore dependencies, and have the targeted
 runtimes available: [Directory.Build.props](../../Directory.Build.props) targets
-`net8.0;net9.0;net10.0`. Server tests need a working Docker daemon and obtainable,
+`net8.0;net9.0;net10.0;net11.0`. A net10-only run is partial framework evidence.
+Server tests need a working Docker daemon and obtainable,
 host-compatible database images unless an explicitly authorized isolated external
 database is configured. SQLite's ordinary tests use local files.
 
@@ -107,24 +108,30 @@ same requirement when running downloaded test DLLs with `dotnet test --test-modu
   and run an explicit AOT artifact on a supported host; existing passes provide no
   AOT evidence.
 - **NuGet libraries:** [build.yml](../../.github/workflows/build.yml) packs
-  `grate.core` and all five provider packages. Existing provider tests reference
-  projects; no dedicated packed-library consumer integration suite exists here.
-  For package/API/resource changes, add or run a temporary consumer restoring the
-  exact local `.nupkg` versions, wire a provider, and perform a real migration,
-  checking dependency resolution, bootstrap resources, SQL effects, and history.
+  `grate.core` and all five provider packages. The CI package job runs
+  [verify-packages.ps1](../../scripts/verify-packages.ps1), which restores all six
+  locally packed libraries into a separate consumer for each target framework
+  and runs SQLite migrations/reruns with schema, data, hash/history and error-row
+  assertions. It does not establish packaged execution for the other providers;
+  add affected provider consumer checks when those boundaries change.
 - **.NET tool:** the build workflow packs the CLI with `PackAsTool=true` and
-  `SelfContained=true`. [skill-installation.yml](../../.github/workflows/skill-installation.yml)
-  instead packs `SelfContained=false`, installs from a local feed, and tests skill
+  `SelfContained=false`, preserving per-framework assets. `verify-packages.ps1`
+  installs each tool target and checks migrations/reruns with its matching runtime
+  isolated. [skill-installation.yml](../../.github/workflows/skill-installation.yml)
+  packs net11 with `SelfContained=false`, installs from a local feed, and tests skill
   installation from that tool and a self-contained binary on Ubuntu, Windows, and
-  macOS. This proves those skill operations, not general tool migration behavior
-  or the build workflow's exact tool packaging. Add consumer migration checks when
-  those boundaries change; do not claim library-package coverage from tool tests.
+  macOS. These skill checks do not establish migration behavior on those platforms;
+  do not claim library-package coverage from tool tests.
 - **Docker distribution:** [DockerGrateMigrator](../../unittests/Docker/Docker.Common/TestInfrastructure/DockerGrateMigrator.cs)
-  hardcodes `gratedevs/grate` with no source-specific tag or image override. It uses
+  accepts `GrateTestConfig__ApplicationDockerImage`; the local test profile selects
+  `grate-local:tests` and builds it from the checkout when first needed. Other
+  explicit images and CI do not trigger that local build. Without a configured image the
+  runner falls back to `gratedevs/grate`. See [CONTRIBUTING.md](../../CONTRIBUTING.md)
+  for build plans, overrides and `--no-build` behavior. It uses
   bind mounts, a shared test network, read-only root filesystem, and bundle extraction.
   `GrateTestConfig__DockerImage` cannot select the grate image. Align the image with
   the source before claiming validation; the current runner can exercise a released
-  image. It overrides the image entrypoint, so validate
+  image when selected. It overrides the image entrypoint, so validate
   [entrypoint.sh](../../installers/docker/entrypoint.sh) separately when changed.
 
 ## Matrix facts to preserve
@@ -132,18 +139,28 @@ same requirement when running downloaded test DLLs with `dotnet test --test-modu
 [ci.yml](../../.github/workflows/ci.yml) runs Basic_tests and all six provider suites
 on Ubuntu, including SqlServerCaseSensitive; `build.yml` omits the case-sensitive
 suite. Their test commands select no single TFM. Build output is not execution proof.
-`build.yml` publishes net10 self-contained RIDs `win-x64`, `win-x86`, `win-arm64`,
+`build.yml` publishes net11 self-contained RIDs `win-x64`, `win-x86`, `win-arm64`,
 `linux-musl-x64`, `linux-musl-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, and
 `osx-arm64` (the last on macOS). Docker builds target `linux/amd64,linux/arm64` using
 the Alpine/musl [Dockerfile](../../installers/docker/Dockerfile).
 
 [integration-tests.yml](../../.github/workflows/integration-tests.yml) actively runs
-net10 Linux x64 self-contained CLI tests against SQL Server 2017/2019/2022/2025,
+net11 Linux x64 self-contained CLI tests against SQL Server 2017/2019/2022/2025,
 PostgreSQL 12–18, MariaDB 10.4/10.10/11/12/13 RC, SQLite, and Oracle Free/XE image
 variants. Read its exact image tags when selecting compatibility checks. These jobs
-use `continue-on-error: true`. The grate Docker-distribution step, external/cloud
+test both All and the matching slim CLI and propagate failures. The grate Docker-distribution step, external/cloud
 test environment, and wider OS/architecture integration jobs are disabled; commented
 matrix entries and successful artifact publication establish no runtime coverage.
+
+`ci.yml` additionally requires twelve All/slim CLI lanes, including
+`CommandLine.SqlServerCaseSensitive` for SQL Server's case-sensitive database
+contract. `scripts/ci/Invoke-DistributionTests.ps1` publishes the selected
+self-contained binary and installs its exact local NuGet tool, verifies provider
+dependencies (all four tool TFMs), then runs the complete matching CommandLine
+suite against both forms on net11.0. The existing library matrix still exercises
+the provider suites on all supported frameworks. CLI overrides retain their
+explicit skips for inaccessible in-process exception details; see the reports
+for exact execution and skip counts.
 
 For a handoff, record source/artifact identity, selected test layers and counts,
 TFM, host/RID, database version/image, CLI publish form or package/image identity,

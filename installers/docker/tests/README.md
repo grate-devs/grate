@@ -8,6 +8,7 @@ pwsh -File scripts/release/Run-Tests.ps1 -Path installers/docker/tests
 
 | File | Purpose |
 | --- | --- |
+| `test_entrypoint.ps1` | Runs the POSIX entrypoint on a Unix host with a PowerShell fixture executable to check compiled defaults, environment values and argument forwarding |
 | `test_release_tags.ps1` | Checks stable/prerelease tag selection and CLI outputs |
 | `test_local_build.ps1` | Exercises `build-docker-local.ps1` with fake Docker/GitVersion commands, including invocation outside the checkout |
 | `check_local_registry.ps1` | Optional real Buildx check using synthetic images and a temporary loopback registry |

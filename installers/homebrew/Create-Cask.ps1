@@ -1,44 +1,45 @@
 #!/usr/bin/env pwsh
-
-param (
-    [Parameter(Mandatory=$true)]
+param(
+    [Parameter(Mandatory)]
     [ValidatePattern('\A[0-9]+\.[0-9]+\.[0-9]+\z')]
     [string]$version,
-    [Parameter(Mandatory=$true)] [string]$artifactDirectory,
+    [Parameter(Mandatory)]
+    [string]$artifactDirectory,
     [string]$releaseTag = $version,
-    [string]$outputPath = (Join-Path $PSScriptRoot '../../artifacts/homebrew/cask/grate.rb')
+    [string]$outputPath,
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../../artifacts/homebrew/cask'),
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
+    [switch]$AllDistributions
 )
 
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/Homebrew.Common.ps1"
 if ($releaseTag -cne $version -and $releaseTag -cne "v$version") {
     throw 'releaseTag must be the version or the version prefixed with v.'
 }
-$armArchive = Join-Path $artifactDirectory "grate-osx-arm64-self-contained-$version.zip"
-$intelArchive = Join-Path $artifactDirectory "grate-osx-x64-self-contained-$version.zip"
-$armHash = (Get-FileHash -LiteralPath $armArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-$intelHash = (Get-FileHash -LiteralPath $intelArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-$outputPath = [System.IO.Path]::GetFullPath($outputPath)
-$null = New-Item -ItemType Directory -Path ([System.IO.Path]::GetDirectoryName($outputPath)) -Force
-
-# Use the final release archives; never guess checksums before they exist.
-@"
-cask "grate" do
-  version "$version"
-  name "grate"
-  desc "grate - the SQL scripts migration runner"
-  homepage "https://grate-devs.github.io/grate/"
-
-  if Hardware::CPU.arm?
-    url "https://github.com/grate-devs/grate/releases/download/$releaseTag/grate-osx-arm64-self-contained-#{version}.zip"
-    sha256 "$armHash"
-  end
-  if Hardware::CPU.intel?
-    url "https://github.com/grate-devs/grate/releases/download/$releaseTag/grate-osx-x64-self-contained-#{version}.zip"
-    sha256 "$intelHash"
-  end
-
-  depends_on :macos
-
-  binary "grate"
-end
-"@ | Set-Content -LiteralPath $outputPath
+if ($AllDistributions -and ($outputPath -or $Distribution -ne 'All')) {
+    throw 'Use OutputDirectory and the default Distribution with AllDistributions.'
+}
+$profiles = if ($AllDistributions) {
+    @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')
+} else {
+    @($Distribution)
+}
+# Resolve and hash every final input before replacing any manifest.
+$candidates = @(foreach ($name in $profiles) {
+    $profile = Get-HomebrewDistribution -Distribution $name
+    $armArchive = Join-Path $artifactDirectory "$($profile.PackageId)-osx-arm64-self-contained-$version.zip"
+    $intelArchive = Join-Path $artifactDirectory "$($profile.PackageId)-osx-x64-self-contained-$version.zip"
+    @{
+        Version = $version
+        ReleaseTag = $releaseTag
+        Distribution = $name
+        Arm64Sha256 = (Get-FileHash -LiteralPath $armArchive -Algorithm SHA256).Hash
+        X64Sha256 = (Get-FileHash -LiteralPath $intelArchive -Algorithm SHA256).Hash
+        Output = if ($outputPath) { $outputPath } else { Join-Path $OutputDirectory "$($profile.PackageId).rb" }
+    }
+})
+foreach ($candidate in $candidates) {
+    Write-HomebrewCask @candidate
+}

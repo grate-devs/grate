@@ -24,6 +24,7 @@
     <InternalsVisibleTo Include="CommandLine.PostgreSQL" />
     <InternalsVisibleTo Include="CommandLine.Sqlite" />
     <InternalsVisibleTo Include="CommandLine.SqlServer" />
+    <InternalsVisibleTo Include="CommandLine.SqlServerCaseSensitive" />
 
     <InternalsVisibleTo Include="Docker.MariaDB" />
     <InternalsVisibleTo Include="Docker.Oracle" />

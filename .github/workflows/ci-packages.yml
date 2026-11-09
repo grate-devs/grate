@@ -1,0 +1,36 @@
+# Reusable packages phase. Scheduling and aggregate gates live in ci.yml.
+name: CI · Packages
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    name: NuGet libraries and installed tool
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Check standalone verification command contract
+        shell: pwsh
+        run: ./scripts/Test-VerifyPackages.Tests.ps1
+      - name: Verify packages across supported frameworks
+        shell: pwsh
+        run: ./scripts/verify-packages.ps1 -Kind Packages -OutputDirectory "${{ runner.temp }}/grate-packages"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: grate-nuget-packages
+          retention-days: 3
+          path: |
+            ${{ runner.temp }}/grate-packages/packages/*
+            ${{ runner.temp }}/grate-packages/tool-runtimes.txt

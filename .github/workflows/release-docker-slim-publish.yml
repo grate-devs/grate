@@ -1,0 +1,99 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · docker slim publish
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      prerelease:
+        type: string
+        required: true
+      publish:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    if: ${{ startsWith(github.workflow_ref, format('{0}/.github/workflows/build.yml@', github.repository)) && inputs.publish == 'true' }}
+    name: Publish verified ${{ matrix.distribution }} Docker archive
+    environment: docker-hub
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+    concurrency:
+      group: docker-publication-${{ matrix.distribution }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download this profile's verified source artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: grate-docker-${{ matrix.distribution }}-oci-${{ inputs.version }}
+          path: slim-docker-artifact
+      - name: Configure isolated canonical Docker credentials and copy tool
+        shell: pwsh
+        env:
+          CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (!$env:CONNECTION_ID) {
+            throw 'DOCKERHUB_OIDC_CONNECTIONID must be configured in docker-hub.'
+          }
+          $directory = "$env:RUNNER_TEMP/slim-docker-auth"
+          New-Item -ItemType Directory -Path $directory | Out-Null
+          chmod 700 $directory
+          "DOCKER_CONFIG=$directory" | Add-Content -LiteralPath $env:GITHUB_ENV
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends skopeo
+      - name: Log in to canonical Docker Hub repository using OIDC
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+          DOCKERHUB_OIDC_EXPIREIN: '3600'
+        with:
+          username: gratedevs
+      - name: Publish and read back the exact verified profile digest
+        shell: pwsh
+        env:
+          DISTRIBUTION: ${{ matrix.distribution }}
+          VERSION: ${{ inputs.version }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $verification = Get-Content -LiteralPath slim-docker-artifact/slim-archive-validation.json -Raw | ConvertFrom-Json
+          $parameters = @{
+            Distribution = $env:DISTRIBUTION
+            Version = $env:VERSION
+            SourceCommit = $env:SOURCE_COMMIT
+            ExpectedDigest = $verification.expected_digest
+            Archive = 'slim-docker-artifact/grate-image.tar'
+            VerificationReport = 'slim-docker-artifact/slim-archive-validation.json'
+            Authfile = "$env:DOCKER_CONFIG/config.json"
+            Report = 'docker-slim-publication.json'
+            Mode = 'Publish'
+            Prerelease = $env:PRERELEASE -eq 'true'
+          }
+          ./scripts/release/publish_slim_docker_archive.ps1 @parameters
+      - name: Retain profile publication results including partial failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: docker-publication-${{ matrix.distribution }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: docker-slim-publication.json
+          if-no-files-found: warn

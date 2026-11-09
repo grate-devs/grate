@@ -83,7 +83,7 @@ function Msi([string]$Operation,[string]$Release,[string]$Name,[int]$ExpectedExi
 try {
     $probe=Join-Path $OutputDirectory 'probe'
     New-Item -ItemType Directory $probe | Out-Null
-    '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><AssemblyName>grate-policy-probe</AssemblyName><UseAppHost>true</UseAppHost></PropertyGroup></Project>' | Set-Content "$probe/Probe.csproj"
+    '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><AssemblyName>grate-policy-probe</AssemblyName><UseAppHost>true</UseAppHost><Product>grate database migration</Product></PropertyGroup></Project>' | Set-Content "$probe/Probe.csproj"
     'System.Console.WriteLine("Disposable MSI policy probe; not a grate release.");' | Set-Content "$probe/Program.cs"
     foreach ($release in @('2.1.9','2.2.0-rc.1','2.2.0-rc.2','2.2.0','2.2.1')) {
         $core=$release.Split('-')[0]

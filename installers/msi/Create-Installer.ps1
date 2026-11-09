@@ -5,6 +5,8 @@ param (
     [Parameter(Mandatory=$true)] [string]$version,
     [string]$ReleaseVersion = $version,
     [ValidateSet('x64', 'arm64')] [string]$arch = 'x64',
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
     [string]$upgradeCode,
     [switch]$TestFailBeforeFinalize
 )
@@ -12,16 +14,17 @@ param (
 $ErrorActionPreference = 'Stop'
 if (!$IsWindows) { throw 'MSI generation requires Windows, WiX and Visual Studio C++ build tools.' }
 & (Join-Path $PSScriptRoot 'helpers/Test-InstallerAuthoring.ps1')
-$identity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $version -Architecture $arch -ReleaseVersion $ReleaseVersion
+$identity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $version -Architecture $arch -ReleaseVersion $ReleaseVersion -Distribution $Distribution
+$arch = $identity.Architecture
+$Distribution = $identity.Distribution
 if ($upgradeCode -and $upgradeCode -ne $identity.UpgradeCode) { throw 'The MSI UpgradeCode must match the stable architecture family in identity-contract.json.' }
 $upgradeCode = $identity.UpgradeCode
 $grateExe = (Resolve-Path -LiteralPath $grateExe).Path
-$payloadVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($grateExe).ProductVersion
+$payload = [Diagnostics.FileVersionInfo]::GetVersionInfo($grateExe)
 # Informational +commit metadata does not distinguish published releases. Refuse
 # dropping a prerelease suffix merely because Windows Installer needs a number.
-if (!$payloadVersion -or $payloadVersion.Split('+')[0] -cne $ReleaseVersion) {
-    throw 'The executable ProductVersion must match ReleaseVersion (excluding +build metadata). Pass the full prerelease version explicitly; never package it as its stable core.'
-}
+. (Join-Path $PSScriptRoot 'helpers/InstallerPayloadPolicy.ps1')
+Assert-MsiPayloadIdentity -ProductVersion $payload.ProductVersion -ProductName $payload.ProductName -Identity $identity
 
 function Recreate {
     param ([string]$dirName)
@@ -34,7 +37,7 @@ function Recreate {
 
 $wixDir = Recreate 'wix'
 $tmpDir = Recreate 'tmp'
-& (Join-Path $PSScriptRoot 'native/Build-UpgradeActions.ps1') -Architecture $arch -OutputDirectory (Join-Path $tmpDir 'upgrade-actions') | ForEach-Object { Write-Host $_ }
+& (Join-Path $PSScriptRoot 'native/Build-UpgradeActions.ps1') -Architecture $arch -Distribution $Distribution -OutputDirectory (Join-Path $tmpDir 'upgrade-actions') | ForEach-Object { Write-Host $_ }
 $upgradeActions = Join-Path $tmpDir 'upgrade-actions/GrateUpgradeActions.dll'
 if (!(Test-Path -LiteralPath $upgradeActions)) { throw 'The native MSI upgrade action was not built.' }
 
@@ -62,9 +65,9 @@ if ((Get-FileHash -LiteralPath $localZip -Algorithm SHA256).Hash -ne $expectedHa
 }
 Expand-Archive -LiteralPath $localZip -DestinationPath $wixDir
 
-$wxs = Join-Path $tmpDir "grate-$version.wxs"
-$wixobj = Join-Path $tmpDir "grate-$version.wixobj"
-$msi = Join-Path $tmpDir "grate-$version.msi"
+$wxs = Join-Path $tmpDir "$($identity.PackageId)-$version.wxs"
+$wixobj = Join-Path $tmpDir "$($identity.PackageId)-$version.wixobj"
+$msi = Join-Path $tmpDir "$($identity.PackageId)-$version.msi"
 $template = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'grate.wxs') -Raw
 if ($TestFailBeforeFinalize) {
     # A separate local test MSI only. The release template has no failure hook.
@@ -74,6 +77,11 @@ if ($TestFailBeforeFinalize) {
 $template.Replace('%%%VERSION%%%', $version).
     Replace('%%%RELEASEVERSION%%%', $ReleaseVersion).
     Replace('%%%PRODUCTCODE%%%', $identity.ProductCode).
+    Replace('%%%PRODUCTNAME%%%', $identity.ProductName).
+    Replace('%%%DISTRIBUTION%%%', $identity.Distribution).
+    Replace('%%%EXECUTABLECOMPONENT%%%', $identity.ExecutableComponent).
+    Replace('%%%PATHCOMPONENT%%%', $identity.PathComponent).
+    Replace('%%%REGISTRYKEY%%%', $identity.RegistryKey).
     Replace('%%%UPGRADECODE%%%', $upgradeCode).
     Replace('%%%UPGRADEACTIONS%%%', [System.Security.SecurityElement]::Escape($upgradeActions)).
     Replace('%%%GRATEEXE%%%', [System.Security.SecurityElement]::Escape($grateExe)) |

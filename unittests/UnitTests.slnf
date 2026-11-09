@@ -9,6 +9,7 @@
       "unittests\\CommandLine\\CommandLine.PostgreSQL\\CommandLine.PostgreSQL.csproj",
       "unittests\\CommandLine\\CommandLine.Sqlite\\CommandLine.Sqlite.csproj",
       "unittests\\CommandLine\\CommandLine.SqlServer\\CommandLine.SqlServer.csproj",
+      "unittests\\CommandLine\\CommandLine.SqlServerCaseSensitive\\CommandLine.SqlServerCaseSensitive.csproj",
       "unittests\\Docker\\Docker.Common\\Docker.Common.csproj",
       "unittests\\Docker\\Docker.MariaDB\\Docker.MariaDB.csproj",
       "unittests\\Docker\\Docker.Oracle\\Docker.Oracle.csproj",

@@ -3,12 +3,7 @@ using System.Reflection;
 using grate.Commands;
 using grate.Configuration;
 using grate.Infrastructure;
-using grate.mariadb.DependencyInjection;
 using grate.Migration;
-using grate.oracle.DependencyInjection;
-using grate.postgresql.DependencyInjection;
-using grate.sqlite.DependencyInjection;
-using grate.sqlserver.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
@@ -40,8 +35,8 @@ public static class Program
         }
 
         var format = MigrationLogFormatSelection.Resolve(config.LogFormat);
-        using var ciLogger = format == MigrationLogFormat.Console ? null : new CiMigrationLoggerProvider(format, Console.Out);
-        await using var serviceProvider = BuildServiceProvider(config, ciLogger);
+        using var migrationLogger = format == MigrationLogFormat.Console ? null : new MigrationLoggerProvider(format, Console.Out);
+        await using var serviceProvider = BuildServiceProvider(config, migrationLogger);
         await using var scope = serviceProvider.CreateAsyncScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<GrateMigrator>>();
 
@@ -49,23 +44,25 @@ public static class Program
         try
         {
             await scope.ServiceProvider.GetRequiredService<IGrateMigrator>().Migrate();
+            migrationLogger?.Complete(logger, config.DryRun ? "Preview completed."
+                : config.Baseline ? "Baseline completed." : "Migration completed.");
             result = 0;
         }
         catch (Exception ex)
         {
-            if (ciLogger is null)
+            if (migrationLogger is null)
             {
                 result = ExceptionHandler(ex, invocationConfiguration, logger);
             }
             else
             {
                 logger.LogDebug(ex, "{ErrorMessage}", ex.Message);
-                ciLogger.ReportFailure(logger, ex);
+                migrationLogger.ReportFailure(logger, ex);
                 result = 1;
             }
         }
 
-        if (ciLogger is null)
+        if (migrationLogger is null)
         {
             await WaitForLoggerToFinish();
         }
@@ -114,7 +111,7 @@ public static class Program
     }
 
     private static ServiceProvider BuildServiceProvider(
-        CommandLineGrateConfiguration config, CiMigrationLoggerProvider? ciLogger)
+        CommandLineGrateConfiguration config, MigrationLoggerProvider? migrationLogger)
     {
         IServiceCollection services = new ServiceCollection();
 
@@ -124,9 +121,9 @@ public static class Program
                 .AddFilter("Grate.Migration.IsUpToDate", LogLevel.Information)
                 .SetMinimumLevel(config.Verbosity);
 
-            if (ciLogger is not null)
+            if (migrationLogger is not null)
             {
-                logging.AddProvider(ciLogger);
+                logging.AddProvider(migrationLogger);
             }
             else
             {
@@ -139,17 +136,7 @@ public static class Program
             }
         });
 
-        services = config.DatabaseType switch
-        {
-            DatabaseType.MariaDB => services.AddGrateWithMariaDb(config),
-            DatabaseType.Oracle => services.AddGrateWithOracle(config),
-            DatabaseType.PostgreSQL => services.AddGrateWithPostgreSQL(config),
-            DatabaseType.SQLServer => services.AddGrateWithSqlServer(config),
-            DatabaseType.SQLite => services.AddGrateWithSqlite(config),
-            _ => throw new ArgumentOutOfRangeException(nameof(config),
-                config.DatabaseType,
-                "Unknown target database type: " + config.DatabaseType)
-        };
+        services = services.AddGrateDatabase(config);
 
         return services.BuildServiceProvider();
     }

@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 # This inventory is deliberately independent of the workflow's matrix. Removing a
 # lane from YAML must not silently redefine the work required for a green check.
-$requiredGroups = @('build-code', 'test', 'packages', 'standalone', 'docker', 'validation-policy')
+$requiredGroups = @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')
 $requiredJobs = @(
     'Build'
     'NuGet libraries and installed tool'
@@ -29,18 +29,78 @@ $requiredJobs = @(
     'Run tests (windows-latest, SqlServerCaseSensitive, SqlServerCaseSensitive.Basic_tests.*)'
     'Run tests (windows-latest, MariaDB, MariaDB.Basic_tests.*)'
     'Run tests (windows-latest, Oracle, Oracle.Basic_tests.*)'
-    'CLI win-x64'
-    'CLI win-x86'
-    'CLI win-arm64'
-    'CLI linux-x64'
-    'CLI linux-arm64'
-    'CLI linux-musl-x64'
-    'CLI linux-musl-arm64'
-    'CLI osx-x64'
-    'CLI osx-arm64'
+    foreach ($distribution in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+        foreach ($rid in @('win-x64', 'win-x86', 'win-arm64', 'linux-x64', 'linux-arm64', 'linux-musl-x64', 'linux-musl-arm64', 'osx-x64', 'osx-arm64')) {
+            if ($distribution -eq 'All') {
+                "CLI $rid"
+            } else {
+                "CLI $distribution $rid"
+            }
+        }
+    }
     'Alpine amd64'
     'Alpine arm64'
+    foreach ($distribution in @('SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+        foreach ($architecture in @('amd64', 'arm64')) {
+            "Alpine $distribution $architecture"
+        }
+    }
+    'CLI database All / Sqlite'
+    'CLI database SQLite / Sqlite'
+    'CLI database All / SqlServer'
+    'CLI database SQLServer / SqlServer'
+    'CLI database All / SqlServerCaseSensitive'
+    'CLI database SQLServer / SqlServerCaseSensitive'
+    'CLI database All / PostgreSQL'
+    'CLI database PostgreSQL / PostgreSQL'
+    'CLI database All / MariaDB'
+    'CLI database MariaDB / MariaDB'
+    'CLI database All / Oracle'
+    'CLI database Oracle / Oracle'
 )
+
+function Get-RequiredApiJobName {
+    param(
+        [string]$Name
+    )
+
+    # Reusable leaves have the caller's name as a prefix. Only these specific
+    # caller/producer pairs count; another caller's green leaf cannot replace one.
+    $caller = switch -CaseSensitive -Regex ($Name) {
+        '^Build$' {
+            'Build'
+            break
+        }
+        '^NuGet libraries and installed tool$' {
+            'Packages'
+            break
+        }
+        '^Run tests \((?:ubuntu|windows)-latest, Basic_tests\)$' {
+            'Isolated tests'
+            break
+        }
+        '^Run tests \(' {
+            'Database tests'
+            break
+        }
+        '^CLI database ' {
+            'CLI distributions'
+            break
+        }
+        '^CLI ' {
+            'Standalone CLI'
+            break
+        }
+        '^Alpine ' {
+            'Docker'
+            break
+        }
+    }
+    if ($caller) {
+        return "$caller / $Name"
+    }
+    return $Name
+}
 
 $needs = ConvertFrom-Json -InputObject $NeedsJson -AsHashtable
 $jobs = ConvertFrom-Json -InputObject $JobsJson -AsHashtable -NoEnumerate
@@ -69,7 +129,8 @@ foreach ($job in $jobs) {
 }
 
 foreach ($name in $requiredJobs) {
-    $matches = @($jobs | Where-Object { $_.name -ceq $name })
+    $apiName = Get-RequiredApiJobName -Name $name
+    $matches = @($jobs | Where-Object { $_.name -ceq $apiName })
     if ($matches.Count -eq 0) {
         $problems.Add("Missing required job '$name'.")
         continue
@@ -96,15 +157,27 @@ foreach ($name in $requiredJobs) {
         }
         'Run tests (ubuntu-latest,*' { 'Test on Linux' }
         'Run tests (windows-latest,*' { 'Test on Windows' }
-        'CLI *' { 'Verify self-contained runtime and execution' }
-        'Alpine *' {
-            'Build native image for verification'
-            'Verify Alpine globalization, migration and bundled skill'
-            'Ensure SQLite client for entrypoint verification'
-            'Verify default image entrypoint'
-        }
+        'CLI database *' { 'Test published CLI and installed tool against database' }
     })
-    if ($name -cin @('CLI win-x64', 'CLI win-arm64')) {
+    if ($name.StartsWith('CLI ', [StringComparison]::Ordinal) -and !$name.StartsWith('CLI database ', [StringComparison]::Ordinal)) {
+        $stepNames += 'Verify self-contained runtime and execution'
+    }
+    if ($name.StartsWith('Alpine ', [StringComparison]::Ordinal)) {
+        $stepNames += 'Build native image for verification'
+        if ($name -cin @('Alpine amd64', 'Alpine arm64')) {
+            $stepNames += @(
+                'Verify Alpine globalization, migration and bundled skill'
+                'Ensure SQLite client for entrypoint verification'
+                'Verify default image entrypoint'
+            )
+        } else {
+            $stepNames += 'Verify selected profile and bundled skill'
+            if ($name.StartsWith('Alpine SQLite ', [StringComparison]::Ordinal)) {
+                $stepNames += 'Verify Alpine globalization, migration and bundled skill'
+            }
+        }
+    }
+    if ($name -cmatch '^CLI (?:SQLite |SQLServer |MariaDB |PostgreSQL |Oracle )?win-(?:x64|arm64)$') {
         $stepNames += @(
             'Check per-user MSI authoring regressions'
             'Build MSI from verified Windows binary'

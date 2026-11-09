@@ -1,0 +1,154 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · homebrew
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      release-tag:
+        type: string
+        required: true
+      publish:
+        type: string
+        required: true
+      prerelease:
+        type: string
+        required: true
+    # The leaf environment may supply these values; existing credential checks reject empties.
+    secrets:
+      HOMEBREW_TAP_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    if: ${{ startsWith(github.workflow_ref, format('{0}/.github/workflows/build.yml@', github.repository)) && inputs.publish == 'true' && inputs.prerelease != 'true' }}
+    name: Update all Homebrew casks and retain formula candidates
+    runs-on: ubuntu-latest
+    environment: homebrew-cask
+    permissions:
+      contents: read
+
+    steps:
+    - name: Validate Homebrew publishing identity
+      shell: bash
+      env:
+        HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      run: |
+        set -euo pipefail
+        if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+          echo "::error::HOMEBREW_TAP_TOKEN needs contents write access to erikbra/homebrew-cask."
+          exit 1
+        fi
+
+    - name: Checkout grate release tooling
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+
+    - name: Checkout Homebrew tap
+      uses: actions/checkout@v7
+      with:
+        repository: erikbra/homebrew-cask
+        ref: main
+        path: homebrew-cask
+        token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+    - name: Download macOS release assets
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        set -euo pipefail
+        mkdir -p artifacts/homebrew
+        gh release download "$RELEASE_TAG" \
+          --repo "$GITHUB_REPOSITORY" \
+          --pattern 'grate*-osx-*-self-contained-*.zip' \
+          --dir artifacts/homebrew
+
+    - name: Update and validate cask
+      shell: pwsh
+      env:
+        VERSION: ${{ inputs.version }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        . ./scripts/release/distribution_profiles.ps1
+        $candidates = @(foreach ($name in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+          $profile = Get-GrateDistribution -Name $name
+          $arm64Asset = "artifacts/homebrew/$($profile.PackageId)-osx-arm64-self-contained-$env:VERSION.zip"
+          $x64Asset = "artifacts/homebrew/$($profile.PackageId)-osx-x64-self-contained-$env:VERSION.zip"
+          @{
+            Version = $env:VERSION
+            ReleaseTag = $env:RELEASE_TAG
+            Distribution = $name
+            Arm64Sha256 = (Get-FileHash -LiteralPath $arm64Asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            X64Sha256 = (Get-FileHash -LiteralPath $x64Asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            Output = "homebrew-cask/Casks/$($profile.PackageId).rb"
+          }
+        })
+        foreach ($candidate in $candidates) {
+          ./scripts/release/update_homebrew_cask.ps1 @candidate
+          ruby -c $candidate.Output
+        }
+
+    - name: Generate all source formula candidates from the final tagged archive
+      shell: pwsh
+      env:
+        VERSION: ${{ inputs.version }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+        SOURCE_COMMIT: ${{ github.sha }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        . ./scripts/release/distribution_profiles.ps1
+        $archive = "$env:RUNNER_TEMP/grate-source.tar.gz"
+        Assert-GrateSourceTag -Tag $env:RELEASE_TAG -SourceCommit $env:SOURCE_COMMIT
+        Invoke-WebRequest "https://github.com/grate-devs/grate/archive/refs/tags/$($env:RELEASE_TAG).tar.gz" -OutFile $archive
+        Assert-GrateSourceTag -Tag $env:RELEASE_TAG -SourceCommit $env:SOURCE_COMMIT
+        ./installers/homebrew/Create-Formula.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -sourceArchive $archive -AllDistributions -OutputDirectory artifacts/homebrew-formulas
+        foreach ($candidate in Get-ChildItem -LiteralPath artifacts/homebrew-formulas -Filter '*.rb') {
+          ruby -c $candidate.FullName
+        }
+
+    - name: Retain all Homebrew cask and formula candidates
+      uses: actions/upload-artifact@v7
+      with:
+        name: homebrew-candidates-${{ inputs.version }}
+        path: |
+          homebrew-cask/Casks/grate*.rb
+          artifacts/homebrew-formulas/*.rb
+        if-no-files-found: error
+
+    - name: Publish cask update
+      working-directory: homebrew-cask
+      shell: pwsh
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        $paths = @('grate', 'grate-sqlite', 'grate-sqlserver', 'grate-mariadb', 'grate-postgresql', 'grate-oracle') | ForEach-Object { "Casks/$_.rb" }
+        git config user.name "grate release workflow"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -- @paths
+        try {
+          $PSNativeCommandUseErrorActionPreference = $false
+          git diff --cached --quiet -- @paths
+          $difference = $LASTEXITCODE
+        } finally {
+          $PSNativeCommandUseErrorActionPreference = $true
+        }
+        if ($difference -eq 0) {
+          'Homebrew casks already match this release.' | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          exit 0
+        }
+        if ($difference -ne 1) { throw 'Could not inspect staged Homebrew candidates.' }
+        git commit -m "Update all grate casks to $env:VERSION"
+        git push origin HEAD:main

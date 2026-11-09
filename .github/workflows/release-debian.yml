@@ -1,0 +1,66 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · debian
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: Build Debian package
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+        arch: [ "linux-arm64", "linux-x64" ]
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+    - name: Select distribution identity
+      id: distribution
+      shell: pwsh
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+        "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+    - uses: actions/download-artifact@v8
+      with:
+        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ inputs.version }}
+        path: ${{ matrix.arch }}/
+
+    - id: get-arch
+      name: Get architecture
+      run: |
+        arch=$(echo ${{ matrix.arch }} | cut -d- -f2 | sed 's/x64/amd64/')
+        echo "arch=$arch" >> "$GITHUB_OUTPUT"
+
+    - name: Verify Debian prerelease package ordering
+      shell: pwsh
+      run: ./installers/deb/Test-PackageVersion.Tests.ps1 -Architecture ${{ steps.get-arch.outputs.arch }}
+
+    - name: Create dpkg # Linux with powershell script? really? YES! :D
+      shell: pwsh
+      run: ./installers/deb/Create-Package.ps1 -grateExe ./${{ matrix.arch }}/grate -Version "${{ inputs.version }}" -arch ${{ steps.get-arch.outputs.arch}} -Distribution ${{ matrix.distribution }}
+      env:
+        VERSION: ${{ inputs.version }}
+
+    - name: Prepare Debian release asset ${{ steps.get-arch.outputs.arch }}
+      shell: pwsh
+      run: |
+        $oldName = './installers/deb/${{ steps.distribution.outputs.package-id }}_${{ inputs.version }}-1_${{ steps.get-arch.outputs.arch }}.deb'
+        $releaseName = '${{ steps.distribution.outputs.package-id }}_${{ inputs.version }}_${{ steps.get-arch.outputs.arch }}.deb'
+        Move-Item -LiteralPath $oldName -Destination $releaseName
+
+    - name: Upload Debian release asset ${{ steps.get-arch.outputs.arch }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-${{ steps.distribution.outputs.package-id }}_${{ inputs.version }}_${{ steps.get-arch.outputs.arch }}.deb
+        path: ${{ steps.distribution.outputs.package-id }}_${{ inputs.version }}_${{ steps.get-arch.outputs.arch }}.deb
+        if-no-files-found: error

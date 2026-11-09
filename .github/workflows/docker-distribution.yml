@@ -1,4 +1,4 @@
-name: Docker distribution policy
+name: CI · Docker distribution policy
 
 on:
   pull_request:

@@ -53,7 +53,10 @@ internal static class TextWriterExtensions
         textWriter.Write(foregroundColorAnsiCode);
     }
 
-    private static bool DisableAnsiColors => !SupportsAnsiColors || Console.IsOutputRedirected;
+    private static bool DisableAnsiColors => Console.IsOutputRedirected
+        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"))
+        || string.Equals(Environment.GetEnvironmentVariable("TERM"), "dumb", StringComparison.OrdinalIgnoreCase)
+        || !SupportsAnsiColors;
 
     private static bool SupportsAnsiColors => _supportsAnsiColors ??= GetSupportsAnsiColors();
 

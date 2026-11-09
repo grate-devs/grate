@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-  <Product Name='grate' Manufacturer='grate-devs' Id='%%%PRODUCTCODE%%%'
+  <Product Name='%%%PRODUCTNAME%%%' Manufacturer='grate-devs' Id='%%%PRODUCTCODE%%%'
     UpgradeCode='%%%UPGRADECODE%%%' Language='1033' Codepage='1252' Version='%%%VERSION%%%'>
     <Package Id='*' Keywords='Installer' Description="grate installer"
       Comments='grate - the SQL scripts migration runner' Manufacturer='grate-devs'
@@ -9,6 +9,7 @@
     <Property Id='DiskPrompt' Value="grate Installation [1]" />
     <!-- Full SemVer is recorded, but MSI compares only numeric ProductVersion. -->
     <Property Id='GRATE_RELEASE_VERSION' Value='%%%RELEASEVERSION%%%' />
+    <Property Id='GRATE_DISTRIBUTION' Value='%%%DISTRIBUTION%%%' />
     <!-- Keep removal inside the installation transaction so failure restores the
          previous product. Stable families handle future releases normally. -->
     <MajorUpgrade Schedule='afterInstallInitialize' DowngradeErrorMessage='A newer version of grate is already installed.' />
@@ -23,7 +24,7 @@
       <Directory Id='LocalAppDataFolder' Name='PFiles'>
         <Directory Id='ROOTDIRECTORY' Name='erikbra'>
           <Directory Id='INSTALLFOLDER' Name='grate'>
-            <Component Id='MainExecutable' Guid='C544280E-4F9B-443D-BE6D-4A82CFEE3723'>
+            <Component Id='MainExecutable' Guid='%%%EXECUTABLECOMPONENT%%%'>
               <File Id='grateEXE' Name='grate.exe' DiskId='1' Source='%%%GRATEEXE%%%'/>
 
               <!-- Remove all files from the INSTALLFOLDER on uninstall -->
@@ -32,13 +33,13 @@
               <RemoveFolder Id="RemoveCompanyFolder" Directory="ROOTDIRECTORY" On="uninstall" />
 
               <!--Create application registry entry-->
-              <RegistryValue Root="HKCU" Key="Software\Microsoft\erikbra\grate" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+              <RegistryValue Root="HKCU" Key="%%%REGISTRYKEY%%%" Name="installed" Type="integer" Value="1" KeyPath="yes" />
             </Component>
           </Directory>
         </Directory>
       </Directory>
 
-      <Component Id='PathVariable' Guid='E7507A5D-D78E-4082-BD75-986A11F54E68'>
+      <Component Id='PathVariable' Guid='%%%PATHCOMPONENT%%%'>
         <Environment Id='UpdatePath' Name='PATH' Action='set' Permanent='yes' System='no' Part='last' Value='[INSTALLFOLDER]' />
       </Component>
     </Directory>
