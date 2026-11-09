@@ -116,6 +116,14 @@ and execution limits belong in the PR verification record. The runnable checks
 and reproduction instructions are in the PoC directory.
 [PoC verification](slim-distributions-poc/README.md)
 
+PR CI requires the corresponding CommandLine suite against each slim profile and
+All, including SQL Server's case-sensitive fixture. Both the self-contained CLI
+and the locally installed NuGet tool run the suite on net11.0; tool dependency
+checks cover every packaged framework. Provider-library suites remain separate
+and retain their full framework matrix. The version compatibility workflow also
+runs both All and slim for every configured database image. Its CLI failures are
+propagated rather than allowed to pass the workflow.
+
 ## Other distribution channels
 
 The same six profiles can feed the other channels. The proposed names below

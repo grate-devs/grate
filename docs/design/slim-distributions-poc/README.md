@@ -10,6 +10,32 @@ and install each tool into a separate directory. PostgreSQL and Oracle use the
 same build and command contract. Their packaged CLI checks belong to the
 per-provider CI validation alongside the other database providers.
 
+## Validate a distribution against its database
+
+With the SDK from `global.json` and Docker available, run, for example:
+
+```powershell
+pwsh -NoProfile -File scripts/ci/Invoke-DistributionTests.ps1 -Distribution PostgreSQL -Database PostgreSQL -OutputDirectory /tmp/grate-postgresql-check
+```
+
+Use a fresh absolute output directory. The default RID is `linux-x64`; use
+`-RuntimeIdentifier linux-arm64` on a native Linux Arm64 host. Server suites start
+disposable database containers; SQLite uses local files. The script publishes a
+self-contained CLI, packs the tool for all four supported frameworks, checks
+provider/client inclusion and exclusion, and installs that exact tool from a
+local-only feed with an isolated cache. It runs the complete matching
+`CommandLine.<Database>` suite against each form on `net11.0`. Existing
+CLI-specific skips remain visible in the reports; library-only tests that require
+in-process migration internals are covered by the separate provider suites.
+
+PR CI requires both `All` and the matching slim profile for `Sqlite`, `SqlServer`,
+`SqlServerCaseSensitive`, `PostgreSQL`, `MariaDB` and `Oracle`. The case-sensitive
+suite uses the `SQLServer` profile. The integration workflow also tests both
+variants against each configured database image/version. Neither lane treats a
+failing migration suite as optional. Current release publishing still uses the
+all-in-one identity; these checks produce candidate artifacts without publishing
+new packages to public feeds.
+
 ## Run the comparison
 
 From the repository root, with PowerShell 7 and Docker available, run the wrapper.

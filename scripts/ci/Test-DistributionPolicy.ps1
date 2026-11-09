@@ -67,7 +67,7 @@ function Assert-Rejected {
 # Independent package fixtures distinguish missing selected clients and leaked
 # omitted clients, including an All artifact substituted into a slim lane.
 $libraries = @{
-    SQLite = @('grate.sqlite/1', 'Microsoft.Data.Sqlite/1', 'SQLitePCLRaw.lib.e_sqlite3/1')
+    SQLite = @('grate.sqlite/1', 'Microsoft.Data.Sqlite/1', 'SQLitePCLRaw.bundle_e_sqlite3/1', 'SQLite/1')
     SQLServer = @('grate.sqlserver/1', 'Microsoft.Data.SqlClient/1')
     MariaDB = @('grate.mariadb/1', 'MySqlConnector/1')
     PostgreSQL = @('grate.postgresql/1', 'Npgsql/1')

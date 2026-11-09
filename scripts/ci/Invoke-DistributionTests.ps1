@@ -110,6 +110,10 @@ try {
     foreach ($form in @('standalone', 'tool')) {
         $env:GrateExecutablePath = "$output/$form/$executableName"
         Assert-DistributionExecutable -Executable $env:GrateExecutablePath -Distribution $Distribution
+        & $env:GrateExecutablePath skills install --local --path "$output/skills-$form"
+        if (!(Test-Path -LiteralPath "$output/skills-$form/.agents/skills/use-grate/SKILL.md")) {
+            throw "$Distribution $form did not install its bundled skill."
+        }
         $testArguments = @(
             $testAssembly, '--minimum-expected-tests', '1', '--long-running', '60', '--timeout', '20m',
             '--results-directory', "$output/results/$form", '--report-xunit-trx'

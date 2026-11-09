@@ -54,5 +54,3 @@ public class One_time_scripts(SqlServerCaseSensitiveGrateTestContext testContext
     }
 
 }
-
-
