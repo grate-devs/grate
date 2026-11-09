@@ -1,5 +1,0 @@
-# Test setup and independent database assertions run under the JIT. The product
-# assemblies opt into Dapper.AOT separately; CLI tests can run a NativeAOT binary.
-# Do not require source generation for the test runner's own Dapper calls.
-[*.cs]
-dotnet_diagnostic.DAP005.severity = none
