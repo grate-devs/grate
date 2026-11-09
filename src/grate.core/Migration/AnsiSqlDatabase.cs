@@ -29,7 +29,7 @@ public abstract record AnsiSqlDatabase : IDatabase
 
     public void SetLogger(ILogger logger) => Logger = logger;
 
-    private IDictionary<string, string>? _scriptsRunCache;
+    private IDictionary<string, string?>? _scriptsRunCache;
 
     private readonly List<Func<DbConnection, Task>> _deferredWrites = new();
 
@@ -276,7 +276,7 @@ public abstract record AnsiSqlDatabase : IDatabase
 
         string existsSql = ExistsSql(tableSchema, fullTableName);
 
-        var res = await ExecuteScalarAsync<object>(ActiveConnection, existsSql);
+        var res = await ActiveConnection.ExecuteScalarAsync<string?>(TraceSql(existsSql));
 
         var name = (!DBNull.Value.Equals(res) && res is not null) ? (string)res : null;
 
@@ -292,7 +292,7 @@ public abstract record AnsiSqlDatabase : IDatabase
 
         if (await ExistingTable(SchemaName, tableName) is { })
         {
-            var res = await ExecuteScalarAsync<int?>(ActiveConnection, existsSql);
+            var res = await ActiveConnection.ExecuteScalarAsync<int?>(TraceSql(existsSql));
             return res is 1;
         }
         return false;
@@ -333,7 +333,7 @@ ORDER BY id DESC", 1)}
         try
         {
             var sql = CurrentVersionSql;
-            var res = await ExecuteScalarAsync<string>(ActiveConnection, sql);
+            var res = await ActiveConnection.ExecuteScalarAsync<string?>(TraceSql(sql));
             return res ?? NotVersioning;
         }
         catch (Exception ex)
@@ -411,9 +411,28 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
 
         // Older internal tracking tables may need to be upgraded by internal migrations.
         // Inspect the schema instead of treating an arbitrary database failure as compatibility.
-        using var reader = await ActiveConnection.ExecuteReaderAsync($"SELECT * FROM {versionTable} WHERE 1 = 0");
-        return Enumerable.Range(0, reader.FieldCount)
-            .Any(index => string.Equals(reader.GetName(index), "status", StringComparison.OrdinalIgnoreCase));
+        // Dapper.AOT does not intercept ExecuteReaderAsync. Preserve Dapper's connection ownership.
+        var wasClosed = ActiveConnection.State == ConnectionState.Closed;
+        try
+        {
+            if (wasClosed)
+            {
+                await ActiveConnection.OpenAsync();
+            }
+
+            await using var command = ActiveConnection.CreateCommand();
+            command.CommandText = $"SELECT * FROM {versionTable} WHERE 1 = 0";
+            await using var reader = await command.ExecuteReaderAsync();
+            return Enumerable.Range(0, reader.FieldCount)
+                .Any(index => string.Equals(reader.GetName(index), "status", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await ActiveConnection.CloseAsync();
+            }
+        }
     }
 
     protected string GetUserName()
@@ -435,7 +454,8 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
             WHERE id = @versionId");
 
         using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
-        await ExecuteAsync(Connection, updateSql, new { status, versionId });
+        var parameters = new { status, versionId };
+        await Connection.ExecuteAsync(TraceSql(updateSql, parameters), parameters);
 
         s.Complete();
     }
@@ -448,10 +468,11 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
             WHERE id = @versionId");
 
         using var s = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
-        await ExecuteAsync(Connection, deleteSql, new { versionId });
+        var parameters = new { versionId };
+        await Connection.ExecuteAsync(TraceSql(deleteSql, parameters), parameters);
 
         // reset the identity column of the table to the previous value
-        await ExecuteAsync(Connection, _syntax.ResetIdentity(SchemaName, versionTableName, versionId - 1));
+        await Connection.ExecuteAsync(TraceSql(_syntax.ResetIdentity(SchemaName, versionTableName, versionId - 1)));
 
         s.Complete();
     }
@@ -514,21 +535,22 @@ VALUES(@repositoryPath, @newVersion, @entryDate, @modifiedDate, @enteredBy{(incl
         };
 
     // ReSharper disable once ClassNeverInstantiated.Local
-    private class ScriptsRunCacheItem
+    // The generated row factory must be able to reference this type.
+    internal class ScriptsRunCacheItem
     {
 #pragma warning disable 8618
         // ReSharper disable InconsistentNaming
         // ReSharper disable UnusedAutoPropertyAccessor.Local
 
         public string script_name { get; init; }
-        public string text_hash { get; init; }
+        public string? text_hash { get; init; }
 
         // ReSharper restore InconsistentNaming
         // ReSharper restore UnusedAutoPropertyAccessor.Local
 #pragma warning restore 8618
     }
 
-    private async Task<IDictionary<string, string>> GetAllScriptsRun()
+    private async Task<IDictionary<string, string?>> GetAllScriptsRun()
     {
         try
         {
@@ -545,12 +567,12 @@ WHERE id = (SELECT MAX(id) FROM {ScriptsRunTable} sr2 WHERE sr2.script_name = sr
         catch (Exception ex) when (DryRunOrBootstrap())
         {
             Logger.LogDebug(ex, "Ignoring error getting ScriptsRun when in --dryrun, probably missing table");
-            return new Dictionary<string, string>(); // return empty set if nothing has ever been run
+            return new Dictionary<string, string?>(); // return empty set if nothing has ever been run
         }
     }
 
 
-    private async Task<IDictionary<string, string>> GetScriptsRunCache() => _scriptsRunCache ??= await GetAllScriptsRun();
+    private async Task<IDictionary<string, string?>> GetScriptsRunCache() => _scriptsRunCache ??= await GetAllScriptsRun();
 
     protected virtual string Parameterize(string sql) => sql;
 
@@ -566,7 +588,8 @@ WHERE id = (SELECT MAX(id) FROM {ScriptsRunTable} sr2 WHERE sr2.script_name = sr
 SELECT text_hash FROM  {ScriptsRunTable}
 WHERE script_name = @scriptName");
 
-        var hash = await ExecuteScalarAsync<string?>(ActiveConnection, hashSql, new { scriptName });
+        var parameters = new { scriptName };
+        var hash = await ActiveConnection.ExecuteScalarAsync<string?>(TraceSql(hashSql, parameters), parameters);
         return hash;
     }
 
@@ -581,7 +604,8 @@ WHERE script_name = @scriptName");
         try
         {
             var hasRunSql = Parameterize(HasRunSql);
-            var run = await ExecuteScalarAsync<bool?>(ActiveConnection, hasRunSql, new { scriptName });
+            var parameters = new { scriptName };
+            var run = await ActiveConnection.ExecuteScalarAsync<bool?>(TraceSql(hasRunSql, parameters), parameters);
             return run ?? false;
         }
         catch (Exception ex) when (DryRunOrBootstrap())
@@ -641,7 +665,8 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
         var (_, versionTable) = await ResolveVersionTable();
         var versionSql = Parameterize($"SELECT version FROM {versionTable} WHERE id = @versionId");
 
-        var version = await ExecuteScalarAsync<string>(ActiveConnection, versionSql, new { versionId });
+        var parameters = new { versionId };
+        var version = await ActiveConnection.ExecuteScalarAsync<string?>(TraceSql(versionSql, parameters), parameters);
         var repositoryPath = Config?.RepositoryPath;
 
         var scriptRunErrors = new DynamicParameters();
@@ -697,6 +722,11 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
         }
     }
 
+    protected async Task<string?> ExecuteStringScalarAsync(DbConnection conn, string sql)
+    {
+        return await conn.ExecuteScalarAsync<string?>(TraceSql(sql));
+    }
+
     protected async Task<T?> ExecuteScalarAsync<T>(DbConnection conn, string sql, object? parameters = null)
     {
         Logger.LogTrace("SQL: {Sql}", sql);
@@ -711,6 +741,19 @@ VALUES (@repositoryPath, @version, @scriptName, @sql, @errorSql, @errorMessage, 
         Logger.LogTrace("Parameters: {@Parameters}", parameters);
 
         return await conn.ExecuteAsync(sql, parameters);
+    }
+
+    // Keep the concrete parameter type visible to Dapper.AOT instead of erasing it to object.
+    private async Task<int> ExecuteAsync(IDbConnection conn, string sql, DynamicParameters parameters)
+    {
+        return await conn.ExecuteAsync(TraceSql(sql, parameters), parameters);
+    }
+
+    private string TraceSql(string sql, object? parameters = null)
+    {
+        Logger.LogTrace("SQL: {Sql}", sql);
+        Logger.LogTrace("Parameters: {@Parameters}", parameters);
+        return sql;
     }
 
     // in order to prevent fat PR, I will create another PR to use IDbConnection and Dapper.

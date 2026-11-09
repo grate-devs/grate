@@ -5,6 +5,7 @@
     <RootNamespace>grate</RootNamespace>
     <SourceRevisionId>build$([System.DateTime]::UtcNow.ToString("O"))</SourceRevisionId>
     <IsPublishable>false</IsPublishable>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Dapper.AOT</InterceptorsNamespaces>
   </PropertyGroup>
   
   <ItemGroup>
@@ -41,6 +42,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting"  />
     <PackageReference Include="Dapper" />
+    <PackageReference Include="Dapper.AOT" PrivateAssets="contentfiles;analyzers;build;buildtransitive" />
   </ItemGroup>
 
   <ItemGroup>

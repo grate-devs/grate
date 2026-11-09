@@ -3,9 +3,11 @@
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <IsPublishable>false</IsPublishable>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Dapper.AOT</InterceptorsNamespaces>
   </PropertyGroup>
   
   <ItemGroup>
+    <PackageReference Include="Dapper.AOT" PrivateAssets="contentfiles;analyzers;build;buildtransitive" />
     <PackageReference Include="Oracle.ManagedDataAccess.Core" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
