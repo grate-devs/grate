@@ -4,7 +4,12 @@
 !global.json
 !NuGet.Config
 !*.props
+!*.targets
+!LICENSE
 !*.ruleset
+!scripts/
+!scripts/licenses/
+!scripts/licenses/**
 !src/
 !src/**
 !docs/

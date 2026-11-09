@@ -16,6 +16,10 @@ $identity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Ver
 if ($upgradeCode -and $upgradeCode -ne $identity.UpgradeCode) { throw 'The MSI UpgradeCode must match the stable architecture family in identity-contract.json.' }
 $upgradeCode = $identity.UpgradeCode
 $grateExe = (Resolve-Path -LiteralPath $grateExe).Path
+$noticeFile = Join-Path (Split-Path -Parent $grateExe) 'THIRD-PARTY-NOTICES.txt'
+if (!(Test-Path -LiteralPath $noticeFile -PathType Leaf)) {
+    throw 'The published payload must include THIRD-PARTY-NOTICES.txt.'
+}
 $payloadVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($grateExe).ProductVersion
 # Informational +commit metadata does not distinguish published releases. Refuse
 # dropping a prerelease suffix merely because Windows Installer needs a number.
@@ -76,6 +80,7 @@ $template.Replace('%%%VERSION%%%', $version).
     Replace('%%%PRODUCTCODE%%%', $identity.ProductCode).
     Replace('%%%UPGRADECODE%%%', $upgradeCode).
     Replace('%%%UPGRADEACTIONS%%%', [System.Security.SecurityElement]::Escape($upgradeActions)).
+    Replace('%%%THIRDPARTYNOTICES%%%', [System.Security.SecurityElement]::Escape($noticeFile)).
     Replace('%%%GRATEEXE%%%', [System.Security.SecurityElement]::Escape($grateExe)) |
     Set-Content -LiteralPath $wxs
 

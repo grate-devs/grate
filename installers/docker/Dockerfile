@@ -7,7 +7,9 @@ ARG RUNTIME
 ARG VERSION=1.0.0
 WORKDIR /app
 COPY global.json NuGet.Config *.props ./
+COPY *.targets LICENSE ./
 COPY *.ruleset ./
+COPY scripts/licenses/ ./scripts/licenses/
 COPY src/ ./src/
 COPY docs/skills/use-grate/ ./docs/skills/use-grate/
 RUN if [ -z "$RUNTIME" ]; then \

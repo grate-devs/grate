@@ -41,7 +41,8 @@ $payloadHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
 ## Build and inspect the package
 
 Copy the recipe into the staging directory. `Create-Package.ps1` stages the
-executable and generates `tools/VERIFICATION.txt` there.
+executable, its required `THIRD-PARTY-NOTICES.txt` companion, and generates
+`tools/VERIFICATION.txt` there.
 
 ```powershell
 $recipe = (Resolve-Path -LiteralPath './installers/chocolatey').Path
@@ -61,7 +62,8 @@ if ($nuspec.package.metadata.id -cne 'grate' -or $nuspec.package.metadata.versio
 $embeddedHash = (Get-FileHash -LiteralPath (Join-Path $inspection 'tools/grate.exe') -Algorithm SHA256).Hash
 $verification = Get-Content (Join-Path $inspection 'tools/VERIFICATION.txt') -Raw
 if ($embeddedHash -ne $payloadHash -or $verification -notmatch $payloadHash -or
-    -not (Test-Path -LiteralPath (Join-Path $inspection 'tools/LICENSE.txt') -PathType Leaf)) {
+    -not (Test-Path -LiteralPath (Join-Path $inspection 'tools/LICENSE.txt') -PathType Leaf) -or
+    -not (Test-Path -LiteralPath (Join-Path $inspection 'tools/THIRD-PARTY-NOTICES.txt') -PathType Leaf)) {
     throw 'Embedded executable, verification file or license failed inspection.'
 }
 Get-FileHash -LiteralPath $package -Algorithm SHA256

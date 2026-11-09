@@ -25,6 +25,7 @@
           <Directory Id='INSTALLFOLDER' Name='grate'>
             <Component Id='MainExecutable' Guid='C544280E-4F9B-443D-BE6D-4A82CFEE3723'>
               <File Id='grateEXE' Name='grate.exe' DiskId='1' Source='%%%GRATEEXE%%%'/>
+              <File Id='ThirdPartyNotices' Name='THIRD-PARTY-NOTICES.txt' DiskId='1' Source='%%%THIRDPARTYNOTICES%%%'/>
 
               <!-- Remove all files from the INSTALLFOLDER on uninstall -->
               <RemoveFile Id="ALLFILES" Name="*.*" On="both" />

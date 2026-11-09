@@ -6,6 +6,10 @@ param (
      [Parameter(Mandatory=$true)] [string] $arch
 )
 
+$noticeFile = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $grateExe).Path) 'THIRD-PARTY-NOTICES.txt'
+if (!(Test-Path -LiteralPath $noticeFile -PathType Leaf)) {
+    throw "The published payload must include THIRD-PARTY-NOTICES.txt: $noticeFile"
+}
 $Root = Resolve-Path "$($PSScriptRoot)";
 
 # Debian sorts ~ before the final version; a SemVer '-' would sort after it.
@@ -42,6 +46,7 @@ $executable = $(basename $grateExe)
 chmod a+x $(Join-Path $binDir $executable)
 
 cp -R $templateDir/* $debianDir
+Copy-Item -LiteralPath $noticeFile -Destination (Join-Path $debianDir 'usr/share/doc/grate/THIRD-PARTY-NOTICES.txt')
 
 ((Get-Content -path $controlTemplateFile -Raw) `
 	-replace '%%%VERSION%%%',$pkgVersion `

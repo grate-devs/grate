@@ -2,6 +2,10 @@ grate
 
 Source: https://github.com/grate-devs/grate/
 
+The MIT license below applies to grate's own source. Bundled third-party
+components retain their original licenses, copyright and notices, reproduced
+in /usr/share/doc/grate/THIRD-PARTY-NOTICES.txt.
+
 Copyright: (C) 2021 Erik A. Brandstadmoen <erik@brandstadmoen.net>
 License: MIT
 

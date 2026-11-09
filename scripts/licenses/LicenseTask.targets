@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <_GrateLicenseJsonReference>$(MSBuildToolsPath)/Newtonsoft.Json.dll</_GrateLicenseJsonReference>
+    <_GrateLicenseJsonReference Condition="Exists('$(MSBuildToolsPath)/Sdks/Microsoft.NET.Sdk/tools/net472/Newtonsoft.Json.dll')">$(MSBuildToolsPath)/Sdks/Microsoft.NET.Sdk/tools/net472/Newtonsoft.Json.dll</_GrateLicenseJsonReference>
+  </PropertyGroup>
+  <UsingTask TaskName="GenerateDependencyNoticesTask" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <Task>
+      <!-- Use the SDK's framework-compatible reference build. Its root copy can
+           target net6+ and cannot compile against the task factory's ref set. -->
+      <Reference Include="$(_GrateLicenseJsonReference)" />
+      <Code Type="Class" Language="cs" Source="$(MSBuildThisFileDirectory)GenerateDependencyNoticesTask.cs" />
+    </Task>
+  </UsingTask>
+</Project>

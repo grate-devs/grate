@@ -1,0 +1,30 @@
+<Project>
+  <Import Project="scripts/licenses/LicenseTask.targets" />
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').StartsWith('grate'))">
+    <GrateLicenseDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'dependency-licenses'))</GrateLicenseDirectory>
+  </PropertyGroup>
+
+  <Target Name="GenerateGrateLicenseNotices" Condition="'$(GrateLicenseDirectory)' != ''">
+    <GenerateDependencyNoticesTask AssetsFiles="$(ProjectAssetsFile)" PackageRoots="$(NuGetPackageRoot)"
+      OutputDirectory="$(GrateLicenseDirectory)" RepositoryRoot="$(MSBuildThisFileDirectory)"
+      SourceDirectory="$(MSBuildThisFileDirectory)scripts/licenses" />
+  </Target>
+
+  <Target Name="PublishGrateLicenseNotices" AfterTargets="ComputeFilesToPublish"
+          DependsOnTargets="GenerateGrateLicenseNotices" Condition="'$(GrateLicenseDirectory)' != ''">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(GrateLicenseDirectory)/THIRD-PARTY-NOTICES.txt">
+        <RelativePath>THIRD-PARTY-NOTICES.txt</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PackGrateLicenseNotices" BeforeTargets="_GetPackageFiles"
+          DependsOnTargets="GenerateGrateLicenseNotices" Condition="'$(GrateLicenseDirectory)' != ''">
+    <ItemGroup>
+      <None Include="$(GrateLicenseDirectory)/THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -75,6 +75,18 @@ jobs:
     - name: Restore dependencies
       run: |
        dotnet restore -r linux-x64 grate.slnx
+    - name: Verify dependency license export and retain inventory
+      shell: pwsh
+      run: |
+        ./scripts/licenses/Test-DependencyLicenses.Tests.ps1
+        $assets = Get-ChildItem -Path src,unittests -Filter project.assets.json -Recurse -Force | ForEach-Object FullName
+        ./scripts/licenses/Export-DependencyLicenses.ps1 -AssetsFile $assets -OutputDirectory artifacts/dependency-licenses
+    - name: Upload dependency license inventory
+      uses: actions/upload-artifact@v7
+      with:
+        name: dependency-license-inventory
+        path: artifacts/dependency-licenses/
+        if-no-files-found: error
     - name: Build
       run: dotnet build --no-restore --no-self-contained -r linux-x64 src/grate/grate.csproj -c release
 

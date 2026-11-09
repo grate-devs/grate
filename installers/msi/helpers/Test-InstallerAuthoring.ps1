@@ -9,6 +9,10 @@ $ErrorActionPreference = 'Stop'
 $namespaces = [System.Xml.XmlNamespaceManager]::new($template.NameTable)
 $namespaces.AddNamespace('w', 'http://schemas.microsoft.com/wix/2006/wi')
 $package = $template.SelectSingleNode('/w:Wix/w:Product/w:Package', $namespaces)
+$notices = $template.SelectSingleNode("//w:Component[@Id='MainExecutable']/w:File[@Id='ThirdPartyNotices']", $namespaces)
+if (!$notices -or $notices.Name -cne 'THIRD-PARTY-NOTICES.txt' -or $notices.Source -cne '%%%THIRDPARTYNOTICES%%%') {
+    throw 'The MSI must install the exact published third-party notices beside grate.exe.'
+}
 
 # ICE91 is harmless only for a per-user-only installation. Reject any change to
 # that contract instead of letting the advisory mask per-machine user-profile files.
