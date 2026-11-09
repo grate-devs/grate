@@ -9,8 +9,8 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $workflow = Get-Content -LiteralPath "$repositoryRoot/.github/workflows/ci.yml" -Raw
 $preflightScript = Get-Content -LiteralPath "$repositoryRoot/scripts/ci/Invoke-Preflight.ps1" -Raw
 $aggregate = Join-Path $PSScriptRoot 'Assert-CiResults.ps1'
-$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
-$expensiveJobs = @('analyze', 'test', 'packages', 'standalone', 'docker')
+$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distributions', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
+$expensiveJobs = @('analyze', 'test', 'cli-distributions', 'packages', 'standalone', 'docker')
 
 function Assert-WorkflowPolicy {
     param(
@@ -54,7 +54,7 @@ function Assert-WorkflowPolicy {
     if (!$aggregateJob.Contains('CI_NEEDS_JSON: ${{ toJSON(needs) }}') -or !$aggregateJob.Contains('./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON')) {
         throw 'The CI result must validate actual dependency results with the tested gate.'
     }
-    if ($jobs['report'] -notmatch '(?m)^     needs: \[fast-tests, test\]\r?$') {
+    if ($jobs['report'] -notmatch '(?m)^     needs: \[fast-tests, test, cli-distributions\]\r?$') {
         throw 'The test report must collect both test tiers.'
     }
     if ($jobs['test'] -match 'category: Basic_tests' -or ([regex]::Matches($jobs['fast-tests'], 'category: Basic_tests')).Count -ne 2) {
@@ -129,7 +129,7 @@ $bypassedPolicy = $workflow.Replace('needs: [build-code, fast-tests, validation-
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $bypassedPolicy } -ExpectedMessage 'must depend'
 $skippedAggregate = $workflow.Replace('    if: always()', '    if: success()')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $skippedAggregate } -ExpectedMessage 'must always evaluate'
-$missingProducer = $workflow.Replace('needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy, pr-validation]', 'needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy]')
+$missingProducer = $workflow.Replace('needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]', 'needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy]')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $missingProducer } -ExpectedMessage 'must always evaluate'
 $missingMonitorTests = $preflightScript.Replace('-Path .github/scripts -Filter monitor-test-containers.Tests.ps1', '-Path scripts -Filter skipped.ps1')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Preflight $missingMonitorTests } -ExpectedMessage 'Container monitor regressions must run'

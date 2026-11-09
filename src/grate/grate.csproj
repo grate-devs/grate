@@ -39,9 +39,21 @@
     <PackageReadmeFile>NuGet.MariaDb.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(GrateDistribution)' == 'PostgreSQL'">
+    <DefineConstants>$(DefineConstants);POSTGRESQL_ONLY</DefineConstants>
+    <PackageId>grate-postgresql</PackageId>
+    <PackageReadmeFile>NuGet.PostgreSQL.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GrateDistribution)' == 'Oracle'">
+    <DefineConstants>$(DefineConstants);ORACLE_ONLY</DefineConstants>
+    <PackageId>grate-oracle</PackageId>
+    <PackageReadmeFile>NuGet.Oracle.md</PackageReadmeFile>
+  </PropertyGroup>
+
   <Target Name="ValidateGrateDistribution" BeforeTargets="PrepareForBuild;CollectPackageReferences">
-    <Error Condition="'$(GrateDistribution)' != 'All' and '$(GrateDistribution)' != 'SQLite' and '$(GrateDistribution)' != 'SQLServer' and '$(GrateDistribution)' != 'MariaDB'"
-           Text="Unknown GrateDistribution '$(GrateDistribution)'. Supported values are All, SQLite, SQLServer and MariaDB." />
+    <Error Condition="'$(GrateDistribution)' != 'All' and '$(GrateDistribution)' != 'SQLite' and '$(GrateDistribution)' != 'SQLServer' and '$(GrateDistribution)' != 'MariaDB' and '$(GrateDistribution)' != 'PostgreSQL' and '$(GrateDistribution)' != 'Oracle'"
+           Text="Unknown GrateDistribution '$(GrateDistribution)'. Supported values are All, SQLite, SQLServer, MariaDB, PostgreSQL and Oracle." />
   </Target>
 
   <!-- Need to do this by hand, due to https://github.com/dotnet/sdk/issues/40690 (duplicate of https://github.com/dotnet/sdk-container-builds/issues/559) -->
@@ -109,8 +121,8 @@
   
   <ItemGroup>
     <ProjectReference Include="..\grate.mariadb\grate.mariadb.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'MariaDB'" />
-    <ProjectReference Include="..\grate.oracle\grate.oracle.csproj" Condition="'$(GrateDistribution)' == 'All'" />
-    <ProjectReference Include="..\grate.postgresql\grate.postgresql.csproj" Condition="'$(GrateDistribution)' == 'All'" />
+    <ProjectReference Include="..\grate.oracle\grate.oracle.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'Oracle'" />
+    <ProjectReference Include="..\grate.postgresql\grate.postgresql.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'PostgreSQL'" />
     <ProjectReference Include="..\grate.sqlite\grate.sqlite.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'SQLite'" />
     <ProjectReference Include="..\grate.sqlserver\grate.sqlserver.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'SQLServer'" />
   </ItemGroup>
@@ -130,6 +142,8 @@
     <None Include="NuGet.Sqlite.md" Pack="true" PackagePath="\" Condition="'$(GrateDistribution)' == 'SQLite'" />
     <None Include="NuGet.SqlServer.md" Pack="true" PackagePath="\" Condition="'$(GrateDistribution)' == 'SQLServer'" />
     <None Include="NuGet.MariaDb.md" Pack="true" PackagePath="\" Condition="'$(GrateDistribution)' == 'MariaDB'" />
+    <None Include="NuGet.PostgreSQL.md" Pack="true" PackagePath="\" Condition="'$(GrateDistribution)' == 'PostgreSQL'" />
+    <None Include="NuGet.Oracle.md" Pack="true" PackagePath="\" Condition="'$(GrateDistribution)' == 'Oracle'" />
   </ItemGroup>
 
   <!-- Embed the complete skill so every CLI distribution, including single-file installers,

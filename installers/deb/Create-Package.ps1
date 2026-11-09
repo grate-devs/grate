@@ -4,7 +4,7 @@ param (
     [Parameter(Mandatory=$true)] [string] $grateExe,
     [Parameter(Mandatory=$true)] [string] $version,
     [Parameter(Mandatory=$true)] [string] $arch,
-    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB')] [string] $Distribution = 'All',
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')] [string] $Distribution = 'All',
     [string] $OutputDirectory = $PSScriptRoot
 )
 
@@ -19,8 +19,12 @@ $packageName = switch ($Distribution) {
     'SQLite' { 'grate-sqlite' }
     'SQLServer' { 'grate-sqlserver' }
     'MariaDB' { 'grate-mariadb' }
+    'PostgreSQL' { 'grate-postgresql' }
+    'Oracle' { 'grate-oracle' }
 }
-$packageFamily = @('grate', 'grate-sqlite', 'grate-sqlserver', 'grate-mariadb')
+$packageFamily = @(
+    'grate', 'grate-sqlite', 'grate-sqlserver', 'grate-mariadb', 'grate-postgresql', 'grate-oracle'
+)
 $conflicts = ($packageFamily | Where-Object { $_ -ne $packageName }) -join ', '
 $description = if ($Distribution -eq 'All') { 'SQL for the 20s' } else { "SQL for the 20s ($Distribution only)" }
 

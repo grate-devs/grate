@@ -40,6 +40,8 @@ try {
         'SQLite' = 'grate-sqlite'
         'SQLServer' = 'grate-sqlserver'
         'MariaDB' = 'grate-mariadb'
+        'PostgreSQL' = 'grate-postgresql'
+        'Oracle' = 'grate-oracle'
     }
     $output = Join-Path $root 'distribution packages'
     foreach ($distribution in $distributionIds.Keys) {

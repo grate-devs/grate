@@ -141,7 +141,10 @@ def inspect_deb(args, package, distribution, log):
     require(fields['Version'] == f'{VERSION}-1' and fields['Architecture'] == 'amd64',
             'Incorrect Debian version or architecture')
     conflicts = set(fields.get('Conflicts', '').split(', '))
-    require(conflicts == set(PACKAGES.values()) - {PACKAGES[distribution]}, 'Incorrect Debian conflicts')
+    # This historical four-profile comparison still checks the complete package
+    # family, including the newer PostgreSQL/Oracle variants sharing /usr/bin/grate.
+    family = set(PACKAGES.values()) | {'grate-postgresql', 'grate-oracle'}
+    require(conflicts == family - {PACKAGES[distribution]}, 'Incorrect Debian conflicts')
     require(not fields.get('Provides'), 'Unexpected Debian Provides')
 
 

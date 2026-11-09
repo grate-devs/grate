@@ -13,9 +13,10 @@ architecture (`amd64` or `arm64`) to `Create-Package.ps1` using `-grateExe`,
 to select another destination. The release workflow gives the uploaded asset its
 public filename.
 
-`-Distribution` accepts `All` (the default), `SQLite`, `SQLServer` and `MariaDB`.
-The slim packages use the names `grate-sqlite`, `grate-sqlserver` and
-`grate-mariadb`. Each installs `/usr/bin/grate` and conflicts with the other
+`-Distribution` accepts `All` (the default), `SQLite`, `SQLServer`, `MariaDB`,
+`PostgreSQL` and `Oracle`. The slim packages use the names `grate-sqlite`,
+`grate-sqlserver`, `grate-mariadb`, `grate-postgresql` and `grate-oracle`.
+Each installs `/usr/bin/grate` and conflicts with the other
 variants because they share that command path. Select the matching executable
 when building a package.
 

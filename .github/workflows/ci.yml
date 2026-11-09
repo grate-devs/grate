@@ -36,7 +36,7 @@ jobs:
     # Keep this name stable: the proposed main ruleset consumes it.
     name: PR validation
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
-    needs: [validation-policy, build-code, test, packages, standalone, docker]
+    needs: [validation-policy, build-code, test, cli-distributions, packages, standalone, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -309,12 +309,68 @@ jobs:
         retention-days: 1
 
 
+  cli-distributions:
+    name: CLI database ${{ matrix.distribution }} / ${{ matrix.database }}
+    needs: [build-code, fast-tests, validation-policy]
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.database == 'Oracle' && 50 || 40 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distribution: All, database: Sqlite }
+          - { distribution: SQLite, database: Sqlite }
+          - { distribution: All, database: SqlServer }
+          - { distribution: SQLServer, database: SqlServer }
+          - { distribution: All, database: SqlServerCaseSensitive }
+          - { distribution: SQLServer, database: SqlServerCaseSensitive }
+          - { distribution: All, database: PostgreSQL }
+          - { distribution: PostgreSQL, database: PostgreSQL }
+          - { distribution: All, database: MariaDB }
+          - { distribution: MariaDB, database: MariaDB }
+          - { distribution: All, database: Oracle }
+          - { distribution: Oracle, database: Oracle }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Test published CLI and installed tool against database
+        shell: pwsh
+        env:
+          LogLevel: Warning
+          TZ: UTC
+        run: ./scripts/ci/Invoke-DistributionTests.ps1 -Distribution '${{ matrix.distribution }}' -Database '${{ matrix.database }}' -OutputDirectory '${{ runner.temp }}/distribution-tests'
+      - name: Upload distribution test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: '${{ matrix.distribution }} ${{ matrix.database }} CLI XML test results'
+          path: ${{ runner.temp }}/distribution-tests/results/
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Upload tested distribution artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: 'cli-${{ matrix.distribution }}-${{ matrix.database }}'
+          path: |
+            ${{ runner.temp }}/distribution-tests/standalone/
+            ${{ runner.temp }}/distribution-tests/packages/
+            ${{ runner.temp }}/distribution-tests/grate.deps.json
+          retention-days: 3
+
   report:
      # Diagnostic output only. PR validation reads test results directly;
      # successful report generation never overrides a failed test producer.
      runs-on: ubuntu-latest
      name: Create test report
-     needs: [fast-tests, test]
+     needs: [fast-tests, test, cli-distributions]
      if: always()
 
      steps:
@@ -568,7 +624,7 @@ jobs:
     timeout-minutes: 5
     # A skipped dependent job can look green in isolation. Only this aggregate
     # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, report, packages, standalone, docker, validation-policy, pr-validation]
+    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
     if: always()
     steps:
       - uses: actions/checkout@v7

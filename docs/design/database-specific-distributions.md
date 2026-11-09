@@ -6,8 +6,9 @@ in #909, and the broader provider architecture has its own discussion.
 [Distribution issue #909](https://github.com/grate-devs/grate/issues/909) ·
 [Architecture issue #891](https://github.com/grate-devs/grate/issues/891)
 
-The Linux x64 PoC builds `All`, `SQLite`, `SQLServer` and `MariaDB`, installs
-the tools from local packages, runs migrations against the respective databases
+The checkout supports `All`, `SQLite`, `SQLServer`, `MariaDB`, `PostgreSQL` and
+`Oracle` build profiles. The original Linux x64 comparison builds the first four,
+installs the tools from local packages, runs migrations against the respective databases
 and compares artifact sizes. Packaging mode also builds Linux amd64 Docker
 images and Debian packages and exercises their normal entry points.
 [Run the PoC](slim-distributions-poc/README.md)
@@ -29,14 +30,18 @@ images and Debian packages and exercises their normal entry points.
   tool builds. [CI workflow](../../.github/workflows/ci.yml) ·
   [Package verification script](../../scripts/verify-packages.ps1)
 
-## Package choices demonstrated by the PoC
+## Build profiles in this checkout
 
-| Format | All-in-one | SQLite | SQL Server | MariaDB |
-| --- | --- | --- | --- | --- |
-| NuGet tool ID | `grate` | `grate-sqlite` | `grate-sqlserver` | `grate-mariadb` |
-| Installed command | `grate` | `grate` | `grate` | `grate` |
-| Default database | SQL Server | SQLite | SQL Server | MariaDB |
-| ZIP prefix | `grate-` | `grate-sqlite-` | `grate-sqlserver-` | `grate-mariadb-` |
+| Build profile | NuGet tool ID | Default database | ZIP prefix |
+| --- | --- | --- | --- |
+| `All` | `grate` | SQL Server | `grate-` |
+| `SQLite` | `grate-sqlite` | SQLite | `grate-sqlite-` |
+| `SQLServer` | `grate-sqlserver` | SQL Server | `grate-sqlserver-` |
+| `MariaDB` | `grate-mariadb` | MariaDB | `grate-mariadb-` |
+| `PostgreSQL` | `grate-postgresql` | PostgreSQL | `grate-postgresql-` |
+| `Oracle` | `grate-oracle` | Oracle | `grate-oracle-` |
+
+Every profile exposes the command `grate`.
 
 Each ZIP follows `<prefix><rid>-self-contained-<version>.zip` and contains
 `grate` or `grate.exe`. Users select a package, then invoke the same command.
@@ -57,7 +62,7 @@ produces a parse error before database services are constructed.
 
 ## Build-time provider selection
 
-The CLI project uses `GrateDistribution` with `All` as the default. The three
+The CLI project uses `GrateDistribution` with `All` as the default. The five
 slim profiles select their provider project and dependencies. For example, the
 SQLite profile excludes the direct SQL Server client references as well as
 the four other provider projects.
@@ -93,8 +98,8 @@ dotnet pack src/grate/grate.csproj -c Release \
 
 ## Verification and size comparison
 
-The PoC exercises every slim variant's extracted ZIP and installed tool against
-its database, then reruns the migration with explicit provider selection. A
+The original comparison exercises SQLite, SQL Server and MariaDB extracted ZIPs
+and installed tools against their databases, then reruns the migration with explicit provider selection. A
 separate direct-client program queries data, script hashes/history and migration
 errors after both invocations. The all-in-one packages exercise all three
 databases using the same fixture and checks.
@@ -113,9 +118,9 @@ and reproduction instructions are in the PoC directory.
 
 ## Other distribution channels
 
-The same four profiles can feed the other channels. The proposed names below
-show SQLite as the example. SQL Server and MariaDB use the corresponding
-`sqlserver` and `mariadb` identifiers. These are channel design proposals for
+The same six profiles can feed the other channels. The proposed names below
+show SQLite as the example. SQL Server, MariaDB, PostgreSQL and Oracle use
+`sqlserver`, `mariadb`, `postgresql` and `oracle` identifiers. These are channel design proposals for
 #909. The executable PoC covers Linux x64 ZIPs, NuGet tools, Linux amd64
 Docker images and Debian packages.
 
@@ -160,9 +165,9 @@ argument forwarding and unsupported database selections.
 [Entrypoint](../../installers/docker/entrypoint.sh)
 
 Use profile-prefixed tags such as `sqlite-<version>`, `sqlserver-<version>`
-and `mariadb-<version>`. A suffix such as `<version>-sqlite` can collide with
+`mariadb-<version>`, `postgresql-<version>` and `oracle-<version>`. A suffix such as `<version>-sqlite` can collide with
 a valid all-in-one SemVer prerelease tag. Stable releases can update `:sqlite`,
-`:sqlserver` and `:mariadb`. Prereleases publish only their versioned tags.
+`:sqlserver`, `:mariadb`, `:postgresql` and `:oracle`. Prereleases publish only their versioned tags.
 Keep version parsing separate from tag rendering, and validate complete tags.
 The proposal adds new variants under the canonical repository. The existing
 compatibility-image policy continues to govern the all-in-one image.
@@ -229,7 +234,7 @@ other grate casks. Verify the interaction with a linked grate formula as well.
 Update both the manual cask generator and automated tap-update path to select
 the profile's archives and hashes.
 [Cask generator](../../installers/homebrew/Create-Cask.ps1) ·
-[Automated cask update](../../scripts/release/update_homebrew_cask.py) ·
+[Automated cask update](../../scripts/release/update_homebrew_cask.ps1) ·
 [Cask conflict declarations](https://docs.brew.sh/Cask-Cookbook#stanza-conflicts_with)
 
 For the source-built formula, pass `-p:GrateDistribution=<profile>` through
@@ -237,8 +242,8 @@ its existing publish command and expose `grate` from the formula's own
 `libexec`. Use formula conflict declarations for competing grate commands.
 Separate slim formulae require upstream acceptance. Their placement should be
 agreed with the channel maintainers alongside the current source-formula work.
-The existing formula test runs SQLite, so SQL Server and MariaDB variants need
-an appropriate database verification arrangement before claiming formula
+The existing formula test runs SQLite, so SQL Server, MariaDB, PostgreSQL and
+Oracle variants need an appropriate database verification arrangement before claiming formula
 coverage. [Formula template](../../installers/homebrew/grate.rb.in) ·
 [Homebrew channel plan](../../installers/homebrew/README.md) ·
 [Formula conflicts](https://docs.brew.sh/Formula-Cookbook#specifying-conflicts-with-other-formulae)
@@ -252,31 +257,32 @@ binary from that run. Docker musl and Homebrew source builds retain their own
 build and verification paths. Record the profile in artifact metadata so a
 correct filename alone cannot select an all-in-one payload for a slim package.
 
-If all four profiles covered every current platform, the primary output counts
+If all six profiles covered every current platform, the primary output counts
 would grow as follows. This is a planning comparison for choosing coverage.
 
-| Output | All-in-one today | Four profiles at current coverage |
+| Output | All-in-one today | Six profiles at current coverage |
 | --- | ---: | ---: |
-| Standalone ZIPs, nine RIDs | 9 | 36 |
-| MSI, x64/Arm64 | 2 | 8 |
-| Debian, amd64/Arm64 | 2 | 8 |
-| NuGet tools | 1 | 4 |
-| Docker multi-platform images | 1 | 4 |
+| Standalone ZIPs, nine RIDs | 9 | 54 |
+| MSI, x64/Arm64 | 2 | 12 |
+| Debian, amd64/Arm64 | 2 | 12 |
+| NuGet tools | 1 | 6 |
+| Docker multi-platform images | 1 | 6 |
 
-The ZIP/MSI/Debian release inventory would therefore grow from 13 to 52 files,
+The ZIP/MSI/Debian release inventory would therefore grow from 13 to 78 files,
 plus checksum and manifest files. Measure installer and image download sizes in
 MB independently. The Linux glibc ZIP measurements do not establish Alpine
 image sizes or Windows/macOS installer savings.
 
 The existing MSI, Debian, Docker-entrypoint and Homebrew tests use SQLite.
-Retain that fixture for All/SQLite and use SQL Server or MariaDB for their slim
-variants. Every channel needs a real migration/rerun through its installed entry
+Retain that fixture for All/SQLite and use the selected server provider for each
+server-specific slim variant. Every channel needs a real migration/rerun through its installed entry
 point, unsupported-provider rejection, bundled-skill verification, and clean
 upgrade/uninstall behavior. Bind those checks to the artifacts being released.
 [Package lifecycle checks](../Packaging.md#package-lifecycle-checks-in-ci)
 
-The packaging PoC exercises Docker musl-x64 and installed Debian amd64 packages
-for the three providers. Additional architectures, the Windows installer/identity
+The original packaging comparison exercises Docker musl-x64 and installed Debian
+amd64 packages for SQLite, SQL Server and MariaDB. Additional architectures, the
+Windows installer/identity
 chain and macOS Homebrew validation require their own runner coverage. Select
 which channels and profiles should ship through #909.
 
@@ -288,8 +294,8 @@ from `set-version-number`. Run the packaged checks against the candidates
 that will be uploaded, and have `release-ready` require their successful results.
 Add the ZIPs to the expected asset list so checksums and the manifest cover them.
 
-Expand the NuGet allowlist to include the selected tool IDs. Shipping all three
-slim tools would produce ten packages with the existing six libraries and
+Expand the NuGet allowlist to include the selected tool IDs. Shipping all five
+slim tools would produce twelve packages with the existing six libraries and
 all-in-one tool. Validate the complete set and versions before publication.
 Confirm availability of the new package IDs and that the NuGet trusted-publishing
 policy permits their creation and subsequent versions.

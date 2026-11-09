@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 # This inventory is deliberately independent of the workflow's matrix. Removing a
 # lane from YAML must not silently redefine the work required for a green check.
-$requiredGroups = @('build-code', 'test', 'packages', 'standalone', 'docker', 'validation-policy')
+$requiredGroups = @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')
 $requiredJobs = @(
     'Build'
     'NuGet libraries and installed tool'
@@ -40,6 +40,18 @@ $requiredJobs = @(
     'CLI osx-arm64'
     'Alpine amd64'
     'Alpine arm64'
+    'CLI database All / Sqlite'
+    'CLI database SQLite / Sqlite'
+    'CLI database All / SqlServer'
+    'CLI database SQLServer / SqlServer'
+    'CLI database All / SqlServerCaseSensitive'
+    'CLI database SQLServer / SqlServerCaseSensitive'
+    'CLI database All / PostgreSQL'
+    'CLI database PostgreSQL / PostgreSQL'
+    'CLI database All / MariaDB'
+    'CLI database MariaDB / MariaDB'
+    'CLI database All / Oracle'
+    'CLI database Oracle / Oracle'
 )
 
 $needs = ConvertFrom-Json -InputObject $NeedsJson -AsHashtable
@@ -96,7 +108,10 @@ foreach ($name in $requiredJobs) {
         }
         'Run tests (ubuntu-latest,*' { 'Test on Linux' }
         'Run tests (windows-latest,*' { 'Test on Windows' }
-        'CLI *' { 'Verify self-contained runtime and execution' }
+        'CLI database *' { 'Test published CLI and installed tool against database' }
+        'CLI win-*' { 'Verify self-contained runtime and execution' }
+        'CLI linux-*' { 'Verify self-contained runtime and execution' }
+        'CLI osx-*' { 'Verify self-contained runtime and execution' }
         'Alpine *' {
             'Build native image for verification'
             'Verify Alpine globalization, migration and bundled skill'

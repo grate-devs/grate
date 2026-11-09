@@ -1,9 +1,14 @@
 # Linux x64 database-specific distribution PoC
 
-Build the same CLI project as `All`, `SQLite`, `SQLServer` and `MariaDB` using
-`GrateDistribution`. The corresponding NuGet tool IDs are `grate`,
-`grate-sqlite`, `grate-sqlserver` and `grate-mariadb`. Every package exposes
-the command `grate`. The PoC installs each into a separate tool directory.
+The checkout builds the same CLI project as `All`, `SQLite`, `SQLServer`,
+`MariaDB`, `PostgreSQL` and `Oracle` using `GrateDistribution`. The NuGet tool
+IDs are `grate`, `grate-sqlite`, `grate-sqlserver`, `grate-mariadb`,
+`grate-postgresql` and `grate-oracle`. Every package exposes the command `grate`.
+
+The original comparison scripts below cover All, SQLite, SQL Server and MariaDB
+and install each tool into a separate directory. PostgreSQL and Oracle use the
+same build and command contract. Their packaged CLI checks belong to the
+per-provider CI validation alongside the other database providers.
 
 ## Run the comparison
 

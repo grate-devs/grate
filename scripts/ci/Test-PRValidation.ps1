@@ -18,9 +18,18 @@ function New-Fixture {
         $names += "CLI $rid"
     }
     $names += 'Alpine amd64', 'Alpine arm64'
-    if ($names.Count -ne 27) { throw 'Fixture must contain 27 required jobs.' }
+    foreach ($database in @('Sqlite', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Oracle')) {
+        $slim = switch ($database) {
+            Sqlite { 'SQLite' }
+            SqlServer { 'SQLServer' }
+            SqlServerCaseSensitive { 'SQLServer' }
+            default { $database }
+        }
+        $names += "CLI database All / $database", "CLI database $slim / $database"
+    }
+    if ($names.Count -ne 39) { throw 'Fixture must contain 39 required jobs.' }
     $needs = @{}
-    foreach ($group in @('build-code', 'test', 'packages', 'standalone', 'docker', 'validation-policy')) {
+    foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
         $needs[$group] = @{ result = 'success' }
     }
     $jobs = @($names | ForEach-Object { @{ name = $_; status = 'completed'; conclusion = 'success'; run_id = 123; run_attempt = 1 } })
@@ -34,6 +43,7 @@ function New-Fixture {
         if ($job.name.StartsWith('Run tests (ubuntu-latest, ')) { $stepNames = @('Test on Linux') }
         if ($job.name.StartsWith('Run tests (windows-latest, ')) { $stepNames = @('Test on Windows') }
         if ($job.name.StartsWith('CLI ')) { $stepNames = @('Verify self-contained runtime and execution') }
+        if ($job.name.StartsWith('CLI database ')) { $stepNames = @('Test published CLI and installed tool against database') }
         if ($job.name -cin @('CLI win-x64', 'CLI win-arm64')) {
             $stepNames += @('Check per-user MSI authoring regressions', 'Build MSI from verified Windows binary',
                 'Check verified Windows MSI metadata', 'Verify installed MSI, major upgrade and uninstall')
@@ -100,7 +110,7 @@ $fixture = New-Fixture
 $fixture.jobs += $fixture.jobs[0].Clone()
 Assert-Rejected 'duplicate required job' { Invoke-Gate $fixture } 'Duplicate required job'
 
-foreach ($group in @('build-code', 'test', 'packages', 'standalone', 'docker', 'validation-policy')) {
+foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
     foreach ($result in @('failure', 'cancelled', 'skipped', 'unknown', $null)) {
         $fixture = New-Fixture
         $fixture.needs[$group].result = $result
