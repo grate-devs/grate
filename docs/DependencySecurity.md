@@ -1,7 +1,9 @@
 # Code and dependency security checks
 
-`CI` keeps the existing Windows `Analyze Code Security` job and its CodeQL
-analysis identity (`.github/workflows/ci.yml:analyze`). The explicit language list
+`CI` calls the Windows analysis job in `ci-security-analysis.yml` through its
+`analyze` caller. Its GitHub Actions check is
+`Security analysis / Analyze Code Security`, combining caller and leaf names.
+The leaf retains job ID `analyze`. The explicit language list
 covers C#, C++ and GitHub Actions; Python sources were migrated to PowerShell on
 main. The explicit `grate.slnx` build and native MSI compilation remain between
 initialization and analysis. Do not replace this with a second overlapping
@@ -52,7 +54,7 @@ fix before changing the pin. See also [packaging guidance](Packaging.md).
 
 ## Merge enforcement handoff
 
-A successful `Analyze Code Security` job means extraction/analysis/upload worked.
+A successful `Security analysis / Analyze Code Security` check means extraction/analysis/upload worked.
 It does **not** establish a high/critical finding threshold. The main ruleset owner
 should add the native `code_scanning` rule with these parameters after validating
 the main baseline and PR analyses:
@@ -72,7 +74,7 @@ the main baseline and PR analyses:
 }
 ```
 
-Require the GitHub Actions checks `Analyze Code Security`, `Dependency Review`
+Require the GitHub Actions checks `Security analysis / Analyze Code Security`, `Dependency Review`
 and `NuGet dependency audit` only once they have produced verified results.
 CodeQL merge protection rejects new high/critical security alerts; pre-existing
 findings remain a separate triage queue. General correctness warnings do not

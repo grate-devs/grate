@@ -27,7 +27,7 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           { "context": "PR validation", "integration_id": 15368 },
-          { "context": "Analyze Code Security", "integration_id": 15368 },
+          { "context": "Security analysis / Analyze Code Security", "integration_id": 15368 },
           { "context": "Dependency Review", "integration_id": 15368 },
           { "context": "NuGet dependency audit", "integration_id": 15368 }
         ]

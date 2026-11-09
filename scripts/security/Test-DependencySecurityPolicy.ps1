@@ -5,6 +5,16 @@ param(
 $ErrorActionPreference = 'Stop'
 Import-Module powershell-yaml -RequiredVersion 0.4.12 -ErrorAction Stop
 
+function Get-ResolvedCiWorkflow {
+    param(
+        [string]$Root
+    )
+
+    # Keep helper variables local so isolated RepositoryRoot fixtures stay intact.
+    . "$PSScriptRoot/../release/workflow_test_helpers.ps1"
+    Read-Workflow -Name 'ci.yml' -Root $Root
+}
+
 function Assert-Policy {
     param(
         [bool] $Condition,
@@ -62,6 +72,38 @@ function Assert-CodeqlExtraction {
         $analyze -gt $managedBuild -and $analyze -gt $nativeBuild
     )
     Assert-Policy $buildsAreTraced 'Trace the full SLNX solution and native compilation between CodeQL init and analyze.'
+}
+
+function Assert-CodeqlBinding {
+    param(
+        [System.Collections.IDictionary]$Job,
+        [string]$ReusableWorkflow
+    )
+
+    Assert-Policy ($Job['_workflowCall']['uses'] -ceq './.github/workflows/ci-security-analysis.yml' -and
+        $Job['_workflowFile'] -ceq 'ci-security-analysis.yml' -and $Job['_workflowJobId'] -ceq 'analyze') 'Bind CodeQL to its same-commit reusable analysis job.'
+    Assert-Policy ($Job['_workflowCall']['name'] -ceq 'Security analysis' -and $Job['name'] -ceq 'Analyze Code Security') 'Preserve the complete reusable CodeQL check name.'
+    Assert-Policy (!$Job.Contains('_workflowLeafIf') -and !$Job['_workflowCall'].Contains('continue-on-error')) 'Do not add a leaf gate or bypass the CodeQL caller.'
+    Assert-Policy ($Job['permissions']['security-events'] -ceq 'write' -and
+        $Job['_workflowCall']['permissions']['security-events'] -ceq 'write') 'Allow CodeQL publication in both caller and leaf permissions.'
+    $definition = ConvertFrom-Yaml $ReusableWorkflow
+    Assert-Policy ($definition.on.Count -eq 1 -and $definition.on.Contains('workflow_call') -and
+        $definition.jobs.Count -eq 1 -and $definition.jobs.Contains('analyze')) 'Run the analysis leaf only through its workflow_call boundary.'
+}
+
+function Assert-CodeqlCheckReferences {
+    param(
+        [string]$CheckName,
+        [object]$Proposal,
+        [string[]]$Documents
+    )
+
+    $checks = @($Proposal.rules | Where-Object type -CEQ 'required_status_checks').parameters.required_status_checks
+    $matching = @($checks | Where-Object { $_.context -ceq $CheckName -and $_.integration_id -eq 15368 })
+    Assert-Policy ($matching.Count -eq 1 -and @($checks | Where-Object context -CEQ 'Analyze Code Security').Count -eq 0) 'Bind the proposed ruleset to the complete GitHub Actions CodeQL check name.'
+    foreach ($document in $Documents) {
+        Assert-Policy ($document.Contains('`' + $CheckName + '`')) 'Document the complete reusable CodeQL check name.'
+    }
 }
 
 function Assert-StagedCiJobs {
@@ -354,9 +396,13 @@ function Assert-AuditFeed {
 
 $ci = Get-Content -LiteralPath (Join-Path $RepositoryRoot '.github/workflows/ci.yml') -Raw
 $dependencies = Get-Content -LiteralPath (Join-Path $RepositoryRoot '.github/workflows/dependency-security.yml') -Raw
+$resolvedCi = Get-ResolvedCiWorkflow -Root $RepositoryRoot
+$analysis = $resolvedCi.jobs.analyze
+$analysisWorkflow = Get-Content -LiteralPath (Join-Path $RepositoryRoot '.github/workflows/ci-security-analysis.yml') -Raw
 Assert-SecurityTriggers $ci
 Assert-SecurityTriggers $dependencies
-Assert-CodeqlExtraction (Get-WorkflowJob $ci 'analyze')
+Assert-CodeqlBinding -Job $analysis -ReusableWorkflow $analysisWorkflow
+Assert-CodeqlExtraction (Get-WorkflowJob $analysisWorkflow 'analyze')
 Assert-StagedCiJobs $ci
 $schedulingCases = Assert-CodeqlScheduling (Get-WorkflowJob $ci 'analyze')
 Assert-DependencyReview $dependencies
@@ -364,4 +410,54 @@ Assert-NugetAuditJob $dependencies
 Assert-AuditMockIsolation $RepositoryRoot
 Assert-AuditFeed $RepositoryRoot
 Assert-SecurityPolicyRegressions -CiWorkflow $ci -DependencyWorkflow $dependencies
-Write-Host "Dependency security policy, $schedulingCases scheduling cases and audit command checks passed."
+$checkName = $analysis['_workflowCall']['name'] + ' / ' + $analysis['name']
+$proposal = Get-Content -LiteralPath (Join-Path $RepositoryRoot '.github/main-ruleset.proposed.json') -Raw | ConvertFrom-Json
+$documents = @('docs/DependencySecurity.md', 'docs/agents/pr-validation.md') | ForEach-Object {
+    Get-Content -LiteralPath (Join-Path $RepositoryRoot $_) -Raw
+}
+Assert-CodeqlCheckReferences -CheckName $checkName -Proposal $proposal -Documents $documents
+foreach ($defect in @('caller-name', 'leaf-name', 'reference', 'leaf-gate', 'caller-permission', 'leaf-permission')) {
+    $mutated = $analysis | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+    $expectedMessage = 'complete reusable CodeQL check name'
+    switch ($defect) {
+        'caller-name' {
+            $mutated['_workflowCall']['name'] = 'Other analysis'
+        }
+        'leaf-name' {
+            $mutated['name'] = 'Other analysis'
+        }
+        'reference' {
+            $mutated['_workflowCall']['uses'] = './.github/workflows/ci-packages.yml'
+            $expectedMessage = 'Bind CodeQL'
+        }
+        'leaf-gate' {
+            $mutated['_workflowLeafIf'] = '${{ false }}'
+            $expectedMessage = 'Do not add a leaf gate'
+        }
+        'caller-permission' {
+            $mutated['_workflowCall']['permissions']['security-events'] = 'read'
+            $expectedMessage = 'Allow CodeQL publication'
+        }
+        'leaf-permission' {
+            $mutated['permissions']['security-events'] = 'read'
+            $expectedMessage = 'Allow CodeQL publication'
+        }
+    }
+    Assert-PolicyRejected {
+        Assert-CodeqlBinding -Job $mutated -ReusableWorkflow $analysisWorkflow
+    } $expectedMessage
+}
+Assert-PolicyRejected {
+    Assert-CodeqlBinding -Job $analysis -ReusableWorkflow ($analysisWorkflow.Replace('workflow_call:', 'workflow_dispatch:'))
+} 'workflow_call boundary'
+Assert-PolicyRejected {
+    Assert-CodeqlExtraction ((Get-WorkflowJob $analysisWorkflow 'analyze').Replace('grate.slnx', 'other.sln'))
+} 'Trace the full SLNX solution'
+Assert-PolicyRejected {
+    Assert-CodeqlCheckReferences -CheckName $checkName -Proposal $proposal -Documents @('Only the old `Analyze Code Security` name.')
+} 'Document the complete'
+$obsoleteProposal = ($proposal | ConvertTo-Json -Depth 100).Replace($checkName, 'Analyze Code Security') | ConvertFrom-Json
+Assert-PolicyRejected {
+    Assert-CodeqlCheckReferences -CheckName $checkName -Proposal $obsoleteProposal -Documents $documents
+} 'Bind the proposed ruleset'
+Write-Host "Dependency security policy, $schedulingCases scheduling cases, ten reusable binding regressions and audit command checks passed."

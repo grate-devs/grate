@@ -18,12 +18,15 @@ workflow evaluates its own first job using the same action. Failed, cancelled or
 skipped preflight prevents its build jobs from starting. The final `PR validation`
 and `CI result` checks still run to report incomplete CI.
 
-`PR validation` uses `always()` and requires all six dependencies to succeed:
-`validation-policy`, `build-code`, `test`, `packages`, `standalone` and `docker`.
-It also queries every page of the current run's Jobs API and requires all 27
-expected jobs and their 47 mandatory producer steps to complete successfully.
+`PR validation` uses `always()` and requires all seven dependencies to succeed:
+`validation-policy`, `build-code`, `test`, `cli-distributions`, `packages`,
+`standalone` and `docker`. It also queries every page of the current run's Jobs
+API and requires all 94 expected jobs and their applicable mandatory producer
+steps to complete successfully. This includes every All/slim CLI and tool lane,
+native standalone target, MSI lifecycle and Alpine target.
 Missing, duplicate, failed, cancelled, unexpectedly skipped, timed-out, neutral,
-unknown and pending required results fail validation. Existing names remain.
+unknown and pending required results fail validation. Reusable workflow jobs are
+matched by their exact caller/leaf check names.
 `Create test report` is diagnostic; successful HTML never overrides failed tests.
 
 For partial reruns, the newest attempt per job is used. Earlier successes from
@@ -32,8 +35,9 @@ Workflow cancellation may cancel the aggregate; a cancelled required check block
 merging. CodeQL and dependency-security checks remain separate controls.
 
 This aggregate covers the required producers in `ci.yml`. The separate
-heavyweight `Integration tests` workflow retains its existing advisory
-`continue-on-error` lanes and disabled Docker execution steps. Path-specific
+heavyweight `Integration tests` workflow runs All and slim CommandLine suites
+against its database-version matrix and propagates native test failures. Its
+legacy Docker lane remains disabled and advisory. Path-specific
 skill, installer and release-contract workflows retain their separate checks;
 they are not silently promoted into required workflows by this proposal.
 
@@ -63,7 +67,7 @@ proposal**, not applied repository settings. It proposes:
 
 - PRs with no required approvals, stale approval dismissal and resolved review
   threads.
-- Required `PR validation`, `Analyze Code Security`, `Dependency Review` and
+- Required `PR validation`, `Security analysis / Analyze Code Security`, `Dependency Review` and
   `NuGet dependency audit` from GitHub Actions (app ID 15368), on up-to-date PRs.
 - Native CodeQL protection rejecting high/critical security alerts, no additional
   non-security threshold. Green analysis alone does not enforce alert severity.
