@@ -7,12 +7,24 @@ param (
     [string]$wingetCreate = 'wingetcreate',
     [string]$outputDirectory = (Join-Path $PSScriptRoot 'artifacts'),
     [switch]$PrepareMigration,
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
     [string]$MsiMetadataReader = (Join-Path (Split-Path $PSScriptRoot) 'msi/helpers/Get-InstallerMetadata.ps1')
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'helpers/MigrationManifestPolicy.ps1')
+$Distribution = @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle') | Where-Object { $_ -ieq $Distribution }
+$prepareNewIdentity = $PrepareMigration -or $Distribution -cne 'All'
+$packagePrefix = 'grate'
+$newId = 'grate-devs.grate'
+$packagePath = 'grate'
+if ($Distribution -cne 'All') {
+    $packagePrefix += '-' + $Distribution.ToLowerInvariant()
+    $newId += ".$Distribution"
+    $packagePath += "/$Distribution"
+}
 
 # A GitVersion release flag alone also admits prereleases. Reject them here,
 # independently of workflow conditions, before invoking any external tool.
@@ -30,11 +42,11 @@ if ($release.draft -or $release.prerelease -or $release.tag_name -cne $releaseTa
 # Use the release inventory, rather than inventing URLs. Old releases used other
 # layouts (for example grate-1.2.0.msi); do not silently create broken manifests.
 $releaseAssets = @(
-    @{ Name = "grate-win-x86-self-contained-$version.zip"; Architecture = 'x86' },
-    @{ Name = "grate-win-x64-self-contained-$version.zip"; Architecture = 'x64' },
-    @{ Name = "grate-win-arm64-self-contained-$version.zip"; Architecture = 'arm64' },
-    @{ Name = "grate-msi-win-x64-$version.msi"; Architecture = 'x64' },
-    @{ Name = "grate-msi-win-arm64-$version.msi"; Architecture = 'arm64' }
+    @{ Name = "$packagePrefix-win-x86-self-contained-$version.zip"; Architecture = 'x86' },
+    @{ Name = "$packagePrefix-win-x64-self-contained-$version.zip"; Architecture = 'x64' },
+    @{ Name = "$packagePrefix-win-arm64-self-contained-$version.zip"; Architecture = 'arm64' },
+    @{ Name = "$packagePrefix-msi-win-x64-$version.msi"; Architecture = 'x64' },
+    @{ Name = "$packagePrefix-msi-win-arm64-$version.msi"; Architecture = 'arm64' }
 )
 $urls = foreach ($asset in $releaseAssets) {
     $matchingAssets = @($release.assets | Where-Object name -CEQ $asset.Name)
@@ -51,7 +63,7 @@ $urls = foreach ($asset in $releaseAssets) {
 # explicitly start with erikbra.grate, then convert a private copy. Never submit
 # from this helper; neither generation nor schema validation proves migration.
 $sourceId = 'erikbra.grate'
-$destinationPath = if ($PrepareMigration) { "manifests/g/grate-devs/grate/$version" } else { "manifests/e/erikbra/grate/$version" }
+$destinationPath = if ($prepareNewIdentity) { "manifests/g/grate-devs/$packagePath/$version" } else { "manifests/e/erikbra/grate/$version" }
 $destinations = @((Join-Path $outputDirectory $destinationPath))
 foreach ($destination in $destinations) {
     if (Test-Path -LiteralPath $destination) { throw "Refusing to overwrite manifests: $destination" }
@@ -80,10 +92,10 @@ try {
             }
     }
     $contractPath = Join-Path (Split-Path $PSScriptRoot) 'msi/identity-contract.json'
-    if ($PrepareMigration) {
+    if ($prepareNewIdentity) {
         # Reject legacy releases before generating a new identity. Successful
         # YAML conversion cannot turn an uncorrected MSI into a migration.
-        Assert-WinGetMigrationMetadata $msiMetadata $version $contractPath
+        Assert-WinGetMigrationMetadata $msiMetadata $version $contractPath -Distribution $Distribution
     } else {
         $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
         $newFamilies = @($contract.Architectures.x64.UpgradeCode, $contract.Architectures.arm64.UpgradeCode)
@@ -108,21 +120,41 @@ try {
         }
         $contents[$name] = $content
     }
+    $document = Get-WinGetInstallerDocument $contents["$sourceId.installer.yaml"]
+    if ($document.Nodes.Count -ne $releaseAssets.Count) {
+        throw 'The generated manifest must contain exactly the five selected distribution assets.'
+    }
+    foreach ($asset in $releaseAssets) {
+        $published = @($release.assets | Where-Object name -CEQ $asset.Name)[0]
+        $nodes = @($document.Nodes | Where-Object {
+            (Get-WinGetScalar $_ InstallerUrl -Required) -ceq $published.browser_download_url
+        })
+        if ($nodes.Count -ne 1 -or (Get-WinGetScalar $nodes[0] Architecture -Required) -cne $asset.Architecture) {
+            throw "Generated manifest URL/architecture does not match the selected release asset: $($asset.Name)."
+        }
+        $hash = Get-WinGetScalar $nodes[0] InstallerSha256 -Required
+        if ($published.digest -cnotmatch '^sha256:[a-f0-9]{64}$' -or "sha256:$($hash.ToLowerInvariant())" -cne $published.digest) {
+            throw "Generated manifest SHA256 does not match the release digest: $($asset.Name)."
+        }
+    }
     $sets = @(@{ Id=$sourceId; Destination=$destinations[0]; Contents=$contents })
-    if ($PrepareMigration) {
-        $policy = ConvertTo-WinGetMigrationManifests -InstallerYaml $contents["$sourceId.installer.yaml"] -Version $version -MsiMetadata $msiMetadata
+    if ($prepareNewIdentity) {
+        $policy = ConvertTo-WinGetMigrationManifests -InstallerYaml $contents["$sourceId.installer.yaml"] -Version $version -MsiMetadata $msiMetadata -Distribution $Distribution
         $locale = $contents["$sourceId.locale.en-US.yaml"]
         if ($locale -cnotmatch '(?m)^Publisher: (?:erikbra|grate-devs)\r?$') { throw 'Review the changed upstream publisher before preparing migration.' }
         $newContents = @{}
         foreach ($name in $files) {
-            $newContents[$name] = $contents[$name] -creplace '(?m)^PackageIdentifier: erikbra\.grate\r?$', 'PackageIdentifier: grate-devs.grate'
+            $newContents[$name] = $contents[$name] -creplace '(?m)^PackageIdentifier: erikbra\.grate\r?$', "PackageIdentifier: $newId"
         }
         $newContents["$sourceId.installer.yaml"] = $policy.NewInstallerYaml
         $newContents["$sourceId.locale.en-US.yaml"] = $newContents["$sourceId.locale.en-US.yaml"] -creplace '(?m)^Publisher: (?:erikbra|grate-devs)\r?$', 'Publisher: grate-devs'
+        if ($Distribution -ne 'All') {
+            $newContents["$sourceId.locale.en-US.yaml"] = $newContents["$sourceId.locale.en-US.yaml"] -creplace '(?m)^PackageName: [^\r\n]+\r?$', "PackageName: grate ($Distribution)"
+        }
         # A corrected MSI installed under the old ID enriches its WinGet
         # tracking record with the new MSI family, even without manifest codes.
         # Keep historical old-ID manifests untouched; emit only the new ID.
-        $sets = @(@{ Id='grate-devs.grate'; Destination=$destinations[0]; Contents=$newContents })
+        $sets = @(@{ Id=$newId; Destination=$destinations[0]; Contents=$newContents })
     }
     foreach ($set in $sets) {
         New-Item -ItemType Directory -Path $set.Destination -Force | Out-Null
@@ -132,7 +164,7 @@ try {
         }
         Write-Host "Prepared $($set.Id) $version in $($set.Destination). Submission is a separate step."
     }
-    if ($PrepareMigration) { Write-Warning 'Local candidate only: upstream acceptance and Windows migration/correlation verification are still required.' }
+    if ($prepareNewIdentity) { Write-Warning 'Local candidate only: upstream acceptance and Windows migration/correlation verification are still required.' }
 } catch {
     foreach ($destination in $created) { Remove-Item -LiteralPath $destination -Recurse -Force -ErrorAction SilentlyContinue }
     throw

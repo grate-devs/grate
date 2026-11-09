@@ -9,9 +9,15 @@ the [release process](../docs/ReleaseProcess.md) for a complete release, or the
 | [msi](msi/README.md) | Per-user Windows x64/ARM64 installers, with stable upgrade identities |
 | [winget](winget/README.md) | WinGet manifests referring to the final Windows release assets |
 | [deb](deb/README.md) | Debian packages containing the Linux standalone executable |
-| [chocolatey](chocolatey/README.md) | A Chocolatey package embedding the Windows x64 executable |
-| [homebrew](homebrew/README.md) | A cask referring to the final macOS release archives |
+| [chocolatey](chocolatey/README.md) | Chocolatey packages embedding the Windows x64 executable |
+| [homebrew](homebrew/README.md) | macOS casks and source-built formula candidates |
 | [docker](docker/README.md) | A multi-architecture Alpine image built from source |
+
+Every channel supports `All`, `SQLite`, `SQLServer`, `MariaDB`, `PostgreSQL` and
+`Oracle`. All retains its existing identity; slim packages use separate names
+and share command `grate`. New WinGet, Chocolatey and source-formula candidates
+require separate channel publication/acceptance. See the
+[profile and channel matrix](../docs/distributions.md).
 
 Build entrypoints remain at the top of each installer folder. Larger folders
 separate reusable helpers, native code, configuration and tests. The release

@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <GrateDistribution Condition="'$(GrateDistribution)' == ''">All</GrateDistribution>
+    <Product Condition="'$(GrateDistribution)' != 'All'">grate ($(GrateDistribution))</Product>
     <DebugType>Embedded</DebugType>
     <Nullable>enable</Nullable>
     <IsPublishable>true</IsPublishable>

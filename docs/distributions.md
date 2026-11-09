@@ -20,6 +20,30 @@ NuGet tools include net8.0, net9.0, net10.0 and net11.0 assets.
 Debian packages cover amd64/arm64; Docker images cover linux/amd64 and linux/arm64.
 The all-in-one package and asset names remain unchanged.
 
+Every profile also has Windows x64/Arm64 MSI installers, a WinGet candidate,
+a Windows x64 Chocolatey package, a macOS Intel/Arm64 Homebrew cask and a
+source-built Homebrew formula candidate. These changes are available in this
+checkout; new package-manager identities require their channel's publication
+or acceptance before users can install them from public sources.
+
+| Channel | All identity | SQLite example |
+| --- | --- | --- |
+| CLI ZIP, MSI, Debian, Chocolatey, Homebrew | `grate` | `grate-sqlite` |
+| WinGet | `grate-devs.grate` | `grate-devs.grate.SQLite` |
+| Docker tags | `<version>`, `latest` | `sqlite-<version>`, `sqlite` |
+
+The other profile suffixes are `sqlserver`, `mariadb`, `postgresql` and `oracle`;
+WinGet uses the profile's exact casing from the table above. Package-manager
+variants share the `grate` command: uninstall the installed variant before
+switching. MSI families and package conflict checks protect that command;
+Homebrew also rejects an existing linked binary during a cross-format switch.
+
+The release workflow retains all six Chocolatey packages without submitting
+them, prepares all six WinGet candidates after stable GitHub publication,
+updates all six casks in the existing tap and retains six source-formula
+candidates. Formula submission and Chocolatey/WinGet acceptance remain separate
+release steps. See the [release runbook](ReleaseProcess.md).
+
 ## Validate a profile against its database
 
 Install PowerShell 7, Docker and the SDK pinned in `global.json`, then run from

@@ -30,11 +30,19 @@ The Build and Publish workflow produces the existing distribution formats:
 | Format | Outputs |
 | --- | --- |
 | NuGet libraries and symbols | `grate.core`, `grate.mariadb`, `grate.oracle`, `grate.postgresql`, `grate.sqlite`, `grate.sqlserver` |
-| .NET tool | `grate` with .NET 8/9/10/11 assets |
+| .NET tools | All six profiles with .NET 8/9/10/11 assets |
 | Self-contained ZIPs | `win-x86`, `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`, `linux-musl-arm64`, `osx-x64`, `osx-arm64` |
 | MSI | Windows x64 and Arm64, built from the corresponding self-contained binaries |
 | Debian | Linux amd64 and Arm64, built from the corresponding self-contained binaries |
 | Docker | Linux amd64 and Arm64 on Alpine 3.24, including ICU |
+| Chocolatey candidates | Six Windows x64 packages, retained without feed submission |
+| WinGet candidates | Six identities wrapping each profile's final stable MSI/ZIP assets |
+| Homebrew candidates | Six Intel/Arm64 casks and six source-built formulas |
+
+CLI ZIP, MSI, Debian and Docker outputs cover All, SQLite, SQLServer, MariaDB,
+PostgreSQL and Oracle. Names use `grate` for All and `grate-<database>` for slim
+profiles; see [distribution identities](distributions.md). All variants expose
+`grate`; uninstall the existing package before switching profiles.
 
 Debian package metadata maps a SemVer prerelease such as `2.2.0-rc.1` to
 `2.2.0~rc.1-1`, so Debian orders it before the final `2.2.0-1` package.
@@ -43,6 +51,9 @@ Release asset filenames retain the original SemVer version.
 MSI generation uses checksum-pinned WiX 3.14.1, whose compiler supports Arm64.
 Pass `-arch x64` or `-arch arm64` to `installers/msi/Create-Installer.ps1` to
 match the input executable. Windows Installer 5.0 is required by the Arm64 MSI.
+Pass `-Distribution SQLite` (or another profile) to select its distinct installer
+family. The generator verifies the executable's product/profile and version
+metadata before packaging it; All's existing identity remains unchanged.
 
 Inspect the produced runtime configuration/dependency metadata and run the
 packaged executable, a representative migration and `grate skills install` on
@@ -54,12 +65,15 @@ in the PR/release verification record.
 
 The existing native packaging jobs also exercise the distribution boundaries:
 
-- **MSI, Windows x64 and Arm64:** install the candidate MSI per user, run the
-  installed executable against disposable SQLite data, apply an explicit Windows
+- **MSI, every profile on Windows x64 and Arm64:** install the candidate MSI per user,
+  check payload identity, provider selection, rejection and bundled skills,
+  then apply an explicit Windows
   Installer major upgrade with a newer executable, then uninstall. The check
   verifies installed payloads, product registration and cleanup while preserving
   unrelated user data. This tests the per-release ProductCode and stable
-  architecture-specific UpgradeCode family used by the installer.
+  profile/architecture-specific UpgradeCode family used by the installer.
+  All/SQLite run a disposable SQLite migration; server-profile migrations are
+  exercised by the Linux CLI/tool suites, not this Windows lifecycle fixture.
 - **Debian, Linux amd64 and Arm64:** install test package `0.0.1-1` in a disposable
   Ubuntu container, migrate and rerun through `/usr/bin/grate`, upgrade to
   `0.0.2-1`, then purge. Both packages wrap the same candidate executable, so this
@@ -94,11 +108,17 @@ files/packages; submission to the external repositories/feeds is separate.
   Review the generated `artifacts/homebrew/cask/grate.rb`, including the SHA256 of
   each archive, and update [erikbra/homebrew-cask](https://github.com/erikbra/homebrew-cask/blob/main/Casks/grate.rb).
   Install and smoke-test each native architecture using that cask.
+  Add `-AllDistributions` to generate six casks from all twelve profile ZIPs,
+  or select one with `-Distribution SQLite`.
 - **Chocolatey:** extract `grate-win-x64-self-contained-<version>.zip` and run
   `./installers/chocolatey/Create-Package.ps1 -grateExe <extracted-grate.exe> -version <version>`
   on a machine with Chocolatey installed. It embeds the executable and records
   its SHA256 in `tools/VERIFICATION.txt`. Check the generated `.nupkg` and install
   it from a local source before submitting it to the Chocolatey feed.
+  Use `-Distribution SQLite` for a selected executable, or
+  `-AllDistributions -ArtifactDirectory <final-windows-x64-zips>` instead of
+  `-grateExe` to prepare all six packages. The workflow retains these same
+  candidates; it does not submit them to Chocolatey.
 - **WinGet:** for a stable release with corrected MSI identity, run
   `./installers/winget/Create-Installer.ps1 -version <version> -PrepareMigration`.
   The release workflow prepares the same new-ID candidate after uploading the
@@ -110,6 +130,9 @@ files/packages; submission to the external repositories/feeds is separate.
   migration with the final files before submitting to `microsoft/winget-pkgs`.
   See the [migration contract and Windows verification](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md)
   for the different MSI and portable transition commands and pending public acceptance.
+  Add `-Distribution SQLite` (or another profile) for its separate
+  `grate-devs.grate.SQLite` identity. The stable workflow retains all six
+  candidates; new IDs need upstream acceptance before public installation.
 
 Use `-releaseTag <tag>` with the Homebrew/winget generators if the release tag
 differs from the numeric grate version. External channel publication and native
@@ -147,6 +170,11 @@ The helper hashes the supplied source archive and writes
 `v` prefix, and download the archive for that exact tag. The cask
 and formula generators have separate output directories. Neither helper publishes
 anything or updates an external repository.
+Add `-AllDistributions` to render all six source-formula candidates, or use
+`-Distribution SQLite` to select one. Both stable and HEAD builds pass the
+selected `GrateDistribution` to MSBuild. Server-profile formula tests check
+provider help, rejection and skills; real server migrations through Homebrew
+remain a separate native check. New formula IDs require channel acceptance.
 
 Review the generated URL and SHA256 against the archive that was downloaded,
 then copy the formula to `Formula/g/grate.rb` in the `grate-devs/homebrew-core` fork.

@@ -8,25 +8,31 @@ $previousNativeExitCodeValue = if ($previousNativeExitCode) { $previousNativeExi
 $helper = Join-Path $PSScriptRoot '../Create-Installer.ps1'
 . (Join-Path $PSScriptRoot '../helpers/MigrationManifestPolicy.ps1')
 $state = Join-Path ([IO.Path]::GetTempPath()) ('grate-winget-tests-' + [Guid]::NewGuid().ToString('N'))
-$wingetTest = @{ apiCalls=0; toolCalls=0; downloadCalls=0; metadataCalls=0; schemaCalls=0; schemaExitCode=0; toolExitCode=0; wrongOutput=$false; arguments=@(); testCount=0; release=$null; metadata=@{} }
+$wingetTest = @{ apiCalls=0; toolCalls=0; downloadCalls=0; metadataCalls=0; schemaCalls=0; schemaExitCode=0; toolExitCode=0; wrongOutput=$false; wrongAsset=$false; wrongHash=$false; arguments=@(); testCount=0; release=$null; metadata=@{} }
 function Test-Hash([string]$Architecture) {
     [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("payload-$Architecture")))
 }
-function Set-Release([string]$Version='2.1.7', [switch]$Corrected) {
+function Set-Release([string]$Version='2.1.7', [switch]$Corrected, [string]$Distribution='All') {
+    $wingetTest.profile = $Distribution
+    $prefix = if ($Distribution -eq 'All') {
+        'grate'
+    } else {
+        'grate-' + $Distribution.ToLowerInvariant()
+    }
     $wingetTest.release = [pscustomobject]@{
         tag_name=$Version; draft=$false; prerelease=$false; published_at='2026-07-31T21:00:00Z'
-        assets=@("grate-win-x86-self-contained-$Version.zip", "grate-win-x64-self-contained-$Version.zip", "grate-win-arm64-self-contained-$Version.zip", "grate-msi-win-x64-$Version.msi", "grate-msi-win-arm64-$Version.msi") | ForEach-Object {
+        assets=@("$prefix-win-x86-self-contained-$Version.zip", "$prefix-win-x64-self-contained-$Version.zip", "$prefix-win-arm64-self-contained-$Version.zip", "$prefix-msi-win-x64-$Version.msi", "$prefix-msi-win-arm64-$Version.msi") | ForEach-Object {
             $arch = if ($_ -like '*arm64*') {'arm64'} else {'x64'}
             [pscustomobject]@{name=$_; browser_download_url="https://github.com/grate-devs/grate/releases/download/$Version/$_"; state='uploaded'; size=123; digest=('sha256:'+(Test-Hash $arch).ToLowerInvariant())}
         }
     }
     foreach ($arch in @('x64','arm64')) {
-        $identity = & "$PSScriptRoot/../../msi/helpers/Get-InstallerIdentity.ps1" -Version $Version -Architecture $arch
+        $identity = & "$PSScriptRoot/../../msi/helpers/Get-InstallerIdentity.ps1" -Version $Version -Architecture $arch -Distribution $Distribution
         $wingetTest.metadata[$arch] = [pscustomobject]@{
             ProductCode=$(if ($Corrected) {$identity.ProductCode} else {'{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'})
             UpgradeCode=$(if ($Corrected) {$identity.UpgradeCode} else {'{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'})
             Manufacturer=$(if ($Corrected) {'grate-devs'} else {'erikbra'})
-            ProductName='grate'; ProductVersion=$Version; Platform=$arch
+            ProductName=$identity.ProductName; ProductVersion=$Version; Platform=$arch
             AllUsers=$null; MsiInstallPerUser=''
         }
     }
@@ -56,17 +62,34 @@ function Invoke-TestWingetCreate {
     New-Item -ItemType Directory -Path $path -Force | Out-Null
     $writtenVersion = if ($wingetTest.wrongOutput) {'0.0.1'} else {$version}
     $common = "PackageIdentifier: erikbra.grate`nPackageVersion: $writtenVersion`n"
+    $prefix = if ($wingetTest.profile -eq 'All') {
+        'grate'
+    } else {
+        'grate-' + $wingetTest.profile.ToLowerInvariant()
+    }
     ($common+"DefaultLocale: en-US`nManifestType: version`nManifestVersion: 1.12.0`n") | Set-Content (Join-Path $path 'erikbra.grate.yaml')
     ($common+"PackageLocale: en-US`nPublisher: erikbra`nPackageName: grate`nLicense: MIT`nShortDescription: SQL migrations`nManifestType: defaultLocale`nManifestVersion: 1.12.0`n") | Set-Content (Join-Path $path 'erikbra.grate.locale.en-US.yaml')
     $nodes = foreach ($arch in @('x86','x64','arm64')) {
-        "- Architecture: $arch`n  InstallerType: zip`n  NestedInstallerType: portable`n  NestedInstallerFiles:`n  - RelativeFilePath: grate.exe`n  InstallerUrl: https://github.com/grate-devs/grate/releases/download/$version/grate-win-$arch-self-contained-$version.zip`n  InstallerSha256: $('A'*64)`n"
+        $hashArch = if ($arch -eq 'arm64') {
+            'arm64'
+        } else {
+            'x64'
+        }
+        "- Architecture: $arch`n  InstallerType: zip`n  NestedInstallerType: portable`n  NestedInstallerFiles:`n  - RelativeFilePath: grate.exe`n  InstallerUrl: https://github.com/grate-devs/grate/releases/download/$version/$prefix-win-$arch-self-contained-$version.zip`n  InstallerSha256: $(Test-Hash $hashArch)`n"
     }
     foreach ($arch in @('x64','arm64')) {
         # Stale upstream AFE values must be replaced using actual inspected MSI
         # metadata, never mistaken for evidence that the payload was corrected.
-        $nodes += "- InstallerLocale: en-US`n  Architecture: $arch`n  InstallerType: wix`n  Scope: user`n  InstallerUrl: https://github.com/grate-devs/grate/releases/download/$version/grate-msi-win-$arch-$version.msi`n  InstallerSha256: $(Test-Hash $arch)`n  ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'`n  AppsAndFeaturesEntries:`n  - Publisher: erikbra`n    UpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'`n"
+        $nodes += "- InstallerLocale: en-US`n  Architecture: $arch`n  InstallerType: wix`n  Scope: user`n  InstallerUrl: https://github.com/grate-devs/grate/releases/download/$version/$prefix-msi-win-$arch-$version.msi`n  InstallerSha256: $(Test-Hash $arch)`n  ProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'`n  AppsAndFeaturesEntries:`n  - Publisher: erikbra`n    UpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'`n"
     }
-    ($common+"Scope: user`nProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'`nUpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'`nInstallers:`n"+($nodes -join '')+"ManifestType: installer`nManifestVersion: 1.12.0`n") | Set-Content (Join-Path $path 'erikbra.grate.installer.yaml')
+    $installerText = $common+"Scope: user`nProductCode: '{E281998A-D8A2-4926-AAA3-066EFA4B2E74}'`nUpgradeCode: '{98CF60F4-3F43-4ACE-B364-ADBCD893A144}'`nInstallers:`n"+($nodes -join '')+"ManifestType: installer`nManifestVersion: 1.12.0`n"
+    if ($wingetTest.wrongAsset) {
+        $installerText = $installerText.Replace("$prefix-win-x86-", 'grate-win-x86-')
+    }
+    if ($wingetTest.wrongHash) {
+        $installerText = $installerText.Replace((Test-Hash 'x64'), ('0' * 64))
+    }
+    $installerText | Set-Content (Join-Path $path 'erikbra.grate.installer.yaml')
 }
 function Read-TestCandidateMetadata([string]$MsiPath) {
     if ($MsiPath -notmatch 'candidate-(?<version>2\.1\.[78])\.msi$') { throw 'Unexpected candidate MSI fixture path.' }
@@ -229,6 +252,42 @@ try {
     }
     Assert-True ($schemaRejected -and !(Test-Path "$state/candidate-schema-warning/summary.json")) 'A nonzero schema-warning result was promoted as successful candidate verification.'
     $wingetTest.testCount++
+
+    $wingetTest.wrongOutput = $false
+    foreach ($profile in @('SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+        Set-Release -Corrected -Distribution $profile
+        $directory = Join-Path $state $profile
+        & $helper -version '2.1.7' -Distribution $profile -wingetCreate Invoke-TestWingetCreate -MsiMetadataReader Read-TestMsiMetadata -outputDirectory $directory
+        $identifier = "grate-devs.grate.$profile"
+        $candidatePath = "$directory/manifests/g/grate-devs/grate/$profile/2.1.7"
+        $installerYaml = Get-Content -LiteralPath "$candidatePath/$identifier.installer.yaml" -Raw
+        $localeYaml = Get-Content -LiteralPath "$candidatePath/$identifier.locale.en-US.yaml" -Raw
+        Assert-True ($installerYaml.Contains("PackageIdentifier: $identifier") -and $localeYaml.Contains("PackageName: grate ($profile)")) 'Slim WinGet candidate identity/name does not match its profile.'
+        Assert-True (@(Get-ChildItem -LiteralPath $directory -Recurse -File).Count -eq 3) 'Slim generation must emit only its own three candidate manifests.'
+        Assert-True ($installerYaml -notmatch '(?m)^\s*(?:- )?Scope:') 'Slim candidate emitted unsupported Scope.'
+        foreach ($arch in @('x64', 'arm64')) {
+            $identity = & "$PSScriptRoot/../../msi/helpers/Get-InstallerIdentity.ps1" -Version '2.1.7' -Architecture $arch -Distribution $profile
+            Assert-True ($installerYaml.Contains($identity.ProductCode) -and $installerYaml.Contains($identity.UpgradeCode)) 'Slim manifest omitted independently inspected profile MSI identities.'
+        }
+        Assert-True ([regex]::Matches($installerYaml, "grate-$($profile.ToLowerInvariant())-win-").Count -eq 3) 'Slim portable assets do not match the profile.'
+        Assert-True ('--submit' -notin $wingetTest.arguments -and '-s' -notin $wingetTest.arguments) 'Slim candidate generation submitted manifests.'
+        $wingetTest.testCount++
+
+        Set-Release -Corrected
+        $prefix = 'grate-' + $profile.ToLowerInvariant()
+        foreach ($asset in $wingetTest.release.assets) {
+            $asset.name = $asset.name -creplace '^grate-', "$prefix-"
+            $asset.browser_download_url = "https://github.com/grate-devs/grate/releases/download/2.1.7/$($asset.name)"
+        }
+        Assert-Rejected @{ version='2.1.7'; Distribution=$profile } '*corrected*MSI*actual grate-devs publisher*'
+    }
+    Set-Release -Corrected -Distribution SQLite
+    $wingetTest.wrongAsset = $true
+    Assert-Rejected @{ version='2.1.7'; Distribution='SQLite' } '*URL/architecture does not match*' -AllowToolCall
+    $wingetTest.wrongAsset = $false
+    $wingetTest.wrongHash = $true
+    Assert-Rejected @{ version='2.1.7'; Distribution='SQLite' } '*SHA256 does not match the release digest*' -AllowToolCall
+    $wingetTest.wrongHash = $false
 } finally {
     Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction SilentlyContinue
     # Recording native-tool failures must not leak into the caller's shell exit.

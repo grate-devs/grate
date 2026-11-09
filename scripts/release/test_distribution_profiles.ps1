@@ -37,11 +37,15 @@ function New-PackageFixture {
 try {
     Invoke-Test 'release and native CLI matrices require every profile on the supported platforms' {
         $release = Read-Workflow 'build.yml'
-        foreach ($job in @('build-netcore-tool', 'build-standalone', 'build-standalone-mac-arm64', 'build-deb')) {
+        foreach ($job in @('build-netcore-tool', 'build-standalone', 'build-standalone-mac-arm64', 'build-deb', 'build-msi')) {
             Assert-Equal @($profiles | Sort-Object) @($release.jobs[$job].strategy.matrix.distribution | Sort-Object) $job
         }
         $releaseRids = @($release.jobs['build-standalone'].strategy.matrix.arch) + @($release.jobs['build-standalone-mac-arm64'].strategy.matrix.arch)
         Assert-Equal @($rids | Sort-Object) @($releaseRids | Sort-Object)
+        foreach ($producer in @('build-standalone', 'build-standalone-mac-arm64')) {
+            $commands = $release.jobs[$producer].steps.run -join "`n"
+            Assert-True $commands.Contains("-StandaloneVersion '`${{ needs.set-version-number.outputs.semVer }}'") 'Full prerelease version must reach the executable metadata.'
+        }
         Assert-Equal @('linux-arm64', 'linux-x64') @($release.jobs['build-deb'].strategy.matrix.arch | Sort-Object)
         $ci = (Read-Workflow 'ci.yml').jobs.standalone
         Assert-Equal @($profiles | Sort-Object) @($ci.strategy.matrix.distribution | Sort-Object)
@@ -49,23 +53,66 @@ try {
         Assert-Equal @($rids | Sort-Object) @($ci.strategy.matrix.include.rid | Sort-Object)
         $verify = $ci.steps | Where-Object name -CEQ 'Verify self-contained runtime and execution'
         Assert-True $verify.run.Contains("-Distribution '`${{ matrix.distribution }}'")
-        foreach ($step in $ci.steps | Where-Object { $_.name -match 'MSI|Debian' }) {
+        foreach ($step in $ci.steps | Where-Object { $_.name -match 'Debian' }) {
             Assert-True ([string]$step.if).Contains("matrix.distribution == 'All'") 'Installer identities remain scoped to the All fixture.'
         }
     }
 
-    Invoke-Test 'release inventory contains 54 ZIPs, twelve Debian packages and the two All MSIs' {
+    Invoke-Test 'release inventory contains 54 ZIPs, twelve Debian packages and twelve profile MSIs' {
         $assets = @(Get-GrateReleaseAssets -Version '2.3.4-rc.1')
-        Assert-Equal 68 $assets.Count
-        Assert-Equal 68 @($assets | Select-Object -Unique).Count
+        Assert-Equal 78 $assets.Count
+        Assert-Equal 78 @($assets | Select-Object -Unique).Count
         Assert-Equal 54 @($assets | Where-Object { $_.EndsWith('.zip') }).Count
         Assert-Equal 12 @($assets | Where-Object { $_.EndsWith('.deb') }).Count
-        Assert-Equal @('grate-msi-win-arm64-2.3.4-rc.1.msi', 'grate-msi-win-x64-2.3.4-rc.1.msi') @($assets | Where-Object { $_.EndsWith('.msi') } | Sort-Object)
+        $msis = @($assets | Where-Object { $_.EndsWith('.msi') })
+        Assert-Equal 12 $msis.Count
         foreach ($id in $toolIds) {
+            foreach ($architecture in @('x64', 'arm64')) {
+                Assert-True ($msis -ccontains "$id-msi-win-$architecture-2.3.4-rc.1.msi")
+            }
             foreach ($rid in $rids) {
                 Assert-True ($assets -ccontains "$id-$rid-self-contained-2.3.4-rc.1.zip")
             }
         }
+    }
+
+    Invoke-Test 'all package-manager candidates use every profile and retain publication boundaries' {
+        $workflow = Read-Workflow 'build.yml'
+        foreach ($name in @('build-chocolatey', 'prepare-winget')) {
+            $job = $workflow.jobs[$name]
+            Assert-Equal @($profiles | Sort-Object) @($job.strategy.matrix.distribution | Sort-Object) $name
+            Assert-True (!$job.'continue-on-error') "$name failures must remain visible."
+        }
+        Assert-True ($workflow.jobs['release-ready'].needs -ccontains 'build-chocolatey')
+        $chocolatey = $workflow.jobs['build-chocolatey']
+        Assert-True ($chocolatey.needs -ccontains 'build-standalone')
+        $chocolateyCommands = $chocolatey.steps.run -join "`n"
+        Assert-True $chocolateyCommands.Contains("-Distribution '`${{ matrix.distribution }}'")
+        Assert-True $chocolateyCommands.Contains('-ReleaseTag $tag') 'Retain the exact release tag in embedded verification URLs.'
+        $packStep = $chocolatey.steps | Where-Object name -CEQ 'Check and build the profile package'
+        Assert-Equal '${{ needs.set-version-number.outputs.release-tag }}' $packStep.env.RELEASE_TAG
+        Assert-True (!$chocolateyCommands.Contains('choco push')) 'Feed publication remains a separate step.'
+        $winget = $workflow.jobs['prepare-winget']
+        $homebrew = $workflow.jobs['publish-homebrew']
+        foreach ($job in @($winget, $homebrew)) {
+            Assert-True ($job.needs -ccontains 'publish-github-release') 'Use final published artifacts.'
+            Assert-True ([string]$job.if).Contains("is-prerelease != 'true'") 'These candidates require a stable release.'
+        }
+        Assert-True (($winget.steps.run -join "`n").Contains('-PrepareMigration'))
+        $casks = $homebrew.steps | Where-Object name -CEQ 'Update and validate cask'
+        foreach ($profile in $profiles) {
+            Assert-True $casks.run.Contains("'$profile'") "Missing cask $profile."
+        }
+        Assert-True $casks.run.Contains('ReleaseTag = $env:RELEASE_TAG')
+        $formulas = $homebrew.steps | Where-Object name -CEQ 'Generate all source formula candidates from the final tagged archive'
+        Assert-True $formulas.run.Contains('-AllDistributions')
+        Assert-Equal 2 ([regex]::Matches($formulas.run, 'Assert-GrateSourceTag -Tag').Count) 'Check the source tag before and after download.'
+        Assert-Equal '${{ github.sha }}' $formulas.env.SOURCE_COMMIT
+        $publish = $homebrew.steps | Where-Object name -CEQ 'Publish cask update'
+        foreach ($id in $toolIds) {
+            Assert-True $publish.run.Contains("'$id'") "Missing staged cask $id."
+        }
+        Assert-True ($publish.run.IndexOf('git add -- @paths') -lt $publish.run.IndexOf('git diff --cached')) 'Stage new identities before checking the tap diff.'
     }
 
     Invoke-Test 'manifest requires the complete exact inventory and records candidate bytes' {
@@ -85,7 +132,7 @@ try {
         Remove-Item -LiteralPath "$assetsRoot/unexpected.zip"
         Write-GrateReleaseManifest -Directory $assetsRoot -Version '2.3.4' -Tag '2.3.4' -Repository 'grate-devs/grate'
         $manifest = Get-Content -LiteralPath "$assetsRoot/release-manifest.json" -Raw | ConvertFrom-Json
-        Assert-Equal 68 $manifest.assets.Count
+        Assert-Equal 78 $manifest.assets.Count
         Assert-Equal 'grate-devs/grate' $manifest.repository
         Assert-Equal '2.3.4' $manifest.version
         $fixtureDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes('fixture'))).ToLowerInvariant()
@@ -93,7 +140,7 @@ try {
             Assert-Equal 7 $asset.size
             Assert-Equal $fixtureDigest $asset.sha256
         }
-        Assert-Equal 68 @(Get-Content -LiteralPath "$assetsRoot/checksums.sha256").Count
+        Assert-Equal 78 @(Get-Content -LiteralPath "$assetsRoot/checksums.sha256").Count
         Remove-Item -LiteralPath "$assetsRoot/checksums.sha256", "$assetsRoot/release-manifest.json"
         Write-GrateReleaseManifest -Directory $assetsRoot -Version '2.3.4' -Tag $null -Repository 'grate-devs/grate'
         $dryRun = Get-Content -LiteralPath "$assetsRoot/release-manifest.json" -Raw | ConvertFrom-Json

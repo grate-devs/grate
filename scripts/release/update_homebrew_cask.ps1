@@ -1,30 +1,42 @@
 #!/usr/bin/env pwsh
 [CmdletBinding()]
-param([string]$Version, [string]$Arm64Sha256, [string]$X64Sha256, [string]$Output)
+param(
+    [string]$Version,
+    [string]$Arm64Sha256,
+    [string]$X64Sha256,
+    [string]$Output,
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
+    [switch]$AllDistributions,
+    [string]$ArtifactDirectory,
+    [string]$OutputDirectory,
+    [string]$ReleaseTag = $Version
+)
+
 $ErrorActionPreference = 'Stop'
-function Write-HomebrewCask([string]$Version, [string]$Arm64Sha256, [string]$X64Sha256, [string]$Output) {
-    if ($Version -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'Homebrew only publishes stable SemVer versions.' }
-    $Arm64Sha256 = $Arm64Sha256.ToLowerInvariant()
-    $X64Sha256 = $X64Sha256.ToLowerInvariant()
-    if ($Arm64Sha256 -cnotmatch '\A[0-9a-f]{64}\z' -or $X64Sha256 -cnotmatch '\A[0-9a-f]{64}\z') { throw 'Invalid SHA-256.' }
-    $content = @"
-cask "grate" do
-  arch arm: "arm64", intel: "x64"
-
-  version "$Version"
-  sha256 arm:   "$Arm64Sha256",
-         intel: "$X64Sha256"
-
-  url "https://github.com/grate-devs/grate/releases/download/#{version}/grate-osx-#{arch}-self-contained-#{version}.zip"
-  name "grate"
-  desc "SQL scripts migration runner"
-  homepage "https://grate-devs.github.io/grate/"
-
-  binary "grate"
-end
-"@
-    $path = [IO.Path]::GetFullPath($Output)
-    $null = [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path))
-    [IO.File]::WriteAllText($path, $content + "`n", [Text.UTF8Encoding]::new($false))
+. "$PSScriptRoot/../../installers/homebrew/Homebrew.Common.ps1"
+if ($MyInvocation.InvocationName -ne '.') {
+    if ($AllDistributions) {
+        if ($Distribution -ne 'All' -or $Output -or $Arm64Sha256 -or $X64Sha256 -or !$ArtifactDirectory -or !$OutputDirectory) {
+            throw 'AllDistributions requires ArtifactDirectory and OutputDirectory instead of per-cask hashes/output.'
+        }
+        $parameters = @{
+            version = $Version
+            releaseTag = $ReleaseTag
+            artifactDirectory = $ArtifactDirectory
+            OutputDirectory = $OutputDirectory
+            AllDistributions = $true
+        }
+        & "$PSScriptRoot/../../installers/homebrew/Create-Cask.ps1" @parameters
+    } else {
+        $parameters = @{
+            Version = $Version
+            ReleaseTag = $ReleaseTag
+            Arm64Sha256 = $Arm64Sha256
+            X64Sha256 = $X64Sha256
+            Output = $Output
+            Distribution = $Distribution
+        }
+        Write-HomebrewCask @parameters
+    }
 }
-if ($MyInvocation.InvocationName -ne '.') { Write-HomebrewCask $Version $Arm64Sha256 $X64Sha256 $Output }

@@ -55,6 +55,37 @@ try {
             throw 'Invalid checksum must fail without overwriting the cask.'
         }
     }
+
+    $caskArguments.Arm64Sha256 = $arm64Checksum
+    $profiles = [ordered]@{
+        All = 'grate'
+        SQLite = 'grate-sqlite'
+        SQLServer = 'grate-sqlserver'
+        MariaDB = 'grate-mariadb'
+        PostgreSQL = 'grate-postgresql'
+        Oracle = 'grate-oracle'
+    }
+    foreach ($profile in $profiles.Keys) {
+        $id = $profiles[$profile]
+        $caskArguments.Distribution = $profile
+        $caskArguments.ReleaseTag = 'v2.3.4'
+        $caskArguments.Output = "$temporary/variants/$id.rb"
+        & $pwsh -NoLogo -NoProfile -File "$PSScriptRoot/update_homebrew_cask.ps1" @caskArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "Cask generation failed for $profile."
+        }
+        $variant = Get-Content -LiteralPath $caskArguments.Output -Raw
+        foreach ($expected in @("cask `"$id`" do", "/download/v2.3.4/$id-osx-#{arch}-self-contained-#{version}.zip", 'binary "grate"')) {
+            if (!$variant.Contains($expected)) {
+                throw "Missing $profile cask value: $expected"
+            }
+        }
+        foreach ($other in @($profiles.Values | Where-Object { $_ -cne $id })) {
+            if (!$variant.Contains("`"$other`",")) {
+                throw "Missing $other conflict in $profile cask."
+            }
+        }
+    }
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -31,7 +31,7 @@ canonical version with a conflicting digest before any GitHub asset upload.
 
 The read-only `release-ready` gate requires all packaging and policy prerequisites
 to succeed; it rejects failures, cancellations and unexpected skips. It validates
-the 68-file release asset contract and generates checksums/manifest. The separate
+the 78-file release asset contract and generates checksums/manifest. The separate
 application test job and normal required CI checks supply test evidence; the
 packaging gate does not claim to include those database tests.
 

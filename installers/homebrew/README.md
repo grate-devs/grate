@@ -1,5 +1,17 @@
 # Homebrew packaging
 
+Both delivery forms support `All`, `SQLite`, `SQLServer`, `MariaDB`, `PostgreSQL`
+and `Oracle`. Their IDs are `grate`, `grate-sqlite`, `grate-sqlserver`,
+`grate-mariadb`, `grate-postgresql` and `grate-oracle`. Every variant installs
+the command `grate`.
+
+Formulae build the selected profile from source using `-p:GrateDistribution`,
+including HEAD builds. Casks select that profile's Intel and Arm64 macOS ZIPs.
+Each formula conflicts with the other five formulae; each cask conflicts with
+the other five casks. Homebrew's binary link check prevents overwriting an
+installed command across formula/cask forms. Uninstall the current formula or
+cask before switching variants or forms; do not force an overwrite of `grate`.
+
 ## Distribution strategy
 
 The goal is a formula in the official `Homebrew/homebrew-core` repository so users
@@ -39,6 +51,21 @@ Both generators accept a stable numeric version and either that tag or its
   the release operator must download the exact URLs being rendered. Use
   `-outputPath` to override either helper's default destination.
 
+Both generators accept `-Distribution <profile>` with `All` as the compatible
+default. `-AllDistributions` writes all six named files into the respective
+default formula/cask directory, or into `-OutputDirectory`. It cannot be combined
+with a single `-outputPath` or a non-default `-Distribution`.
+
+```powershell
+./installers/homebrew/Create-Formula.ps1 -version 2.2.0 -sourceArchive ./2.2.0.tar.gz -AllDistributions
+./installers/homebrew/Create-Cask.ps1 -version 2.2.0 -artifactDirectory ./release-assets -AllDistributions
+```
+
+The formulae share the exact source archive hash and have distinct Ruby classes.
+The cask generator resolves and hashes all twelve requested macOS archives before
+replacing any cask. Inputs use the matching ID prefix, for example
+`grate-oracle-osx-arm64-self-contained-2.2.0.zip`.
+
 The automated release workflow uses
 [`scripts/release/update_homebrew_cask.ps1`](../../scripts/release/update_homebrew_cask.ps1)
 to generate the cask update for `erikbra/homebrew-cask`; the PowerShell helper
@@ -50,9 +77,20 @@ tap. Neither PowerShell generator needs credentials or rebuilds grate. See the
 [release configuration](../../docs/ReleaseConfiguration.md) for publication and
 verification steps. Formula submission to core remains separate.
 
+The release cask writer accepts `-Distribution` and `-ReleaseTag` while retaining
+the existing four-argument All call. Batch generation is also available through
+`-AllDistributions -ArtifactDirectory <archives> -OutputDirectory <casks>`.
+
 Run `pwsh -NoProfile -File installers/homebrew/Test-PackageGenerators.ps1` for the
 offline generator checks from the repository root. They use synthetic fixtures
 and do not establish a working Homebrew installation.
+
+Generated formula tests perform a SQLite migration and rerun for All and SQLite.
+Server-only formulae test compiled provider selection, rejection of an unsupported
+provider and bundled skill installation without requiring a database server on a
+Homebrew runner. Actual server migrations run in distribution CI. Generator
+checks also load all twelve manifests with Homebrew's native Ruby DSL when
+`brew` is available.
 
 ## Validate and submit updates
 

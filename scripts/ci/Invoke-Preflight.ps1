@@ -11,6 +11,12 @@ $PSNativeCommandUseErrorActionPreference = $true
 ./scripts/release/Run-Tests.ps1
 ./scripts/release/Run-Tests.ps1 -Path installers/docker/tests
 ./scripts/release/Run-Tests.ps1 -Path installers/deb -Filter Test-PackageLifecycle.Tests.ps1
+./scripts/release/Run-Tests.ps1 -Path installers/homebrew -Filter Test-*.ps1
+./scripts/release/Run-Tests.ps1 -Path installers/chocolatey -Filter Test-*.ps1
+./scripts/release/Run-Tests.ps1 -Path installers/msi/tests -Filter Test-InstallerIdentity.Tests.ps1
+./scripts/release/Run-Tests.ps1 -Path installers/msi/tests -Filter Test-InstallerAuthoring.Tests.ps1
+./scripts/release/Run-Tests.ps1 -Path installers/winget/tests -Filter Test-CreateInstaller.Tests.ps1
+./scripts/release/Run-Tests.ps1 -Path installers/winget/tests -Filter Test-InstallerCorrelation.Tests.ps1
 
 $tokens = $null
 $errors = $null

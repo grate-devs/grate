@@ -134,7 +134,7 @@ jobs:
       run: dotnet restore
     - name: Build
       shell: pwsh
-      run: dotnet pack ./src/grate/grate.csproj -c Release -p:SelfContained=false -p:PackAsTool=true -p:GrateDistribution=${{ matrix.distribution }} -p:ArtifactsPath=/tmp/grate/build -p:PackageOutputPath=/tmp/grate/nupkg -p:Version=${{ needs.set-version-number.outputs.nuGetVersion }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }}
+      run: dotnet pack ./src/grate/grate.csproj -c Release -p:SelfContained=false -p:PackAsTool=true -p:GrateDistribution=${{ matrix.distribution }} -p:ArtifactsPath=/tmp/grate/build -p:PackageOutputPath=/tmp/grate/nupkg -p:Version=${{ needs.set-version-number.outputs.semVer }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }}
 
     - name: Upload published tool artifact
       uses: actions/upload-artifact@v7
@@ -271,7 +271,7 @@ jobs:
 
     - name: Publish self-contained ${{ matrix.arch }}
       shell: pwsh
-      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.nuGetVersion }}' -OutputDirectory './publish/${{ matrix.arch }}'
+      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.semVer }}' -OutputDirectory './publish/${{ matrix.arch }}'
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
         TargetFramework: net11.0
@@ -336,7 +336,7 @@ jobs:
 
     - name: Publish self-contained ${{ matrix.arch }}
       shell: pwsh
-      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.nuGetVersion }}' -OutputDirectory './publish/${{ matrix.arch }}'
+      run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution '${{ matrix.distribution }}' -RuntimeIdentifier '${{ matrix.arch }}' -StandaloneVersion '${{ needs.set-version-number.outputs.semVer }}' -OutputDirectory './publish/${{ matrix.arch }}'
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
         TargetFramework: net11.0
@@ -372,22 +372,30 @@ jobs:
         if-no-files-found: error
 
   build-msi:
-    name: Build MSI
+    name: Build MSI (${{ matrix.distribution }}, ${{ matrix.arch }})
     needs:
      - set-version-number
      - build-standalone
     runs-on: windows-latest
     strategy:
       matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
         arch: [ "win-x64", "win-arm64" ]
 
     steps:
     - uses: actions/checkout@v7
       with:
         ref: ${{ github.sha }}
+    - name: Select MSI distribution identity
+      id: distribution
+      shell: pwsh
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+        "package-id=$($profile.PackageId)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
     - uses: actions/download-artifact@v8
       with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
+        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.semVer }}
         path: ${{ matrix.arch }}/
 
     - name: Test WinGet preparation and MSI identity contracts
@@ -399,23 +407,23 @@ jobs:
         ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
 
     - name: Create msi
-      run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -ReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -arch ("${{ matrix.arch }}" -replace "win-", "")
+      run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -ReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -Distribution '${{ matrix.distribution }}' -arch ("${{ matrix.arch }}" -replace "win-", "")
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
     - name: Prepare MSI release asset ${{ matrix.arch }}
       shell: pwsh
       run: |
-        $name = "grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi"
-        $msiFile = Get-ChildItem -Path ./installers/msi/tmp -Filter *.msi | Select-Object -First 1
-        Copy-Item $msiFile.FullName -Destination $name
-        ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
+        $name = '${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi'
+        $source = './installers/msi/tmp/${{ steps.distribution.outputs.package-id }}-${{ needs.set-version-number.outputs.nuGetVersion }}.msi'
+        Copy-Item -LiteralPath $source -Destination $name
+        ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ needs.set-version-number.outputs.nuGetVersion }}" -ExpectedReleaseVersion "${{ needs.set-version-number.outputs.semVer }}" -Distribution '${{ matrix.distribution }}' -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
 
     - name: Upload MSI release asset ${{ matrix.arch }}
       uses: actions/upload-artifact@v7
       with:
-        name: release-grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi
-        path: grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi
+        name: release-${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi
+        path: ${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.semVer }}.msi
         if-no-files-found: error
 
 
@@ -479,6 +487,48 @@ jobs:
           ${{ runner.temp }}/grate-image.tar
           ${{ runner.temp }}/docker-archive-validation.json
         if-no-files-found: error
+
+  build-chocolatey:
+    name: Build ${{ matrix.distribution }} Chocolatey package
+    needs: [set-version-number, build-standalone]
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Select the profile package identity
+        id: profile
+        shell: pwsh
+        run: |
+          . ./scripts/release/distribution_profiles.ps1
+          $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+          "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+      - name: Download the matching Windows payload
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ steps.profile.outputs.package-id }}-win-x64-self-contained-${{ needs.set-version-number.outputs.semVer }}
+          path: chocolatey-payload
+      - name: Check and build the profile package
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.set-version-number.outputs.semVer }}
+          RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tag = if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { $env:VERSION }
+          ./installers/chocolatey/Create-Package.ps1 -grateExe chocolatey-payload/grate.exe -version $env:VERSION -ReleaseTag $tag -Distribution '${{ matrix.distribution }}' -OutputDirectory "$env:RUNNER_TEMP/chocolatey-packages"
+      - name: Retain the exact package for Chocolatey submission
+        uses: actions/upload-artifact@v7
+        with:
+          name: chocolatey-${{ steps.profile.outputs.package-id }}-${{ needs.set-version-number.outputs.semVer }}
+          path: ${{ runner.temp }}/chocolatey-packages/*.nupkg
+          if-no-files-found: error
 
   build-slim-docker-images:
     name: Build and verify ${{ matrix.distribution }} Docker archive
@@ -618,6 +668,7 @@ jobs:
       - build-msi
       - build-docker-image
       - build-slim-docker-images
+      - build-chocolatey
       - build-deb
     runs-on: ubuntu-latest
     permissions:
@@ -916,7 +967,7 @@ jobs:
           if-no-files-found: warn
 
   prepare-winget:
-    name: Prepare WinGet migration candidate (no submission)
+    name: Prepare WinGet ${{ matrix.distribution }} candidate (no submission)
     needs:
       - set-version-number
       - release-ready
@@ -924,6 +975,10 @@ jobs:
     if: ${{ needs.set-version-number.outputs.is-release == 'true' && needs.set-version-number.outputs.is-prerelease != 'true' }}
     runs-on: windows-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
     permissions:
       contents: read
 
@@ -932,6 +987,21 @@ jobs:
       with:
         ref: ${{ github.sha }}
         persist-credentials: false
+    - name: Select WinGet candidate identity
+      id: profile
+      shell: pwsh
+      run: |
+        $identifier = 'grate-devs.grate'
+        $path = 'grate'
+        $artifact = 'winget-migration-candidate-${{ needs.set-version-number.outputs.semVer }}'
+        if ('${{ matrix.distribution }}' -ne 'All') {
+          $identifier += '.${{ matrix.distribution }}'
+          $path += '/${{ matrix.distribution }}'
+          $artifact = 'winget-${{ matrix.distribution }}-candidate-${{ needs.set-version-number.outputs.semVer }}'
+        }
+        "WINGET_PACKAGE_ID=$identifier" | Out-File -FilePath $env:GITHUB_ENV -Append
+        "WINGET_PACKAGE_PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Append
+        "artifact-name=$artifact" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
     - name: Prepare new-ID manifests from the final published assets
       shell: pwsh
       env:
@@ -946,11 +1016,11 @@ jobs:
         if ((Get-FileHash $tool -Algorithm SHA256).Hash -ne '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA') {
           throw 'wingetcreate checksum does not match the pinned release.'
         }
-        ./installers/winget/Create-Installer.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -wingetCreate $tool -PrepareMigration -outputDirectory "$env:RUNNER_TEMP/winget-candidate"
+        ./installers/winget/Create-Installer.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -Distribution '${{ matrix.distribution }}' -wingetCreate $tool -PrepareMigration -outputDirectory "$env:RUNNER_TEMP/winget-candidate"
         @'
         ## WinGet migration candidate
 
-        Prepared only grate-devs.grate from the published stable release assets.
+        Prepared the ${{ matrix.distribution }} candidate from the matching published stable release assets.
         No manifest was submitted. Historical erikbra.grate versions stay unchanged.
         Schema validation follows in this job. Installation of the final files, upstream acceptance,
         and verification through the public winget source remain separate #800 steps.
@@ -966,12 +1036,12 @@ jobs:
         $ErrorActionPreference = 'Stop'
         $winget = ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
         $candidate = "$env:RUNNER_TEMP/winget-candidate"
-        & $winget validate --manifest "$candidate/manifests/g/grate-devs/grate/$env:VERSION" --disable-interactivity *>&1 | Tee-Object -FilePath "$candidate/schema.log"
+        & $winget validate --manifest "$candidate/manifests/g/grate-devs/$env:WINGET_PACKAGE_PATH/$env:VERSION" --disable-interactivity *>&1 | Tee-Object -FilePath "$candidate/schema.log"
         if ($LASTEXITCODE -ne 0) { throw 'Final WinGet migration candidate failed schema validation.' }
         @{
           SourceCommit=$env:SOURCE_COMMIT; Version=$env:VERSION; ReleaseTag=$env:RELEASE_TAG
           RunId=$env:GITHUB_RUN_ID; RunAttempt=$env:GITHUB_RUN_ATTEMPT
-          PackageIdentifier='grate-devs.grate'; Submitted=$false; SchemaValidated=$true
+          PackageIdentifier=$env:WINGET_PACKAGE_ID; Distribution='${{ matrix.distribution }}'; Submitted=$false; SchemaValidated=$true
           WingetVersion='1.29.380'; WingetCreateVersion='1.12.13.0'
           WingetCreateSha256=(Get-FileHash "$env:RUNNER_TEMP/wingetcreate.exe" -Algorithm SHA256).Hash
         } | ConvertTo-Json | Set-Content "$candidate/provenance.json"
@@ -979,12 +1049,12 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
-        name: winget-migration-candidate-${{ needs.set-version-number.outputs.semVer }}
+        name: ${{ steps.profile.outputs.artifact-name }}
         path: ${{ runner.temp }}/winget-candidate/
         if-no-files-found: error
 
   publish-homebrew:
-    name: Update Homebrew cask (erikbra/cask/grate)
+    name: Update all Homebrew casks and retain formula candidates
     needs:
       - set-version-number
       - release-ready
@@ -1030,41 +1100,89 @@ jobs:
         mkdir -p artifacts/homebrew
         gh release download "$RELEASE_TAG" \
           --repo "$GITHUB_REPOSITORY" \
-          --pattern 'grate-osx-*-self-contained-*.zip' \
+          --pattern 'grate*-osx-*-self-contained-*.zip' \
           --dir artifacts/homebrew
 
     - name: Update and validate cask
       shell: pwsh
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
+        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
       run: |
         $ErrorActionPreference = 'Stop'
         $PSNativeCommandUseErrorActionPreference = $true
-        $arm64Asset = "artifacts/homebrew/grate-osx-arm64-self-contained-$env:VERSION.zip"
-        $x64Asset = "artifacts/homebrew/grate-osx-x64-self-contained-$env:VERSION.zip"
-        ./scripts/release/update_homebrew_cask.ps1 `
-          -Version $env:VERSION `
-          -Arm64Sha256 (Get-FileHash -LiteralPath $arm64Asset -Algorithm SHA256).Hash.ToLowerInvariant() `
-          -X64Sha256 (Get-FileHash -LiteralPath $x64Asset -Algorithm SHA256).Hash.ToLowerInvariant() `
-          -Output homebrew-cask/Casks/grate.rb
-        ruby -c homebrew-cask/Casks/grate.rb
+        . ./scripts/release/distribution_profiles.ps1
+        $candidates = @(foreach ($name in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+          $profile = Get-GrateDistribution -Name $name
+          $arm64Asset = "artifacts/homebrew/$($profile.PackageId)-osx-arm64-self-contained-$env:VERSION.zip"
+          $x64Asset = "artifacts/homebrew/$($profile.PackageId)-osx-x64-self-contained-$env:VERSION.zip"
+          @{
+            Version = $env:VERSION
+            ReleaseTag = $env:RELEASE_TAG
+            Distribution = $name
+            Arm64Sha256 = (Get-FileHash -LiteralPath $arm64Asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            X64Sha256 = (Get-FileHash -LiteralPath $x64Asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            Output = "homebrew-cask/Casks/$($profile.PackageId).rb"
+          }
+        })
+        foreach ($candidate in $candidates) {
+          ./scripts/release/update_homebrew_cask.ps1 @candidate
+          ruby -c $candidate.Output
+        }
+
+    - name: Generate all source formula candidates from the final tagged archive
+      shell: pwsh
+      env:
+        VERSION: ${{ needs.set-version-number.outputs.semVer }}
+        RELEASE_TAG: ${{ needs.set-version-number.outputs.release-tag }}
+        SOURCE_COMMIT: ${{ github.sha }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        . ./scripts/release/distribution_profiles.ps1
+        $archive = "$env:RUNNER_TEMP/grate-source.tar.gz"
+        Assert-GrateSourceTag -Tag $env:RELEASE_TAG -SourceCommit $env:SOURCE_COMMIT
+        Invoke-WebRequest "https://github.com/grate-devs/grate/archive/refs/tags/$($env:RELEASE_TAG).tar.gz" -OutFile $archive
+        Assert-GrateSourceTag -Tag $env:RELEASE_TAG -SourceCommit $env:SOURCE_COMMIT
+        ./installers/homebrew/Create-Formula.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -sourceArchive $archive -AllDistributions -OutputDirectory artifacts/homebrew-formulas
+        foreach ($candidate in Get-ChildItem -LiteralPath artifacts/homebrew-formulas -Filter '*.rb') {
+          ruby -c $candidate.FullName
+        }
+
+    - name: Retain all Homebrew cask and formula candidates
+      uses: actions/upload-artifact@v7
+      with:
+        name: homebrew-candidates-${{ needs.set-version-number.outputs.semVer }}
+        path: |
+          homebrew-cask/Casks/grate*.rb
+          artifacts/homebrew-formulas/*.rb
+        if-no-files-found: error
 
     - name: Publish cask update
       working-directory: homebrew-cask
-      shell: bash
+      shell: pwsh
       env:
         VERSION: ${{ needs.set-version-number.outputs.semVer }}
       run: |
-        set -euo pipefail
-        if git diff --quiet -- Casks/grate.rb; then
-          echo "Homebrew cask already contains grate $VERSION; nothing to publish." >> "$GITHUB_STEP_SUMMARY"
-          exit 0
-        fi
-
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        $paths = @('grate', 'grate-sqlite', 'grate-sqlserver', 'grate-mariadb', 'grate-postgresql', 'grate-oracle') | ForEach-Object { "Casks/$_.rb" }
         git config user.name "grate release workflow"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add Casks/grate.rb
-        git commit -m "Update grate to $VERSION"
+        git add -- @paths
+        try {
+          $PSNativeCommandUseErrorActionPreference = $false
+          git diff --cached --quiet -- @paths
+          $difference = $LASTEXITCODE
+        } finally {
+          $PSNativeCommandUseErrorActionPreference = $true
+        }
+        if ($difference -eq 0) {
+          'Homebrew casks already match this release.' | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          exit 0
+        }
+        if ($difference -ne 1) { throw 'Could not inspect staged Homebrew candidates.' }
+        git commit -m "Update all grate casks to $env:VERSION"
         git push origin HEAD:main
 
   test:

@@ -1,6 +1,11 @@
 # Chocolatey package
 
 The `grate` package embeds the published self-contained Windows x64 CLI.
+Database-specific IDs are `grate-sqlite`, `grate-sqlserver`, `grate-mariadb`,
+`grate-postgresql` and `grate-oracle`. All expose the command `grate`. Install
+scripts reject another installed member of this family before automatic shimming.
+Uninstall the current variant before selecting another; same-package upgrades
+remain supported.
 Chocolatey creates the `grate.exe` shim during installation. Use a clean,
 disposable Windows x64 machine with PowerShell 7, Chocolatey 2 and GitHub CLI.
 Run the commands from the repository root in an elevated PowerShell session.
@@ -46,9 +51,11 @@ executable and generates `tools/VERIFICATION.txt` there.
 ```powershell
 $recipe = (Resolve-Path -LiteralPath './installers/chocolatey').Path
 Copy-Item -LiteralPath (Join-Path $recipe 'Create-Package.ps1') -Destination $stage.FullName
+Copy-Item -LiteralPath (Join-Path $recipe 'Package.Common.ps1') -Destination $stage.FullName
 $tools = New-Item -ItemType Directory -Path (Join-Path $stage.FullName 'grate/tools') -Force
 Copy-Item -LiteralPath (Join-Path $recipe 'grate/grate.nuspec') -Destination $tools.Parent.FullName
 Copy-Item -LiteralPath (Join-Path $recipe 'grate/tools/LICENSE.txt') -Destination $tools.FullName
+Copy-Item -LiteralPath (Join-Path $recipe 'grate/tools/chocolateyInstall.ps1') -Destination $tools.FullName
 & (Join-Path $stage.FullName 'Create-Package.ps1') -grateExe $exe -version $version
 
 $package = Join-Path $stage.FullName "grate.$version.nupkg"
@@ -66,6 +73,29 @@ if ($embeddedHash -ne $payloadHash -or $verification -notmatch $payloadHash -or
 }
 Get-FileHash -LiteralPath $package -Algorithm SHA256
 ```
+
+For one slim candidate, add `-Distribution SQLite` (or `SQLServer`, `MariaDB`,
+`PostgreSQL`, `Oracle`) and supply `grate.exe` from that variant's matching
+`grate-<provider>-win-x64-self-contained-<version>.zip`. `All` is the default.
+The recipe uses isolated staging and accepts `-OutputDirectory`. The selected
+ID appears in its nuspec and verification URLs.
+It checks the executable's PE ProductName and full ProductVersion against the
+selected profile and version before packing. Pass `-ReleaseTag v2.2.0` when the
+actual upstream tag has that prefix; the package version remains `2.2.0`.
+
+Generate all six packages from verified release archives in one directory:
+
+```powershell
+./installers/chocolatey/Create-Package.ps1 -version $version -AllDistributions -ArtifactDirectory $stage.FullName -OutputDirectory "$($stage.FullName)/packages"
+```
+
+The Windows x64 boundary follows this channel's existing embedded executable
+package. Other Windows architectures remain available as standalone ZIPs.
+Stable and SemVer prerelease versions use the same IDs. Candidate generation
+runs `choco pack` locally and never pushes packages. Run
+`pwsh -NoProfile -File installers/chocolatey/Test-PackageGenerator.ps1` for offline
+metadata, payload/provenance and all thirty ordered conflict-pair checks. Its
+pack fixture is separate from real Chocolatey installation on Windows.
 
 ## Test the local package on Windows
 

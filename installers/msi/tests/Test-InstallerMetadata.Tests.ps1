@@ -5,6 +5,8 @@ param (
     [Parameter(Mandatory=$true)] [string]$ExpectedVersion,
     [Parameter(Mandatory=$true)] [ValidateSet('x64', 'arm64')] [string]$ExpectedArchitecture,
     [string]$ExpectedReleaseVersion = $ExpectedVersion,
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
     [switch]$Historical
 )
 
@@ -13,23 +15,28 @@ Set-StrictMode -Version Latest
 $reader = Join-Path $PSScriptRoot '../helpers/Get-InstallerMetadata.ps1'
 $hash = (Get-FileHash -LiteralPath $MsiPath -Algorithm SHA256).Hash
 $metadata = & $reader -MsiPath $MsiPath
-$identity = & (Join-Path $PSScriptRoot '../helpers/Get-InstallerIdentity.ps1') -Version $ExpectedVersion -Architecture $ExpectedArchitecture -ReleaseVersion $ExpectedReleaseVersion
+$identity = & (Join-Path $PSScriptRoot '../helpers/Get-InstallerIdentity.ps1') -Version $ExpectedVersion -Architecture $ExpectedArchitecture -ReleaseVersion $ExpectedReleaseVersion -Distribution $Distribution
 $expectations = @{
     ProductCode = $identity.ProductCode
     UpgradeCode = $identity.UpgradeCode
-    ProductName = 'grate'
+    ProductName = $identity.ProductName
+    Distribution = $identity.Distribution
     Manufacturer = $identity.Manufacturer
     ProductVersion = $ExpectedVersion
     ReleaseVersion = $ExpectedReleaseVersion
     Platform = $ExpectedArchitecture
 }
 if ($Historical) {
+    if ($Distribution -ne 'All') {
+        throw 'Only the All distribution has historical MSI products.'
+    }
     $expectations.ProductCode = $identity.LegacyProductCode
     $expectations.Manufacturer = 'erikbra'
     # Published legacy Arm64 payloads were also wrapped in x64 MSI databases.
     $expectations.Platform = 'x64'
     $expectations.Remove('UpgradeCode')
     $expectations.Remove('ReleaseVersion')
+    $expectations.Remove('Distribution')
 }
 foreach ($expected in $expectations.GetEnumerator()) {
     if ($metadata.($expected.Key) -cne $expected.Value) {

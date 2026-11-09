@@ -55,7 +55,7 @@ function New-Fixture {
         if ($job.name.StartsWith('Run tests (windows-latest, ')) { $stepNames = @('Test on Windows') }
         if ($job.name.StartsWith('CLI ')) { $stepNames = @('Verify self-contained runtime and execution') }
         if ($job.name.StartsWith('CLI database ')) { $stepNames = @('Test published CLI and installed tool against database') }
-        if ($job.name -cin @('CLI win-x64', 'CLI win-arm64')) {
+        if ($job.name -cmatch '^CLI (?:SQLite |SQLServer |MariaDB |PostgreSQL |Oracle )?win-(?:x64|arm64)$') {
             $stepNames += @('Check per-user MSI authoring regressions', 'Build MSI from verified Windows binary',
                 'Check verified Windows MSI metadata', 'Verify installed MSI, major upgrade and uninstall')
         }
@@ -206,7 +206,7 @@ foreach ($job in $fixture.jobs) {
     if ($job.name.StartsWith('Run tests (windows-latest, ')) {
         $job.steps += @{ name = 'Test on Linux'; status = 'completed'; conclusion = 'skipped' }
     }
-    if ($job.name.StartsWith('CLI ') -and $job.name -cnotin @('CLI win-x64', 'CLI win-arm64')) {
+    if ($job.name.StartsWith('CLI ') -and $job.name -cnotmatch '^CLI (?:SQLite |SQLServer |MariaDB |PostgreSQL |Oracle )?win-(?:x64|arm64)$') {
         $job.steps += @{ name = 'Build MSI from verified Windows binary'; status = 'completed'; conclusion = 'skipped' }
     }
     $job.steps += @{ name = 'Upload diagnostics'; status = 'completed'; conclusion = 'skipped' }

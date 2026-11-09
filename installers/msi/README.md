@@ -10,10 +10,23 @@ From the repository root:
 
 ```powershell
 ./installers/msi/Create-Installer.ps1 -grateExe <published-grate.exe> -Version <numeric-version> -ReleaseVersion <full-semver> -arch x64
+./installers/msi/Create-Installer.ps1 -grateExe <published-sqlite-grate.exe> -Version <numeric-version> -ReleaseVersion <full-semver> -arch arm64 -Distribution SQLite
 ```
 
-The MSI is written to `tmp/grate-<numeric-version>.msi`; `wix/` contains downloaded
-build tools. These are generated output, not source.
+`-Distribution` accepts `All` (the default), `SQLite`, `SQLServer`, `MariaDB`,
+`PostgreSQL` and `Oracle`. The payload's Windows product name and full release
+must match the selected profile, including when cross-building an ARM64 MSI.
+Output is `tmp/grate-<numeric-version>.msi` for All and
+`tmp/grate-<profile>-<numeric-version>.msi` for slim profiles, using lowercase
+profile names. `wix/` contains downloaded build tools. These are generated output.
+
+Every profile installs the `grate.exe` command in the existing per-user
+`LocalAppData/erikbra/grate` directory. Profiles cannot coexist there. The native
+ownership check refuses another profile or architecture before installation
+changes files, registration or PATH. Switching requires explicitly uninstalling
+the existing profile. Each profile/architecture has a stable upgrade family;
+future releases upgrade within that family. All retains its published identities,
+components and registry key, and alone supports the legacy All upgrade bridge.
 
 | File or folder | Purpose |
 | --- | --- |
@@ -30,7 +43,12 @@ version. Same-core prerelease/final replacements require explicit uninstall and
 reinstall. See the [WinGet migration contract](../winget/MIGRATION.md) for upgrade
 and package-identity behavior.
 
-CI runs `Test-InstallerLifecycle.ps1` through the existing lifecycle supervisor
-with a six-minute limit and retains both lifecycle and supervisor artifacts.
+CI runs `Test-InstallerLifecycle.ps1` for each profile on native Windows x64 and
+ARM64 through the existing lifecycle supervisor with a ten-minute limit. It
+checks exact installed payloads, refused cross-profile switching, major upgrades,
+bundled skills, external data preservation and uninstall. All and SQLite run
+SQLite migrations and reruns. Server profiles check help, their compiled default
+and unsupported-provider rejection; their actual migrations run in the matching
+Linux CLI suites. Both lifecycle and supervisor artifacts are retained.
 This also bounds COM calls outside individual subprocesses. Run the portable
 process regressions with `pwsh -NoProfile -File installers/msi/Test-InstallerLifecycle.Process.Tests.ps1`.

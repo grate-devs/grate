@@ -1,19 +1,16 @@
 #!/usr/bin/env pwsh
 param (
     [Parameter(Mandatory=$true)] [ValidateSet('x64', 'arm64')] [string]$Architecture,
-    [Parameter(Mandatory=$true)] [string]$OutputDirectory
+    [Parameter(Mandatory=$true)] [string]$OutputDirectory,
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All'
 )
 $ErrorActionPreference = 'Stop'
 if (!$IsWindows) { throw 'Building the native MSI upgrade action requires Visual Studio C++ tools and Windows SDK on Windows.' }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
-$contract = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../identity-contract.json') -Raw | ConvertFrom-Json
-@"
-#define GRATE_LEGACY_PRODUCT_CODE L"$($contract.LegacyProductCode)"
-#define GRATE_X64_UPGRADE_CODE L"$($contract.Architectures.x64.UpgradeCode)"
-#define GRATE_ARM64_UPGRADE_CODE L"$($contract.Architectures.arm64.UpgradeCode)"
-#define GRATE_CURRENT_UPGRADE_CODE L"$($contract.Architectures.$Architecture.UpgradeCode)"
-"@ | Set-Content -LiteralPath (Join-Path $OutputDirectory 'IdentityContract.h')
+& (Join-Path $PSScriptRoot 'Get-UpgradeActionContract.ps1') -Architecture $Architecture -Distribution $Distribution |
+    Set-Content -LiteralPath (Join-Path $OutputDirectory 'IdentityContract.h')
 $vswhere = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio/Installer/vswhere.exe'
 if (!(Test-Path -LiteralPath $vswhere)) { throw 'MSI upgrade actions require Visual Studio C++ build tools (vswhere.exe not found).' }
 $visualStudio = & $vswhere -latest -products '*' -property installationPath

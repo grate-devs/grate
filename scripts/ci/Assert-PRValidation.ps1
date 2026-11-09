@@ -133,7 +133,7 @@ foreach ($name in $requiredJobs) {
             }
         }
     }
-    if ($name -cin @('CLI win-x64', 'CLI win-arm64')) {
+    if ($name -cmatch '^CLI (?:SQLite |SQLServer |MariaDB |PostgreSQL |Oracle )?win-(?:x64|arm64)$') {
         $stepNames += @(
             'Check per-user MSI authoring regressions'
             'Build MSI from verified Windows binary'

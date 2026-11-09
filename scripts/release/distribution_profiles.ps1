@@ -1,4 +1,29 @@
 # Distribution identities shared by release artifact producers and validators.
+function Assert-GrateSourceTag {
+    param(
+        [string]$Tag,
+        [string]$SourceCommit
+    )
+
+    if ($Tag -cnotmatch '\Av?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z' -or
+        $SourceCommit -cnotmatch '\A[a-f0-9]{40}\z') {
+        throw 'A stable release tag and immutable source SHA are required.'
+    }
+    $references = @(git ls-remote --tags origin "refs/tags/$Tag" "refs/tags/$Tag^{}")
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not verify the source archive tag.'
+    }
+    $peeled = @($references | Where-Object { $_.EndsWith("refs/tags/$Tag^{}", [StringComparison]::Ordinal) })
+    $target = @(if ($peeled.Count -eq 1) {
+        $peeled
+    } else {
+        $references
+    })
+    if ($target.Count -ne 1 -or ($target[0] -split '\s+')[0] -cne $SourceCommit) {
+        throw 'The source archive tag does not identify the verified release commit.'
+    }
+}
+
 function Get-GrateDistribution {
     param(
         [Parameter(Mandatory)]
@@ -31,9 +56,9 @@ function Get-GrateReleaseAssets {
         foreach ($architecture in @('amd64', 'arm64')) {
             "$($profile.PackageId)_${Version}_${architecture}.deb"
         }
-    }
-    foreach ($architecture in @('x64', 'arm64')) {
-        "grate-msi-win-$architecture-$Version.msi"
+        foreach ($architecture in @('x64', 'arm64')) {
+            "$($profile.PackageId)-msi-win-$architecture-$Version.msi"
+        }
     }
 }
 
