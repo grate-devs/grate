@@ -14,13 +14,33 @@ function New-Fixture {
     foreach ($category in @('SqlServer', 'SqlServerCaseSensitive', 'MariaDB', 'Oracle')) {
         $names += "Run tests (windows-latest, $category, $category.Basic_tests.*)"
     }
-    foreach ($rid in @('win-x64', 'win-x86', 'win-arm64', 'linux-x64', 'linux-arm64', 'linux-musl-x64', 'linux-musl-arm64', 'osx-x64', 'osx-arm64')) {
-        $names += "CLI $rid"
+    foreach ($distribution in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+        foreach ($rid in @('win-x64', 'win-x86', 'win-arm64', 'linux-x64', 'linux-arm64', 'linux-musl-x64', 'linux-musl-arm64', 'osx-x64', 'osx-arm64')) {
+            if ($distribution -eq 'All') {
+                $names += "CLI $rid"
+            } else {
+                $names += "CLI $distribution $rid"
+            }
+        }
     }
     $names += 'Alpine amd64', 'Alpine arm64'
-    if ($names.Count -ne 27) { throw 'Fixture must contain 27 required jobs.' }
+    foreach ($distribution in @('SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+        foreach ($architecture in @('amd64', 'arm64')) {
+            $names += "Alpine $distribution $architecture"
+        }
+    }
+    foreach ($database in @('Sqlite', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Oracle')) {
+        $slim = switch ($database) {
+            Sqlite { 'SQLite' }
+            SqlServer { 'SQLServer' }
+            SqlServerCaseSensitive { 'SQLServer' }
+            default { $database }
+        }
+        $names += "CLI database All / $database", "CLI database $slim / $database"
+    }
+    if ($names.Count -ne 94) { throw 'Fixture must contain 94 required jobs.' }
     $needs = @{}
-    foreach ($group in @('build-code', 'test', 'packages', 'standalone', 'docker', 'validation-policy')) {
+    foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
         $needs[$group] = @{ result = 'success' }
     }
     $jobs = @($names | ForEach-Object { @{ name = $_; status = 'completed'; conclusion = 'success'; run_id = 123; run_attempt = 1 } })
@@ -34,7 +54,8 @@ function New-Fixture {
         if ($job.name.StartsWith('Run tests (ubuntu-latest, ')) { $stepNames = @('Test on Linux') }
         if ($job.name.StartsWith('Run tests (windows-latest, ')) { $stepNames = @('Test on Windows') }
         if ($job.name.StartsWith('CLI ')) { $stepNames = @('Verify self-contained runtime and execution') }
-        if ($job.name -cin @('CLI win-x64', 'CLI win-arm64')) {
+        if ($job.name.StartsWith('CLI database ')) { $stepNames = @('Test published CLI and installed tool against database') }
+        if ($job.name -cmatch '^CLI (?:SQLite |SQLServer |MariaDB |PostgreSQL |Oracle )?win-(?:x64|arm64)$') {
             $stepNames += @('Check per-user MSI authoring regressions', 'Build MSI from verified Windows binary',
                 'Check verified Windows MSI metadata', 'Verify installed MSI, major upgrade and uninstall')
         }
@@ -42,17 +63,74 @@ function New-Fixture {
             $stepNames += @('Build Debian packages from verified Linux binary', 'Verify Debian installation, package upgrade and purge')
         }
         if ($job.name.StartsWith('Alpine ')) {
-            $stepNames = @('Build native image for verification', 'Verify Alpine globalization, migration and bundled skill',
-                'Ensure SQLite client for entrypoint verification', 'Verify default image entrypoint')
+            $stepNames = @('Build native image for verification')
+            if ($job.name -cin @('Alpine amd64', 'Alpine arm64')) {
+                $stepNames += @('Verify Alpine globalization, migration and bundled skill',
+                    'Ensure SQLite client for entrypoint verification', 'Verify default image entrypoint')
+            } else {
+                $stepNames += 'Verify selected profile and bundled skill'
+                if ($job.name.StartsWith('Alpine SQLite ')) {
+                    $stepNames += 'Verify Alpine globalization, migration and bundled skill'
+                }
+            }
         }
         $job.steps = @($stepNames | ForEach-Object { @{ name = $_; status = 'completed'; conclusion = 'success' } })
     }
     return @{ needs = $needs; jobs = $jobs }
 }
 
-function Invoke-Gate($Fixture, [int] $Attempt = 1) {
+function ConvertTo-ApiJobFixture {
+    param(
+        [object[]]$Jobs
+    )
+
+    # Expected API names are independent of the production mapping.
+    foreach ($job in $Jobs) {
+        $copy = $job.Clone()
+        $prefix = switch -CaseSensitive -Regex ($job.name) {
+            '^Build$' {
+                'Build'
+                break
+            }
+            '^NuGet libraries and installed tool$' {
+                'Packages'
+                break
+            }
+            '^Run tests \((ubuntu|windows)-latest, Basic_tests\)$' {
+                'Isolated tests'
+                break
+            }
+            '^Run tests \(' {
+                'Database tests'
+                break
+            }
+            '^CLI database ' {
+                'CLI distributions'
+                break
+            }
+            '^CLI ' {
+                'Standalone CLI'
+                break
+            }
+            '^Alpine ' {
+                'Docker'
+                break
+            }
+        }
+        if ($prefix) {
+            $copy.name = "$prefix / $($job.name)"
+        }
+        $copy
+    }
+}
+
+function Invoke-Gate($Fixture, [int] $Attempt = 1, [switch]$RawJobEvidence) {
+    $jobs = $Fixture.jobs
+    if (!$RawJobEvidence) {
+        $jobs = @(ConvertTo-ApiJobFixture -Jobs $Fixture.jobs)
+    }
     & $gate -NeedsJson (ConvertTo-Json -InputObject $Fixture.needs -Depth 10 -Compress) `
-        -JobsJson (ConvertTo-Json -InputObject $Fixture.jobs -Depth 10 -Compress) -RunId 123 -RunAttempt $Attempt
+        -JobsJson (ConvertTo-Json -InputObject $jobs -Depth 10 -Compress) -RunId 123 -RunAttempt $Attempt
 }
 
 function Assert-Rejected([string] $Name, [scriptblock] $Action, [string] $Message) {
@@ -68,7 +146,19 @@ $fixture = New-Fixture
 Invoke-Gate $fixture
 $script:passed++
 
+# Reject bare historical names and success from another reusable caller.
+foreach ($apiName in @((ConvertTo-ApiJobFixture -Jobs (New-Fixture).jobs).name | Where-Object { $_ -cne 'PR validation policy' })) {
+    $leafName = $apiName.Substring($apiName.IndexOf(' / ') + 3)
+    foreach ($wrongName in @($leafName, "Unexpected / $leafName", "Extra / $apiName")) {
+        $fixture = New-Fixture
+        $fixture.jobs = @(ConvertTo-ApiJobFixture -Jobs $fixture.jobs)
+        ($fixture.jobs | Where-Object name -CEQ $apiName).name = $wrongName
+        Assert-Rejected "wrong reusable caller $wrongName" { Invoke-Gate $fixture -RawJobEvidence } 'Missing required job'
+    }
+}
+
 # Optional reports and security analysis do not replace any required producer.
+$fixture = New-Fixture
 $fixture.jobs += @{ name = 'Create test report'; status = 'completed'; conclusion = 'success'; run_id = 123; run_attempt = 1 }
 $fixture.jobs += @{ name = 'Analyze Code Security'; status = 'completed'; conclusion = 'failure'; run_id = 123; run_attempt = 1 }
 Invoke-Gate $fixture
@@ -100,7 +190,7 @@ $fixture = New-Fixture
 $fixture.jobs += $fixture.jobs[0].Clone()
 Assert-Rejected 'duplicate required job' { Invoke-Gate $fixture } 'Duplicate required job'
 
-foreach ($group in @('build-code', 'test', 'packages', 'standalone', 'docker', 'validation-policy')) {
+foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
     foreach ($result in @('failure', 'cancelled', 'skipped', 'unknown', $null)) {
         $fixture = New-Fixture
         $fixture.needs[$group].result = $result
@@ -177,7 +267,7 @@ foreach ($job in $fixture.jobs) {
     if ($job.name.StartsWith('Run tests (windows-latest, ')) {
         $job.steps += @{ name = 'Test on Linux'; status = 'completed'; conclusion = 'skipped' }
     }
-    if ($job.name.StartsWith('CLI ') -and $job.name -cnotin @('CLI win-x64', 'CLI win-arm64')) {
+    if ($job.name.StartsWith('CLI ') -and $job.name -cnotmatch '^CLI (?:SQLite |SQLServer |MariaDB |PostgreSQL |Oracle )?win-(?:x64|arm64)$') {
         $job.steps += @{ name = 'Build MSI from verified Windows binary'; status = 'completed'; conclusion = 'skipped' }
     }
     $job.steps += @{ name = 'Upload diagnostics'; status = 'completed'; conclusion = 'skipped' }

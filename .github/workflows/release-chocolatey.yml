@@ -1,0 +1,57 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · chocolatey
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      release-tag:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: Build ${{ matrix.distribution }} Chocolatey package
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Select the profile package identity
+        id: profile
+        shell: pwsh
+        run: |
+          . ./scripts/release/distribution_profiles.ps1
+          $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+          "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+      - name: Download the matching Windows payload
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ steps.profile.outputs.package-id }}-win-x64-self-contained-${{ inputs.version }}
+          path: chocolatey-payload
+      - name: Check and build the profile package
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tag = if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { $env:VERSION }
+          ./installers/chocolatey/Create-Package.ps1 -grateExe chocolatey-payload/grate.exe -version $env:VERSION -ReleaseTag $tag -Distribution '${{ matrix.distribution }}' -OutputDirectory "$env:RUNNER_TEMP/chocolatey-packages"
+      - name: Retain the exact package for Chocolatey submission
+        uses: actions/upload-artifact@v7
+        with:
+          name: chocolatey-${{ steps.profile.outputs.package-id }}-${{ inputs.version }}
+          path: ${{ runner.temp }}/chocolatey-packages/*.nupkg
+          if-no-files-found: error

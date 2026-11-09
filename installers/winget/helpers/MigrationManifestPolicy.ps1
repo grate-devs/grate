@@ -40,7 +40,14 @@ function Remove-WinGetAppsAndFeatures([string]$Text, [switch]$Root) {
     [regex]::Replace($Text, "(?ms)^${prefix}AppsAndFeaturesEntries:\r?\n.*?$stop", '')
 }
 
-function Assert-WinGetMigrationMetadata([object[]]$MsiMetadata, [string]$Version, [string]$IdentityContractPath) {
+function Assert-WinGetMigrationMetadata {
+    param(
+        [object[]]$MsiMetadata,
+        [string]$Version,
+        [string]$IdentityContractPath,
+        [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+        [string]$Distribution = 'All'
+    )
     $contract = Get-Content -LiteralPath $IdentityContractPath -Raw | ConvertFrom-Json
     if ($contract.SchemaVersion -ne 1 -or $contract.Manufacturer -cne 'grate-devs') { throw 'Unsupported MSI identity contract.' }
     $products = @()
@@ -50,7 +57,8 @@ function Assert-WinGetMigrationMetadata([object[]]$MsiMetadata, [string]$Version
         $items = @($MsiMetadata | Where-Object Architecture -CEQ $architecture)
         if ($items.Count -ne 1) { throw "Expected independently inspected $architecture MSI metadata." }
         $item = $items[0]
-        if ($item.Manufacturer -cne $contract.Manufacturer -or $item.ProductName -cne $contract.ProductName -or
+        $identity = & (Join-Path $PSScriptRoot '../../msi/helpers/Get-InstallerIdentity.ps1') -Version $Version -Architecture $architecture -Distribution $Distribution
+        if ($item.Manufacturer -cne $contract.Manufacturer -or $item.ProductName -cne $identity.ProductName -or
             $item.ProductVersion -cne $Version -or $item.Platform -cne $architecture) {
             throw "Migration requires the corrected $architecture MSI with actual grate-devs publisher, version and platform."
         }
@@ -65,8 +73,7 @@ function Assert-WinGetMigrationMetadata([object[]]$MsiMetadata, [string]$Version
             $item.ProductCode -ieq $contract.LegacyProductCode) {
             throw 'Migration requires new MSI ProductCodes; the legacy fixed ProductCode must not alias the new identity.'
         }
-        if ($item.UpgradeCode -ine $contract.Architectures.$architecture.UpgradeCode) { throw "Migration requires the stable $architecture MSI UpgradeCode from the identity contract." }
-        $identity = & (Join-Path $PSScriptRoot '../../msi/helpers/Get-InstallerIdentity.ps1') -Version $Version -Architecture $architecture
+        if ($item.UpgradeCode -ine $identity.UpgradeCode) { throw "Migration requires the stable $Distribution $architecture MSI UpgradeCode from the identity contract." }
         if ($item.ProductCode -ine $identity.ProductCode) { throw "Migration requires the version-specific $architecture MSI ProductCode from the identity contract." }
         if ($item.Sha256 -notmatch '^[A-Fa-f0-9]{64}$') { throw 'Migration requires an independently computed MSI SHA256.' }
         $products += $item.ProductCode.ToUpperInvariant()
@@ -81,9 +88,15 @@ function ConvertTo-WinGetMigrationManifests {
         [Parameter(Mandatory)] [string]$InstallerYaml,
         [Parameter(Mandatory)] [string]$Version,
         [Parameter(Mandatory)] [object[]]$MsiMetadata,
-        [string]$IdentityContractPath = (Join-Path $PSScriptRoot '../../msi/identity-contract.json')
+        [string]$IdentityContractPath = (Join-Path $PSScriptRoot '../../msi/identity-contract.json'),
+        [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+        [string]$Distribution = 'All'
     )
-    Assert-WinGetMigrationMetadata $MsiMetadata $Version $IdentityContractPath
+    Assert-WinGetMigrationMetadata $MsiMetadata $Version $IdentityContractPath -Distribution $Distribution
+    $packageId = 'grate-devs.grate'
+    if ($Distribution -ne 'All') {
+        $packageId += ".$Distribution"
+    }
     $document = Get-WinGetInstallerDocument $InstallerYaml
     if ((Get-WinGetScalar $document.Header PackageIdentifier -Root -Required) -cne 'erikbra.grate' -or
         (Get-WinGetScalar $document.Header PackageVersion -Root -Required) -cne $Version) {
@@ -124,13 +137,13 @@ function ConvertTo-WinGetMigrationManifests {
         # Actual installs enrich old-ID tracking even when these codes are absent;
         # production preparation must emit only NewInstallerYaml.
         $bridgeNodes += $clean + "  AppsAndFeaturesEntries:`n  - DisplayName: grate`n    Publisher: erikbra`n"
-        $newNodes += $clean + "  ProductCode: '$($metadata.ProductCode)'`n  AppsAndFeaturesEntries:`n  - DisplayName: grate`n    Publisher: grate-devs`n    ProductCode: '$($metadata.ProductCode)'`n    UpgradeCode: '$($metadata.UpgradeCode)'`n"
+        $newNodes += $clean + "  ProductCode: '$($metadata.ProductCode)'`n  AppsAndFeaturesEntries:`n  - DisplayName: $($metadata.ProductName)`n    Publisher: grate-devs`n    ProductCode: '$($metadata.ProductCode)'`n    UpgradeCode: '$($metadata.UpgradeCode)'`n"
     }
     foreach ($metadata in $MsiMetadata) {
         if ($metadata.InstallerUrl -cnotin $seenUrls) { throw 'An inspected MSI is missing from the migration manifest.' }
     }
     $bridge = $header + "Installers:`n" + ($bridgeNodes -join '') + $document.Footer
-    $new = ($header -creplace '(?m)^PackageIdentifier: erikbra\.grate\r?$', 'PackageIdentifier: grate-devs.grate') + "Installers:`n" + ($newNodes -join '') + $document.Footer
+    $new = ($header -creplace '(?m)^PackageIdentifier: erikbra\.grate\r?$', "PackageIdentifier: $packageId") + "Installers:`n" + ($newNodes -join '') + $document.Footer
     if ($bridge -match '(?m)^\s*(?:- )?(?:ProductCode|UpgradeCode):') { throw 'Bridge manifests must not contain strong MSI reference codes.' }
     [pscustomobject]@{ BridgeInstallerYaml=$bridge; NewInstallerYaml=$new }
 }

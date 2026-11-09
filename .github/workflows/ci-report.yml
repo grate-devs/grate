@@ -1,0 +1,55 @@
+# Reusable test report phase. Scheduling and aggregate gates live in ci.yml.
+name: CI · Test report
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    # Diagnostic output only. PR validation reads test results directly;
+    # successful report generation never overrides a failed test producer.
+    runs-on: ubuntu-latest
+    name: Create test report
+
+    steps:
+      - name: Download XML test reports
+        uses: actions/download-artifact@v8
+        with:
+          path: test-results
+          pattern: '* XML test results'
+
+      - name: Setup .NET # Required to execute ReportGenerator
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Create HTML test report
+        uses: danielpalme/ReportGenerator-GitHub-Action@v5
+        with:
+          reports: 'test-results/**/*.xml'
+          targetdir: 'test-outputs' # REQUIRED # The directory where the generated report should be saved.
+          reporttypes: 'HtmlInline;Cobertura' # The output formats and scope (separated by semicolon) Values: Badges, Clover, Cobertura, OpenCover, CsvSummary, Html, Html_Dark, Html_Light, Html_BlueRed, HtmlChart, HtmlInline, HtmlInline_AzurePipelines, HtmlInline_AzurePipelines_Dark, HtmlInline_AzurePipelines_Light, HtmlSummary, Html_BlueRed_Summary, JsonSummary, Latex, LatexSummary, lcov, MarkdownSummary, MarkdownSummaryGithub, MarkdownDeltaSummary, MHtml, SvgChart, SonarQube, TeamCitySummary, TextSummary, TextDeltaSummary, Xml, XmlSummary
+          sourcedirs: '' # Optional directories which contain the corresponding source code (separated by semicolon). The source directories are used if coverage report contains classes without path information.
+          historydir: '' # Optional directory for storing persistent coverage information. Can be used in future reports to show coverage evolution.
+          workingdir: '' # Optional working directory. If available, the targetdir, sourcedirs and historydir are interpreted relative to the working directory (only if not specified as absolute paths).'
+          plugins: '' # Optional plugin files for custom reports or custom history storage (separated by semicolon).
+          assemblyfilters: '+*' # Optional list of assemblies that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+          classfilters: '+*' # Optional list of classes that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+          filefilters: '+*' # Optional list of files that should be included or excluded in the report. Exclusion filters take precedence over inclusion filters. Wildcards are allowed.
+          verbosity: 'Info' # The verbosity level of the log messages. Values: Verbose, Info, Warning, Error, Off
+          title: 'grate unit tests' # Optional title.
+          tag: '${{ github.run_number }}_${{ github.run_id }}' # Optional tag or build version.
+          license: '' # Optional license for PRO version. Get your license here: https://reportgenerator.io/pro
+          customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
+          toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
+
+      - name: Upload HTML test report
+        uses: actions/upload-artifact@v7
+        with:
+          name: HTML test report
+          path: |
+            test-outputs/*.html
+          retention-days: 1

@@ -1,0 +1,328 @@
+# Database-specific CLI and .NET tool distributions
+
+Offer ready-to-run downloads and installable .NET tools for individual databases
+alongside the existing all-in-one releases. The distribution choices are tracked
+in #909, and the broader provider architecture has its own discussion.
+[Distribution issue #909](https://github.com/grate-devs/grate/issues/909) ·
+[Architecture issue #891](https://github.com/grate-devs/grate/issues/891)
+
+The checkout supports `All`, `SQLite`, `SQLServer`, `MariaDB`, `PostgreSQL` and
+`Oracle` build profiles. All six are included in the standalone platform matrix,
+NuGet tool packages, Docker images and Debian packages. Validation runs the
+matching database suite against standalone and installed tools. The size comparison
+builds all six profiles for the selected RID.
+[Build, validate and compare distributions](../distributions.md)
+
+## Existing release build
+
+- The default CLI build references all five provider projects and directly
+  references `Microsoft.Data.SqlClient` and its Azure extensions. The CLI
+  defaults to SQL Server. [CLI project](../../src/grate/grate.csproj)
+- The release workflow publishes self-contained, single-file ZIPs per runtime
+  identifier (RID), currently targeting `net11.0`. It also packs the
+  framework-dependent `grate` tool with assets for each supported framework
+  and builds six provider/core library packages separately.
+  [Release workflow](../../.github/workflows/build.yml) ·
+  [Framework targets](../../Directory.Build.props)
+- The release workflow validates its expected GitHub asset list before generating
+  `checksums.sha256` and `release-manifest.json`. The NuGet publisher validates
+  twelve package IDs at the release version. CI exercises standalone and installed
+  tool builds. [CI workflow](../../.github/workflows/ci.yml) ·
+  [Package verification script](../../scripts/verify-packages.ps1)
+
+## Build profiles in this checkout
+
+| Build profile | NuGet tool ID | Default database | ZIP prefix |
+| --- | --- | --- | --- |
+| `All` | `grate` | SQL Server | `grate-` |
+| `SQLite` | `grate-sqlite` | SQLite | `grate-sqlite-` |
+| `SQLServer` | `grate-sqlserver` | SQL Server | `grate-sqlserver-` |
+| `MariaDB` | `grate-mariadb` | MariaDB | `grate-mariadb-` |
+| `PostgreSQL` | `grate-postgresql` | PostgreSQL | `grate-postgresql-` |
+| `Oracle` | `grate-oracle` | Oracle | `grate-oracle-` |
+
+Every profile exposes the command `grate`.
+
+Each ZIP follows `<prefix><rid>-self-contained-<version>.zip` and contains
+`grate` or `grate.exe`. Users select a package, then invoke the same command.
+
+```sh
+dotnet tool install --global grate-mariadb
+grate --connectionstring "Server=localhost;Database=example;User ID=example;Password=example"
+```
+
+A global tool installation or a project tool manifest selects one variant.
+Switching a global installation requires uninstalling the current package before
+installing another variant with the same command name. Validation uses separate
+tool paths to verify every package. [.NET tool packaging](https://learn.microsoft.com/en-us/dotnet/core/tools/global-tools-how-to-create)
+
+Each slim build accepts explicit selection of its database as well as its default.
+Help and completions expose the selected provider, and an unsupported provider
+produces a parse error before database services are constructed.
+
+## Build-time provider selection
+
+The CLI project uses `GrateDistribution` with `All` as the default. The five
+slim profiles select their provider project and dependencies. For example, the
+SQLite profile excludes the direct SQL Server client references as well as
+the four other provider projects.
+
+`DatabaseProviders` owns the compiled provider list, database option construction
+and service registration. Its imports, provider list entries and switch arms each
+have an individual `ALL_DATABASES || <PROVIDER>_ONLY` condition. The single-provider
+default, help, completions and validation derive from that list. This lets
+`MigrateCommand` and `Program` delegate provider configuration to one place.
+[Provider configuration](../../src/grate/Configuration/DatabaseProviders.cs)
+
+The package ID identifies the variant while `ToolCommandName` and the assembly
+name are both `grate`. Each package includes a matching README. Migration
+commands, logging and bundled skills use shared CLI code. Separate MSBuild
+artifact roots keep the variants' restore and build outputs isolated.
+[MSBuild artifact layout](https://learn.microsoft.com/en-us/dotnet/core/sdk/artifacts-output)
+
+These commands build the SQL Server variant using a local candidate version.
+CI uses the existing version outputs and SDK pin for every profile.
+
+```sh
+out="$PWD/artifacts/sqlserver-build"
+
+dotnet publish src/grate/grate.csproj -c Release -f net11.0 -r linux-x64 \
+  --self-contained -p:TargetFrameworks=net11.0 -p:GrateDistribution=SQLServer \
+  -p:Version=0.0.1 -p:ArtifactsPath="$out/standalone-build" -o "$out/publish"
+
+dotnet pack src/grate/grate.csproj -c Release \
+  -p:PackAsTool=true -p:SelfContained=false -p:GrateDistribution=SQLServer \
+  -p:Version=0.0.1 -p:PackageVersion=0.0.1 \
+  -p:ArtifactsPath="$out/tool-build" -o "$out/feed"
+```
+
+## Verification and size comparison
+
+Validation exercises all five database-specific standalone CLIs and installed
+tools, plus All against every database. The matching CommandLine suites query
+data, migration history and errors after migrations and reruns. SQL Server also
+has a case-sensitive database lane with a direct collation assertion.
+
+Each tool framework's metadata must declare command `grate`. Dependency checks
+require the selected provider and client libraries, and exclude other provider
+assemblies and clients from slim builds. Installed tool package bytes must
+match the local build. Bundled skill installation is exercised as well.
+
+Executable, ZIP and NuGet package sizes are compared using matching versions,
+SDK, frameworks and compression. Standalone ZIPs include .NET, while tool
+packages include four framework targets and their runtime assets. Measurements
+and execution limits belong in the PR verification record.
+[Reproduce validation and measurements](../distributions.md)
+
+PR CI requires the corresponding CommandLine suite against each slim profile and
+All, including SQL Server's case-sensitive fixture. Both the self-contained CLI
+and the locally installed NuGet tool run the suite on net11.0; tool dependency
+checks cover every packaged framework. Provider-library suites remain separate
+and retain their full framework matrix. The version compatibility workflow also
+runs both All and slim for every configured database image. Its CLI failures are
+propagated rather than allowed to pass the workflow.
+
+## Other distribution channels
+
+The same six profiles can feed the other channels. The proposed names below
+show SQLite as the example. SQL Server, MariaDB, PostgreSQL and Oracle use
+`sqlserver`, `mariadb`, `postgresql` and `oracle` identifiers. These are channel design proposals for
+#909. Standalone ZIPs cover every current RID, with matching NuGet tools,
+Docker images and Debian packages.
+
+| Channel | Existing all-in-one identity | Proposed SQLite selection | Installed command |
+| --- | --- | --- | --- |
+| GitHub ZIP | `grate-<rid>-self-contained-<version>.zip` | `grate-sqlite-<rid>-self-contained-<version>.zip` | `grate` |
+| Docker | `gratedevs/grate:<version>` and `:latest` | `gratedevs/grate:sqlite-<version>` and stable alias `:sqlite` | `/app/grate` |
+| Debian download | `grate_<version>_<arch>.deb` | `grate-sqlite_<version>_<arch>.deb`, package `grate-sqlite` | `/usr/bin/grate` |
+| MSI download | `grate-msi-win-<arch>-<version>.msi` | `grate-sqlite-msi-win-<arch>-<version>.msi` | `grate.exe` |
+| WinGet manifest | Generator's `grate-devs.grate` identity | Candidate ID `grate-devs.grate.SQLite` | `grate` |
+| Chocolatey | Package `grate` | Package `grate-sqlite` | `grate` |
+| Homebrew cask | `erikbra/cask/grate` | `erikbra/cask/grate-sqlite` candidate | `grate` |
+| Homebrew formula | Source-built `grate` template | Formula candidate `grate-sqlite`, subject to channel acceptance | `grate` |
+
+ZIP users select a directory, and container users select an image. For package
+managers, propose one active grate variant per managed installation. Document
+removing the installed variant before selecting another, and detect conflicting
+variants before changing shared files, shims or PATH. Each manager controls
+its own installation records. Document how users verify the selected `grate` when
+mixing installation methods.
+
+### ZIPs and Docker
+
+Extend standalone publishing with the distribution dimension and reuse the
+matching verified output in downstream installers. Match the current RID
+support explicitly. Execution evidence identifies the exact RID and source in
+the PR and release verification records.
+Each additional Windows, macOS, Arm64 and musl build needs its own packaged
+checks. Release downloads should group assets by provider and platform so users
+can find one artifact without scanning the complete matrix.
+
+Docker uses Alpine and musl builds for amd64/arm64. The Dockerfile accepts
+`GRATE_DISTRIBUTION` and passes `GrateDistribution` to `dotnet publish`. The
+release workflow keeps one checked OCI archive and multi-platform digest per
+profile, with a distribution label. The retained verification report binds
+profile, version, source commit and digest before publication.
+[Docker build](../../installers/docker/Dockerfile)
+
+The entrypoint supplies `--databasetype` only when `DATABASE_TYPE` has a value.
+The compiled CLI supplies the profile default when the variable is unset or
+empty. The packaging checks exercise these defaults, environment overrides,
+argument forwarding and unsupported database selections.
+[Entrypoint](../../installers/docker/entrypoint.sh)
+
+Use profile-prefixed tags such as `sqlite-<version>`, `sqlserver-<version>`,
+`mariadb-<version>`, `postgresql-<version>` and `oracle-<version>`. A suffix such as `<version>-sqlite` can collide with
+a valid all-in-one SemVer prerelease tag. Stable releases can update `:sqlite`,
+`:sqlserver`, `:mariadb`, `:postgresql` and `:oracle`. Prereleases publish only their versioned tags.
+Keep version parsing separate from tag rendering, and validate complete tags.
+New variants are added under the canonical repository. The existing
+compatibility-image policy continues to govern the all-in-one image.
+[Tag policy](../../installers/docker/release_tags.ps1) ·
+[Profile publication](../../scripts/release/publish_slim_docker_archive.ps1) ·
+[Digest-preserving publication](../../installers/docker/RELEASE.md)
+
+### Debian
+
+The Debian recipe accepts `Distribution` and `OutputDirectory`, selecting the
+package ID, description, document paths, maintainer scripts and filename. Each
+slim package installs its selected binary at `/usr/bin/grate`. Its metadata
+declares conflicts with the other variants. Switching uses explicit removal
+and installation. A dependency requiring
+the full provider set should continue to select the all-in-one package. Keep
+Debian version ordering, including the existing prerelease conversion, separate
+from the provider name. The current channel publishes downloadable .deb files.
+[Debian recipe](../../installers/deb/Create-Package.ps1) ·
+[Package relationships](https://www.debian.org/doc/debian-policy/ch-relationships.html)
+
+Give each package its own `/usr/share/doc/<package>` content. The common binary
+and manpage paths participate in the package-conflict policy. Test install,
+same-variant upgrade, remove and purge with the matching database. Then test a
+variant switch while preserving migration files, database contents and history.
+[Existing lifecycle test](../../installers/deb/Verify-PackageLifecycle.ps1)
+
+### MSI, WinGet and Chocolatey
+
+MSI uses a distribution-aware identity contract with a stable UpgradeCode
+for each profile/architecture family, and a ProductCode derived from
+profile, architecture and full release version. The existing all-in-one
+identity derivation and family are preserved. New families have their own display names,
+registry keys and component identities. They share the existing per-user
+installation directory and command. Reject another installed grate variant
+in the relevant installation scope before changing files or PATH. Switching
+variants is an explicit uninstall/install operation, including at the same
+version. Legacy all-in-one migration applies only to All; slim variants reject
+an installed legacy product. [Current identity contract](../../installers/msi/identity-contract.json) ·
+[MSI template](../../installers/msi/grate.wxs) ·
+[ProductCode](https://learn.microsoft.com/en-us/windows/win32/msi/productcode) ·
+[UpgradeCode](https://learn.microsoft.com/en-us/windows/win32/msi/upgradecode)
+
+WinGet exposes each variant under a separate candidate package ID and generates its
+URLs, hashes, ProductCode and upgrade metadata from that variant's final MSI.
+The current generator also handles portable ZIPs, whose aliases need the same
+single-command policy. Test install, upgrade, uninstall and source correlation
+per ID, followed by switching between variants. Publishing candidates to the
+community repository remains a channel acceptance step.
+[Manifest generator](../../installers/winget/Create-Installer.ps1) ·
+[Existing identity migration](../../installers/winget/MIGRATION.md) ·
+[WinGet manifest identity](https://learn.microsoft.com/en-us/windows/package-manager/package/manifest)
+
+Chocolatey uses one package ID per variant, embedding the corresponding
+verified Windows x64 executable. The generator selects the nuspec, output directory and
+verification URL/hash. Its common `grate.exe` shim has an install-time
+check for another installed grate package before accepting a variant. Test that
+upgrade and uninstall operate on the selected package's shim and payload.
+[Chocolatey recipe](../../installers/chocolatey/Create-Package.ps1) ·
+[Executable shimming](https://docs.chocolatey.org/en-us/features/shim/)
+
+### Homebrew
+
+For the existing cask channel, generate all six casks from their final
+Intel and Arm64 macOS ZIPs. Keep `binary "grate"` and declare conflicts with
+other grate casks. A linked formula's binary must be removed before installing
+a cask, and vice versa; Homebrew's existing binary-link checks reject collisions.
+Both the manual generator and automated tap-update path select
+each profile's archives and hashes.
+[Cask generator](../../installers/homebrew/Create-Cask.ps1) ·
+[Automated cask update](../../scripts/release/update_homebrew_cask.ps1) ·
+[Cask conflict declarations](https://docs.brew.sh/Cask-Cookbook#stanza-conflicts_with)
+
+For the source-built formula, pass `-p:GrateDistribution=<profile>` through
+its existing publish command and expose `grate` from the formula's own
+`libexec`. Use formula conflict declarations for competing grate commands.
+Separate slim formulae require upstream acceptance. Their placement should be
+agreed with the channel maintainers alongside the current source-formula work.
+All/SQLite formula tests run SQLite migrations; server profiles check help and
+unsupported-provider rejection. Validate server migrations through the installed
+source-built formula before claiming Homebrew migration coverage.
+[Formula template](../../installers/homebrew/grate.rb.in) ·
+[Homebrew channel plan](../../installers/homebrew/README.md) ·
+[Formula conflicts](https://docs.brew.sh/Formula-Cookbook#specifying-conflicts-with-other-formulae)
+
+### Release and verification cost
+
+Use one profile catalog for names, CLI build properties, supported providers and
+package-manager identities. Have builders and release validation consume the
+selected channel/profile matrix. Installer jobs should wrap the matching checked
+binary from that run. Docker musl and Homebrew source builds retain their own
+build and verification paths. Record the profile in artifact metadata so a
+correct filename alone cannot select an all-in-one payload for a slim package.
+
+All six profiles cover every current standalone platform. The output inventory
+across all distribution channels is:
+
+| Output | All-in-one | Current profile coverage |
+| --- | ---: | ---: |
+| Standalone ZIPs, nine RIDs | 9 | 54 |
+| MSI, x64/Arm64 | 2 | 12 |
+| Debian, amd64/Arm64 | 2 | 12 |
+| NuGet tools | 1 | 6 |
+| Docker multi-platform images | 1 | 6 |
+| WinGet candidate identities | 1 | 6 |
+| Chocolatey x64 packages | 1 | 6 |
+| Homebrew casks, Intel/Arm64 | 1 | 6 |
+| Homebrew source formula candidates | 1 | 6 |
+
+The ZIP/MSI/Debian release inventory contains 54 ZIPs, 12 MSI files and 12 Debian packages,
+plus checksum and manifest files. Measure installer and image download sizes in
+MB independently. The Linux glibc ZIP measurements do not establish Alpine
+image sizes or Windows/macOS installer savings.
+
+The Windows MSI lifecycle fixture checks installation, same-profile upgrade, uninstall,
+payload identity, provider selection and skills for every profile on x64/Arm64.
+Its local database migration fixture covers All/SQLite; server migrations run
+through the Linux standalone/tool suites. Complete native package-manager
+migration/rerun and variant-switch verification remains necessary before public
+channel acceptance. Bind those checks to the artifacts being released.
+[Package lifecycle checks](../Packaging.md#package-lifecycle-checks-in-ci)
+
+Docker builds cover both supported Linux architectures for every profile.
+Windows installer identities and package-manager wrappers cover every profile.
+Generating a candidate does not establish public availability or native installation.
+
+## Release contract
+
+The generated [distribution catalog](../distribution-catalog.md) expands every
+channel/profile/platform combination and links to build results. Its source is
+the shared release-asset/profile catalog and build target frameworks; shared
+preflight rejects stale generated content. Workflow badges report main's workflow
+status, while individual matrix-job results remain in the linked Actions run.
+
+The release workflow builds all six profiles with distinct Actions artifacts and
+the version from `set-version-number`. `release-ready` requires all producers,
+and the complete expected ZIP/Debian/MSI inventory is validated before checksums
+and the release manifest are generated. All asset names remain compatible.
+
+The NuGet allowlist includes all five slim tool IDs, the six existing libraries
+and the all-in-one tool: twelve packages. The complete set and versions are
+validated before publication.
+Confirm availability of the new package IDs and that the NuGet trusted-publishing
+policy permits their creation and subsequent versions.
+[Release configuration](../ReleaseConfiguration.md) ·
+[NuGet trusted publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
+
+## Decisions recorded from #909
+
+- Ship all five database-specific profiles alongside All on every existing CLI RID.
+- Keep the extra packages: the measured download savings justify the distribution
+  variants. The command remains `grate` in every profile.

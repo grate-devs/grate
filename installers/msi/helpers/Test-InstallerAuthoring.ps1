@@ -33,17 +33,18 @@ foreach ($directoryId in @('INSTALLFOLDER', 'ROOTDIRECTORY')) {
 # filesystem/component contract while deriving product/family identity centrally.
 $identityAttributes = @(
     @('/w:Wix/w:Product', 'Id', '%%%PRODUCTCODE%%%'),
-    @('/w:Wix/w:Product', 'Name', 'grate'),
+    @('/w:Wix/w:Product', 'Name', '%%%PRODUCTNAME%%%'),
     @('/w:Wix/w:Product', 'Manufacturer', 'grate-devs'),
     @('/w:Wix/w:Product', 'UpgradeCode', '%%%UPGRADECODE%%%'),
     @('/w:Wix/w:Product/w:Package', 'Manufacturer', 'grate-devs'),
     @("//w:Property[@Id='GRATE_RELEASE_VERSION']", 'Value', '%%%RELEASEVERSION%%%'),
+    @("//w:Property[@Id='GRATE_DISTRIBUTION']", 'Value', '%%%DISTRIBUTION%%%'),
     @("//w:Directory[@Id='ROOTDIRECTORY']", 'Name', 'erikbra'),
     @("//w:Directory[@Id='INSTALLFOLDER']", 'Name', 'grate'),
-    @("//w:Component[@Id='MainExecutable']", 'Guid', 'C544280E-4F9B-443D-BE6D-4A82CFEE3723'),
-    @("//w:Component[@Id='PathVariable']", 'Guid', 'E7507A5D-D78E-4082-BD75-986A11F54E68'),
+    @("//w:Component[@Id='MainExecutable']", 'Guid', '%%%EXECUTABLECOMPONENT%%%'),
+    @("//w:Component[@Id='PathVariable']", 'Guid', '%%%PATHCOMPONENT%%%'),
     @("//w:Component[@Id='MainExecutable']/w:RegistryValue", 'Root', 'HKCU'),
-    @("//w:Component[@Id='MainExecutable']/w:RegistryValue", 'Key', 'Software\Microsoft\erikbra\grate')
+    @("//w:Component[@Id='MainExecutable']/w:RegistryValue", 'Key', '%%%REGISTRYKEY%%%')
 )
 foreach ($contract in $identityAttributes) {
     $node = $template.SelectSingleNode($contract[0], $namespaces)

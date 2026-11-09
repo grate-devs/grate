@@ -270,12 +270,7 @@ the last one will expect the folders to be named 'folder1', 'folder2', and 'fold
         };
 
     //DATABASE OPTIONS
-    private readonly Option<DatabaseType> DatabaseType =
-        new("--databasetype", "--dt", "--dbt")
-        {
-            Description = "TELLS GRATE WHAT TYPE OF DATABASE IT IS RUNNING ON.",
-            DefaultValueFactory = _ => Configuration.DatabaseType.SQLServer
-        };
+    private readonly Option<DatabaseType> DatabaseType = DatabaseProviders.CreateDatabaseTypeOption();
 
     private readonly Option<bool> RunInTransaction =
         new("--transaction", "--trx", "-t")

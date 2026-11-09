@@ -145,7 +145,7 @@ namespace
         return result;
     }
 
-    std::vector<Instance> CurrentUserInstances(const wchar_t* code, const std::wstring& userSid)
+    std::vector<Instance> CurrentUserInstances(const wchar_t* code, const std::wstring& userSid, const wchar_t* productName = L"grate")
     {
         std::vector<Instance> result;
         for (DWORD index = 0; ; ++index)
@@ -160,13 +160,13 @@ namespace
             Check(status, "MsiEnumProductsEx");
             const auto state = ProductProperty(installedCode, owner, context, INSTALLPROPERTY_PRODUCTSTATE);
             if (state != L"5") { throw std::runtime_error("Related grate MSI is advertised or incompletely installed"); }
-            if (ProductProperty(installedCode, owner, context, L"InstalledProductName") != L"grate") { throw std::runtime_error("Related MSI has an unexpected product name"); }
+            if (ProductProperty(installedCode, owner, context, L"InstalledProductName") != productName) { throw std::runtime_error("Related MSI has an unexpected product name"); }
             result.push_back({ static_cast<unsigned>(context), owner, 5, ProductProperty(installedCode, owner, context, L"Publisher"), ProductProperty(installedCode, owner, context, L"VersionString") });
         }
         return result;
     }
 
-    std::vector<std::wstring> CurrentUserFamily(const wchar_t* family, const std::wstring& sid)
+    std::vector<std::wstring> CurrentUserFamily(const wchar_t* family, const std::wstring& sid, const wchar_t* productName)
     {
         std::vector<std::wstring> result;
         for (DWORD index = 0; ; ++index)
@@ -175,7 +175,7 @@ namespace
             const UINT status = MsiEnumRelatedProductsW(family, 0, index, code);
             if (status == ERROR_NO_MORE_ITEMS) { break; }
             Check(status, "MsiEnumRelatedProducts");
-            const auto instances = CurrentUserInstances(code, sid);
+            const auto instances = CurrentUserInstances(code, sid, productName);
             if (instances.size() > 1) { throw std::runtime_error("Ambiguous new grate MSI contexts"); }
             if (!instances.empty())
             {
@@ -206,20 +206,34 @@ extern "C" __declspec(dllexport) UINT __stdcall DetectLegacyGrate(MSIHANDLE sess
         if (sid.empty() || sid == L"S-1-5-18" || sid != CallingUserSid()) { throw std::runtime_error("MSI UserSID does not match the calling user"); }
         const auto version = ParseVersion(Property(session, L"ProductVersion"));
         const auto family = Upper(Property(session, L"UpgradeCode"));
-        const wchar_t* other = family == GRATE_X64_UPGRADE_CODE ? GRATE_ARM64_UPGRADE_CODE : GRATE_X64_UPGRADE_CODE;
         if (family != GRATE_CURRENT_UPGRADE_CODE) { throw std::runtime_error("Unexpected grate upgrade family for this installer architecture"); }
-        if (!CurrentUserFamily(other, sid).empty()) { throw std::runtime_error("The other architecture of grate is already installed for this user; uninstall it before changing architecture"); }
-        const auto allowed = CurrentUserFamily(family.c_str(), sid);
+        if (Property(session, L"ProductName") != GRATE_CURRENT_PRODUCT_NAME ||
+            Property(session, L"GRATE_DISTRIBUTION") != GRATE_CURRENT_DISTRIBUTION)
+        {
+            throw std::runtime_error("Unexpected grate distribution identity for this installer");
+        }
+        // All variants own the same command and per-user installation directory.
+        // Check every other profile/architecture before the transaction changes
+        // files, PATH or registration. Only this exact family can major-upgrade.
+        for (const auto& other : GRATE_FAMILIES)
+        {
+            if (family != other.code && !CurrentUserFamily(other.code, sid, other.productName).empty())
+            {
+                throw std::runtime_error("Another distribution or architecture of grate is already installed for this user; uninstall it explicitly before switching");
+            }
+        }
+        const auto allowed = CurrentUserFamily(family.c_str(), sid, GRATE_CURRENT_PRODUCT_NAME);
         const auto candidateCode = Property(session, L"ProductCode");
         for (const auto& code : allowed)
         {
-            const auto instances = CurrentUserInstances(code.c_str(), sid);
+            const auto instances = CurrentUserInstances(code.c_str(), sid, GRATE_CURRENT_PRODUCT_NAME);
             for (const auto& instance : instances)
             {
                 RejectSameVersionProduct(code, instance.version, candidateCode, version);
             }
         }
         const auto legacy = CurrentUserInstances(GRATE_LEGACY_PRODUCT_CODE, sid);
+        if (!GRATE_ALLOW_LEGACY && !legacy.empty()) { throw std::runtime_error("Legacy grate is already installed; uninstall it explicitly before switching distribution"); }
         const bool migrate = AcceptLegacy(legacy, sid, version);
         if (migrate) { RejectSameVersionProduct(GRATE_LEGACY_PRODUCT_CODE, legacy.front().version, candidateCode, version); }
         // MajorUpgrade authors a Secure WIX_UPGRADE_DETECTED action property in

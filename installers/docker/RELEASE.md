@@ -31,7 +31,7 @@ canonical version with a conflicting digest before any GitHub asset upload.
 
 The read-only `release-ready` gate requires all packaging and policy prerequisites
 to succeed; it rejects failures, cancellations and unexpected skips. It validates
-the 13-file release asset contract and generates checksums/manifest. The separate
+the 78-file release asset contract and generates checksums/manifest. The separate
 application test job and normal required CI checks supply test evidence; the
 packaging gate does not claim to include those database tests.
 
@@ -42,6 +42,16 @@ job uses password-free login with username `gratedevs`, environment
 `docker-hub`, its `DOCKERHUB_OIDC_CONNECTIONID` variable and `id-token: write`.
 Its 3600-second credential outlives the bounded 45-minute publication job.
 Compatibility then copies the same immutable digest using the personal token.
+
+All five slim profiles have their own dual-architecture OCI build and retained
+verification report. `publish_slim_docker_archive.ps1` checks the profile,
+version, event SHA and archive digest again before canonical OIDC publication.
+It preflights immutable `sqlite-<version>`, `sqlserver-<version>`,
+`mariadb-<version>`, `postgresql-<version>` and `oracle-<version>` tags before
+the release gate. Stable releases also update their corresponding profile alias;
+prereleases update only the immutable tag. Prefixes keep these names distinct
+from valid All SemVer prereleases. Slim variants use only `gratedevs/grate`;
+the existing All compatibility-image contract remains unchanged.
 
 Version and stable-only `latest` policies come from `release_tags.ps1`, using the
 validated `is-prerelease` output for both release events and manual recovery.

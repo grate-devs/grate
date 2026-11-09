@@ -46,7 +46,7 @@ Guards such as `SupportsTransaction` and absent `Sql.SleepTwoSeconds` return ear
 in shared tests. These can produce green results without exercising the named
 behavior; record the capability gap, not just the test count.
 
-The five `CommandLine.*` and five `Docker.*` provider projects reuse source via
+The six `CommandLine.*` and five `Docker.*` provider projects reuse source via
 [CommandLine/IncludeTests.targets](../../unittests/CommandLine/IncludeTests.targets)
 and [Docker/IncludeTests.targets](../../unittests/Docker/IncludeTests.targets).
 `ProjectToIncludeTestsFrom` selects the provider. Imports include its migration
@@ -148,9 +148,19 @@ the Alpine/musl [Dockerfile](../../installers/docker/Dockerfile).
 net11 Linux x64 self-contained CLI tests against SQL Server 2017/2019/2022/2025,
 PostgreSQL 12–18, MariaDB 10.4/10.10/11/12/13 RC, SQLite, and Oracle Free/XE image
 variants. Read its exact image tags when selecting compatibility checks. These jobs
-use `continue-on-error: true`. The grate Docker-distribution step, external/cloud
+test both All and the matching slim CLI and propagate failures. The grate Docker-distribution step, external/cloud
 test environment, and wider OS/architecture integration jobs are disabled; commented
 matrix entries and successful artifact publication establish no runtime coverage.
+
+`ci.yml` additionally requires twelve All/slim CLI lanes, including
+`CommandLine.SqlServerCaseSensitive` for SQL Server's case-sensitive database
+contract. `scripts/ci/Invoke-DistributionTests.ps1` publishes the selected
+self-contained binary and installs its exact local NuGet tool, verifies provider
+dependencies (all four tool TFMs), then runs the complete matching CommandLine
+suite against both forms on net11.0. The existing library matrix still exercises
+the provider suites on all supported frameworks. CLI overrides retain their
+explicit skips for inaccessible in-process exception details; see the reports
+for exact execution and skip counts.
 
 For a handoff, record source/artifact identity, selected test layers and counts,
 TFM, host/RID, database version/image, CLI publish form or package/image identity,

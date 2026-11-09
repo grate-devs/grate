@@ -39,6 +39,7 @@
     <Project Path="unittests/CommandLine/CommandLine.PostgreSQL/CommandLine.PostgreSQL.csproj" />
     <Project Path="unittests/CommandLine/CommandLine.Sqlite/CommandLine.Sqlite.csproj" />
     <Project Path="unittests/CommandLine/CommandLine.SqlServer/CommandLine.SqlServer.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.SqlServerCaseSensitive/CommandLine.SqlServerCaseSensitive.csproj" />
   </Folder>
   <Folder Name="/Unit tests/Docker tests/">
     <Project Path="unittests/Docker/Docker.Common/Docker.Common.csproj" />

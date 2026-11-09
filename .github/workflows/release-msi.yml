@@ -1,0 +1,68 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · msi
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      core-version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: Build MSI (${{ matrix.distribution }}, ${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+        arch: [ "win-x64", "win-arm64" ]
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+    - name: Select MSI distribution identity
+      id: distribution
+      shell: pwsh
+      run: |
+        . ./scripts/release/distribution_profiles.ps1
+        $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+        "package-id=$($profile.PackageId)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+    - uses: actions/download-artifact@v8
+      with:
+        name: ${{ steps.distribution.outputs.package-id }}-${{ matrix.arch }}-self-contained-${{ inputs.version }}
+        path: ${{ matrix.arch }}/
+
+    - name: Test WinGet preparation and MSI identity contracts
+      shell: pwsh
+      run: |
+        ./installers/winget/tests/Test-CreateInstaller.Tests.ps1
+        ./installers/winget/tests/Test-InstallerCorrelation.Tests.ps1
+        ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
+        ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
+
+    - name: Create msi
+      run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ inputs.core-version }}" -ReleaseVersion "${{ inputs.version }}" -Distribution '${{ matrix.distribution }}' -arch ("${{ matrix.arch }}" -replace "win-", "")
+      env:
+        VERSION: ${{ inputs.core-version }}
+
+    - name: Prepare MSI release asset ${{ matrix.arch }}
+      shell: pwsh
+      run: |
+        $name = '${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ inputs.version }}.msi'
+        $source = './installers/msi/tmp/${{ steps.distribution.outputs.package-id }}-${{ inputs.core-version }}.msi'
+        Copy-Item -LiteralPath $source -Destination $name
+        ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath $name -ExpectedVersion "${{ inputs.core-version }}" -ExpectedReleaseVersion "${{ inputs.version }}" -Distribution '${{ matrix.distribution }}' -ExpectedArchitecture ("${{ matrix.arch }}" -replace "win-", "")
+
+    - name: Upload MSI release asset ${{ matrix.arch }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ inputs.version }}.msi
+        path: ${{ steps.distribution.outputs.package-id }}-msi-${{ matrix.arch }}-${{ inputs.version }}.msi
+        if-no-files-found: error

@@ -5,6 +5,31 @@ Historical `erikbra.grate` manifests remain unchanged. Public availability requi
 a corrected stable release and separate acceptance into `microsoft/winget-pkgs`;
 check that acceptance before using the public-source commands below.
 
+## Database-specific candidates
+
+The build in this checkout prepares independent candidates for six IDs:
+`grate-devs.grate`, `grate-devs.grate.SQLite`, `grate-devs.grate.SQLServer`,
+`grate-devs.grate.MariaDB`, `grate-devs.grate.PostgreSQL` and
+`grate-devs.grate.Oracle`. Each candidate contains that profile's three portable
+Windows ZIPs and two x64/ARM64 MSIs. Generation verifies the five release digests
+and uses the inspected MSI ProductCodes and profile/architecture UpgradeCodes.
+Preparation and schema validation retain local review artifacts; neither submits
+or activates these IDs in the public source.
+
+For example, after the matching stable assets have been published:
+
+```powershell
+./installers/winget/Create-Installer.ps1 -version <stable-version> -Distribution SQLite -outputDirectory <fresh-candidate-directory>
+```
+
+All retains its existing `-PrepareMigration` opt-in and legacy behavior. The
+legacy-to-new-ID transition below applies to All. Slim profiles have separate MSI
+families. Their native installer refuses an installed different profile or
+architecture before changing the shared `grate.exe` or user PATH. Explicitly
+uninstall the existing profile before switching; a profile switch is not an
+automatic major upgrade. Acceptance and client correlation for each new public
+ID require their own evidence.
+
 ## Supported transition
 
 For an existing MSI, install directly through the new ID. The corrected MSI
@@ -154,16 +179,23 @@ same client limitation. Portable ZIP commands can still select user scope.
 
 ## Preparation and CI
 
-`Create-Installer.ps1` requires a published stable three-part release and its
-actual five uploaded assets: three Windows self-contained ZIPs (x86/x64/ARM64)
-and two MSIs (x64/ARM64). Drafts, prereleases, missing assets, unexpected URLs and
-MSI digest mismatches are rejected. It never submits or overwrites output.
+`Create-Installer.ps1` requires a published stable three-part release and the
+selected distribution's five uploaded assets: three Windows self-contained ZIPs
+(x86/x64/ARM64) and two MSIs (x64/ARM64). Drafts, prereleases, missing assets,
+unexpected URLs and digest mismatches in any of the five assets are rejected.
+It never submits or overwrites output. Release CI runs six independent candidate
+lanes for the six IDs listed above; each validates and retains its own files.
 
-The default mode inspects actual MSI metadata and permits only the historical
-old identity. Corrected or unrecognized identities require `-PrepareMigration`;
+The default All mode inspects actual MSI metadata and permits only the historical
+old identity. Corrected or unrecognized All identities require `-PrepareMigration`;
 otherwise new family codes could permanently pollute old historical manifests.
-Migration mode verifies the corrected MSI identity, per-user properties, version,
-architecture, digest and stable family, then emits only `grate-devs.grate`.
+Migration mode verifies the corrected All MSI identity, per-user properties,
+version, architecture, digest and stable family, then emits `grate-devs.grate`.
+Selecting a slim `-Distribution` always prepares its corresponding new ID, using
+that profile's MSI identities and ZIPs. The historical old-ID path is specific to
+All. Slim preparation does not establish public-source acceptance or client
+correlation, and the All lifecycle evidence below does not establish those
+properties for the five new profile IDs.
 
 ```powershell
 # Historical published release; old-ID preparation only:
@@ -172,8 +204,8 @@ architecture, digest and stable family, then emits only `grate-devs.grate`.
 ./installers/winget/Create-Installer.ps1 -version VERSION -PrepareMigration -outputDirectory ./candidate
 ```
 
-The opt-in Windows lifecycle workflow builds test-only 2.1.7/2.1.8 artifacts from
-source. It pins WinGet 1.29.380, preserves candidate run/source/script provenance
+The opt-in Windows lifecycle workflow builds test-only All 2.1.7/2.1.8 artifacts
+from source. It pins WinGet 1.29.380, preserves candidate run/source/script provenance
 and supports isolated HTTPS REST and preindexed SQLite sources.
 Candidates may be reused without rebuilding the MSI when only test scripts change.
 The REST source returns every matching strong identity. It advertises normalized

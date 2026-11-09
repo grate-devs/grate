@@ -2,14 +2,23 @@
 
 `Create-Package.ps1` packages an already published Linux executable. It copies
 the payload into `/usr/bin`, adds the Debian metadata, manual and documentation,
-then builds the package with `fakeroot dpkg-deb`. Run it on Linux with PowerShell,
-`dpkg`, `fakeroot`, `gzip` and the usual Unix file utilities installed.
+then builds the package with `dpkg-deb --root-owner-group`. Run it on Linux with
+PowerShell, `dpkg-deb` with `--root-owner-group` support, `gzip` and the usual Unix
+file utilities installed.
 
 From the repository root, pass the executable, Grate version and Debian
 architecture (`amd64` or `arm64`) to `Create-Package.ps1` using `-grateExe`,
-`-version` and `-arch`. The script recreates `debian/` and writes
-`grate_<version>-1_<arch>.deb` beside itself. The release workflow gives the
-uploaded asset its public filename.
+`-version` and `-arch`. The script uses a temporary staging directory and writes
+`grate_<version>-1_<arch>.deb` beside itself by default. Pass `-OutputDirectory`
+to select another destination. The release workflow gives the uploaded asset its
+public filename.
+
+`-Distribution` accepts `All` (the default), `SQLite`, `SQLServer`, `MariaDB`,
+`PostgreSQL` and `Oracle`. The slim packages use the names `grate-sqlite`,
+`grate-sqlserver`, `grate-mariadb`, `grate-postgresql` and `grate-oracle`.
+Each installs `/usr/bin/grate` and conflicts with the other
+variants because they share that command path. Select the matching executable
+when building a package.
 
 | File or folder | Purpose |
 | --- | --- |

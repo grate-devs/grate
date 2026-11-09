@@ -50,3 +50,95 @@ foreach ($release in @('2.2.1-rc.1','2.2.0-01','2.2.0-rc..1','2.2.0+sha','2.2.0-
     if (!$rejected) { throw "Invalid or mismatched release identity accepted: $release" }
 }
 Write-Host 'PASS: six independent full-version ProductCodes, unchanged stable identities/families and six invalid release identities.'
+
+. (Join-Path $PSScriptRoot '../helpers/InstallerPayloadPolicy.ps1')
+$profiles = @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')
+$families = @()
+$products = @()
+foreach ($profile in $profiles) {
+    foreach ($architecture in @('x64', 'arm64')) {
+        $identity = & $helper -Version '2.1.7' -Architecture $architecture -Distribution $profile
+        $next = & $helper -Version '2.1.8' -Architecture $architecture -Distribution $profile
+        $rc = & $helper -Version '2.1.7' -ReleaseVersion '2.1.7-rc.1' -Architecture $architecture -Distribution $profile
+        $caseVariant = & $helper -Version '2.1.7' -Architecture $architecture.ToUpperInvariant() -Distribution $profile.ToLowerInvariant()
+        if ($next.UpgradeCode -cne $identity.UpgradeCode -or $next.ProductCode -ceq $identity.ProductCode -or
+            $rc.UpgradeCode -cne $identity.UpgradeCode -or $rc.ProductCode -ceq $identity.ProductCode -or
+            $caseVariant.ProductCode -cne $identity.ProductCode -or $caseVariant.Distribution -cne $profile) {
+            throw "Unstable MSI profile identity: $profile $architecture."
+        }
+        $families += $identity.UpgradeCode
+        $products += @($identity.ProductCode, $next.ProductCode, $rc.ProductCode)
+        $payloadName = if ($profile -eq 'All') {
+            'grate database migration'
+        } else {
+            "grate ($profile)"
+        }
+        Assert-MsiPayloadIdentity -ProductVersion '2.1.7+commit' -ProductName $payloadName -Identity $identity
+        foreach ($wrongProfile in @($profiles | Where-Object { $_ -cne $profile })) {
+            $wrongName = if ($wrongProfile -eq 'All') {
+                'grate database migration'
+            } else {
+                "grate ($wrongProfile)"
+            }
+            $rejected = $false
+            try {
+                Assert-MsiPayloadIdentity -ProductVersion '2.1.7' -ProductName $wrongName -Identity $identity
+            } catch {
+                $rejected = $_.Exception.Message -like 'The executable ProductName must match*'
+            }
+            if (!$rejected) {
+                throw "MSI accepted the $wrongProfile payload as $profile."
+            }
+        }
+        foreach ($wrongVersion in @('', '2.1.8', '2.1.7-rc.1')) {
+            $rejected = $false
+            try {
+                Assert-MsiPayloadIdentity -ProductVersion $wrongVersion -ProductName $payloadName -Identity $identity
+            } catch {
+                $rejected = $_.Exception.Message -like 'The executable ProductVersion must match*'
+            }
+            if (!$rejected) {
+                throw 'MSI accepted a missing or mismatched payload release.'
+            }
+        }
+        $header = & (Join-Path $PSScriptRoot '../native/Get-UpgradeActionContract.ps1') -Architecture $architecture -Distribution $profile
+        if ([regex]::Matches($header, '\{ L"\{').Count -ne 12 -or
+            !$header.Contains("#define GRATE_CURRENT_UPGRADE_CODE L`"$($identity.UpgradeCode)`"") -or
+            !$header.Contains("{ L`"$($identity.UpgradeCode)`", L`"$($identity.ProductName)`" }")) {
+            throw 'The native guard must know every profile/architecture and its own upgrade family.'
+        }
+        $expectedLegacy = if ($profile -eq 'All') {
+            'true'
+        } else {
+            'false'
+        }
+        if (!$header.Contains("#define GRATE_ALLOW_LEGACY $expectedLegacy")) {
+            throw 'Only All can migrate a legacy All MSI.'
+        }
+    }
+}
+if (@($families | Select-Object -Unique).Count -ne 12 -or @($products | Select-Object -Unique).Count -ne 36) {
+    throw 'MSI distribution, architecture and full release identities must never alias.'
+}
+$all = & $helper -Version '2.1.7' -Architecture x64
+if ($all.PackageId -cne 'grate' -or $all.ProductName -cne 'grate' -or
+    $all.RegistryKey -cne 'Software\Microsoft\erikbra\grate' -or
+    $all.ExecutableComponent -cne 'C544280E-4F9B-443D-BE6D-4A82CFEE3723' -or
+    $all.PathComponent -cne 'E7507A5D-D78E-4082-BD75-986A11F54E68') {
+    throw 'The published All MSI component and registry identity changed.'
+}
+$sqlite = & $helper -Version '2.1.7' -Architecture x64 -Distribution SQLite
+if ($sqlite.ProductCode -cne '{52F93309-A095-510F-9162-6F6E06189720}' -or
+    $sqlite.UpgradeCode -cne '{74ADAB62-09B5-512B-AE0B-F576DE8C56FE}') {
+    throw 'The stable SQLite MSI UUIDv5 identity contract changed.'
+}
+$rejected = $false
+try {
+    & $helper -Version '2.1.7' -Architecture x64 -Distribution Unknown | Out-Null
+} catch {
+    $rejected = $_.Exception.Message -like '*ValidateSet*' -or $_.Exception.Message -like '*does not belong to the set*'
+}
+if (!$rejected) {
+    throw 'An unknown MSI distribution was accepted.'
+}
+Write-Host 'PASS: 12 stable profile/architecture families, 36 full-release products, native conflict inventory, 60 wrong-profile and 36 wrong-release payload rejections; All identity preserved.'

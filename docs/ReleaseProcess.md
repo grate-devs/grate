@@ -80,9 +80,9 @@ the release tag supplies the package version.
 | NuGet tool and six libraries | Publish exact version | Publish exact version including suffix |
 | Docker `gratedevs/grate` | Version tag and `latest` | Version tag only |
 | Docker compatibility `erikbra/grate` | Same version digest and `latest` | Same version digest only |
-| WinGet | Prepare a new-ID candidate for separate submission | Skip |
-| Homebrew `erikbra/cask/grate` | Update existing cask | Skip |
-| Chocolatey | Separate manual packaging/submission | No automatic publication |
+| WinGet | Prepare six identity candidates for separate submission | Skip |
+| Homebrew `erikbra/cask` | Update six casks; retain six source-formula candidates | Skip |
+| Chocolatey | Retain six x64 package candidates; separate submission | Retain candidates; no automatic publication |
 
 GitHub is `grate-devs/grate`; the Docker organization is **`gratedevs`** without a
 hyphen. A repository move does not rename packages in other registries.
@@ -177,14 +177,15 @@ gh run watch "$RUN_ID" --repo grate-devs/grate --exit-status
 | --- | --- |
 | Resolve release context | Correct tag, source SHA, version and prerelease setting |
 | Build and validate | CLI archives, MSI, Debian, NuGet and Docker OCI archive succeed |
-| Release contract ready | Every required packaging/policy job succeeds; all 13 payload files exist |
+| Release contract ready | Every required packaging/policy job succeeds; all 78 payload files exist |
 | GitHub and NuGet publication | Files attached to the release; exact NuGet versions published in a separate job |
-| Docker, Homebrew and WinGet handoff | Docker digest promotion/copy; stable cask update; stable WinGet candidate retained |
+| Docker, Homebrew and WinGet handoff | Six Docker digest promotions; six stable cask updates; six formula and WinGet candidates retained |
 
-Docker is built once per run into an amd64/arm64 OCI archive and verified before
-publication. Its publication job promotes that retained archive, then copies the
-same digest to the compatibility repository. It does not rebuild the image in
-the publishing job or promote an archive from an earlier PR run.
+Each Docker profile is built once per run into an amd64/arm64 OCI archive and
+verified before publication. Publication promotes that profile's retained
+archive, bound to its version, source and digest. All also copies its digest to
+the compatibility repository. Publishing does not rebuild an image or promote
+an archive from an earlier PR run.
 
 The application-test job is intentionally skipped in a release or publishing
 recovery run. Use the separate test evidence collected before publication.
@@ -202,7 +203,7 @@ upload. Do not announce that every channel is updated until it is observable.
 
 ### GitHub files and checksums
 
-Expect **15 uploaded files**: nine CLI ZIPs, two MSIs, two Debian packages,
+Expect **80 uploaded files**: 54 CLI ZIPs, twelve MSIs, twelve Debian packages,
 `checksums.sha256` and `release-manifest.json`. GitHub's automatically generated
 source ZIP/tarball are additional downloads, outside this count.
 
@@ -220,15 +221,17 @@ gh release download "$RELEASE_TAG" --repo grate-devs/grate --dir "$RELEASE_DIR"
 (cd "$RELEASE_DIR" && shasum -a 256 --check checksums.sha256)
 ```
 
-Use a fresh directory for each inspection. All 13 payload files should report
+Use a fresh directory for each inspection. All 78 payload files should report
 `OK`. Check the manifest's `version`, `tag` and asset names/sizes as well. On
 Windows, use `Get-FileHash -Algorithm SHA256` to compare downloaded files with
 the checksum list or manifest. Matching filenames alone are not verification.
 
 ### NuGet and native package smoke checks
 
-Check the exact version on NuGet for `grate`, `grate.core`, `grate.mariadb`,
-`grate.oracle`, `grate.postgresql`, `grate.sqlite` and `grate.sqlserver`.
+Check the exact version on NuGet for the six tools (`grate`, `grate-sqlite`,
+`grate-sqlserver`, `grate-mariadb`, `grate-postgresql`, `grate-oracle`) and the
+six libraries (`grate.core`, `grate.mariadb`, `grate.oracle`, `grate.postgresql`,
+`grate.sqlite`, `grate.sqlserver`).
 The tool can be installed into a fresh local path to avoid replacing your normal
 installation:
 
@@ -284,21 +287,27 @@ on the architectures being claimed.
 ### WinGet, Homebrew and Chocolatey
 
 - **WinGet:** for a stable release, download the
-  `winget-migration-candidate-VERSION` Actions artifact. It contains proposed
-  `grate-devs.grate` manifests, schema results and provenance. Review/install-test
+  `winget-migration-candidate-VERSION` and five `winget-PROFILE-candidate-VERSION`
+  Actions artifacts. They contain `grate-devs.grate` and
+  `grate-devs.grate.{SQLite,SQLServer,MariaDB,PostgreSQL,Oracle}` candidates,
+  schema results and provenance. Review/install-test
   those final files before a separate submission to `microsoft/winget-pkgs`.
   A generated candidate is not an accepted/public package. After acceptance,
   verify the new ID through the public `winget` source. Follow the
   [MSI and portable transition instructions](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md);
   keep public installation commands on the accepted identity until then.
-- **Homebrew:** confirm `erikbra/homebrew-cask` contains the new version, both
-  architecture hashes and canonical GitHub download URLs. The workflow checks
+- **Homebrew:** confirm `erikbra/homebrew-cask` contains all six profile casks with
+  the new version, both architecture hashes and canonical GitHub download URLs. The workflow checks
   Ruby syntax; it does not prove native installation. Install/smoke-test the
-  cask on available macOS architectures. Formula/core preparation is separate;
-  check that work's acceptance before announcing `brew install grate`.
-- **Chocolatey:** the workflow has no publication job. If it is in scope for
-  this release, follow the [manual package recipe](Packaging.md#package-manager-updates-after-a-release)
-  and verify the submitted package separately.
+  casks on available macOS architectures. The `homebrew-candidates-VERSION`
+  artifact retains six casks and six source formulas. Formula source-tag lookup
+  must match the release commit before and after downloading the archive.
+  Formula/core submission is separate; check acceptance before announcing
+  public formula installation. Uninstall an existing variant before switching.
+- **Chocolatey:** download all six `chocolatey-PACKAGEID-VERSION` artifacts.
+  The workflow packages candidates but has no feed publication job. Follow the
+  [package recipe](Packaging.md#package-manager-updates-after-a-release),
+  install-test the final `.nupkg` files and verify submitted packages separately.
 
 ## 6. Recover a failed or partial release
 
