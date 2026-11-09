@@ -559,7 +559,7 @@ jobs:
           # Bound COM calls and inherited output handles as well as child processes.
           ./installers/msi/tests/support/Invoke-MsiLifecycle.ps1 `
             -ScriptPath ./installers/msi/Test-InstallerLifecycle.ps1 `
-            -Parameters $parameters -TimeoutSeconds 600
+            -Parameters $parameters -TimeoutSeconds 360
       - name: Build Debian packages from verified Linux binary
         if: matrix.distribution == 'All' && (matrix.rid == 'linux-x64' || matrix.rid == 'linux-arm64')
         shell: pwsh

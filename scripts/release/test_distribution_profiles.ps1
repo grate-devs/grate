@@ -58,6 +58,25 @@ try {
         }
     }
 
+    Invoke-Test 'Windows MSI workflow timeout binds to the supervisor contract' {
+        $workflow = Read-Workflow 'ci.yml'
+        $step = $workflow.jobs.standalone.steps | Where-Object name -CEQ 'Verify installed MSI, major upgrade and uninstall'
+        $timeouts = [regex]::Matches($step.run, '-TimeoutSeconds\s+(\d+)')
+        Assert-Equal 1 $timeouts.Count 'The MSI lifecycle step must specify its bounded timeout.'
+        $supervisor = Get-Command "$repositoryRoot/installers/msi/tests/support/Invoke-MsiLifecycle.ps1"
+        # Execute only the real parameter declaration, before any Windows/installer
+        # side effects. This catches caller/validator drift on every preflight host.
+        $bindParameters = [scriptblock]::Create($supervisor.ScriptBlock.Ast.ParamBlock.Extent.Text + "`n'accepted'")
+        $parameters = @{
+            Parameters = @{}
+            ScriptPath = 'binding-only.ps1'
+            TimeoutSeconds = [int]$timeouts[0].Groups[1].Value
+        }
+        Assert-Equal 'accepted' (& $bindParameters @parameters)
+        $parameters.TimeoutSeconds = 600
+        Assert-Throws { & $bindParameters @parameters } '*TimeoutSeconds*'
+    }
+
     Invoke-Test 'release inventory contains 54 ZIPs, twelve Debian packages and twelve profile MSIs' {
         $assets = @(Get-GrateReleaseAssets -Version '2.3.4-rc.1')
         Assert-Equal 78 $assets.Count
