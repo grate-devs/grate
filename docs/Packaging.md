@@ -13,8 +13,13 @@ package generation. Publication identities are covered in
 
 The stable SDK is pinned in `global.json` to `11.0.100`. Library and
 .NET tool packages retain `net8.0`, `net9.0` and `net10.0` assets and add `net11.0`.
-Self-contained binaries and Docker images built from this checkout bundle stable
-runtime `11.0.0`. Rebuild all self-contained distributions when updating the SDK,
+Self-contained binaries built from this checkout bundle stable runtime `11.0.0`,
+including standalone Linux/musl outputs. Docker images temporarily retain SDK
+`11.0.100-rc.3.26522.148`, runtime `11.0.0-rc.3.26522.148` and their pinned Alpine
+3.24 base images until the matching GA images are available.
+`installers/docker/global.json` selects the Docker-only SDK exception; the root
+`global.json` and runtime pin continue to select GA elsewhere.
+Rebuild all self-contained distributions when updating the SDK,
 bundled runtime or Docker base images; existing release artifacts retain the
 runtime they were built with.
 
@@ -205,7 +210,11 @@ then make `brew install grate` the normal Homebrew instruction.
 
 ## Moving to .NET 11 GA
 
-The source now selects stable .NET 11. For subsequent servicing, update the SDK
+The source selects stable .NET 11 outside the temporary Docker exception above.
+Once the GA Alpine images are available, replace the Docker SDK selection,
+runtime argument and both base-image tags/digests together, then rebuild and
+verify all six profiles on amd64 and Arm64 before retiring the exception.
+For subsequent servicing, update the SDK
 in `global.json`, the bundled runtime version used by publishing,
 and both Docker base-image tags/digests together. Rebuild every self-contained
 binary, installer and Docker image, then regenerate package-manager references

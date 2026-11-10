@@ -1,7 +1,7 @@
 # C# formatting
 
-Use the SDK selected by the repository's `global.json` (including the prerelease
-SDK when pinned). From the repository root, check changed C# files with:
+Use the stable .NET 11 SDK selected by the repository's `global.json`.
+From the repository root, check changed C# files with:
 
 ```powershell
 pwsh -NoProfile -File scripts/format/Check-ChangedCSharp.ps1

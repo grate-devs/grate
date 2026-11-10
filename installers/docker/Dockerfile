@@ -7,7 +7,10 @@ ARG RUNTIME
 ARG VERSION=1.0.0
 ARG GRATE_DISTRIBUTION=All
 WORKDIR /app
-COPY global.json NuGet.Config *.props ./
+# Temporary Alpine exception: keep the RC3 SDK/runtime until the stable
+# Alpine 3.24 images are available. Other distributions use the root GA pins.
+COPY installers/docker/global.json ./global.json
+COPY NuGet.Config *.props ./
 COPY *.ruleset ./
 COPY src/ ./src/
 COPY docs/skills/use-grate/ ./docs/skills/use-grate/

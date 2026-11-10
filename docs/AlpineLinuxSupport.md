@@ -21,7 +21,8 @@ docker pull erikbra/grate:latest
 ```
 
 The Docker image:
-- Builds from the stable .NET 11 runtime-deps image on Alpine 3.24
+- Temporarily retains the pinned .NET 11 RC3 SDK/runtime on Alpine 3.24 until the
+  stable base images are available; standalone Linux/musl binaries use .NET 11 GA
 - Includes the .NET native dependencies and icu-libs for globalization
 - Supports multiple architectures (amd64, arm64)
 - Is published to Docker Hub on every release

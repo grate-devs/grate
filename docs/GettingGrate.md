@@ -68,8 +68,10 @@ to a supported runtime. The current packages retain both targets.
 
 ## Runtime and platform requirements
 
-Self-contained CLI archives, MSI and Debian packages, Chocolatey packages,
-and Docker images built from this checkout bundle stable .NET runtime `11.0.0`.
+Self-contained CLI archives, MSI and Debian packages and Chocolatey packages
+built from this checkout bundle stable .NET runtime `11.0.0`, including standalone
+Linux/musl binaries. Docker images temporarily retain .NET runtime
+`11.0.0-rc.3.26522.148` until the stable Alpine 3.24 base images are available.
 These distributions need no separately installed .NET runtime; native OS dependencies still apply.
 The Docker images use Alpine 3.24 and include the .NET native dependencies and ICU
 for globalization.
@@ -81,8 +83,9 @@ the existing personal Homebrew tap is still at 1.8.0, as described below.
 The proposed [Homebrew/core formula](#homebrew) instead builds from source and
 uses Homebrew's shared .NET installation. Homebrew installs that dependency automatically.
 
-Older grate distributions can still bundle a prerelease runtime. Move to a
-distribution rebuilt with stable .NET 11; installing a newer runtime on the host
+Older grate distributions and the temporary Docker exception can still bundle a
+prerelease runtime. Move to a distribution rebuilt with stable .NET 11;
+installing a newer runtime on the host
 does not update self-contained grate. Future runtime servicing likewise requires
 rebuilding and reinstalling these distributions.
 
