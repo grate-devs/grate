@@ -21,8 +21,10 @@ GA SDK and runtime-deps images on Alpine 3.24. Update the SDK/runtime pins and
 both image tags/digests together for servicing releases; rebuild all self-contained outputs
 to pick up runtime security fixes. Existing .NET 8/9/10 runtime minimum checks
 and the patched native SQLite dependency remain in effect.
-Self-contained distributions use the selected SDK's latest runtime patch and reject versions below
+Self-contained .NET 8/9/10 distributions use the selected SDK's latest runtime patch and reject versions below
 8.0.33 / 9.0.22 / 10.0.14. These are security minimums, not exact runtime pins.
+Self-contained .NET 11 distributions use the exact `RuntimeFrameworkVersion` in
+`Directory.Build.props`, currently `11.0.0`; update that pin when servicing the runtime.
 Pull fresh base images when rebuilding Docker (`docker buildx build --pull ...`), record the resulting
 image digests, and verify the embedded runtime and native SQLite versions before releasing.
 The Docker final stage supplies Alpine and ICU; the .NET runtime is embedded by `dotnet publish` in the build stage.
