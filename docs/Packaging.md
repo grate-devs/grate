@@ -32,6 +32,7 @@ The Build and Publish workflow produces the existing distribution formats:
 | NuGet libraries and symbols | `grate.core`, `grate.mariadb`, `grate.oracle`, `grate.postgresql`, `grate.sqlite`, `grate.sqlserver` |
 | .NET tools | All six profiles with .NET 8/9/10/11 assets |
 | Self-contained ZIPs | `win-x86`, `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`, `linux-musl-arm64`, `osx-x64`, `osx-arm64` |
+| Optional NativeAOT ZIPs | All six profiles on the same nine platforms, using `-nativeaot-` in the filename |
 | MSI | Windows x64 and Arm64, built from the corresponding self-contained binaries |
 | Debian | Linux amd64 and Arm64, built from the corresponding self-contained binaries |
 | Docker | Linux amd64 and Arm64 on Alpine 3.24, including ICU |
@@ -45,6 +46,11 @@ profiles; see [distribution identities](distributions.md). All variants expose
 `grate`; uninstall the existing package before switching profiles.
 The generated [distribution catalog](distribution-catalog.md) lists every
 platform/package permutation with release filenames and build-result links.
+
+NativeAOT is an additional archive option in this checkout. NuGet libraries and
+tools and the existing installer/package-manager channels retain their normal
+builds. The [NativeAOT build instructions](distributions.md#optional-nativeaot-archives)
+cover native toolchains, full trimming, Dapper.AOT and complete ZIP extraction.
 
 Debian package metadata maps a SemVer prerelease such as `2.2.0-rc.1` to
 `2.2.0~rc.1-1`, so Debian orders it before the final `2.2.0-1` package.
@@ -67,6 +73,13 @@ in the PR/release verification record.
 
 The existing native packaging jobs also exercise the distribution boundaries:
 
+- **NativeAOT ZIPs, every profile/platform:** verify the pinned native compiler and
+  runtime pack, selected provider dependencies, complete payload and ZIP hashes,
+  then execute the extracted CLI and bundled skill. All/SQLite also migrate and
+  rerun SQLite on each native host. Separate database jobs run the existing
+  command-line suites against the same run's Linux x64 NativeAOT release ZIPs
+  for All and each provider, including case-sensitive SQL Server. These checks
+  gate the release contract; they keep the test runner itself as a normal build.
 - **MSI, every profile on Windows x64 and Arm64:** install the candidate MSI per user,
   check payload identity, provider selection, rejection and bundled skills,
   then apply an explicit Windows

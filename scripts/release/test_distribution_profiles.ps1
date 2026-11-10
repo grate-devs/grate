@@ -77,11 +77,12 @@ try {
         Assert-Throws { & $bindParameters @parameters } '*TimeoutSeconds*'
     }
 
-    Invoke-Test 'release inventory contains 54 ZIPs, twelve Debian packages and twelve profile MSIs' {
+    Invoke-Test 'release inventory preserves 78 ordinary files and adds 54 NativeAOT ZIPs' {
         $assets = @(Get-GrateReleaseAssets -Version '2.3.4-rc.1')
-        Assert-Equal 78 $assets.Count
-        Assert-Equal 78 @($assets | Select-Object -Unique).Count
-        Assert-Equal 54 @($assets | Where-Object { $_.EndsWith('.zip') }).Count
+        Assert-Equal 132 $assets.Count
+        Assert-Equal 132 @($assets | Select-Object -Unique).Count
+        Assert-Equal 108 @($assets | Where-Object { $_.EndsWith('.zip') }).Count
+        Assert-Equal 54 @($assets | Where-Object { $_.Contains('-nativeaot-') }).Count
         Assert-Equal 12 @($assets | Where-Object { $_.EndsWith('.deb') }).Count
         $msis = @($assets | Where-Object { $_.EndsWith('.msi') })
         Assert-Equal 12 $msis.Count
@@ -91,6 +92,7 @@ try {
             }
             foreach ($rid in $rids) {
                 Assert-True ($assets -ccontains "$id-$rid-self-contained-2.3.4-rc.1.zip")
+                Assert-True ($assets -ccontains "$id-$rid-nativeaot-2.3.4-rc.1.zip")
             }
         }
     }
@@ -151,7 +153,7 @@ try {
         Remove-Item -LiteralPath "$assetsRoot/unexpected.zip"
         Write-GrateReleaseManifest -Directory $assetsRoot -Version '2.3.4' -Tag '2.3.4' -Repository 'grate-devs/grate'
         $manifest = Get-Content -LiteralPath "$assetsRoot/release-manifest.json" -Raw | ConvertFrom-Json
-        Assert-Equal 78 $manifest.assets.Count
+        Assert-Equal 132 $manifest.assets.Count
         Assert-Equal 'grate-devs/grate' $manifest.repository
         Assert-Equal '2.3.4' $manifest.version
         $fixtureDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes('fixture'))).ToLowerInvariant()
@@ -159,7 +161,7 @@ try {
             Assert-Equal 7 $asset.size
             Assert-Equal $fixtureDigest $asset.sha256
         }
-        Assert-Equal 78 @(Get-Content -LiteralPath "$assetsRoot/checksums.sha256").Count
+        Assert-Equal 132 @(Get-Content -LiteralPath "$assetsRoot/checksums.sha256").Count
         Remove-Item -LiteralPath "$assetsRoot/checksums.sha256", "$assetsRoot/release-manifest.json"
         Write-GrateReleaseManifest -Directory $assetsRoot -Version '2.3.4' -Tag $null -Repository 'grate-devs/grate'
         $dryRun = Get-Content -LiteralPath "$assetsRoot/release-manifest.json" -Raw | ConvertFrom-Json

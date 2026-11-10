@@ -7,6 +7,8 @@ $expectedRoutes = @{
     'build-nuget-package' = 'release-libraries.yml'
     'build-standalone' = 'release-cli.yml'
     'build-standalone-mac-arm64' = 'release-cli.yml'
+    'build-native-aot' = 'release-native-aot.yml'
+    'test-native-aot' = 'release-native-aot-tests.yml'
     'build-msi' = 'release-msi.yml'
     'build-deb' = 'release-debian.yml'
     'build-chocolatey' = 'release-chocolatey.yml'
@@ -24,6 +26,8 @@ $expectedInputNames = @{
     'release-tools.yml' = @('version')
     'release-libraries.yml' = @('version', 'core-version')
     'release-cli.yml' = @('version', 'publish', 'runner', 'runtime-identifiers', 'native-arm-sdk')
+    'release-native-aot.yml' = @('version')
+    'release-native-aot-tests.yml' = @('version')
     'release-msi.yml' = @('version', 'core-version')
     'release-debian.yml' = @('version')
     'release-chocolatey.yml' = @('version', 'release-tag')
@@ -197,7 +201,7 @@ function Assert-ReleaseCallContracts {
 
     $required = @(
         'set-version-number', 'validate-release-policy', 'build-netcore-tool', 'build-nuget-package',
-        'build-standalone', 'build-standalone-mac-arm64', 'build-msi', 'build-docker-image',
+        'build-standalone', 'build-standalone-mac-arm64', 'build-native-aot', 'test-native-aot', 'build-msi', 'build-docker-image',
         'build-slim-docker-images', 'build-chocolatey', 'build-deb'
     )
     $ready = $Workflow.jobs['release-ready']

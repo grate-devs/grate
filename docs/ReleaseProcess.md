@@ -176,8 +176,8 @@ gh run watch "$RUN_ID" --repo grate-devs/grate --exit-status
 | Stage | What to look for |
 | --- | --- |
 | Resolve release context | Correct tag, source SHA, version and prerelease setting |
-| Build and validate | CLI archives, MSI, Debian, NuGet and Docker OCI archive succeed |
-| Release contract ready | Every required packaging/policy job succeeds; all 78 payload files exist |
+| Build and validate | Ordinary and NativeAOT CLI archives, MSI, Debian, NuGet and Docker OCI archive succeed; NativeAOT archive database suites pass |
+| Release contract ready | Every required packaging/policy job succeeds; all 132 payload files exist |
 | GitHub and NuGet publication | Files attached to the release; exact NuGet versions published in a separate job |
 | Docker, Homebrew and WinGet handoff | Six Docker digest promotions; six stable cask updates; six formula and WinGet candidates retained |
 
@@ -189,7 +189,9 @@ an archive from an earlier PR run.
 
 The application-test job is intentionally skipped in a release or publishing
 recovery run. Use the separate test evidence collected before publication.
-A green release run is packaging/publication evidence, not a fresh database test.
+A green release run includes fresh database command-line tests of the Linux x64
+NativeAOT release archives. Other application/library test evidence still comes
+from the separate test runs collected before publication.
 
 The destinations progress independently. One failed channel does not mean that
 nothing was published elsewhere. If any job fails, record the successful and
@@ -203,7 +205,8 @@ upload. Do not announce that every channel is updated until it is observable.
 
 ### GitHub files and checksums
 
-Expect **80 uploaded files**: 54 CLI ZIPs, twelve MSIs, twelve Debian packages,
+Expect **134 uploaded files**: 54 ordinary CLI ZIPs, 54 optional NativeAOT ZIPs,
+twelve MSIs, twelve Debian packages,
 `checksums.sha256` and `release-manifest.json`. GitHub's automatically generated
 source ZIP/tarball are additional downloads, outside this count.
 
@@ -221,7 +224,7 @@ gh release download "$RELEASE_TAG" --repo grate-devs/grate --dir "$RELEASE_DIR"
 (cd "$RELEASE_DIR" && shasum -a 256 --check checksums.sha256)
 ```
 
-Use a fresh directory for each inspection. All 78 payload files should report
+Use a fresh directory for each inspection. All 132 payload files should report
 `OK`. Check the manifest's `version`, `tag` and asset names/sizes as well. On
 Windows, use `Get-FileHash -Algorithm SHA256` to compare downloaded files with
 the checksum list or manifest. Matching filenames alone are not verification.
@@ -240,7 +243,8 @@ dotnet tool install grate --version "$RELEASE_TAG" --tool-path "$RELEASE_DIR/too
 "$RELEASE_DIR/tool/grate" --help
 ```
 
-Also extract the relevant self-contained ZIP and exercise that executable on its
+Also extract the relevant self-contained and optional NativeAOT ZIPs into separate
+directories and exercise each executable on its
 native platform. Follow [Getting started](GettingStarted.md) with a disposable
 database, then repeat the migration to check its one-time behavior. Check the
 bundled skill with `grate skills install --local --path <temporary-directory>`.

@@ -19,6 +19,7 @@ on:
       - "scripts/release/**"
       - "scripts/verify-packages.ps1"
       - "scripts/ci/Distribution.Common.ps1"
+      - "scripts/ci/Invoke-DistributionTests.ps1"
       - "installers/**"
       - "src/**"
   release:
@@ -212,6 +213,20 @@ jobs:
       runtime-identifiers: '["osx-arm64"]'
       native-arm-sdk: true
 
+  build-native-aot:
+    name: Build optional NativeAOT CLI archives
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-native-aot.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+
+  test-native-aot:
+    name: Verify NativeAOT archives against databases
+    needs: [set-version-number, build-native-aot]
+    uses: ./.github/workflows/release-native-aot-tests.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+
   build-msi:
     name: Build MSI
     needs: [set-version-number, build-standalone]
@@ -255,7 +270,7 @@ jobs:
 
   release-ready:
     name: Release contract ready
-    needs: [set-version-number, validate-release-policy, build-netcore-tool, build-nuget-package, build-standalone, build-standalone-mac-arm64, build-msi, build-docker-image, build-slim-docker-images, build-chocolatey, build-deb]
+    needs: [set-version-number, validate-release-policy, build-netcore-tool, build-nuget-package, build-standalone, build-standalone-mac-arm64, build-native-aot, test-native-aot, build-msi, build-docker-image, build-slim-docker-images, build-chocolatey, build-deb]
     if: ${{ always() }}
     permissions:
       contents: read

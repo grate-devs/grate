@@ -48,6 +48,62 @@ updates all six casks in the existing tap and retains six source-formula
 candidates. Formula submission and Chocolatey/WinGet acceptance remain separate
 release steps. See the [release runbook](ReleaseProcess.md).
 
+## Optional NativeAOT archives
+
+This checkout adds a NativeAOT ZIP alongside each ordinary CLI ZIP, for all six
+profiles and all nine platforms above. For example,
+`grate-postgresql-linux-x64-nativeaot-<version>.zip` accompanies
+`grate-postgresql-linux-x64-self-contained-<version>.zip`. The optional archives
+become available when a release containing this change is published.
+NuGet tools/libraries, MSI, Debian, Docker and package-manager channels continue
+to use their existing builds and identities.
+
+NativeAOT compiles the CLI ahead of time with full assembly trimming and
+Dapper.AOT-generated database calls. It needs no installed .NET runtime.
+Extract the **complete** ZIP into its own directory: SQLite and All include a
+native SQLite library beside `grate`. Linux glibc and musl archives are separate;
+choose the matching operating system and architecture. Native OS dependencies
+such as ICU and OpenSSL still apply. NativeAOT can improve startup and memory
+use; file-size savings depend on the database profile.
+
+Linux glibc release archives are built on Ubuntu 24.04; musl archives use Alpine
+3.24. These are the build/test baselines. A matching RID alone does not establish
+compatibility with older distributions: NativeAOT links against the build OS's
+native libraries. Use an ordinary archive where an older Linux baseline is needed.
+
+Build and smoke-test an archive with PowerShell 7, the pinned SDK and the
+[NativeAOT prerequisites](https://learn.microsoft.com/dotnet/core/deploying/native-aot/):
+
+```powershell
+./scripts/release/Publish-NativeAot.ps1 -Distribution PostgreSQL `
+    -RuntimeIdentifier linux-x64 -Version 0.0.1 `
+    -OutputDirectory ./artifacts/native-postgresql
+```
+
+Use a fresh output directory and build on the target OS; Linux/macOS Arm64 also
+require a matching host architecture. For musl on Linux, build the pinned Alpine
+toolchain and pass its immutable image ID as `-ContainerImage`:
+
+```powershell
+docker build --file scripts/release/NativeAot.Alpine.Dockerfile --tag grate-aot-toolchain .
+$image = docker image inspect grate-aot-toolchain --format '{{.Id}}'
+./scripts/release/Publish-NativeAot.ps1 -Distribution SQLite `
+    -RuntimeIdentifier linux-musl-arm64 -Version 0.0.1 `
+    -ContainerImage $image -OutputDirectory ./artifacts/native-sqlite-musl
+```
+
+The publisher retains expanded trim/AOT diagnostics and compiler/runtime-pack
+evidence, checks provider selection, verifies every archived file by hash, and
+executes the unpacked CLI. All/SQLite also migrate and rerun a SQLite database.
+The release workflow runs the existing database command-line suites against the
+actual Linux x64 release ZIPs for All and each matching provider, including
+case-sensitive SQL Server. Native-host smoke checks cover the other platforms;
+the full database suite is not repeated for every OS/architecture.
+
+To exercise a local archive against a server database, add `-NativeAot` and
+`-NativeAotArchive <zip>` to the verification command below. The test runner
+remains a normal .NET build; NativeAOT applies to the CLI being tested.
+
 ## Validate a profile against its database
 
 Install PowerShell 7, Docker and the SDK pinned in `global.json`, then run from
