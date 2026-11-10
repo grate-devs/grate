@@ -103,10 +103,14 @@ same requirement when running downloaded test DLLs with `dotnet test --test-modu
 - **Self-contained CLI:** [grate.csproj](../../src/grate/grate.csproj) enables single
   file publishing, native-library extraction, and partial trimming; Windows disables
   trimming. Exercise published binaries for resource/reflection/native-loading risks.
-- **Native AOT:** the inspected projects/workflows have no `PublishAot` lane.
-  Self-contained does not imply native AOT. If adding/changing AOT support, publish
-  and run an explicit AOT artifact on a supported host; existing passes provide no
-  AOT evidence.
+- **Native AOT:** [release-native-aot.yml](../../.github/workflows/release-native-aot.yml)
+  publishes and executes all six profiles on nine native RIDs, with SQLite
+  migration/rerun smoke checks for All/SQLite. The release workflow also runs
+  twelve provider-default CLI suites and 42 database-version compatibility
+  suites against its actual Linux x64 NativeAOT ZIPs. The latter matrix must
+  match the ordinary CLI compatibility entries exactly; both database groups
+  gate release publication. The test runners stay normal JIT builds, and these
+  suites do not establish server-version compatibility on the other eight RIDs.
 - **NuGet libraries:** [build.yml](../../.github/workflows/build.yml) packs
   `grate.core` and all five provider packages. The CI package job runs
   [verify-packages.ps1](../../scripts/verify-packages.ps1), which restores all six

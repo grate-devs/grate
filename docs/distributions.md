@@ -96,9 +96,20 @@ The publisher retains expanded trim/AOT diagnostics and compiler/runtime-pack
 evidence, checks provider selection, verifies every archived file by hash, and
 executes the unpacked CLI. All/SQLite also migrate and rerun a SQLite database.
 The release workflow runs the existing database command-line suites against the
-actual Linux x64 release ZIPs for All and each matching provider, including
-case-sensitive SQL Server. Native-host smoke checks cover the other platforms;
-the full database suite is not repeated for every OS/architecture.
+actual Linux x64 release ZIPs for All and each matching provider. Twelve checks
+cover provider defaults, including case-sensitive SQL Server. Another 42 checks
+cover All and the matching slim CLI against every database/image entry in the
+ordinary [version compatibility matrix](https://github.com/grate-devs/grate/blob/main/.github/workflows/integration-tests.yml).
+A policy test rejects differences in image tags, database types or profiles
+between these matrices. Both groups gate release publication.
+
+These are 54 archive execution checks plus 12 default-database and 42
+database-version suite executions, or 108 NativeAOT verification configurations.
+The 18 All/SQLite migration smoke checks are part of the archive checks, not
+additional configurations. The version suites run one NativeAOT executable form
+on net11.0/Linux x64; they are not multiplied by the four library TFMs.
+Native-host smoke checks cover the other platforms; the full database/version
+suite is not repeated for every OS/architecture.
 
 To exercise a local archive against a server database, add `-NativeAot` and
 `-NativeAotArchive <zip>` to the verification command below. The test runner

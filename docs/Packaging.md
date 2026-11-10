@@ -78,8 +78,11 @@ The existing native packaging jobs also exercise the distribution boundaries:
   then execute the extracted CLI and bundled skill. All/SQLite also migrate and
   rerun SQLite on each native host. Separate database jobs run the existing
   command-line suites against the same run's Linux x64 NativeAOT release ZIPs
-  for All and each provider, including case-sensitive SQL Server. These checks
-  gate the release contract; they keep the test runner itself as a normal build.
+  for All and each provider, including case-sensitive SQL Server. Twelve checks
+  retain the provider defaults; another 42 match the ordinary CLI's complete
+  database-version/image matrix. Both groups gate the release contract; they
+  keep the test runner itself as a normal build. Other RIDs have native smoke
+  coverage rather than the full server-version matrix.
 - **MSI, every profile on Windows x64 and Arm64:** install the candidate MSI per user,
   check payload identity, provider selection, rejection and bundled skills,
   then apply an explicit Windows

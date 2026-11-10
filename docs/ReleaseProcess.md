@@ -190,7 +190,9 @@ an archive from an earlier PR run.
 The application-test job is intentionally skipped in a release or publishing
 recovery run. Use the separate test evidence collected before publication.
 A green release run includes fresh database command-line tests of the Linux x64
-NativeAOT release archives. Other application/library test evidence still comes
+NativeAOT release archives: twelve provider-default cases and 42 All/slim cases
+covering every configured CLI database-version/image entry. Both matrices must
+pass before publication. Other application/library test evidence still comes
 from the separate test runs collected before publication.
 
 The destinations progress independently. One failed channel does not mean that

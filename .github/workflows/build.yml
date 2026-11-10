@@ -20,6 +20,7 @@ on:
       - "scripts/verify-packages.ps1"
       - "scripts/ci/Distribution.Common.ps1"
       - "scripts/ci/Invoke-DistributionTests.ps1"
+      - ".github/workflows/integration-tests.yml"
       - "installers/**"
       - "src/**"
   release:
@@ -227,6 +228,13 @@ jobs:
     with:
       version: ${{ needs.set-version-number.outputs.semVer }}
 
+  test-native-aot-compatibility:
+    name: Verify NativeAOT database versions
+    needs: [set-version-number, build-native-aot]
+    uses: ./.github/workflows/release-native-aot-compatibility.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+
   build-msi:
     name: Build MSI
     needs: [set-version-number, build-standalone]
@@ -270,7 +278,7 @@ jobs:
 
   release-ready:
     name: Release contract ready
-    needs: [set-version-number, validate-release-policy, build-netcore-tool, build-nuget-package, build-standalone, build-standalone-mac-arm64, build-native-aot, test-native-aot, build-msi, build-docker-image, build-slim-docker-images, build-chocolatey, build-deb]
+    needs: [set-version-number, validate-release-policy, build-netcore-tool, build-nuget-package, build-standalone, build-standalone-mac-arm64, build-native-aot, test-native-aot, test-native-aot-compatibility, build-msi, build-docker-image, build-slim-docker-images, build-chocolatey, build-deb]
     if: ${{ always() }}
     permissions:
       contents: read
