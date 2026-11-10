@@ -25,6 +25,8 @@ Self-contained .NET 8/9/10 distributions use the selected SDK's latest runtime p
 8.0.33 / 9.0.22 / 10.0.14. These are security minimums, not exact runtime pins.
 Self-contained .NET 11 distributions use the exact `RuntimeFrameworkVersion` in
 `Directory.Build.props`, currently `11.0.0`; update that pin when servicing the runtime.
+Also update `RUNTIME_VERSION` in `installers/docker/Dockerfile`: Docker passes
+that argument to `dotnet publish`, overriding `RuntimeFrameworkVersion` for the image.
 Pull fresh base images when rebuilding Docker (`docker buildx build --pull ...`), record the resulting
 image digests, and verify the embedded runtime and native SQLite versions before releasing.
 The Docker final stage supplies Alpine and ICU; the .NET runtime is embedded by `dotnet publish` in the build stage.
