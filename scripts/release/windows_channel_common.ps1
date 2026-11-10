@@ -136,3 +136,22 @@ function Assert-WindowsChannelEvidence {
         throw 'Missing native channel coverage.'
     }
 }
+
+function Get-WindowsChannelUninstallArguments {
+    param(
+        [Parameter(Mandatory)][ValidateSet('zip', 'wix')][string]$InstallerType,
+        [Parameter(Mandatory)][string]$ManifestDirectory,
+        [string]$PortableProductCode
+    )
+
+    $identity = @('--manifest', $ManifestDirectory)
+    if ($InstallerType -eq 'zip') {
+        if ([string]::IsNullOrWhiteSpace($PortableProductCode)) {
+            throw 'The exact installed portable registration is required for uninstall.'
+        }
+        $identity = @('--product-code', $PortableProductCode)
+    }
+    # WinGet may consult configured sources while resolving a local installation.
+    # Noninteractive uninstall must carry the same source-agreement opt-in as install.
+    @('uninstall') + $identity + @('--silent', '--disable-interactivity', '--accept-source-agreements')
+}

@@ -80,18 +80,22 @@ try {
         Invoke-WindowsChannelCommand -FilePath $Winget -Arguments $install -Log "$OutputDirectory/install.log"
         $installed = if ($InstallerType -eq 'zip') { "$env:LOCALAPPDATA/Microsoft/WinGet/Links/grate.exe" } else { "$env:LOCALAPPDATA/erikbra/grate/grate.exe" }
         Test-WindowsChannelExecutable -Executable $installed -ExpectedExecutable $expected -Distribution $Distribution -Version $Version -OutputDirectory $OutputDirectory
-        $uninstall = @('uninstall', '--manifest', $candidate, '--silent', '--disable-interactivity')
+        $portableProductCode = $null
         if ($InstallerType -eq 'zip') {
             $arp = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall'
             $entries = @(Get-ItemProperty "$arp/*" | Where-Object { $_.WinGetPackageIdentifier -ceq $packageId -and $_.DisplayVersion -ceq $Version })
             if ($entries.Count -ne 1) {
                 throw 'Expected exactly one local portable registration.'
             }
-            $uninstall = @('uninstall', '--product-code', $entries[0].PSChildName, '--silent', '--disable-interactivity')
+            $portableProductCode = $entries[0].PSChildName
         }
+        $uninstall = @(Get-WindowsChannelUninstallArguments -InstallerType $InstallerType -ManifestDirectory $candidate -PortableProductCode $portableProductCode)
         Invoke-WindowsChannelCommand -FilePath $Winget -Arguments $uninstall -Log "$OutputDirectory/uninstall.log"
         if (Test-Path -LiteralPath $installed) {
             throw 'WinGet uninstall left the release executable.'
+        }
+        if ($InstallerType -eq 'zip' -and (Test-Path -LiteralPath "$arp/$portableProductCode")) {
+            throw 'WinGet uninstall left the exact portable registration.'
         }
         $ownsInstall = $false
     } else {

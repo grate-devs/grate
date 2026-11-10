@@ -60,6 +60,7 @@ jobs:
         run: |
           ./scripts/release/test_windows_channel_context.ps1
           ./scripts/release/test_windows_channel_evidence.ps1
+          ./scripts/release/test_windows_channel_uninstall.ps1
 
   winget-verify:
     needs: resolve
