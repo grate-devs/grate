@@ -48,9 +48,9 @@ grate is available as a [dotnet global tool](https://docs.microsoft.com/en-us/do
 
 The tool and library packages target .NET 8, 9, 10 and 11. Install a matching
 .NET runtime; installing a local or global tool also requires the .NET SDK.
-For .NET 11, install the [RC3 SDK](https://dotnet.microsoft.com/download/dotnet/11.0)
-(`11.0.100-rc.3.26522.148`) or a newer supported .NET 11 release. An RC3-only
-machine can install and run the tool's `net11.0` assets; no older runtime is needed.
+For .NET 11, install the [stable SDK](https://dotnet.microsoft.com/download/dotnet/11.0)
+(`11.0.100`) or a newer supported .NET 11 release. A machine with only the stable
+.NET 11 runtime can run the tool's `net11.0` assets; no older runtime is needed.
 Use `--version <grate-version>` to select a particular grate release. Only use
 `--prerelease` if the **grate package version** is itself a prerelease.
 
@@ -68,9 +68,10 @@ to a supported runtime. The current packages retain both targets.
 
 ## Runtime and platform requirements
 
-New self-contained CLI archives, MSI and Debian packages, Chocolatey packages,
-and Docker images bundle .NET runtime `11.0.0-rc.3.26522.148`. These distributions
-need no separately installed .NET runtime; native OS dependencies still apply.
+Self-contained CLI archives, MSI and Debian packages, Chocolatey packages and
+Docker images built from this checkout bundle stable .NET runtime `11.0.0`,
+including standalone Linux/musl binaries.
+These distributions need no separately installed .NET runtime; native OS dependencies still apply.
 The Docker images use Alpine 3.24 and include the .NET native dependencies and ICU
 for globalization.
 
@@ -81,11 +82,10 @@ the existing personal Homebrew tap is still at 1.8.0, as described below.
 The proposed [Homebrew/core formula](#homebrew) instead builds from source and
 uses Homebrew's shared .NET installation. Homebrew installs that dependency automatically.
 
-.NET 11 RC3 has a go-live license and is supported by Microsoft in production
-until November 10, 2026 ([support policy](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)).
-This allows grate releases before .NET 11 GA. When GA is available, the bundled
-runtime must be updated by rebuilding and reinstalling these distributions;
-installing a newer runtime on the host does not update self-contained grate.
+Older grate distributions can still bundle a prerelease runtime. Move to a
+distribution rebuilt with stable .NET 11; installing a newer runtime on the host
+does not update self-contained grate. Future runtime servicing likewise requires
+rebuilding and reinstalling these distributions.
 
 The existing Windows (x86/x64/Arm64), Linux (x64/Arm64, glibc or musl) and macOS
 (x64/Arm64) binaries remain available. Check Microsoft's

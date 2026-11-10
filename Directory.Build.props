@@ -28,10 +28,10 @@
     <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
   </PropertyGroup>
 
-  <!-- Keep every net11.0 distribution on the RC3 go-live runtime, including
+  <!-- Keep every net11.0 distribution on the stable .NET 11 runtime, including
        self-contained publishes that restore runtime packs independently of the SDK. -->
   <PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
-    <RuntimeFrameworkVersion>11.0.0-rc.3.26522.148</RuntimeFrameworkVersion>
+    <RuntimeFrameworkVersion>11.0.0</RuntimeFrameworkVersion>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -24,7 +24,7 @@ for ($index = 0; $index -lt $args.Count; $index++) {
 $args = $nativeArgs
 if ($args[0] -eq 'msbuild') {
     if ($args -contains '-getProperty:TargetFrameworks') { 'net11.0' }
-    else { '11.0.0-rc.3.26522.148' }
+    else { '11.0.0' }
     exit 0
 }
 if ($args[0] -ne 'publish') { throw "Unexpected dotnet command: $args" }
@@ -38,8 +38,8 @@ $profileArgument = @($args | Where-Object { $_.StartsWith('-p:GrateDistribution=
 $profile = $profileArgument.Substring('-p:GrateDistribution='.Length)
 $build = "$artifactRoot/bin/grate/release_net11.0_$rid"
 New-Item -ItemType Directory -Path $output, $build -Force | Out-Null
-'{"runtimeOptions":{"includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"11.0.0-rc.3.26522.148"}]}}' | Set-Content "$build/grate.runtimeconfig.json"
-$libraries = @{ "runtimepack.Microsoft.NETCore.App.Runtime.$rid/11.0.0-rc.3.26522.148" = @{} }
+'{"runtimeOptions":{"includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"11.0.0"}]}}' | Set-Content "$build/grate.runtimeconfig.json"
+$libraries = @{ "runtimepack.Microsoft.NETCore.App.Runtime.$rid/11.0.0" = @{} }
 $providers = @{
     SQLite = @('grate.sqlite', 'Microsoft.Data.Sqlite', 'SQLitePCLRaw.bundle_e_sqlite3', 'SQLite')
     SQLServer = @('grate.sqlserver', 'Microsoft.Data.SqlClient', 'Microsoft.Data.SqlClient.Extensions.Azure')

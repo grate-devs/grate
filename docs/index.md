@@ -47,6 +47,10 @@ Standalone executables bundle the .NET runtime; .NET tools and libraries use an
 installed runtime. See [installation and runtime requirements](GettingGrate.md)
 for your distribution and platform.
 
+Source builds use the stable .NET 11 SDK selected by `global.json`. Self-contained
+builds and Docker images use .NET 11 GA, including Linux/musl binaries. See the
+[SDK and bundled runtime guidance](Packaging.md#moving-to-net-11-ga).
+
 ## Why the name grate?
 
 grate is short for migrate. And it's also pronounced the same way as _great_, so, there you go. 

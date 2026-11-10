@@ -39,7 +39,7 @@ jobs:
             8.0.x
             9.0.x
             10.0.x
-            11.0.100-rc.3.26522.148
+            11.0.100
       - name: Test published CLI and installed tool against database
         shell: pwsh
         env:

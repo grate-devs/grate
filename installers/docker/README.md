@@ -9,6 +9,11 @@ root, a local build is:
 docker build -f installers/docker/Dockerfile -t grate-local:tests .
 ```
 
+Docker uses pinned .NET 11 GA SDK/runtime-deps images on Alpine 3.24 and copies
+the repository's `global.json` into the build stage. See the
+[bundled runtime update guidance](../../docs/Packaging.md#moving-to-net-11-ga)
+for updating both image pins and the runtime argument together.
+
 | File or folder | Purpose |
 | --- | --- |
 | `Dockerfile` | Pinned SDK build stage and runtime-dependencies image |
