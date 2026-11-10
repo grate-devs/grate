@@ -291,13 +291,14 @@ try {
         Assert-SubmissionFailure { & $script:ActualPublicVersions -Id grate -ReadFeed $readPage | Out-Null } '*pagination*'
     }
     $pageCount = [Collections.Generic.List[string]]::new()
+    $newFeedFixture = (Get-Command New-ChocolateyFeedFixture).ScriptBlock
     $readMany = {
         param(
             $uri
         )
         $pageCount.Add($uri)
         $next = 'https://community.chocolatey.org/api/v2/FindPackagesById?id=%27grate%27&$skip=' + $pageCount.Count
-        New-ChocolateyFeedFixture -Id grate -PackageVersion '2.2.0' -NextLinks @($next)
+        & $newFeedFixture -Id grate -PackageVersion '2.2.0' -NextLinks @($next)
     }.GetNewClosure()
     Assert-SubmissionFailure { & $script:ActualPublicVersions -Id grate -ReadFeed $readMany | Out-Null } '*excessive or cyclic*'
     if ($pageCount.Count -ne 100) {
