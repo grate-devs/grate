@@ -16,13 +16,9 @@ execute tests for those target frameworks. See
 [package release guidance](docs/Packaging.md) for all distribution formats and
 the bundled runtime requirements.
 
-CI installs the stable SDK selected by `global.json`. Docker temporarily retains
-the pinned .NET 11 RC3 SDK and runtime-deps images on Alpine 3.24 while the GA
-images are unavailable. `installers/docker/global.json` selects that container SDK;
-the standalone Linux/musl builds still use GA. Replace the Docker SDK selection,
-runtime argument and both image tags/digests together when the GA images become
-available. Update the SDK/runtime pins and image digests together for servicing
-releases; rebuild all self-contained outputs
+CI installs the stable SDK selected by `global.json`. Docker uses pinned .NET 11
+GA SDK and runtime-deps images on Alpine 3.24. Update the SDK/runtime pins and
+both image tags/digests together for servicing releases; rebuild all self-contained outputs
 to pick up runtime security fixes. Existing .NET 8/9/10 runtime minimum checks
 and the patched native SQLite dependency remain in effect.
 Self-contained distributions use the selected SDK's latest runtime patch and reject versions below

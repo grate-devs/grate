@@ -9,18 +9,15 @@ root, a local build is:
 docker build -f installers/docker/Dockerfile -t grate-local:tests .
 ```
 
-Docker temporarily retains the pinned .NET 11 RC3 SDK/runtime while the stable
-Alpine 3.24 images are unavailable. Its separate `global.json` is copied into
-the build stage so the repository's GA SDK pin does not select an unavailable
-container SDK. Standalone Linux/musl builds continue to use GA. See the
+Docker uses pinned .NET 11 GA SDK/runtime-deps images on Alpine 3.24 and copies
+the repository's `global.json` into the build stage. See the
 [bundled runtime update guidance](../../docs/Packaging.md#moving-to-net-11-ga)
-for retiring this exception together with both image pins and the runtime argument.
+for updating both image pins and the runtime argument together.
 
 | File or folder | Purpose |
 | --- | --- |
 | `Dockerfile` | Pinned SDK build stage and runtime-dependencies image |
 | `Dockerfile.dockerignore` | Keeps the build context to the files the Dockerfile needs |
-| `global.json` | Temporary Docker-only SDK selection, independent of the repository's GA SDK |
 | `entrypoint.sh` | Maps connection/version/environment variables to CLI arguments and forwards extra arguments |
 | `release_tags.ps1` | Selects version tags and stable-only `latest` for canonical and compatibility image names |
 | [config/](config/README.md) | Reusable GitHub environment and Docker OIDC setup templates |

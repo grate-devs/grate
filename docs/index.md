@@ -48,8 +48,7 @@ installed runtime. See [installation and runtime requirements](GettingGrate.md)
 for your distribution and platform.
 
 Source builds use the stable .NET 11 SDK selected by `global.json`. Self-contained
-builds use .NET 11 GA, including Linux/musl binaries. Docker temporarily retains
-RC3 while the stable Alpine base images are unavailable; see the
+builds and Docker images use .NET 11 GA, including Linux/musl binaries. See the
 [SDK and bundled runtime guidance](Packaging.md#moving-to-net-11-ga).
 
 ## Why the name grate?

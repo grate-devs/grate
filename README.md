@@ -97,8 +97,7 @@ for compatibility details and the changes to make when moving an existing projec
 ## Contributing
 
 Source builds use the stable .NET 11 SDK selected by `global.json`. Self-contained
-builds use .NET 11 GA, including Linux/musl binaries. Docker temporarily retains
-RC3 while the stable Alpine base images are unavailable; see the
+builds and Docker images use .NET 11 GA, including Linux/musl binaries. See the
 [SDK and bundled runtime guidance](docs/Packaging.md#moving-to-net-11-ga).
 
 Bug reports, documentation improvements, and code contributions are welcome.
