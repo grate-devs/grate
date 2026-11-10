@@ -7,18 +7,18 @@ For maintainers, the [release process](docs/ReleaseProcess.md) covers preparatio
 publication, verification, and recovery. The repository's
 [release-grate skill](.agents/skills/release-grate/SKILL.md) supports the same work.
 
-## Get .NET 11 RC3
+## Get .NET 11
 
-Install the SDK pinned in `global.json`: .NET `11.0.100-rc.3.26522.148`.
+Install the stable SDK pinned in `global.json`: .NET `11.0.100`.
 It is available from the [.NET 11 downloads](https://dotnet.microsoft.com/download/dotnet/11.0).
 Grate targets .NET 8/9/10/11; install the .NET 8, 9 and 10 runtimes as well to
-execute tests for those target frameworks. RC3 has go-live support for production
-use through November 10, 2026. See [package release guidance](docs/Packaging.md)
-for all distribution formats and the move to .NET 11 GA.
+execute tests for those target frameworks. See
+[package release guidance](docs/Packaging.md) for all distribution formats and
+the bundled runtime requirements.
 
-CI installs the RC3 SDK selected by `global.json`. Docker uses pinned RC3 SDK
+CI installs the stable SDK selected by `global.json`. Docker uses pinned .NET 11 SDK
 and runtime-deps images on Alpine 3.24. Update the SDK/runtime pins and image
-digests together for servicing releases and GA; rebuild all self-contained outputs
+digests together for servicing releases; rebuild all self-contained outputs
 to pick up runtime security fixes. Existing .NET 8/9/10 runtime minimum checks
 and the patched native SQLite dependency remain in effect.
 Self-contained distributions use the selected SDK's latest runtime patch and reject versions below
@@ -30,9 +30,9 @@ MSI and Debian recipes consume those published standalone binaries; framework-de
 
 ### Working with the stable .NET 10 SDK
 
-To work only on the `net10.0` target without installing the .NET 11 prerelease,
+To work only on the `net10.0` target without installing the .NET 11 SDK,
 run from a directory outside the checkout so the repository's `global.json`
-does not select the RC SDK. With a stable .NET 10 SDK selected by
+does not select the .NET 11 SDK. With a stable .NET 10 SDK selected by
 `dotnet --version`, use absolute paths and override the target list, for example:
 
 ```sh

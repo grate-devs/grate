@@ -11,13 +11,12 @@ This page is the reference for SDK/runtime choices, output formats and manual
 package generation. Publication identities are covered in
 [Release configuration](ReleaseConfiguration.md).
 
-The SDK is pinned in `global.json` to `11.0.100-rc.3.26522.148`. Library and
+The stable SDK is pinned in `global.json` to `11.0.100`. Library and
 .NET tool packages retain `net8.0`, `net9.0` and `net10.0` assets and add `net11.0`.
-Self-contained binaries and the Docker image bundle runtime
-`11.0.0-rc.3.26522.148`. RC3 has [go-live production support](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)
-until November 10, 2026, so a grate release need not wait for .NET 11 GA.
-We will update the SDK and bundled runtime to stable .NET 11 as soon as it is
-released, following the [GA update procedure](#moving-to-net-11-ga) below.
+Self-contained binaries and Docker images built from this checkout bundle stable
+runtime `11.0.0`. Rebuild all self-contained distributions when updating the SDK,
+bundled runtime or Docker base images; existing release artifacts retain the
+runtime they were built with.
 
 The pinned SDK is used for normal repository builds. Developers who only need
 to work on `net10.0` can use the stable .NET 10 SDK with the
@@ -152,7 +151,7 @@ block publishing grate 2.2.0.
 both a build and runtime dependency and publishes with `--no-self-contained`.
 The apphost locates Homebrew's .NET installation, and Homebrew installs that dependency
 for users. The formula selects the target framework matching Homebrew's SDK rather
-than the .NET 11 RC3 runtime bundled in the self-contained release archives.
+than the .NET 11 runtime bundled in the self-contained release archives.
 
 After the final stable tag exists, download its source archive and generate the
 formula. For 2.2.0, run from the repository root:
@@ -206,7 +205,8 @@ then make `brew install grate` the normal Homebrew instruction.
 
 ## Moving to .NET 11 GA
 
-Update the SDK in `global.json`, the bundled runtime version used by publishing,
+The source now selects stable .NET 11. For subsequent servicing, update the SDK
+in `global.json`, the bundled runtime version used by publishing,
 and both Docker base-image tags/digests together. Rebuild every self-contained
 binary, installer and Docker image, then regenerate package-manager references
 and checksums. Updating the host's .NET installation does not service an embedded
