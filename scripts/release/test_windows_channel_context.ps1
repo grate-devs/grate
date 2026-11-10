@@ -44,4 +44,3 @@ $fork.head_repository.full_name = 'outsider/grate'
 Assert-RejectedContext -Run $fork -Release $release -Commit $commit -ExpectedVersion '2.3.0'
 Assert-RejectedContext -Run $run -Release $release -Commit $commit -ExpectedVersion '2.3.0-rc.1'
 Write-Output 'PASS: original stable release accepted; wrong trigger/status/conclusion/SHA/tag/workflow/fork and draft/prerelease rejected.'
-
