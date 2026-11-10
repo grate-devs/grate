@@ -43,7 +43,7 @@ function Get-WindowsChannelReleaseContext {
     }
     Assert-WindowsChannelReleaseContext -Run $run -Release $release -TagCommit $tag.object.sha -Version $Version
     $source = Invoke-RestMethod "$api/contents/Directory.Packages.props?ref=$($tag.object.sha)" -Headers $headers
-    [xml]$centralPackages = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($source.content))
+    $centralPackages = ConvertFrom-WindowsChannelCentralPackagesBase64 -Content $source.content
     $sqlite = Resolve-WindowsChannelSQLitePolicy -CentralPackages $centralPackages -ReadBundleNuspec {
         param(
             $bundleVersion
@@ -374,4 +374,23 @@ function Test-WindowsChannelChocolateyUpgrade {
         PreservedDatabaseBeforeUpgradeSha256 = $existingHash
         PreservedDatabaseBeforeUninstallSha256 = $upgradedHash
     }
+}
+
+function ConvertFrom-WindowsChannelCentralPackagesBase64 {
+    param(
+        [Parameter(Mandatory)][string]$Content
+    )
+
+    $bytes = [Convert]::FromBase64String($Content)
+    $stream = [IO.MemoryStream]::new($bytes, $false)
+    $reader = [IO.StreamReader]::new($stream, [Text.UTF8Encoding]::new($false, $true), $true)
+    try {
+        # StreamReader consumes an encoding preamble. Casting a UTF-8 string
+        # containing U+FEFF directly to XML leaves a non-XML leading character.
+        [xml]$document = $reader.ReadToEnd()
+    } finally {
+        $reader.Dispose()
+        $stream.Dispose()
+    }
+    $document
 }

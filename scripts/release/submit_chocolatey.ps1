@@ -22,11 +22,50 @@ function Assert-ChocolateyPublicationHost {
 
 function Get-ChocolateyPublicVersions {
     param(
-        [string]$Id
+        [string]$Id,
+        [scriptblock]$ReadFeed = {
+            param(
+                $uri
+            )
+            (Invoke-WebRequest -Uri $uri -TimeoutSec 60).Content
+        }
     )
 
-    [xml]$feed = (Invoke-WebRequest -Uri "https://community.chocolatey.org/api/v2/FindPackagesById()?id=%27$Id%27" -TimeoutSec 60).Content
-    return @($feed.SelectNodes("//*[local-name()='entry']//*[local-name()='Version']") | ForEach-Object InnerText)
+    if ($Id -cnotmatch '\A[a-z0-9]+(?:[.-][a-z0-9]+)*\z') {
+        throw 'A canonical Chocolatey package ID is required for destination inventory.'
+    }
+    $uri = [uri]"https://community.chocolatey.org/api/v2/FindPackagesById()?id=%27$Id%27"
+    $visited = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $versions = [Collections.Generic.List[string]]::new()
+    while ($uri) {
+        $idParameters = @([regex]::Matches($uri.Query, '(?:^\?|&)id=([^&]*)'))
+        if ($uri.Scheme -cne 'https' -or $uri.IdnHost -cne 'community.chocolatey.org' -or $uri.Port -ne 443 -or
+            $uri.UserInfo -or $uri.Fragment -or $uri.AbsolutePath -cnotin @('/api/v2/FindPackagesById', '/api/v2/FindPackagesById()') -or
+            $idParameters.Count -ne 1 -or [Net.WebUtility]::UrlDecode($idParameters[0].Groups[1].Value) -cne "'$Id'") {
+            throw 'Chocolatey destination pagination left the expected same-origin package feed.'
+        }
+        if ($visited.Count -ge 100 -or !$visited.Add($uri.AbsoluteUri)) {
+            throw 'Chocolatey destination pagination is excessive or cyclic.'
+        }
+        [xml]$feed = & $ReadFeed $uri.AbsoluteUri
+        if ($feed.DocumentElement.LocalName -cne 'feed' -or $feed.DocumentElement.NamespaceURI -cne 'http://www.w3.org/2005/Atom') {
+            throw 'Chocolatey destination inventory did not return an Atom package feed.'
+        }
+        foreach ($entry in $feed.SelectNodes("/*[local-name()='feed']/*[local-name()='entry']")) {
+            $title = $entry.SelectSingleNode("./*[local-name()='title']")
+            $version = @($entry.SelectNodes(".//*[local-name()='properties']/*[local-name()='Version']"))
+            if (!$title -or $title.InnerText -cne $Id -or $version.Count -ne 1 -or [string]::IsNullOrWhiteSpace($version[0].InnerText)) {
+                throw 'Chocolatey destination inventory returned an unexpected package identity or version.'
+            }
+            $versions.Add($version[0].InnerText)
+        }
+        $next = @($feed.SelectNodes("/*[local-name()='feed']/*[local-name()='link' and @rel='next']"))
+        if ($next.Count -gt 1) {
+            throw 'Chocolatey destination pagination returned multiple next-page links.'
+        }
+        $uri = if ($next.Count -eq 1) { [uri]::new($uri, [string]$next[0].href) } else { $null }
+    }
+    $versions.ToArray()
 }
 
 function Save-ChocolateyPublicPackage {

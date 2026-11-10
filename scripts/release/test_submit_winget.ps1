@@ -29,6 +29,7 @@ $script:PullRequests = @{}
 $script:FakeNumber = 100
 $script:Public = $false
 $script:Divergent = $false
+$script:MissTitleSearch = $false
 
 function Assert-Failure {
     param(
@@ -91,6 +92,9 @@ function Invoke-WinGetGitHub {
         '^repos/erikbra/winget-pkgs$' { return @{ fork = $true; parent = @{ full_name = 'microsoft/winget-pkgs' }; permissions = @{ push = $true } } }
         '^repos/[^/]+/winget-pkgs/contents/(.+)\?ref=(.+)$' { return Get-FakeContents -Path $Matches[1] -Ref ([Uri]::UnescapeDataString($Matches[2])) }
         '^search/issues\?q=([^&]+)' {
+            if ($script:MissTitleSearch) {
+                return @{ incomplete_results = $false; total_count = 0; items = @() }
+            }
             $query = [Uri]::UnescapeDataString($Matches[1])
             $null = $query -match '"([^"]+)"'
             $identifier = $Matches[1]
@@ -132,7 +136,14 @@ function Invoke-WinGetGitHub {
             $script:References[$Body.ref.Substring('refs/heads/'.Length)] = $Body.sha
             return @{ object = @{ sha = $Body.sha } }
         }
-        '^repos/microsoft/winget-pkgs/pulls\?state=open&head=' { return @() }
+        '^repos/erikbra/winget-pkgs/compare/[a-f0-9]{40}\.\.\.([a-f0-9]{40})$' {
+            return @{ files = @($script:Commits[$Matches[1]].Keys | ForEach-Object { @{ filename = $_ } }) }
+        }
+        '^repos/microsoft/winget-pkgs/pulls\?state=open&head=([^&]+)' {
+            $head = [Uri]::UnescapeDataString($Matches[1])
+            $branch = $head.Split(':')[1]
+            return @($script:PullRequests.Values | Where-Object { $_.head.ref -ceq $branch })
+        }
         '^repos/microsoft/winget-pkgs/pulls$' {
             $script:FakeNumber++
             $number = $script:FakeNumber
@@ -311,6 +322,34 @@ try {
         @($script:Requests | Where-Object Method -CNE 'GET').Count -ne $writeCount) {
         throw 'Re-running submission must reuse identical open PRs without another write.'
     }
+    $script:MissTitleSearch = $true
+    $reusedByHead = @(Invoke-WinGetSubmission @arguments)
+    if ($reusedByHead.Count -ne 6 -or @($reusedByHead | Where-Object State -CNE 'existing_submission').Count -or
+        @($script:Requests | Where-Object Method -CNE 'GET').Count -ne $writeCount) {
+        throw 'A title search miss must reuse a valid head-matched PR without another write.'
+    }
+    $savedPullRequests = $script:PullRequests.Clone()
+    $lastIdentifier = $submitted[-1].Identifier
+    $lastPr = @($savedPullRequests.Values | Where-Object Identifier -CEQ $lastIdentifier)[0]
+    foreach ($invalid in @('base', 'draft')) {
+        # Earlier profiles need new PRs, while the last profile has a PR whose
+        # changed title hides an invalid target from title-based discovery.
+        $script:PullRequests.Clear()
+        $script:PullRequests[$lastPr.number] = $lastPr
+        if ($invalid -ceq 'base') {
+            $lastPr.base.ref = 'unexpected-base'
+        } else {
+            $lastPr.draft = $true
+        }
+        Assert-Failure { Invoke-WinGetSubmission @arguments | Out-Null } '*head-matched WinGet submission needs reconciliation*'
+        if (@($script:Requests | Where-Object Method -CNE 'GET').Count -ne $writeCount) {
+            throw "A title-missed head PR with invalid $invalid must reject the entire plan before any write."
+        }
+        $lastPr.base.ref = 'master'
+        $lastPr.draft = $false
+    }
+    $script:PullRequests = $savedPullRequests
+    $script:MissTitleSearch = $false
     $script:Divergent = $true
     Assert-Failure { Invoke-WinGetSubmission @arguments | Out-Null } '*Existing WinGet manifest differs*'
     $script:Divergent = $false
@@ -320,7 +359,7 @@ try {
         @($script:Requests | Where-Object Method -CNE 'GET').Count -ne $writeCount) {
         throw 'An identical already-public version must remain a read-only no-op.'
     }
-    Write-Output 'PASS: complete-set/native-evidence/hash binding, wrong-context refusals, six isolated PRs, identical reruns, divergent PR refusal and existing public versions.'
+    Write-Output 'PASS: complete-set/native-evidence/hash binding, six isolated PRs, title/head idempotence, draft/wrong-base head refusal before writes, divergent PR refusal and existing public versions.'
 } finally {
     $env:GH_TOKEN = $previousToken
     foreach ($name in $previousGitHubEnvironment.Keys) {

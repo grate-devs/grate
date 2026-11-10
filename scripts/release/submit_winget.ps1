@@ -277,6 +277,38 @@ function Get-WinGetPullRequest {
     return $matching | Select-Object -First 1
 }
 
+function Get-WinGetHeadPullRequest {
+    param(
+        $Set,
+        [string]$Fork,
+        [string]$Branch,
+        [string]$ExpectedHead,
+        [string]$DefaultBranch
+    )
+
+    $owner = $Fork.Split('/')[0]
+    $head = "${owner}:$Branch"
+    $open = @(Invoke-WinGetGitHub "repos/microsoft/winget-pkgs/pulls?state=open&head=$([Uri]::EscapeDataString($head))&per_page=100")
+    if ($open.Count -gt 1) {
+        throw 'Multiple pull requests unexpectedly reference the submission branch.'
+    }
+    if ($open.Count -eq 0) {
+        return $null
+    }
+    $pr = $open[0]
+    if ($pr.head.repo.full_name -cne $Fork -or $pr.head.ref -cne $Branch -or
+        $ExpectedHead -cnotmatch '\A[a-f0-9]{40}\z' -or $pr.head.sha -cne $ExpectedHead -or
+        $pr.base.ref -cne $DefaultBranch -or $pr.draft) {
+        throw "The head-matched WinGet submission needs reconciliation for $($Set.Identifier): $($pr.html_url)."
+    }
+    $files = @(Invoke-WinGetGitHub "repos/microsoft/winget-pkgs/pulls/$($pr.number)/files?per_page=100")
+    if ($files.Count -ne 3 -or @(Compare-Object @($Set.Contents.Keys) @($files.filename) -CaseSensitive).Count -or
+        !(Assert-WinGetRemoteContents -Set $Set -Repository $Fork -Ref $ExpectedHead)) {
+        throw "The head-matched WinGet submission differs from the selected release: $($Set.Identifier)."
+    }
+    return $pr
+}
+
 function New-WinGetPullRequestBody {
     param(
         $Set,
@@ -301,7 +333,7 @@ This is a command-line tool. Invoking ``grate.exe`` without required arguments r
 
 ## 📦 Manifest Checklist
 
-- [x] Checked for competing open pull requests for this package/version
+- [x] Searched conventionally titled open PRs for this identifier and checked their manifest paths
 - [x] This PR modifies exactly one package/version manifest set
 - [x] Validated using ``winget validate --manifest`` on GitHub-hosted Windows
 - [x] Installed using ``winget install --manifest`` on GitHub-hosted Windows
@@ -385,6 +417,13 @@ function Invoke-WinGetSubmission {
         }
         $branch = $set.Identifier.Replace('.', '-').ToLowerInvariant() + "-$SelectedVersion"
         $reference = Invoke-WinGetGitHub "repos/$Fork/git/ref/heads/$branch" -AllowMissing
+        # Titles are mutable and search indexing can lag. Validate the direct
+        # head query during whole-set planning as well as immediately before use.
+        $headPr = Get-WinGetHeadPullRequest -Set $set -Fork $Fork -Branch $branch -ExpectedHead $reference.object.sha -DefaultBranch $upstream.default_branch
+        if ($headPr) {
+            [pscustomobject]@{ Set = $set; State = 'existing_submission'; PullRequest = $headPr; Branch = $branch; Head = $reference.object.sha }
+            continue
+        }
         if ($reference) {
             if (!(Assert-WinGetRemoteContents -Set $set -Repository $Fork -Ref $reference.object.sha)) {
                 throw "The existing submission branch is incomplete: $branch."
@@ -422,12 +461,9 @@ function Invoke-WinGetSubmission {
             }
             $owner = $Fork.Split('/')[0]
             $head = "${owner}:$($plan.Branch)"
-            $open = @(Invoke-WinGetGitHub "repos/microsoft/winget-pkgs/pulls?state=open&head=$([Uri]::EscapeDataString($head))&per_page=100")
-            if ($open.Count -gt 1) {
-                throw 'Multiple pull requests unexpectedly reference the submission branch.'
-            }
-            $created = if ($open.Count -eq 1) {
-                $open[0]
+            $headPr = Get-WinGetHeadPullRequest -Set $set -Fork $Fork -Branch $plan.Branch -ExpectedHead $plan.Head -DefaultBranch $upstream.default_branch
+            $created = if ($headPr) {
+                $headPr
             } else {
                 Invoke-WinGetGitHub 'repos/microsoft/winget-pkgs/pulls' -Method POST -Body @{
                     title = "New package: $($set.Identifier) version $SelectedVersion"

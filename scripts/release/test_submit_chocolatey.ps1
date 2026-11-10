@@ -1,6 +1,7 @@
 #!/usr/bin/env pwsh
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/submit_chocolatey.ps1" -FunctionsOnly
+$script:ActualPublicVersions = (Get-Command Get-ChocolateyPublicVersions).ScriptBlock
 
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('grate-choco-submit-' + [guid]::NewGuid().ToString('N'))
 $version = '2.3.4'
@@ -23,6 +24,18 @@ $script:FeedReads = [Collections.Generic.List[string]]::new()
 $script:FeedMode = 'fresh'
 $script:FailPushAt = 0
 $script:ResolvedSource = $source
+$script:PageReads = [Collections.Generic.List[string]]::new()
+
+function New-ChocolateyFeedFixture {
+    param(
+        [string]$Id,
+        [string]$PackageVersion,
+        [string[]]$NextLinks = @()
+    )
+
+    $links = @($NextLinks | ForEach-Object { '<link rel="next" href="' + [Security.SecurityElement]::Escape($_) + '"/>' }) -join ''
+    '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata"><entry><title>' + $Id + '</title><m:properties><d:Version>' + $PackageVersion + '</d:Version></m:properties></entry>' + $links + '</feed>'
+}
 
 function Assert-SubmissionFailure {
     param(
@@ -79,6 +92,30 @@ function Get-ChocolateyPublicVersions {
     )
 
     $script:FeedReads.Add($Id)
+    if ($script:FeedMode.StartsWith('paged-', [StringComparison]::Ordinal)) {
+        $firstUri = "https://community.chocolatey.org/api/v2/FindPackagesById()?id=%27$Id%27"
+        $nextUri = "https://community.chocolatey.org/api/v2/FindPackagesById?id=%27$Id%27&`$skip=1"
+        $laterVersion = if ($script:FeedMode -eq 'paged-existing' -or ($script:FeedMode -eq 'paged-different' -and $Id -eq 'grate-oracle')) {
+            $version
+        } elseif ($script:FeedMode -eq 'paged-newer' -and $Id -eq 'grate-oracle') {
+            '2.3.5'
+        } else {
+            '2.2.1'
+        }
+        $firstPage = New-ChocolateyFeedFixture -Id $Id -PackageVersion '2.2.0' -NextLinks @($nextUri)
+        $secondPage = New-ChocolateyFeedFixture -Id $Id -PackageVersion $laterVersion
+        $pageReads = $script:PageReads
+        $readPage = {
+            param(
+                $uri
+            )
+            $pageReads.Add($uri)
+            if ($uri -ceq $firstUri) { return $firstPage }
+            if ($uri -ceq $nextUri) { return $secondPage }
+            throw 'Unexpected destination page requested.'
+        }.GetNewClosure()
+        return @(& $script:ActualPublicVersions -Id $Id -ReadFeed $readPage)
+    }
     switch ($script:FeedMode) {
         'existing' { return @('2.2.0', $version) }
         'different' {
@@ -104,7 +141,7 @@ function Save-ChocolateyPublicPackage {
         [string]$Path
     )
 
-    if ($script:FeedMode -ceq 'different') {
+    if ($script:FeedMode -cin @('different', 'paged-different')) {
         [IO.File]::WriteAllText($Path, 'different bytes already accepted by feed')
     } else {
         Copy-Item -LiteralPath "$temporary/candidates/$Id.$Version.nupkg" -Destination $Path
@@ -143,6 +180,7 @@ function Reset-SubmissionScenario {
     $script:FailPushAt = 0
     $script:Pushes.Clear()
     $script:FeedReads.Clear()
+    $script:PageReads.Clear()
     $env:CHOCOLATEY_API_KEY = $apiKey
     if (Test-Path -LiteralPath "$temporary/output") {
         Remove-Item -LiteralPath "$temporary/output" -Recurse -Force
@@ -217,6 +255,53 @@ try {
         if ($script:Pushes.Count -ne 0 -or (Test-Path -LiteralPath "$temporary/output/chocolatey-submissions.json")) {
             throw 'An invalid final destination must reject the whole plan before the first write.'
         }
+    }
+
+    Reset-SubmissionScenario -Mode paged-existing
+    Invoke-ChocolateySubmission @arguments | Out-Null
+    if ($script:Pushes.Count -ne 0 -or $script:PageReads.Count -ne 12) {
+        throw 'Exact existing versions on later pages must be found for every profile without another push.'
+    }
+    foreach ($mode in @('paged-different', 'paged-newer')) {
+        Reset-SubmissionScenario -Mode $mode
+        $expected = if ($mode -ceq 'paged-different') { '*Existing Chocolatey version has different bytes*' } else { '*newer stable Chocolatey version exists*' }
+        Assert-SubmissionFailure { Invoke-ChocolateySubmission @arguments } $expected
+        if ($script:Pushes.Count -ne 0 -or $script:PageReads.Count -ne 12 -or (Test-Path -LiteralPath "$temporary/output/chocolatey-submissions.json")) {
+            throw 'A conflicting or newer sixth-profile version on a later page must block all publication writes.'
+        }
+    }
+
+    $initialUri = 'https://community.chocolatey.org/api/v2/FindPackagesById()?id=%27grate%27'
+    foreach ($links in @(
+        @($initialUri),
+        @($initialUri, $initialUri),
+        @('https://outside.invalid/api/v2/FindPackagesById?id=%27grate%27'),
+        @('http://community.chocolatey.org/api/v2/FindPackagesById?id=%27grate%27'),
+        @('https://community.chocolatey.org:444/api/v2/FindPackagesById?id=%27grate%27'),
+        @('https://community.chocolatey.org/api/v2/FindPackagesById?id=%27other%27'),
+        @('https://community.chocolatey.org/api/v2/FindPackagesById?id=%27grate%27&id=%27grate%27')
+    )) {
+        $feed = New-ChocolateyFeedFixture -Id grate -PackageVersion '2.2.0' -NextLinks $links
+        $readPage = {
+            param(
+                $uri
+            )
+            $feed
+        }.GetNewClosure()
+        Assert-SubmissionFailure { & $script:ActualPublicVersions -Id grate -ReadFeed $readPage | Out-Null } '*pagination*'
+    }
+    $pageCount = [Collections.Generic.List[string]]::new()
+    $readMany = {
+        param(
+            $uri
+        )
+        $pageCount.Add($uri)
+        $next = 'https://community.chocolatey.org/api/v2/FindPackagesById?id=%27grate%27&$skip=' + $pageCount.Count
+        New-ChocolateyFeedFixture -Id grate -PackageVersion '2.2.0' -NextLinks @($next)
+    }.GetNewClosure()
+    Assert-SubmissionFailure { & $script:ActualPublicVersions -Id grate -ReadFeed $readMany | Out-Null } '*excessive or cyclic*'
+    if ($pageCount.Count -ne 100) {
+        throw 'Destination feed pagination did not stop at its bounded page limit.'
     }
 
     Reset-SubmissionScenario

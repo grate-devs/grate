@@ -323,7 +323,12 @@ is not an implicit recovery step.
   schema results and provenance. The post-release pipeline validates and
   install-tests those final files before submitting one package/version per PR
   to `microsoft/winget-pkgs`. Existing matching submissions are reused.
-  A pending submission for a different version stops for explicit reconciliation.
+  Discovery searches PR titles for the package identifier, then checks the
+  changed manifest paths and contents. A discovered submission for a different
+  version stops for explicit reconciliation. Before submission, also inspect
+  open upstream PRs for grate in their title or description and check their
+  manifest paths; a competing PR with an unrelated title can escape automatic
+  discovery.
   A generated candidate is not an accepted/public package. After acceptance,
   verify the new ID through the public `winget` source. Follow the
   [MSI and portable transition instructions](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md);

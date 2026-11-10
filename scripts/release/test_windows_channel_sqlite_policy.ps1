@@ -63,3 +63,24 @@ if (!$rejected) {
     throw 'Conflicting native dependency groups were accepted.'
 }
 Write-Output 'PASS: selected-source SQLite pins determine historical/current/future probe versions; missing, conflicting and SQL-unsafe versions rejected.'
+
+$xmlText = '<?xml version="1.0" encoding="utf-8"?><Project><ItemGroup><PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5"/></ItemGroup></Project>'
+$plainBytes = [Text.UTF8Encoding]::new($false).GetBytes($xmlText)
+$bomBytes = [byte[]]([Text.UTF8Encoding]::new($true).GetPreamble() + $plainBytes)
+foreach ($bytes in @($plainBytes, $bomBytes)) {
+    $base64 = [Convert]::ToBase64String($bytes)
+    $document = ConvertFrom-WindowsChannelCentralPackagesBase64 -Content $base64
+    $result = Resolve-WindowsChannelSQLitePolicy -CentralPackages $document -ReadBundleNuspec {
+        param(
+            $requested
+        )
+        if ($requested -cne '3.0.5') {
+            throw 'BOM decoding changed the selected source package pin.'
+        }
+        '<package><metadata><id>SQLitePCLRaw.bundle_e_sqlite3</id><version>3.0.5</version><dependencies><dependency id="SQLite" version="3.53.4"/></dependencies></metadata></package>'
+    }
+    if ($result.ExpectedSQLiteVersion -cne '3.53.4' -or [Convert]::ToBase64String($bytes) -cne $base64) {
+        throw 'UTF-8 source decoding changed the raw source bytes or selected SQLite policy.'
+    }
+}
+Write-Output 'PASS: tagged central-package source bytes with and without a UTF-8 BOM decode to the same selected SQLite policy without changing the raw blob.'
