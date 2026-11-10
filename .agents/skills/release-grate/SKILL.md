@@ -29,9 +29,9 @@ Confirm these implementation contracts before planning publication:
   requires `refs/tags/TAG` as its workflow ref and that tag's commit must equal
   the event SHA. Selecting another tag from a `main` dispatch is rejected.
 - The packaging gate requires successful artifact/policy jobs and validates
-  13 release files (nine CLI ZIPs, two MSIs, two Debian packages), then generates
+  78 release files (54 CLI ZIPs, 12 MSIs, 12 Debian packages), then generates
   checksums/manifest. The Docker OCI archive is verified before that gate;
-  NuGet publication validates the seven package IDs/versions. A file count alone
+  NuGet publication validates twelve package IDs/versions. A file count alone
   does not validate every binary's embedded version.
 - Release and publishing-recovery runs skip application tests. Confirm separate
   CI/test evidence for the intended commit, including runtime/native dependency
@@ -60,19 +60,23 @@ source, packaging gate and per-channel outcomes.
 Use the publication policy at the selected commit:
 
 - GitHub assets and NuGet support stable and prerelease versions. Check the
-  release manifest/checksums, uploaded assets and all seven NuGet IDs/versions.
-- Docker builds one amd64/arm64 OCI archive before publication. The publishing
-  job promotes that verified archive with organization OIDC to `gratedevs/grate`,
-  then copies the same immutable digest to compatibility `erikbra/grate` with
-  the retained token. Only stable releases update `latest` on both names.
+  release manifest/checksums, uploaded assets and all twelve NuGet IDs/versions.
+- Docker builds six amd64/arm64 OCI archives before publication. The publishing
+  jobs promote the verified profiles with organization OIDC to `gratedevs/grate`.
+  The All profile's immutable digest is also copied to compatibility
+  `erikbra/grate` with the retained token. Only stable releases update `latest`
+  on the two All image names and the corresponding slim profile aliases.
   Record per-tag digest/platform verification and any partial copy outcome.
-- Stable WinGet preparation generates and schema-validates a `grate-devs.grate`
-  candidate from the final uploaded files; it does not submit to Microsoft.
+- Stable WinGet preparation generates and schema-validates six profile candidates
+  from the final uploaded files. The separate `publish-windows-channels.yml`
+  pipeline checks the original release run/tag, public assets and Windows
+  installations before submitting manifest PRs and the retained Chocolatey
+  packages. Reuse matching published versions/PRs and preserve other work.
   Leave historical `erikbra.grate` manifests unchanged. Acceptance and public
   new-ID installation checks remain separate steps. Use the migration guide's
   distinct MSI and portable transition commands; preserve full SemVer MSI
   identities and the explicit uninstall/reinstall rule for same-core releases.
-- The current stable Homebrew job updates `erikbra/cask/grate`. Recheck the
+- The current stable Homebrew job updates all six casks in `erikbra/cask`. Recheck the
   workflow and package guidance if the separate formula/core work has landed;
   a proposed formula or namespace is not evidence of public availability.
 

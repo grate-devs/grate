@@ -35,7 +35,7 @@ The Build and Publish workflow produces the existing distribution formats:
 | MSI | Windows x64 and Arm64, built from the corresponding self-contained binaries |
 | Debian | Linux amd64 and Arm64, built from the corresponding self-contained binaries |
 | Docker | Linux amd64 and Arm64 on Alpine 3.24, including ICU |
-| Chocolatey candidates | Six Windows x64 packages, retained without feed submission |
+| Chocolatey candidates | Six Windows x64 packages, retained for the post-release Windows validation/submission pipeline |
 | WinGet candidates | Six identities wrapping each profile's final stable MSI/ZIP assets |
 | Homebrew candidates | Six Intel/Arm64 casks and six source-built formulas |
 
@@ -103,7 +103,11 @@ Homebrew's shared .NET runtime; its preparation is described below.
 Generate their references and checksums from the **final published release
 artifacts**. Do not edit the historical manifests in `installers/winget/grate` or
 invent checksums for an unreleased version. The commands below generate local
-files/packages; submission to the external repositories/feeds is separate.
+files/packages. The separate `publish-windows-channels.yml` pipeline reuses the
+release build's candidates after the stable public GitHub assets are available,
+validates installation on Windows and submits to WinGet and Chocolatey. See the
+[release runbook](ReleaseProcess.md#winget-homebrew-and-chocolatey) and
+[credential configuration](ReleaseConfiguration.md#publication-identities-and-configuration).
 
 - **Homebrew cask (existing personal tap):** download both final macOS ZIPs and run
   `./installers/homebrew/Create-Cask.ps1 -version <version> -artifactDirectory <download-directory>`.
@@ -120,7 +124,9 @@ files/packages; submission to the external repositories/feeds is separate.
   Use `-Distribution SQLite` for a selected executable, or
   `-AllDistributions -ArtifactDirectory <final-windows-x64-zips>` instead of
   `-grateExe` to prepare all six packages. The workflow retains these same
-  candidates; it does not submit them to Chocolatey.
+  candidates; the post-release pipeline validates and submits those retained
+  packages without rebuilding them. Upload acceptance and community moderation
+  are separate results.
 - **WinGet:** for a stable release with corrected MSI identity, run
   `./installers/winget/Create-Installer.ps1 -version <version> -PrepareMigration`.
   The release workflow prepares the same new-ID candidate after uploading the
@@ -134,7 +140,8 @@ files/packages; submission to the external repositories/feeds is separate.
   for the different MSI and portable transition commands and pending public acceptance.
   Add `-Distribution SQLite` (or another profile) for its separate
   `grate-devs.grate.SQLite` identity. The stable workflow retains all six
-  candidates; new IDs need upstream acceptance before public installation.
+  candidates for the post-release submission pipeline; new IDs need upstream
+  acceptance before public installation.
 
 Use `-releaseTag <tag>` with the Homebrew/winget generators if the release tag
 differs from the numeric grate version. External channel publication and native
