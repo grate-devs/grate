@@ -290,7 +290,10 @@ The separate `publish-windows-channels.yml` pipeline follows a successful stable
 release workflow. It verifies that the original run, immutable tag and public
 release agree, then downloads that run's existing WinGet and Chocolatey candidates.
 It checks the actual published GitHub files before installing the packages on
-disposable Windows runners. It does not rebuild the application or rerun the
+disposable Windows runners. SQLite probes use the selected release commit's
+native dependency policy. Chocolatey All also upgrades a real earlier approved
+public package, preserving migration data and history before cleanup.
+It does not rebuild the application or rerun the
 GitHub/NuGet/Docker/Homebrew publishers. Publication credentials are confined to
 the submission jobs after the Windows checks pass.
 
@@ -320,6 +323,7 @@ is not an implicit recovery step.
   schema results and provenance. The post-release pipeline validates and
   install-tests those final files before submitting one package/version per PR
   to `microsoft/winget-pkgs`. Existing matching submissions are reused.
+  A pending submission for a different version stops for explicit reconciliation.
   A generated candidate is not an accepted/public package. After acceptance,
   verify the new ID through the public `winget` source. Follow the
   [MSI and portable transition instructions](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md);

@@ -17,7 +17,9 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/distribution_profiles.ps1"
 
 function ConvertTo-WinGetManifestText {
-    param([string]$Text)
+    param(
+        [string]$Text
+    )
 
     # Only normalize BOM/newlines. Installer fields and their values are unchanged.
     $normalized = $Text.TrimStart([char]0xfeff).Replace("`r`n", "`n").Replace("`r", "`n")
@@ -211,7 +213,11 @@ function Assert-WinGetVerificationEvidence {
 }
 
 function Assert-WinGetRemoteContents {
-    param($Set, [string]$Repository, [string]$Ref)
+    param(
+        $Set,
+        [string]$Repository,
+        [string]$Ref
+    )
 
     $encodedRef = [Uri]::EscapeDataString($Ref)
     $listing = Invoke-WinGetGitHub "repos/$Repository/contents/$($Set.VersionPath)?ref=$encodedRef" -AllowMissing
@@ -236,7 +242,11 @@ function Assert-WinGetRemoteContents {
 }
 
 function Get-WinGetPullRequest {
-    param($Set, [string]$Fork, [string]$DefaultBranch)
+    param(
+        $Set,
+        [string]$Fork,
+        [string]$DefaultBranch
+    )
 
     $query = [Uri]::EscapeDataString("repo:microsoft/winget-pkgs is:pr is:open `"$($Set.Identifier)`" in:title")
     $search = Invoke-WinGetGitHub "search/issues?q=$query&per_page=100"
@@ -268,7 +278,12 @@ function Get-WinGetPullRequest {
 }
 
 function New-WinGetPullRequestBody {
-    param($Set, [string]$RunId, [string]$VerificationRunId, [string]$Commit)
+    param(
+        $Set,
+        [string]$RunId,
+        [string]$VerificationRunId,
+        [string]$Commit
+    )
 
     return @"
 ## 📖 Description

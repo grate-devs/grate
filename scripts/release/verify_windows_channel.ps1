@@ -37,6 +37,8 @@ $expected = "$expectedDirectory/grate.exe"
 $packageHash = $null
 $manifestHashes = @()
 $legacyMigration = 'not applicable; separate slim identity'
+$chocolateyAllUpgrade = 'not applicable'
+$chocolateyUpgradeEvidence = $null
 $ownsInstall = $false
 try {
     if ($Channel -eq 'winget') {
@@ -79,7 +81,7 @@ try {
         $ownsInstall = $true
         Invoke-WindowsChannelCommand -FilePath $Winget -Arguments $install -Log "$OutputDirectory/install.log"
         $installed = if ($InstallerType -eq 'zip') { "$env:LOCALAPPDATA/Microsoft/WinGet/Links/grate.exe" } else { "$env:LOCALAPPDATA/erikbra/grate/grate.exe" }
-        Test-WindowsChannelExecutable -Executable $installed -ExpectedExecutable $expected -Distribution $Distribution -Version $Version -OutputDirectory $OutputDirectory
+        Test-WindowsChannelExecutable -Executable $installed -ExpectedExecutable $expected -Distribution $Distribution -Version $Version -OutputDirectory $OutputDirectory -ExpectedSQLiteVersion $context.ExpectedSQLiteVersion
         $portableProductCode = $null
         if ($InstallerType -eq 'zip') {
             $arp = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall'
@@ -119,19 +121,28 @@ try {
         $ownsInstall = $true
         Invoke-WindowsChannelCommand -FilePath $choco -Arguments @('install', $id, "--version=$Version", "--source=$($package.DirectoryName)", '--yes', '--no-progress', '--limit-output') -Log "$OutputDirectory/install.log"
         $installed = Join-Path $env:ChocolateyInstall "lib/$id/tools/grate.exe"
-        Test-WindowsChannelExecutable -Executable $installed -ExpectedExecutable $expected -Distribution $Distribution -Version $Version -OutputDirectory $OutputDirectory
+        Test-WindowsChannelExecutable -Executable $installed -ExpectedExecutable $expected -Distribution $Distribution -Version $Version -OutputDirectory $OutputDirectory -ExpectedSQLiteVersion $context.ExpectedSQLiteVersion
         Invoke-WindowsChannelCommand -FilePath (Join-Path $env:ChocolateyInstall 'bin/grate.exe') -Arguments @('--help') -Log "$OutputDirectory/shim-help.log"
         Invoke-WindowsChannelCommand -FilePath $choco -Arguments @('uninstall', $id, '--yes', '--no-progress', '--limit-output') -Log "$OutputDirectory/uninstall.log"
         if ((Test-Path -LiteralPath $installed) -or (Test-Path -LiteralPath (Join-Path $env:ChocolateyInstall 'bin/grate.exe'))) {
             throw 'Chocolatey uninstall left the executable or command shim.'
         }
         $ownsInstall = $false
+        if ($Distribution -eq 'All') {
+            $ownsInstall = $true
+            $chocolateyUpgradeEvidence = Test-WindowsChannelChocolateyUpgrade -Version $Version -CandidateDirectory $package.DirectoryName -ExpectedExecutable $expected -ExpectedSQLiteVersion $context.ExpectedSQLiteVersion -OutputDirectory "$OutputDirectory/upgrade-evidence"
+            $chocolateyAllUpgrade = $chocolateyUpgradeEvidence.Status
+            $ownsInstall = $false
+        }
     }
     [pscustomobject]@{
         Version = $Version
         ReleaseRunId = $ReleaseRunId
         ValidationRunId = [string]$env:GITHUB_RUN_ID
         SourceCommit = $context.SourceCommit
+        ExpectedSQLiteVersion = $context.ExpectedSQLiteVersion
+        SQLiteBundleVersion = $context.SQLiteBundleVersion
+        SQLiteNativePackageId = $context.SQLiteNativePackageId
         Distribution = $Distribution
         PackageId = $id
         WingetPackageIdentifier = if ($Channel -eq 'winget') { $packageId } else { $null }
@@ -141,8 +152,10 @@ try {
         PackageSha256 = $packageHash
         ManifestHashes = $manifestHashes
         LegacyMigration = $legacyMigration
+        ChocolateyAllUpgrade = $chocolateyAllUpgrade
+        ChocolateyUpgradeEvidence = $chocolateyUpgradeEvidence
         PublicExecutableSha256 = (Get-FileHash -LiteralPath $expected -Algorithm SHA256).Hash
-        MigrationAndRerun = if ($Distribution -in @('All', 'SQLite')) { 'passed; SQLite 3.53.4 and one history row' } else { 'not applicable; help and skill smoke only' }
+        MigrationAndRerun = if ($Distribution -in @('All', 'SQLite')) { "passed; SQLite $($context.ExpectedSQLiteVersion) and one history row" } else { 'not applicable; help and skill smoke only' }
         Status = 'passed'
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$OutputDirectory/verification.json" -Encoding utf8NoBOM
 } finally {

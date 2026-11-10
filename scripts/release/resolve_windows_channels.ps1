@@ -1,4 +1,7 @@
-param([string]$Version, [string]$ReleaseRunId)
+param(
+    [string]$Version,
+    [string]$ReleaseRunId
+)
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/windows_channel_common.ps1"
 if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and $env:CHANNEL_PUBLISH -eq 'true' -and
@@ -28,9 +31,11 @@ $context = Get-WindowsChannelReleaseContext -Version $Version -ReleaseRunId $Rel
 "version=$Version" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 "release-run-id=$ReleaseRunId" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 "source-commit=$($context.SourceCommit)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+"expected-sqlite-version=$($context.ExpectedSQLiteVersion)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 [pscustomobject]@{
     Version = $Version
     ReleaseRunId = $ReleaseRunId
     SourceCommit = $context.SourceCommit
+    ExpectedSQLiteVersion = $context.ExpectedSQLiteVersion
     Publication = 'Only the two secret-isolated jobs may submit after every native validation passes.'
 } | ConvertTo-Json

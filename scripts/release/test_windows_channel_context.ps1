@@ -5,7 +5,12 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/windows_channel_common.ps1"
 
 function Assert-RejectedContext {
-    param($Run, $Release, [string]$Commit, [string]$ExpectedVersion)
+    param(
+        $Run,
+        $Release,
+        [string]$Commit,
+        [string]$ExpectedVersion
+    )
     $rejected = $false
     try {
         Assert-WindowsChannelReleaseContext -Run $Run -Release $Release -TagCommit $Commit -Version $ExpectedVersion

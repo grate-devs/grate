@@ -42,6 +42,7 @@ jobs:
       version: ${{ steps.resolve.outputs.version }}
       release-run-id: ${{ steps.resolve.outputs.release-run-id }}
       source-commit: ${{ steps.resolve.outputs.source-commit }}
+      expected-sqlite-version: ${{ steps.resolve.outputs.expected-sqlite-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -61,6 +62,10 @@ jobs:
           ./scripts/release/test_windows_channel_context.ps1
           ./scripts/release/test_windows_channel_evidence.ps1
           ./scripts/release/test_windows_channel_uninstall.ps1
+          ./scripts/release/test_windows_channel_sqlite_policy.ps1
+          ./scripts/release/test_windows_channel_chocolatey_baseline.ps1
+          ./scripts/release/test_submit_winget.ps1
+          ./scripts/release/test_submit_chocolatey.ps1
 
   winget-verify:
     needs: resolve
@@ -177,7 +182,7 @@ jobs:
           path: evidence
       - name: Verify the complete 36-lane evidence inventory
         shell: pwsh
-        run: ./scripts/release/verify_windows_channel_evidence.ps1 -EvidenceDirectory ./evidence -Version '${{ needs.resolve.outputs.version }}' -ReleaseRunId '${{ needs.resolve.outputs.release-run-id }}' -SourceCommit '${{ needs.resolve.outputs.source-commit }}' -OutputPath ./verified.json
+        run: ./scripts/release/verify_windows_channel_evidence.ps1 -EvidenceDirectory ./evidence -Version '${{ needs.resolve.outputs.version }}' -ReleaseRunId '${{ needs.resolve.outputs.release-run-id }}' -SourceCommit '${{ needs.resolve.outputs.source-commit }}' -ExpectedSQLiteVersion '${{ needs.resolve.outputs.expected-sqlite-version }}' -OutputPath ./verified.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-channel-verification-gate

@@ -13,13 +13,17 @@ $records = @(foreach ($profile in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'Po
             ReleaseRunId = '12345'
             ValidationRunId = '67890'
             SourceCommit = $commit
+            ExpectedSQLiteVersion = '3.53.4'
+            ChocolateyAllUpgrade = if ($profile -eq 'All' -and $parts[0] -eq 'chocolatey') { 'passed' } else { 'not applicable' }
             Status = 'passed'
             LegacyMigration = if ($profile -eq 'All') { 'passed; actual public 2.0.0 to final release through private PreIndexed source' } else { 'not applicable; separate slim identity' }
         }
     }
 })
 function Write-Fixture {
-    param($Items)
+    param(
+        $Items
+    )
     if (Test-Path -LiteralPath $root) {
         Remove-Item -LiteralPath $root -Recurse -Force
     }
@@ -30,10 +34,12 @@ function Write-Fixture {
     }
 }
 function Test-Fixture {
-    param([switch]$Reject)
+    param(
+        [switch]$Reject
+    )
     $rejected = $false
     try {
-        & "$PSScriptRoot/verify_windows_channel_evidence.ps1" -EvidenceDirectory $root -Version '2.3.0' -ReleaseRunId '12345' -ValidationRunId '67890' -SourceCommit $commit -OutputPath "$root/gate.json" | Out-Null
+        & "$PSScriptRoot/verify_windows_channel_evidence.ps1" -EvidenceDirectory $root -Version '2.3.0' -ReleaseRunId '12345' -ValidationRunId '67890' -SourceCommit $commit -ExpectedSQLiteVersion '3.53.4' -OutputPath "$root/gate.json" | Out-Null
     } catch {
         $rejected = $true
     }
@@ -50,12 +56,16 @@ try {
     $duplicate[1] = $duplicate[0]
     Write-Fixture $duplicate
     Test-Fixture -Reject
-    foreach ($field in @('Status', 'SourceCommit', 'LegacyMigration')) {
+    foreach ($field in @('Status', 'SourceCommit', 'LegacyMigration', 'ExpectedSQLiteVersion')) {
         $changed = @($records | ConvertTo-Json -Depth 6 | ConvertFrom-Json)
         $changed[0].$field = 'wrong'
         Write-Fixture $changed
         Test-Fixture -Reject
     }
+    $withoutUpgrade = @($records | ConvertTo-Json -Depth 6 | ConvertFrom-Json)
+    ($withoutUpgrade | Where-Object { $_.Channel -eq 'chocolatey' -and $_.Distribution -eq 'All' }).ChocolateyAllUpgrade = 'not run'
+    Write-Fixture $withoutUpgrade
+    Test-Fixture -Reject
     Write-Output 'PASS: complete native evidence accepted; missing/duplicate/failed/wrong-source/unexecuted-legacy cases rejected.'
 } finally {
     if (Test-Path -LiteralPath $root) {

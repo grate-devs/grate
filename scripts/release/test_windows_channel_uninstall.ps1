@@ -2,7 +2,11 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/windows_channel_common.ps1"
 
 function Assert-UninstallArguments {
-    param([string[]]$Arguments, [string]$Selector, [string]$Identity)
+    param(
+        [string[]]$Arguments,
+        [string]$Selector,
+        [string]$Identity
+    )
 
     if ($Arguments[0] -cne 'uninstall' -or $Arguments[1] -cne $Selector -or $Arguments[2] -cne $Identity) {
         throw 'Uninstall did not select the exact tested installation.'

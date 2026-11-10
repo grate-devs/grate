@@ -31,7 +31,10 @@ $script:Public = $false
 $script:Divergent = $false
 
 function Assert-Failure {
-    param([scriptblock]$Action, [string]$Message)
+    param(
+        [scriptblock]$Action,
+        [string]$Message
+    )
 
     try {
         & $Action
@@ -45,7 +48,10 @@ function Assert-Failure {
 }
 
 function Get-FakeContents {
-    param([string]$Path, [string]$Ref)
+    param(
+        [string]$Path,
+        [string]$Ref
+    )
 
     if ($Ref -ceq $baseSha -and !$script:Public) {
         return $null
@@ -66,7 +72,12 @@ function Get-FakeContents {
 }
 
 function Invoke-WinGetGitHub {
-    param([string]$Endpoint, [string]$Method = 'GET', $Body, [switch]$AllowMissing)
+    param(
+        [string]$Endpoint,
+        [string]$Method = 'GET',
+        $Body,
+        [switch]$AllowMissing
+    )
 
     $script:Requests.Add(@{ Method = $Method; Endpoint = $Endpoint; Body = $Body })
     switch -Regex ($Endpoint) {
@@ -146,7 +157,10 @@ function Invoke-WinGetGitHub {
 }
 
 function Invoke-ReleaseHttp {
-    param([string]$Uri, [int]$MaxBytes)
+    param(
+        [string]$Uri,
+        [int]$MaxBytes
+    )
 
     return @{ Bytes = $script:ManifestBytes }
 }
