@@ -1,6 +1,17 @@
 #!/usr/bin/env pwsh
 $ErrorActionPreference = 'Stop'
-$forwarded = @($args)
+$commandLine = [Environment]::GetCommandLineArgs()
+$scriptIndex = -1
+for ($index = 0; $index -lt $commandLine.Length; $index++) {
+    if ([string]::Equals($commandLine[$index], $PSCommandPath, [StringComparison]::Ordinal)) {
+        $scriptIndex = $index
+        break
+    }
+}
+if ($scriptIndex -lt 0) {
+    throw 'Cannot locate the probe script in the native argument vector.'
+}
+$forwarded = @($commandLine | Select-Object -Skip ($scriptIndex + 1))
 $directory = $env:GRATE_ORACLE_CLI_PROBE_DIRECTORY
 New-Item -ItemType Directory -Path $directory -Force | Out-Null
 $prefix = Join-Path $directory ([Guid]::NewGuid().ToString('N'))
