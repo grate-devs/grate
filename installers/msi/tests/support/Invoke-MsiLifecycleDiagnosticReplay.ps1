@@ -32,8 +32,8 @@ $wrapper = Join-Path $directory 'child-wrapper.ps1'
 @'
 param([string]$Settings)
 $ErrorActionPreference = 'Stop'
-$settings = Get-Content -LiteralPath $Settings -Raw | ConvertFrom-Json -AsHashtable
-. $settings.Diagnostics
+$replayConfiguration = Get-Content -LiteralPath $Settings -Raw | ConvertFrom-Json -AsHashtable
+. $replayConfiguration.Diagnostics
 $failures = [Collections.Generic.List[Exception]]::new()
 function Write-ChildStage {
     param([string]$Phase)
@@ -41,17 +41,17 @@ function Write-ChildStage {
         Phase = $Phase
         Utc = [DateTime]::UtcNow.ToString('o')
     }
-    Write-InstallerLifecycleDiagnostic -Path (Join-Path $settings.EvidenceDirectory 'child-stage.json') -Value $stage -Failures $failures
-    Write-InstallerLifecycleDiagnostic -Path (Join-Path $settings.EvidenceDirectory 'child-stages.jsonl') -Value $stage -Failures $failures -Append
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $replayConfiguration.EvidenceDirectory 'child-stage.json') -Value $stage -Failures $failures
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $replayConfiguration.EvidenceDirectory 'child-stages.jsonl') -Value $stage -Failures $failures -Append
 }
 try {
     Write-ChildStage 'BeforeNativeAddType'
     if ($null -eq ('Grate.MsiTests.MsiLifecycleNativeProcess' -as [type])) {
-        Add-Type -Path $settings.NativeSource -ErrorAction Stop
+        Add-Type -Path $replayConfiguration.NativeSource -ErrorAction Stop
     }
     Write-ChildStage 'AfterNativeAddType'
     Write-ChildStage 'BeforeSupervisor'
-    & $settings.Supervisor -ScriptPath $settings.TestScript -Parameters $settings.Parameters -TimeoutSeconds 360
+    & $replayConfiguration.Supervisor -ScriptPath $replayConfiguration.TestScript -Parameters $replayConfiguration.Parameters -TimeoutSeconds 360
     Write-ChildStage 'AfterSupervisor'
     Assert-InstallerLifecycleDiagnostics -Failures $failures
 } catch {
