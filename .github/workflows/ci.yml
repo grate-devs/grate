@@ -1,157 +1,36 @@
-name: MSI lifecycle supervision probe
-
+name: MSI outer-pipe EOF probe
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  supervisor:
-    name: Supervisor ${{ matrix.arch }} (${{ matrix.mode }})
+  outer-pipes:
+    name: Outer pipes ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 8
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { mode: baseline, arch: x64, os: windows-latest }
-          - { mode: fixed, arch: x64, os: windows-latest }
-          - { mode: baseline, arch: arm64, os: windows-11-arm }
-          - { mode: fixed, arch: arm64, os: windows-11-arm }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Verify native architecture
-        shell: pwsh
-        run: |
-          if ([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant() -ne '${{ matrix.arch }}') {
-            throw 'Supervisor proof must execute natively.'
-          }
-      - name: Exercise regression contract and historical sensitivity
-        timeout-minutes: 3
-        shell: pwsh
-        env:
-          PROBE_MODE: ${{ matrix.mode }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $evidence = Join-Path $env:RUNNER_TEMP 'supervisor-proof'
-          New-Item -ItemType Directory -Path $evidence | Out-Null
-          $failure = $null
-          if ($env:PROBE_MODE -eq 'baseline') {
-            $legacy = Join-Path $evidence 'legacy-supervisor.ps1'
-            $specification = 'f476dd313a81a7bf76c10ae1c73b307c60717b23:installers/msi/tests/support/Invoke-MsiLifecycle.ps1'
-            $source = & git show $specification
-            if ($LASTEXITCODE -ne 0) { throw 'Cannot read the historical supervisor.' }
-            $source | Set-Content -LiteralPath $legacy -Encoding utf8NoBOM
-            try {
-              & ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1 -SupervisorPath $legacy -Cases DescendantSuccess
-            } catch {
-              $failure = $_.Exception.Message
-            }
-            if ($failure -notlike '*DescendantSuccess did not retain partial native stdout evidence*') {
-              throw "Historical proof did not reproduce the output-retention defect: $failure"
-            }
-            $observations = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/lifecycle" -Filter DescendantSuccess.trigger.json -Recurse)
-            if ($observations.Count -ne 1) { throw 'Missing independent trigger observation.' }
-            $trigger = Get-Content -LiteralPath $observations[0].FullName -Raw | ConvertFrom-Json
-            if (!$trigger.WorkerEntered -or !$trigger.DescendantReady -or !$trigger.DescendantAlive -or !$trigger.SupervisorExited) {
-              throw 'Historical trigger was not established before cleanup.'
-            }
-            foreach ($stream in @('stdout', 'stderr')) {
-              $path = Join-Path $observations[0].DirectoryName "DescendantSuccess-supervisor/$stream.log"
-              $text = Get-Content -LiteralPath $path -Raw
-              if ($text -notlike '*Stream drain exceeded its bound or failed*' -or $text.Contains("Descendant $stream marker")) {
-                throw 'Historical output-loss evidence does not match the reported defect.'
-              }
-            }
-          } else {
-            & ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
-            $reports = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/lifecycle" -Filter result.json -Recurse)
-            if ($reports.Count -ne 1) { throw 'Expected one complete regression report.' }
-            $report = Get-Content -LiteralPath $reports[0].FullName -Raw | ConvertFrom-Json
-            $expected = @('DescendantSuccess', 'DescendantTimeout', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'ScriptFailureStaleNonzero', 'Success', 'WorkerHang')
-            $actual = @($report.Cases.Mode | Sort-Object)
-            if (!$report.Succeeded -or $actual.Count -ne 8 -or (Compare-Object $expected $actual)) {
-              throw 'All eight exact supervisor scenarios must pass.'
-            }
-          }
-          [pscustomobject]@{
-            Source = $env:GITHUB_SHA
-            Mode = $env:PROBE_MODE
-            Architecture = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
-            PowerShell = $PSVersionTable.PSVersion.ToString()
-            HistoricalFailure = $failure
-          } | ConvertTo-Json | Set-Content -LiteralPath "$evidence/proof.json"
-          exit 0
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: always()
-        with:
-          name: supervisor-${{ matrix.arch }}-${{ matrix.mode }}
-          path: |
-            ${{ runner.temp }}/lifecycle/**
-            ${{ runner.temp }}/supervisor-proof/**
-          retention-days: 3
-
-  oracle-msi:
-    name: Actual Oracle MSI ${{ matrix.arch }}
-    needs: supervisor
-    if: ${{ !cancelled() }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
         include:
           - { arch: x64, os: windows-latest }
           - { arch: arm64, os: windows-11-arm }
-    env:
-      STANDALONE_VERSION: '0.0.1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
-        with:
-          global-json-file: global.json
-      - name: Build and verify the actual Oracle CLI
-        shell: pwsh
-        run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution Oracle -RuntimeIdentifier 'win-${{ matrix.arch }}' -StandaloneVersion $env:STANDALONE_VERSION -OutputDirectory "$env:RUNNER_TEMP/grate-cli" -RunSmokeTest
-      - name: Verify MSI contracts and build the package
+      - name: Verify native architecture
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          ./installers/msi/tests/Test-InstallerAuthoring.Tests.ps1
-          ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
-          ./installers/msi/Test-InstallerLifecycle.Assertions.Tests.ps1
-          ./installers/msi/Test-InstallerLifecycle.Process.Tests.ps1
-          $identity = ./installers/msi/helpers/Get-InstallerIdentity.ps1 -Version $env:STANDALONE_VERSION -Distribution Oracle -Architecture '${{ matrix.arch }}'
-          "MSI_PACKAGE_ID=$($identity.PackageId)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          ./installers/msi/Create-Installer.ps1 -grateExe "$env:RUNNER_TEMP/grate-cli/published/grate.exe" -Version $env:STANDALONE_VERSION -Distribution Oracle -arch '${{ matrix.arch }}'
-          ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/$($identity.PackageId)-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -Distribution Oracle -ExpectedArchitecture '${{ matrix.arch }}'
-      - name: Actual install, conflict, upgrade and uninstall
-        timeout-minutes: 8
-        shell: pwsh
-        run: |
-          $parameters = @{
-            MsiPath = "./installers/msi/tmp/$env:MSI_PACKAGE_ID-$env:STANDALONE_VERSION.msi"
-            PublishedExecutable = "$env:RUNNER_TEMP/grate-cli/published/grate.exe"
-            Architecture = '${{ matrix.arch }}'
-            Distribution = 'Oracle'
-            OutputDirectory = "$env:RUNNER_TEMP/grate-msi-lifecycle"
+          if ([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant() -ne '${{ matrix.arch }}') {
+            throw 'Outer-pipe proof must execute natively.'
           }
-          ./installers/msi/tests/support/Invoke-MsiLifecycle.ps1 -ScriptPath ./installers/msi/Test-InstallerLifecycle.ps1 -Parameters $parameters -TimeoutSeconds 360
+      - name: Check outer EOF and intentional inherited-pipe control
+        timeout-minutes: 3
+        shell: pwsh
+        run: ./installers/msi/tests/Test-MsiLifecycleOuterPipes.Tests.ps1 -OutputDirectory "${{ runner.temp }}/msi-outer-pipes"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: actual-oracle-msi-${{ matrix.arch }}
-          path: |
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.json
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.jsonl
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.log
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.txt
-            ${{ runner.temp }}/grate-msi-lifecycle-supervisor/**
+          name: outer-pipes-${{ matrix.arch }}
+          path: ${{ runner.temp }}/msi-outer-pipes/**
           retention-days: 3
