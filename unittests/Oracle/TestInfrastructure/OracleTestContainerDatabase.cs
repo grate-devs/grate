@@ -18,6 +18,41 @@ public record OracleTestContainerDatabase(
     protected override int InternalPort => OracleBuilder.OraclePort;
     protected override string NetworkAlias => "oracle-test-container";
 
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        if (!string.Equals(Environment.GetEnvironmentVariable("GRATE_ORACLE_TEST_DISABLE_OOB"),
+                "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // Match the image's 21c Docker-proxy cancellation workaround on the
+        // disposable server. Wait until entrypoint has moved/symlinked sqlnet.ora.
+        const string configureCancellation = """
+            if [ -n "${TNS_ADMIN:-}" ]; then
+                netdir="$TNS_ADMIN"
+            else
+                base="${ORACLE_BASE_HOME:-${ORACLE_HOME:-}}"
+                test -n "$base"
+                netdir="$base/network/admin"
+            fi
+            config="$netdir/sqlnet.ora"
+            test -f "$config"
+            if ! grep -Eiq '^[[:space:]]*DISABLE_OOB[[:space:]]*=' "$config"; then
+                printf '\nDISABLE_OOB=ON\n' >> "$config"
+            fi
+            grep -Eiq '^[[:space:]]*DISABLE_OOB[[:space:]]*=[[:space:]]*ON[[:space:]]*$' "$config"
+            printf 'Oracle test SQL*Net in-band cancellation configuration verified.\n'
+            """;
+        var result = await TestContainer.ExecAsync(["/bin/sh", "-ec", configureCancellation]);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Oracle test cancellation configuration failed with exit code {result.ExitCode}.");
+        }
+        Logger.LogWarning("Oracle test SQL*Net in-band cancellation configuration verified.");
+    }
+
     protected override IContainer InitializeTestContainer()
     {
         // Database creation probes log in as missing users. Oracle delays every failed login

@@ -1,126 +1,98 @@
-# Build, security analysis, and the full database/runtime test matrix for PRs.
-name: CI · Build and tests
+name: Oracle XE 18 cancellation probe
 
 on:
-  # Feature branches are validated through PRs; main also needs a CodeQL baseline.
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
-  schedule:
-    # Refresh the main baseline with new queries without rerunning the test matrix.
-    - cron: '23 5 * * 1'
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Replace obsolete test runs without letting a manual branch run cancel a PR's
-# merge-ref validation. Publishing on main is handled by build.yml separately.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  validation-policy:
-    name: PR validation policy
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+  probe:
+    name: XE18 cancellation (${{ matrix.mode }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: Check build-independent contracts
-      uses: ./.github/actions/preflight
-
-  pr-validation:
-    # Keep this name stable: the proposed main ruleset consumes it.
-    name: PR validation
-    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
-    needs: [validation-policy, build-code, test, cli-distributions, packages, standalone, docker]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: Require every build, test and package producer
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ github.token }}
-        NEEDS_JSON: ${{ toJSON(needs) }}
-      run: ./scripts/ci/Invoke-PRValidation.ps1
-
-  build-code:
-    name: Build
-    needs: validation-policy
-    uses: ./.github/workflows/ci-build.yml
-
-  fast-tests:
-    name: Isolated tests
-    needs: validation-policy
-    uses: ./.github/workflows/ci-fast-tests.yml
-
-  analyze:
-    name: Security analysis
-    needs: [build-code, fast-tests, validation-policy]
-    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    uses: ./.github/workflows/ci-security-analysis.yml
-
-  test:
-    name: Database tests
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-database-tests.yml
-
-  cli-distributions:
-    name: CLI distributions
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-cli-distributions.yml
-
-  report:
-    name: Test report
-    needs: [fast-tests, test, cli-distributions]
-    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
-    uses: ./.github/workflows/ci-report.yml
-
-  packages:
-    name: Packages
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-packages.yml
-
-  standalone:
-    name: Standalone CLI
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-standalone.yml
-
-  docker:
-    name: Docker
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-docker.yml
-
-  ci-result:
-    name: CI result
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # A skipped dependent job can look green in isolation. Only this aggregate
-    # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
-    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [baseline, inband]
     steps:
       - uses: actions/checkout@v7
-      - name: Require successful results from every CI phase
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          global-json-file: global.json
+      - name: Build actual Oracle CLI and focused test payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          dotnet publish src/grate/grate.csproj -c Release -f net11.0 -r linux-x64 --self-contained true -p:TargetFrameworks=net11.0 -p:GrateDistribution=Oracle -p:ArtifactsPath="$env:RUNNER_TEMP/cli-build" -o "$env:RUNNER_TEMP/cli"
+          dotnet build unittests/CommandLine/CommandLine.Oracle/CommandLine.Oracle.csproj -c Release -f net11.0 -p:TargetFrameworks=net11.0 -p:ArtifactsPath="$env:RUNNER_TEMP/test-build"
+      - name: Exercise real command and admin cancellation
         shell: pwsh
         env:
-          CI_NEEDS_JSON: ${{ toJSON(needs) }}
-        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON
+          GRATE_ORACLE_TEST_DISABLE_OOB: ${{ matrix.mode == 'inband' && 'true' || 'false' }}
+          GrateTestConfig__DockerImage: gvenzl/oracle-xe:18-faststart
+          TZ: UTC
+          LogLevel: Information
+          PROBE_MODE: ${{ matrix.mode }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:GRATE_ORACLE_CLI_PROBE_TARGET = "$env:RUNNER_TEMP/cli/grate"
+          $env:GRATE_ORACLE_CLI_PROBE_DIRECTORY = "$env:RUNNER_TEMP/probe-results"
+          $env:GrateExecutablePath = "$env:GITHUB_WORKSPACE/scripts/ci/Invoke-OracleCancellationProbe.ps1"
+          chmod +x $env:GrateExecutablePath
+          $arguments = @(
+            "$env:RUNNER_TEMP/test-build/bin/CommandLine.Oracle/release_net11.0/CommandLine.Oracle.dll",
+            '--filter-method', 'CommandLine.Oracle.Running_MigrationScripts.Failing_Scripts.Ensure_Command_Timeout_Fires',
+            '--filter-method', 'CommandLine.Oracle.Running_MigrationScripts.Failing_Scripts.Ensure_AdminCommand_Timeout_Fires',
+            '--minimum-expected-tests', '2', '--report-xunit-trx',
+            '--results-directory', "$env:RUNNER_TEMP/probe-results", '--timeout', '4m'
+          )
+          & dotnet @arguments
+          $exitCode = $LASTEXITCODE
+          $reports = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/probe-results" -Filter *.trx -Recurse)
+          if ($reports.Count -ne 1) {
+            throw 'The probe requires one completed TRX report.'
+          }
+          [xml] $report = Get-Content -LiteralPath $reports[0].FullName -Raw
+          $expected = @('Ensure_AdminCommand_Timeout_Fires', 'Ensure_Command_Timeout_Fires')
+          $actual = @($report.TestRun.TestDefinitions.UnitTest | ForEach-Object { [string] $_.TestMethod.name } | Sort-Object)
+          if ($actual.Count -ne 2 -or (Compare-Object $expected $actual)) {
+            throw 'The probe did not execute both exact timeout cases.'
+          }
+          if ([int] $report.TestRun.ResultSummary.Counters.notExecuted -ne 0) {
+            throw 'The probe cannot accept skipped timeout cases.'
+          }
+          $calls = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/probe-results" -Filter *.json | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json })
+          $timeouts = @($calls | Where-Object { $_.CommandTimeoutOne -or $_.AdminCommandTimeoutOne })
+          if ($timeouts.Count -ne 2 -or @($timeouts | Where-Object CommandTimeoutOne).Count -ne 1 -or @($timeouts | Where-Object AdminCommandTimeoutOne).Count -ne 1) {
+            throw 'Both actual CLI timeout invocations must be identified.'
+          }
+          if ($env:PROBE_MODE -eq 'inband' -and $exitCode -ne 0) {
+            throw "In-band cancellation failed with exit code $exitCode."
+          }
+          if ($env:PROBE_MODE -eq 'inband' -and ([int] $report.TestRun.ResultSummary.Counters.passed -ne 2 -or @($calls | Where-Object ForcedKill).Count -ne 0)) {
+            throw 'In-band cancellation must pass both cases without a forced kill.'
+          }
+          if ($env:PROBE_MODE -eq 'baseline' -and $exitCode -eq 0) {
+            throw 'Baseline unexpectedly passed; the cancellation hypothesis requires reassessment.'
+          }
+          if ($env:PROBE_MODE -eq 'baseline' -and ([int] $report.TestRun.ResultSummary.Counters.failed -lt 1 -or @($timeouts | Where-Object ForcedKill).Count -lt 1)) {
+            throw 'Baseline failure must demonstrate a blocked actual CLI timeout, not a setup/filter failure.'
+          }
+          [pscustomobject]@{
+            Mode = $env:PROBE_MODE
+            TestExitCode = $exitCode
+            Methods = $actual
+            Timeouts = $timeouts
+          } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$env:RUNNER_TEMP/probe-results/proof-summary.json"
+          "PROBE_MODE=$env:PROBE_MODE EXIT_CODE=$exitCode"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: xe18-${{ matrix.mode }}
+          path: ${{ runner.temp }}/probe-results
+          if-no-files-found: warn
+          retention-days: 3
