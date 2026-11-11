@@ -13,7 +13,11 @@ try {
 param($NeedsJson, $JobsJson, $RunId, $RunAttempt)
 if ($NeedsJson -cne '{"fixture":true}' -or $RunId -ne '123' -or $RunAttempt -ne '2') { throw 'Caller changed the decision context.' }
 $items = @($JobsJson | ConvertFrom-Json)
-if ($items.Count -ne 101 -or $items[100].name -cne 'last-page') { throw 'Caller lost a page of jobs.' }
+if ($items.Count -ne 101) { throw 'Caller lost a page of jobs.' }
+foreach ($index in 0..99) {
+    if ($items[$index].name -cne ('job-' + ($index + 1))) { throw 'Caller lost or duplicated a job across pages.' }
+}
+if ($items[100].name -cne 'last-page') { throw 'Caller lost the final page of jobs.' }
 $fixture.DecisionCalled = $true
 '@ | Set-Content "$root/Assert-PRValidation.ps1"
     $env:GITHUB_API_URL = 'https://api.example.invalid'
@@ -22,22 +26,27 @@ $fixture.DecisionCalled = $true
     $env:GITHUB_RUN_ATTEMPT = '2'
     $env:GH_TOKEN = 'fixture-token'
     $env:NEEDS_JSON = '{"fixture":true}'
-    $fixture = @{ Requests = @(); ApiFails = $false; DecisionCalled = $false }
+    $fixture = @{
+        Requests = @()
+        ApiFails = $false
+        DecisionCalled = $false
+        Jobs = @(@(1..100 | ForEach-Object { @{ name = "job-$_" } }) + @{ name = 'last-page' })
+    }
     function Invoke-RestMethod {
         param($Uri, $Headers, $TimeoutSec)
         if ($fixture.ApiFails) { throw 'Fixture API unavailable' }
         if ($Headers.Authorization -cne 'Bearer fixture-token' -or $TimeoutSec -ne 30) { throw 'Incorrect API authentication or timeout.' }
         $fixture.Requests += $Uri
-        if ($Uri -ceq 'https://api.example.invalid/repos/owner/repo/actions/runs/123/jobs?filter=all&per_page=100&page=1') {
-            return @{ jobs = @(1..100 | ForEach-Object { @{ name = "job-$_" } }) }
-        }
-        if ($Uri -ceq 'https://api.example.invalid/repos/owner/repo/actions/runs/123/jobs?filter=all&per_page=100&page=2') {
-            return @{ jobs = @(@{ name = 'last-page' }) }
+        $request = [regex]::Match($Uri, '^https://api\.example\.invalid/repos/owner/repo/actions/runs/123/jobs\?filter=all&per_page=(?<size>[1-9][0-9]*)&page=(?<page>[1-9][0-9]*)$')
+        if ($request.Success) {
+            $size = [int]$request.Groups['size'].Value
+            $offset = ([int]$request.Groups['page'].Value - 1) * $size
+            return @{ jobs = @($fixture.Jobs | Select-Object -Skip $offset -First $size) }
         }
         throw "Unexpected API request: $Uri"
     }
     & "$root/Invoke-PRValidation.ps1"
-    if (!$fixture.DecisionCalled -or $fixture.Requests.Count -ne 2) { throw 'Pagination did not reach the decision.' }
+    if (!$fixture.DecisionCalled -or $fixture.Requests.Count -ne 3) { throw 'Pagination did not deliver all three pages to the decision.' }
 
     $fixture.ApiFails = $true
     $fixture.DecisionCalled = $false

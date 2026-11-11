@@ -16,14 +16,15 @@ $headers = @{
 }
 $jobs = @()
 $page = 1
+$pageSize = 50
 do {
     # Include earlier attempts so GitHub's 're-run failed jobs' can reuse successful
     # producers from this same run. The policy selects the newest result per job.
-    $uri = "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID/jobs?filter=all&per_page=100&page=$page"
+    $uri = "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID/jobs?filter=all&per_page=$pageSize&page=$page"
     $response = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec 30
     $jobs += @($response.jobs)
     $page++
-} while (@($response.jobs).Count -eq 100)
+} while (@($response.jobs).Count -eq $pageSize)
 
 & "$PSScriptRoot/Assert-PRValidation.ps1" -NeedsJson $env:NEEDS_JSON `
     -JobsJson (ConvertTo-Json -InputObject $jobs -Depth 20 -Compress) `
