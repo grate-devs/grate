@@ -1,126 +1,56 @@
-# Build, security analysis, and the full database/runtime test matrix for PRs.
-name: CI · Build and tests
+# Experiment branch only. Do not merge this replacement for normal PR/main CI.
+name: Experiment · Oracle scoped pooling
 
 on:
-  # Feature branches are validated through PRs; main also needs a CodeQL baseline.
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
-  schedule:
-    # Refresh the main baseline with new queries without rerunning the test matrix.
-    - cron: '23 5 * * 1'
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Replace obsolete test runs without letting a manual branch run cancel a PR's
-# merge-ref validation. Publishing on main is handled by build.yml separately.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: oracle-pooling-experiment-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  validation-policy:
-    name: PR validation policy
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+  oracle:
+    name: Oracle paired ${{ matrix.framework }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - framework: net8.0
+            order: baseline-first
+          - framework: net9.0
+            order: scoped-first
+          - framework: net10.0
+            order: baseline-first
+          - framework: net11.0
+            order: scoped-first
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: Check build-independent contracts
-      uses: ./.github/actions/preflight
-
-  pr-validation:
-    # Keep this name stable: the proposed main ruleset consumes it.
-    name: PR validation
-    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
-    needs: [validation-policy, build-code, test, cli-distributions, packages, standalone, docker]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: Require every build, test and package producer
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ github.token }}
-        NEEDS_JSON: ${{ toJSON(needs) }}
-      run: ./scripts/ci/Invoke-PRValidation.ps1
-
-  build-code:
-    name: Build
-    needs: validation-policy
-    uses: ./.github/workflows/ci-build.yml
-
-  fast-tests:
-    name: Isolated tests
-    needs: validation-policy
-    uses: ./.github/workflows/ci-fast-tests.yml
-
-  analyze:
-    name: Security analysis
-    needs: [build-code, fast-tests, validation-policy]
-    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    uses: ./.github/workflows/ci-security-analysis.yml
-
-  test:
-    name: Database tests
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-database-tests.yml
-
-  cli-distributions:
-    name: CLI distributions
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-cli-distributions.yml
-
-  report:
-    name: Test report
-    needs: [fast-tests, test, cli-distributions]
-    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
-    uses: ./.github/workflows/ci-report.yml
-
-  packages:
-    name: Packages
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-packages.yml
-
-  standalone:
-    name: Standalone CLI
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-standalone.yml
-
-  docker:
-    name: Docker
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-docker.yml
-
-  ci-result:
-    name: CI result
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # A skipped dependent job can look green in isolation. Only this aggregate
-    # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
-    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
-    steps:
-      - uses: actions/checkout@v7
-      - name: Require successful results from every CI phase
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+            11.0.100
+      - name: Build the same test binary for both variants
         shell: pwsh
-        env:
-          CI_NEEDS_JSON: ${{ toJSON(needs) }}
-        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON
+        run: dotnet build unittests/Oracle/Oracle.csproj -c Debug '-p:TargetFrameworks=${{ matrix.framework }}'
+      - name: Run complete paired Oracle suites with resource sampling
+        shell: pwsh
+        run: ./scripts/ci/Invoke-OraclePoolingExperiment.ps1 -Framework '${{ matrix.framework }}' -Order '${{ matrix.order }}' -ResultsDirectory '${{ runner.temp }}/oracle-experiment'
+      - name: Upload all experiment evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oracle-pooling-${{ matrix.framework }}
+          path: ${{ runner.temp }}/oracle-experiment/
+          if-no-files-found: error
+          retention-days: 7

@@ -24,6 +24,14 @@ public record OracleGrateTestContext(
 
     public override IDbConnection GetDbConnection(string connectionString) => new OracleConnection(connectionString);
 
+    public override Task DropDatabase(string databaseName)
+    {
+        // Closed test connections remain logged in while pooled; release this
+        // user's idle sessions before the existing drop-user contract runs.
+        OracleTestConnectionPools.ClearUserPool(External.ConnectionString(databaseName));
+        return base.DropDatabase(databaseName);
+    }
+
     public override ISyntax Syntax => new OracleSyntax();
     public override Type DbExceptionType => typeof(OracleException);
 

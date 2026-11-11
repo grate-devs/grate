@@ -2,6 +2,7 @@
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
 using Microsoft.Extensions.Logging;
+using Oracle.TestInfrastructure;
 using Testcontainers.Oracle;
 
 namespace TestCommon.TestInfrastructure;
@@ -47,8 +48,8 @@ public record OracleTestContainerDatabase(
             .Build();
     }
 
-    public override string AdminConnectionString => $@"Data Source={Hostname}:{Port}/FREEPDB1;User ID=system;Password={AdminPassword};Pooling=False";
-    public override string ConnectionString(string database) => $@"Data Source={Hostname}:{Port}/FREEPDB1;User ID={database.ToUpper()};Password={AdminPassword};Pooling=False";
-    public override string UserConnectionString(string database) => $@"Data Source={Hostname}:{Port}/FREEPDB1;User ID={database.ToUpper()};Password={AdminPassword};Pooling=False";
+    public override string AdminConnectionString => OracleTestConnectionPools.Configure($@"Data Source={Hostname}:{Port}/FREEPDB1;User ID=system;Password={AdminPassword};Pooling=False");
+    public override string ConnectionString(string database) => OracleTestConnectionPools.Configure($@"Data Source={Hostname}:{Port}/FREEPDB1;User ID={database.ToUpper()};Password={AdminPassword};Pooling=False");
+    public override string UserConnectionString(string database) => OracleTestConnectionPools.Configure($@"Data Source={Hostname}:{Port}/FREEPDB1;User ID={database.ToUpper()};Password={AdminPassword};Pooling=False");
 
 }

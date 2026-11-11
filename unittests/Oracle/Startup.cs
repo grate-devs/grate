@@ -7,6 +7,7 @@ using Oracle.TestInfrastructure;
 using TestCommon.TestInfrastructure;
 
 [assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
+[assembly: OracleTestPoolScope]
 
 namespace Oracle;
 
