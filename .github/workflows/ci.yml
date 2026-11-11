@@ -72,10 +72,10 @@ jobs:
             $reports = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/lifecycle" -Filter result.json -Recurse)
             if ($reports.Count -ne 1) { throw 'Expected one complete regression report.' }
             $report = Get-Content -LiteralPath $reports[0].FullName -Raw | ConvertFrom-Json
-            $expected = @('DescendantSuccess', 'DescendantTimeout', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'Success', 'WorkerHang')
+            $expected = @('DescendantSuccess', 'DescendantTimeout', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'ScriptFailureStaleNonzero', 'Success', 'WorkerHang')
             $actual = @($report.Cases.Mode | Sort-Object)
-            if (!$report.Succeeded -or $actual.Count -ne 7 -or (Compare-Object $expected $actual)) {
-              throw 'All seven exact supervisor scenarios must pass.'
+            if (!$report.Succeeded -or $actual.Count -ne 8 -or (Compare-Object $expected $actual)) {
+              throw 'All eight exact supervisor scenarios must pass.'
             }
           }
           [pscustomobject]@{

@@ -21,6 +21,7 @@ if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLo
 
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
+$phaseFailures = [Collections.Generic.List[Exception]]::new()
 function Write-LifecyclePhase {
     param(
         [string]$Phase
@@ -29,8 +30,8 @@ function Write-LifecyclePhase {
         Phase = $Phase
         Utc = [DateTime]::UtcNow.ToString('o')
     }
-    $observation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'worker-phase.json')
-    $observation | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $OutputDirectory 'worker-phases.jsonl')
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $OutputDirectory 'worker-phase.json') -Value $observation -Failures $phaseFailures
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $OutputDirectory 'worker-phases.jsonl') -Value $observation -Failures $phaseFailures -Append
 }
 
 $MsiPath = (Resolve-Path -LiteralPath $MsiPath).Path
@@ -329,6 +330,20 @@ try {
             $cleanupFailures.Add($_.Exception)
         }
         Release-LifecycleComObject $installer 'Installer'
+    }
+}
+Complete-InstallerLifecycleDiagnostics -Path (Join-Path $OutputDirectory 'worker-diagnostics.json') -Snapshot @{ Phase = 'CleanupFinished' } -Failures $phaseFailures
+$cleanupFailures.AddRange($phaseFailures)
+if (!$failure -and !$cleanupFailures.Count) {
+    try {
+        Assert-InstallerLifecyclePhaseOrder -Path (Join-Path $OutputDirectory 'worker-phases.jsonl') -RequiredPhases @(
+            'BeforeInstallerComCreation', 'AfterInstallerComCreation',
+            'BeforeCom.OpenDatabase', 'AfterCom.OpenDatabase',
+            'BeforeCom.ProductState', 'AfterCom.ProductState',
+            'BeforeComRelease.Installer', 'AfterComRelease.Installer'
+        )
+    } catch {
+        $cleanupFailures.Add($_.Exception)
     }
 }
 if ($failure -or $cleanupFailures.Count) {

@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot 'InstallerLifecycle.Diagnostics.ps1')
+
 function Invoke-InstallerLifecycleProcess {
     param(
         [Parameter(Mandatory)][string]$Executable,
@@ -20,6 +22,8 @@ function Invoke-InstallerLifecycleProcess {
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $start
     $started = $false
+    $primaryFailure = $null
+    $diagnosticFailures = [Collections.Generic.List[Exception]]::new()
     $command = [ordered]@{
         executable = $Executable
         arguments = $Arguments
@@ -30,18 +34,17 @@ function Invoke-InstallerLifecycleProcess {
         streamDrainFailure = $null
     }
     $commandPath = Join-Path $OutputDirectory "$Name.command.json"
-    $command | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $commandPath
 
     function Write-CommandPhase {
         param(
             [string]$Phase
         )
         $command.phase = $Phase
-        $command | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $commandPath
-        @{
+        Write-InstallerLifecycleDiagnostic -Path $commandPath -Value $command -Failures $diagnosticFailures
+        Write-InstallerLifecycleDiagnostic -Path (Join-Path $OutputDirectory "$Name.process-phases.jsonl") -Append -Failures $diagnosticFailures -Value @{
             Phase = $Phase
             Utc = [DateTime]::UtcNow.ToString('o')
-        } | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $OutputDirectory "$Name.process-phases.jsonl")
+        }
     }
 
     try {
@@ -50,7 +53,7 @@ function Invoke-InstallerLifecycleProcess {
         $started = $true
         $command.processId = $process.Id
         $command.state = 'Running'
-        $command | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $commandPath
+        Write-CommandPhase 'AfterStart'
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
         Write-CommandPhase 'BeforeWait'
@@ -94,7 +97,11 @@ function Invoke-InstallerLifecycleProcess {
         else {
             '[stderr drain did not complete successfully]'
         }
-        ($output + $errorOutput) | Set-Content -LiteralPath (Join-Path $OutputDirectory "$Name.output.log")
+        try {
+            ($output + $errorOutput) | Set-Content -LiteralPath (Join-Path $OutputDirectory "$Name.output.log") -ErrorAction Stop
+        } catch {
+            $diagnosticFailures.Add($_.Exception)
+        }
 
         if ($command.timedOut) {
             throw "$Name exceeded its process timeout. See $OutputDirectory."
@@ -108,6 +115,7 @@ function Invoke-InstallerLifecycleProcess {
         $command.state = 'Completed'
     }
     catch {
+        $primaryFailure = $_.Exception
         $command.state = 'Failed'
         $command.error = $_.Exception.Message
         throw
@@ -116,9 +124,19 @@ function Invoke-InstallerLifecycleProcess {
         if ($started -and $process.HasExited) {
             $command.exitCode = $process.ExitCode
         }
-        Write-CommandPhase 'BeforeDispose'
-        $process.Dispose()
-        $command.completedUtc = [DateTime]::UtcNow.ToString('o')
-        Write-CommandPhase 'AfterDispose'
+        try {
+            Write-CommandPhase 'BeforeDispose'
+            $process.Dispose()
+            $command.completedUtc = [DateTime]::UtcNow.ToString('o')
+            Write-CommandPhase 'AfterDispose'
+        } catch {
+            $diagnosticFailures.Add($_.Exception)
+            if (!$primaryFailure) {
+                throw
+            }
+        } finally {
+            Complete-InstallerLifecycleDiagnostics -Path (Join-Path $OutputDirectory "$Name.diagnostics.json") -Snapshot $command -Failures $diagnosticFailures
+        }
     }
+    Assert-InstallerLifecycleDiagnostics -Failures $diagnosticFailures
 }

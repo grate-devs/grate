@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot '../../InstallerLifecycle.Diagnostics.ps1')
 if (!$IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'MSI lifecycle supervision requires a disposable GitHub-hosted Windows runner.'
 }
@@ -35,6 +36,8 @@ $workerArguments = @(
     '-Settings', ('"{0}"' -f $settings), '-Script', ('"{0}"' -f $resolvedScript)
 )
 $process = $null
+$primaryFailure = $null
+$diagnosticFailures = [Collections.Generic.List[Exception]]::new()
 $result = [ordered]@{
     Script = $resolvedScript
     TimeoutSeconds = $TimeoutSeconds
@@ -49,12 +52,12 @@ function Write-SupervisorPhase {
     )
     $result.Phase = $Phase
     $result.ElapsedSeconds = $watch.Elapsed.TotalSeconds
-    $result | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'process.json')
-    @{
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $directory 'process.json') -Value $result -Failures $diagnosticFailures
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $directory 'phases.jsonl') -Append -Failures $diagnosticFailures -Value @{
         Phase = $Phase
         Utc = [DateTime]::UtcNow.ToString('o')
         ElapsedSeconds = $watch.Elapsed.TotalSeconds
-    } | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $directory 'phases.jsonl')
+    }
 }
 
 try {
@@ -92,12 +95,26 @@ try {
     if ($result.ExitCode -ne 0) {
         throw "MSI lifecycle worker failed with exit code $($result.ExitCode); inspect native and supervisor evidence."
     }
+} catch {
+    $primaryFailure = $_.Exception
+    $result.Error = $primaryFailure.Message
+    throw
 } finally {
-    Write-SupervisorPhase 'BeforeDispose'
-    # No redirected readers exist here, so disposal cannot wait for descendants.
-    if ($null -ne $process) {
-        $process.Dispose()
+    try {
+        Write-SupervisorPhase 'BeforeDispose'
+        # No redirected readers exist here, so disposal cannot wait for descendants.
+        if ($null -ne $process) {
+            $process.Dispose()
+        }
+        $result.CompletedUtc = [DateTime]::UtcNow.ToString('o')
+        Write-SupervisorPhase 'Completed'
+    } catch {
+        $diagnosticFailures.Add($_.Exception)
+        if (!$primaryFailure) {
+            throw
+        }
+    } finally {
+        Complete-InstallerLifecycleDiagnostics -Path (Join-Path $directory 'diagnostics.json') -Snapshot $result -Failures $diagnosticFailures
     }
-    $result.CompletedUtc = [DateTime]::UtcNow.ToString('o')
-    Write-SupervisorPhase 'Completed'
 }
+Assert-InstallerLifecycleDiagnostics -Failures $diagnosticFailures
