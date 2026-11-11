@@ -322,9 +322,16 @@ public abstract class Failing_Scripts(IGrateTestContext context, ITestOutputHelp
         TestOutput.WriteLine($"Failed scripts: {string.Join(", ", failedScripts)}");
         TestOutput.WriteLine($"Successful scripts: {string.Join(", ", successfulScripts)}");
 
-        Assert.IsType<MigrationFailed>(exception);
+        var migrationFailure = Assert.IsType<MigrationFailed>(exception);
         Assert.Equal("goodnight.sql", Assert.Single(failedScripts));
         Assert.Empty(successfulScripts);
+        AssertScriptTimeoutCause(migrationFailure);
+    }
+
+    // Providers can require their specific cancellation evidence in addition to
+    // the shared migration-error and history contract above.
+    protected virtual void AssertScriptTimeoutCause(MigrationFailed exception)
+    {
     }
 
     [Theory]

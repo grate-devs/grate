@@ -144,6 +144,20 @@ suite. Their test commands select no single TFM. Build output is not execution p
 `osx-arm64` (the last on macOS). Docker builds target `linux/amd64,linux/arm64` using
 the Alpine/musl [Dockerfile](../../installers/docker/Dockerfile).
 
+The Linux Oracle provider lane enables `GRATE_ORACLE_SCOPED_POOLING=true`.
+It clears test-host pools before and after each case and releases the selected
+user's idle pool before fixture cleanup drops that user. The dedicated production
+DROP test keeps its original unpooled input. Imported CLI/Docker suites keep their
+existing connection behavior. `GRATE_REPRODUCIBLE_TABLE_CASINGS=true` selects
+27 distinct, reproducible casing combinations for that lane; other lanes retain
+their existing inputs. Both flags default to off outside that CI lane.
+
+In-process Oracle provider command/admin timeout tests require the Oracle
+cancellation code (`ORA-01013`) in the failure's cause chain as well as the
+failed-history/no-success contract. Positive controls run the same sleep SQL with
+a generous timeout and require successful history, so a syntax error cannot
+establish timeout coverage.
+
 [integration-tests.yml](../../.github/workflows/integration-tests.yml) actively runs
 net11 Linux x64 self-contained CLI tests against SQL Server 2017/2019/2022/2025,
 PostgreSQL 12–18, MariaDB 10.4/10.10/11/12/13 RC, SQLite, and Oracle Free/XE image

@@ -24,6 +24,14 @@ public record OracleGrateTestContext(
 
     public override IDbConnection GetDbConnection(string connectionString) => new OracleConnection(connectionString);
 
+    public override Task DropDatabase(string databaseName)
+    {
+        // Closed test connections remain logged in while pooled; release this
+        // user's idle sessions before the existing drop-user contract runs.
+        OracleTestConnectionPools.ClearUserPool(External.ConnectionString(databaseName));
+        return base.DropDatabase(databaseName);
+    }
+
     public override ISyntax Syntax => new OracleSyntax();
     public override Type DbExceptionType => typeof(OracleException);
 
@@ -33,7 +41,7 @@ public record OracleGrateTestContext(
     public override SqlStatements Sql => new()
     {
         SelectVersion = "SELECT * FROM v$version WHERE banner LIKE 'Oracle%'",
-        SleepTwoSeconds = "sys.dbms_session.sleep(2);"
+        SleepTwoSeconds = "BEGIN sys.dbms_session.sleep(2); END;"
     };
 
     public override string ExpectedVersionPrefix => "Oracle "; // might have AI or not, depending on version

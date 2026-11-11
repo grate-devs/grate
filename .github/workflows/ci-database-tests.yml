@@ -96,8 +96,11 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
-        # The 35-minute budget can expire during the fourth sequential Oracle TFM.
-        # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
+        # Reuse connections only inside each Oracle test; linked CLI/Docker suites
+        # keep their existing isolated process/connection behavior.
+        GRATE_ORACLE_SCOPED_POOLING: ${{ matrix.category == 'Oracle' && 'true' || 'false' }}
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ matrix.category == 'Oracle' && 'true' || 'false' }}
+        # Keep diagnostics alive beyond the test deadline, within the Oracle job cap.
         TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
         MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
 
