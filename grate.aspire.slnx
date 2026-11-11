@@ -10,4 +10,12 @@
     <Project Path="examples/aspire/Api/Api.csproj" />
     <Project Path="examples/aspire/Smoke/Smoke.csproj" />
   </Folder>
+  <Folder Name="/examples/SQLite/">
+    <Project Path="examples/aspire/Sqlite/AppHost/AppHost.csproj" />
+    <Project Path="examples/aspire/Sqlite/Smoke/Smoke.csproj" />
+  </Folder>
+  <Folder Name="/examples/SQL Server/">
+    <Project Path="examples/aspire/SqlServer/AppHost/AppHost.csproj" />
+    <Project Path="examples/aspire/SqlServer/Smoke/Smoke.csproj" />
+  </Folder>
 </Solution>

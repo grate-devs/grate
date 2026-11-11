@@ -1,4 +1,5 @@
-﻿using Aspire.Hosting;
+﻿using System.Diagnostics;
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Grate.Aspire.Hosting;
 using Xunit;
@@ -192,6 +193,188 @@ public sealed class GrateMigrationTests : IDisposable
         Assert.Equal(new object[] { "--commandtimeout=7", "--schemaname=custom" }, arguments.Skip(4));
     }
 
+    [Fact]
+    public async Task SqlServer_uses_its_deferred_connection_and_waits_for_Aspire_database_provisioning()
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlServer("sqlserver").AddDatabase("appdb");
+
+        var migration = database.AddGrateMigration().WithScriptsFolder(CreateScripts());
+        var environment = await GetEnvironment(builder, migration.Resource);
+
+        Assert.Equal("appdb-grate", migration.Resource.Name);
+        Assert.Equal("sqlserver", environment["DATABASE_TYPE"]);
+        Assert.Equal("false", environment["CREATE_DATABASE"]);
+        Assert.Equal(database.Resource.ConnectionStringExpression.ValueExpression,
+            ((ReferenceExpression)environment["APP_CONNSTRING"]).ValueExpression);
+        var waits = migration.Resource.Annotations.OfType<WaitAnnotation>().ToArray();
+        Assert.Equal(2, waits.Length);
+        Assert.Contains(waits, wait => wait.Resource == database.Resource);
+        Assert.Contains(waits, wait => wait.Resource == database.Resource.Parent);
+        Assert.All(waits, wait => Assert.Equal(WaitType.WaitUntilHealthy, wait.WaitType));
+        Assert.Equal("2.3.0", Assert.Single(migration.Resource.Annotations.OfType<ContainerImageAnnotation>()).Tag);
+    }
+
+    [Fact]
+    public async Task SqlServer_overrides_name_readiness_and_connection_with_standard_builder_methods()
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlServer("sqlserver").AddDatabase("appdb");
+        var connection = ReferenceExpression.Create($"Server=custom;Database=appdb");
+
+        var migration = database.AddGrateMigration("sql-migration", waitForDatabase: false)
+            .WithEnvironment("APP_CONNSTRING", connection)
+            .WithScriptsFolder(CreateScripts());
+        var environment = await GetEnvironment(builder, migration.Resource);
+
+        Assert.Equal("sql-migration", migration.Resource.Name);
+        Assert.Empty(migration.Resource.Annotations.OfType<WaitAnnotation>());
+        Assert.Same(connection, environment["APP_CONNSTRING"]);
+    }
+
+    [Fact]
+    public async Task Sqlite_shares_the_writable_directory_and_keeps_the_consumers_host_path()
+    {
+        var builder = CreateBuilder();
+        var dataDirectory = Path.Combine(_appHostDirectory, "data files");
+        var database = builder.AddSqlite("appdb", dataDirectory, "demo file.db");
+        var hostExpression = database.Resource.ConnectionStringExpression.ValueExpression;
+
+        var migration = database.AddGrateMigration().WithScriptsFolder(CreateScripts());
+        var environment = await GetEnvironment(builder, migration.Resource);
+
+        Assert.Equal("appdb-grate", migration.Resource.Name);
+        Assert.Equal("sqlite", environment["DATABASE_TYPE"]);
+        Assert.Equal("false", environment["CREATE_DATABASE"]);
+        var connection = Assert.IsType<ReferenceExpression>(environment["APP_CONNSTRING"]).ValueExpression;
+        Assert.Contains("/grate-data/demo file.db", connection);
+        Assert.DoesNotContain(dataDirectory, connection);
+        Assert.Equal(hostExpression, database.Resource.ConnectionStringExpression.ValueExpression);
+        Assert.Contains(dataDirectory, hostExpression);
+        Assert.Empty(migration.Resource.Annotations.OfType<WaitAnnotation>());
+        var mount = Assert.Single(migration.Resource.Annotations.OfType<ContainerMountAnnotation>(), item => item.Target == "/grate-data");
+        Assert.Equal(dataDirectory, mount.Source);
+        Assert.False(mount.IsReadOnly);
+        Assert.True(Directory.Exists(dataDirectory));
+    }
+
+    [Fact]
+    public async Task Sqlite_supports_named_migrations_custom_data_targets_and_scripts_replacement()
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb", Path.Combine(_appHostDirectory, "data"), "demo.db");
+        var migration = database.AddGrateMigration("sqlite-migration", containerDataPath: "/custom-data/")
+            .WithScriptsFolder(CreateScripts())
+            .WithScriptsFolder(CreateScripts("other scripts"), "/other-scripts");
+
+        var environment = await GetEnvironment(builder, migration.Resource);
+
+        Assert.Equal("sqlite-migration", migration.Resource.Name);
+        Assert.Contains("/custom-data/demo.db", ((ReferenceExpression)environment["APP_CONNSTRING"]).ValueExpression);
+        var mounts = migration.Resource.Annotations.OfType<ContainerMountAnnotation>().ToArray();
+        Assert.Equal(2, mounts.Length);
+        Assert.Contains(mounts, mount => mount.Target == "/custom-data" && !mount.IsReadOnly);
+        Assert.Contains(mounts, mount => mount.Target == "/other-scripts" && mount.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task Sqlite_keeps_files_owned_by_the_local_Unix_user_and_uses_writable_runtime_directories()
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb", _appHostDirectory, "demo.db");
+        var migration = database.AddGrateMigration().WithScriptsFolder(CreateScripts());
+        var environment = await GetEnvironment(builder, migration.Resource);
+        var runtimeArguments = new List<object>();
+        var context = new ContainerRuntimeArgsCallbackContext(runtimeArguments, CancellationToken.None);
+        foreach (var annotation in migration.Resource.Annotations.OfType<ContainerRuntimeArgsCallbackAnnotation>())
+        {
+            await annotation.Callback(context);
+        }
+
+        Assert.Equal("/tmp/grate-bundle", environment["DOTNET_BUNDLE_EXTRACT_BASE_DIR"]);
+        Assert.Equal("/tmp/grate-output", environment["GRATE_OUTPUT_PATH"]);
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+        {
+            var expectedUser = $"{await GetId("-u")}:{await GetId("-g")}";
+            Assert.Equal(new object[] { "--user", expectedUser }, runtimeArguments);
+        }
+        else
+        {
+            Assert.Empty(runtimeArguments);
+        }
+    }
+
+    [Theory]
+    [InlineData(":memory:")]
+    [InlineData("file:demo?mode=memory&cache=shared")]
+    [InlineData("demo.db;Mode=Memory")]
+    public void Sqlite_rejects_in_memory_and_URI_sources(string fileName)
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb", _appHostDirectory, fileName);
+
+        Assert.Throws<NotSupportedException>(() => database.AddGrateMigration());
+        Assert.Empty(builder.Resources.OfType<GrateMigrationResource>());
+    }
+
+    [Fact]
+    public void Sqlite_rejects_relative_file_paths_instead_of_guessing_consumer_working_directories()
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb", "relative", "demo.db");
+
+        Assert.Throws<NotSupportedException>(() => database.AddGrateMigration());
+    }
+
+    [Theory]
+    [InlineData("data;files", "demo.db")]
+    [InlineData("data", "demo.db ")]
+    public void Sqlite_rejects_paths_that_the_host_connection_cannot_preserve(string directoryName, string fileName)
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb", Path.Combine(_appHostDirectory, directoryName), fileName);
+
+        Assert.Throws<NotSupportedException>(() => database.AddGrateMigration());
+        Assert.Empty(builder.Resources.OfType<GrateMigrationResource>());
+    }
+
+    [Fact]
+    public void Sqlite_requires_a_dedicated_directory_instead_of_mounting_the_default_shared_temp_root()
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb");
+
+        Assert.Throws<ArgumentException>(() => database.AddGrateMigration());
+    }
+
+    [Theory]
+    [InlineData("/grate-data")]
+    [InlineData("/grate-data/sql")]
+    [InlineData("/grate-data/./")]
+    [InlineData("/grate-data/../sql")]
+    [InlineData("/.")]
+    public void Sqlite_data_cannot_be_hidden_by_an_overlapping_or_ambiguous_scripts_mount(string target)
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb", _appHostDirectory, "demo.db");
+        var migration = database.AddGrateMigration();
+
+        Assert.Throws<ArgumentException>(() => migration.WithScriptsFolder(CreateScripts(), target));
+        var mount = Assert.Single(migration.Resource.Annotations.OfType<ContainerMountAnnotation>());
+        Assert.Equal("/grate-data", mount.Target);
+        Assert.False(mount.IsReadOnly);
+    }
+
+    [Fact]
+    public void Sqlite_data_cannot_be_hidden_by_an_ancestor_scripts_mount()
+    {
+        var builder = CreateBuilder();
+        var database = builder.AddSqlite("appdb", _appHostDirectory, "demo.db");
+        var migration = database.AddGrateMigration(containerDataPath: "/data/sqlite");
+
+        Assert.Throws<ArgumentException>(() => migration.WithScriptsFolder(CreateScripts(), "/data"));
+    }
+
     private IDistributedApplicationBuilder CreateBuilder() => DistributedApplication.CreateBuilder(
         new DistributedApplicationOptions { ProjectDirectory = _appHostDirectory, Args = [], DisableDashboard = true });
 
@@ -217,6 +400,21 @@ public sealed class GrateMigrationTests : IDisposable
             await annotation.Callback(context);
         }
         return arguments;
+    }
+
+    private static async Task<string> GetId(string argument)
+    {
+        using var process = Process.Start(new ProcessStartInfo("id", argument)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        }) ?? throw new InvalidOperationException("Could not start the system identity command.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
+        await process.WaitForExitAsync(timeout.Token);
+        Assert.Equal(0, process.ExitCode);
+        return output.Trim();
     }
 
     public void Dispose() => Directory.Delete(_appHostDirectory, recursive: true);

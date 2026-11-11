@@ -45,12 +45,19 @@ var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOpt
 });
 var database = builder.AddPostgres("postgres").AddDatabase("appdb");
 var migration = database.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
+var sqlServer = builder.AddSqlServer("sqlserver").AddDatabase("sqldb");
+var sqlServerMigration = sqlServer.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
+var sqlite = builder.AddSqlite("filedb",
+    databasePath: Path.Combine(AppContext.BaseDirectory, "sqlite-data"), databaseFileName: "app.db");
+var sqliteMigration = sqlite.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
 if (migration.Resource.Name != "appdb-grate" ||
-    builder.Resources.Count(resource => resource.Name == "appdb-grate") != 1)
+    sqlServerMigration.Resource.Name != "sqldb-grate" ||
+    sqliteMigration.Resource.Name != "filedb-grate" ||
+    builder.Resources.OfType<GrateMigrationResource>().Count() != 3)
 {
-    throw new InvalidOperationException("The packaged API did not register one migration resource.");
+    throw new InvalidOperationException("The packaged API did not register one migration per provider.");
 }
-Console.WriteLine("PASS: isolated NuGet consumer compiled and registered the migration resource.");
+Console.WriteLine("PASS: isolated NuGet consumer compiled and registered all three migration providers.");
 '@
     Set-Content -LiteralPath (Join-Path $consumer 'Program.cs') -Value $program
     Push-Location $consumer

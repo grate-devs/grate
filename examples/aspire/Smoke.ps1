@@ -1,6 +1,8 @@
 #!/usr/bin/env pwsh
 [CmdletBinding()]
 param(
+    [ValidateSet('postgresql', 'sqlite', 'sqlserver')]
+    [string]$Provider = 'postgresql',
     [ValidateSet('all', 'success', 'retained', 'sql-failure', 'credentials-failure', 'readiness', 'interruption')]
     [string]$Scenario = 'all',
     [ValidateSet('Debug', 'Release')]
@@ -10,8 +12,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
-$project = Join-Path $PSScriptRoot 'Smoke/Smoke.csproj'
-$executable = Join-Path $PSScriptRoot "Smoke/bin/$Configuration/net10.0/Smoke.dll"
+$providerDirectory = switch ($Provider) {
+    'sqlite' { 'Sqlite/' }
+    'sqlserver' { 'SqlServer/' }
+    default { '' }
+}
+$project = Join-Path $PSScriptRoot "${providerDirectory}Smoke/Smoke.csproj"
+$executable = Join-Path $PSScriptRoot "${providerDirectory}Smoke/bin/$Configuration/net10.0/Smoke.dll"
 $logPath = Join-Path ([System.IO.Path]::GetTempPath()) "grate-aspire-smoke-$([guid]::NewGuid().ToString('N')).log"
 
 # This example targets .NET 10 independently of grate's .NET 11 source-build SDK.

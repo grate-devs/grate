@@ -6,4 +6,6 @@ namespace Grate.Aspire.Hosting;
 public sealed class GrateMigrationResource(string name) : ContainerResource(name)
 {
     internal ContainerMountAnnotation? ScriptsMount { get; set; }
+
+    internal ContainerMountAnnotation? DataMount { get; set; }
 }

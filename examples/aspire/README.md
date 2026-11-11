@@ -1,5 +1,9 @@
 # PostgreSQL migrations in Aspire
 
+The same fluent API is exercised by the [SQLite](Sqlite/README.md) and
+[SQL Server](SqlServer/README.md) examples. SQLite shares a writable file
+directory; SQL Server uses its own database resource and readiness dependency.
+
 This checkout-based prototype implements the API proposed in
 [#956](https://github.com/grate-devs/grate/issues/956). The hosting package has
 not been published. It runs the released `gratedevs/grate:2.3.0` image against
@@ -8,12 +12,12 @@ PostgreSQL 16; the AppHost and API target .NET 10 with Aspire 13.6.5.
 The consumer API is:
 
 ```csharp
-var migrate = database.AddGrateMigration()
+var migration = database.AddGrateMigration()
     .WithScriptsFolder("../db");
 
 builder.AddProject<Projects.Api>("api")
     .WithReference(database)
-    .WaitForCompletion(migrate);
+    .WaitForCompletion(migration);
 ```
 
 The database resource supplies the connection, PostgreSQL provider and readiness
@@ -54,7 +58,7 @@ Names, readiness and script settings are explicit API parameters. Use ordinary
 Aspire methods for image and environment settings:
 
 ```csharp
-var migrate = database.AddGrateMigration(name: "custom-migrate")
+var migration = database.AddGrateMigration(name: "custom-migrate")
     .WithScriptsFolder("../db", containerPath: "/sql", isReadOnly: true)
     .WithImage("gratedevs/grate", "2.3.0")
     .WithEnvironment("ENVIRONMENT", "TEST")

@@ -4,10 +4,12 @@
     <TargetFrameworks>net10.0</TargetFrameworks>
     <IsPublishable>false</IsPublishable>
     <PackageId>grate.aspire.hosting</PackageId>
-    <Description>Aspire hosting integration for grate PostgreSQL migrations.</Description>
+    <Description>Aspire hosting integration for grate PostgreSQL, SQL Server and SQLite migrations.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Sqlite" />
   </ItemGroup>
   <ItemGroup>
     <None Include="NuGet.md" Pack="true" PackagePath="\" />

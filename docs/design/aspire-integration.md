@@ -1,7 +1,7 @@
 # Aspire integration assessment
 
 Proposal for [#955](https://github.com/grate-devs/grate/issues/955).
-This design now has an [unpublished PostgreSQL prototype](../Aspire.md) and a
+This design now has an [unpublished three-provider prototype](../Aspire.md) and a
 [runnable example](https://github.com/grate-devs/grate/blob/main/examples/aspire/README.md). It is not a released
 integration or a production deployment commitment.
 
@@ -9,7 +9,7 @@ integration or a production deployment commitment.
 
 Proceed with a small grate hosting package that extends an Aspire database
 resource with `AddGrateMigration().WithScriptsFolder(scripts)`. Include a runnable
-PostgreSQL example and smoke checks as verification of that package.
+PostgreSQL, SQL Server and SQLite examples and smoke checks to verify the shared API.
 
 The [maintainer's proposed API](https://github.com/grate-devs/grate/pull/957#discussion_r4543597501)
 identifies the value: the database resource already supplies enough context to
@@ -22,7 +22,7 @@ An example alone still makes every consumer maintain the same wiring.
 Keep the package a thin adapter over the existing container contract, with
 explicit overrides and no migration engine of its own. Package compatibility,
 versioning and release maintenance are costs of this recommendation, to be
-bounded by an initial PostgreSQL implementation rather than all-provider support.
+bounded by these three local providers rather than all-provider or deployment support.
 
 ## Use cases and existing behavior
 
@@ -68,17 +68,17 @@ finite migration job.
 
 The extension methods below are implemented in
 [`grate.aspire.hosting`](https://github.com/grate-devs/grate/blob/main/src/grate.aspire.hosting/NuGet.md), but are not
-available in a released package. `database` is an Aspire PostgreSQL
-database resource; `scripts` identifies the consumer's SQL directory.
+available in a released package. `database` is an Aspire PostgreSQL, SQL Server,
+or toolkit SQLite resource; `scripts` identifies the consumer's SQL directory.
 
 ```csharp
-var migrate = database
+var migration = database
     .AddGrateMigration()
     .WithScriptsFolder(scripts);
 
 builder.AddProject<Projects.Api>("api")
     .WithReference(database)
-    .WaitForCompletion(migrate);
+    .WaitForCompletion(migration);
 ```
 
 `AddGrateMigration` returns an Aspire resource builder for a finite
@@ -93,11 +93,11 @@ consumer implicitly.
 | Runtime container name | Aspire's generated name for the migration resource | Normal container-name customization; avoid a fixed global name that collides across AppHosts |
 | Image and version | `gratedevs/grate` and a package-owned, tested release tag; initially use `2.3.0` | Explicit image/registry and tag or digest using a compatible entrypoint contract |
 | Connection string | Database resource's deferred connection expression | Explicit deferred expression or runtime secret reference |
-| Database type | Typed PostgreSQL resource maps to `postgresql` | `WithEnvironment("DATABASE_TYPE", ...)`; grate validates the value at invocation |
-| Database creation | `CREATE_DATABASE=false`; Aspire owns creation | Explicit creation setting; caller then owns the altered creation/permission contract |
+| Database type | Typed resource selects `postgresql`, `sqlserver` or `sqlite` | `WithEnvironment("DATABASE_TYPE", ...)`; grate validates the value at invocation |
+| Database creation | `CREATE_DATABASE=false`; Aspire provisions server databases, SQLite uses a file-backed connection | Explicit creation setting; caller owns the altered creation/permission contract |
 | Environment | `LOCAL` | Explicit grate environment selection |
 | Script mount | `WithScriptsFolder` resolves the source against the AppHost directory, mounts read-only at `/db` | Explicit source, target and mount settings, keeping the CLI script path aligned with the target |
-| Readiness dependency | Wait for the supplied database resource | Explicit dependency/readiness override; an opt-out must be deliberate |
+| Readiness dependency | Wait for server database resources; SQLite has no server wait | Explicit dependency/readiness override on server overloads |
 
 The prototype uses normal container builder methods for image and environment
 overrides. `AddGrateMigration(name, waitForDatabase)` controls naming and readiness;
@@ -136,7 +136,7 @@ var database = builder.AddPostgres("postgres")
 var scripts = Path.GetFullPath(Path.Combine(
     builder.AppHostDirectory, "db"));
 
-var migrate = builder.AddContainer("migrate", "gratedevs/grate", "2.3.0")
+var migration = builder.AddContainer("migrate", "gratedevs/grate", "2.3.0")
     .WithEnvironment("APP_CONNSTRING", database.Resource.ConnectionStringExpression)
     .WithEnvironment("DATABASE_TYPE", "postgresql")
     .WithEnvironment("CREATE_DATABASE", "false")
@@ -146,7 +146,7 @@ var migrate = builder.AddContainer("migrate", "gratedevs/grate", "2.3.0")
 
 builder.AddProject<Projects.Api>("api")
     .WithReference(database)
-    .WaitForCompletion(migrate);
+    .WaitForCompletion(migration);
 
 builder.Build().Run();
 ```
@@ -217,13 +217,13 @@ resources. This proposed baseline is separate from grate's
 Building a repository-hosted example must account for the repository's SDK and
 central package settings rather than silently inheriting unsuitable defaults.
 
-Start with PostgreSQL because an existing container example supplies a small
-SQL fixture and an observable result. Consider SQL Server next after verifying
-its connection expression, database readiness, TLS settings and an available
-container architecture. Do not imply that all grate providers are supported by
-this initial package. MariaDB/MySQL, Oracle and SQLite need separate
-provider-specific examples and evidence; SQLite also has a shared-file boundary
-instead of a database-server lifecycle.
+PostgreSQL and SQL Server share deferred connection and database readiness wiring.
+SQLite demonstrates the different shared-file boundary: writable database storage,
+no server wait, container-path remapping and Unix file ownership. It uses toolkit
+13.6.1 alongside Aspire 13.6.5. MariaDB/MySQL and Oracle remain outside this scope.
+Do not infer deployment-target support from local resource behavior; the
+[deployment matrix](../Aspire.md#deployment-providers) records the pinned publisher
+constraints and required job/SQL-delivery integration.
 
 The package's runnable example belongs with grate's consumer examples. Updates need a
 small pinned compatibility matrix: Aspire/AppHost, grate image, database image,
@@ -237,7 +237,7 @@ Do not rebuild or fork grate's migration implementation.
 ## Bounded first follow-up and verification
 
 [Issue #956](https://github.com/grate-devs/grate/issues/956) tracks the thin
-hosting package and a standalone PostgreSQL AppHost example using its extension
+hosting package, now exercised by three provider AppHosts using its extension
 API, with a minimal dependent API,
 one-time SQL fixture, pinned dependencies, setup/cleanup instructions and a
 repeatable PowerShell smoke check. Keep it outside the core provider tests.
@@ -258,7 +258,7 @@ these outcomes against disposable local resources:
    the same scripts are selected. Check diagnostics for credential disclosure.
 
 The prototype includes resource-model tests, a packed-library consumer check,
-and repeatable PostgreSQL smoke checks for these boundaries. Keep their actual
+and repeatable provider smoke checks for these boundaries. Keep their actual
 results, environment and limitations in the implementation PR. The earlier
 container-only spike is not evidence for the extension API; use the new checks
 when assessing the implementation.

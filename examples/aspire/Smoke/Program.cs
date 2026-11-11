@@ -81,19 +81,19 @@ static async Task<string?> RunApplication(
         .WithDataVolume(volume)
         .WithHealthCheck("smoke-readiness");
     var database = postgres.AddDatabase("appdb");
-    var migrate = database.AddGrateMigration()
+    var migration = database.AddGrateMigration()
         .WithScriptsFolder(scripts, containerPath: "/sql scripts")
         .WithContainerName(migrationContainer);
     if (scenario == "credentials-failure")
     {
-        migrate.WithEnvironment("APP_CONNSTRING", ReferenceExpression.Create(
+        migration.WithEnvironment("APP_CONNSTRING", ReferenceExpression.Create(
             $"Host={postgres.GetEndpoint("tcp").Property(EndpointProperty.Host)};Port={postgres.GetEndpoint("tcp").Property(EndpointProperty.Port)};Database=appdb;Username=postgres;Password=deliberately-wrong"));
     }
     var api = builder.AddProject<Projects.Api>("api")
         .WithHttpEndpoint(name: "http")
         .WithReference(database)
         .WithHttpHealthCheck("/health")
-        .WaitForCompletion(migrate);
+        .WaitForCompletion(migration);
     await using var app = builder.Build();
     var notifications = app.Services.GetRequiredService<ResourceNotificationService>();
     using var startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -106,7 +106,7 @@ static async Task<string?> RunApplication(
             // Establish that PostgreSQL accepts SQL while the custom readiness gate
             // stays closed, rather than mistaking ordinary server startup for a gate.
             await WaitForMaintenanceDatabase(database, cancellationToken);
-            Require(!notifications.TryGetCurrentState(migrate.Resource.Name, out var beforeGate)
+            Require(!notifications.TryGetCurrentState(migration.Resource.Name, out var beforeGate)
                 || beforeGate.Snapshot.ExitCode is null, "Migration completed before database readiness.");
             Require(!notifications.TryGetCurrentState("api", out var beforeApi)
                 || beforeApi.Snapshot.State?.Text != KnownResourceStates.Running,
@@ -118,7 +118,7 @@ static async Task<string?> RunApplication(
         }
         if (scenario == "interruption")
         {
-            await notifications.WaitForResourceAsync(migrate.Resource.Name, KnownResourceStates.Running, cancellationToken);
+            await notifications.WaitForResourceAsync(migration.Resource.Name, KnownResourceStates.Running, cancellationToken);
             await using var connection = await OpenDatabase(database, cancellationToken);
             await WaitForActiveMigration(connection, cancellationToken);
             await notifications.WaitForResourceAsync("api", KnownResourceStates.Waiting, cancellationToken);
@@ -128,7 +128,7 @@ static async Task<string?> RunApplication(
 
         await starting;
 
-        var completion = await notifications.WaitForResourceAsync(migrate.Resource.Name,
+        var completion = await notifications.WaitForResourceAsync(migration.Resource.Name,
             resource => resource.Snapshot.ExitCode.HasValue, cancellationToken);
         if (scenario is "sql-failure" or "credentials-failure")
         {

@@ -7,13 +7,13 @@ var database = builder.AddPostgres("postgres", password: password)
     .WithDataVolume("grate-aspire-example-postgres")
     .AddDatabase("appdb");
 
-var migrate = database.AddGrateMigration()
+var migration = database.AddGrateMigration()
     .WithScriptsFolder("../db");
 
 builder.AddProject<Projects.Api>("api")
     .WithHttpEndpoint(name: "http")
     .WithReference(database)
     .WithHttpHealthCheck("/health")
-    .WaitForCompletion(migrate);
+    .WaitForCompletion(migration);
 
 await builder.Build().RunAsync();
