@@ -164,11 +164,14 @@ for exact execution and skip counts.
 
 The standalone Windows matrix verifies all six MSI distributions natively on
 x64 and ARM64. Its lifecycle worker has a 360-second execution budget, followed
-by bounded termination, inside an independent eight-minute CI step. Failures
-remain failures and the following artifact step retains partial installer logs,
-worker output and supervisor phase records. The supervisor regression suite also
-exercises a live descendant that retains native output handles; run it on both
-Windows architectures before claiming that output capture and cleanup are bounded.
+by bounded termination. An eight-minute step deadline requests runner cancellation;
+it does not guarantee that a blocked runner completes cancellation or uploads logs.
+The worker launcher explicitly permits inheritance of only NUL stdin and its two
+log-file handles. Native startup/resource controls and the supervisor regressions
+run on both architectures, including outer-pipe EOF while a descendant remains
+alive and an intentional inheritance control. Failures remain failures. The
+following artifact step retains partial installer logs, worker output, phase
+records and regression evidence whenever the runner can execute it.
 
 For a handoff, record source/artifact identity, selected test layers and counts,
 TFM, host/RID, database version/image, CLI publish form or package/image identity,

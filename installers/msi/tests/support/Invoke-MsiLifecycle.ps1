@@ -28,9 +28,12 @@ foreach ($name in @('stdout.log', 'stderr.log')) {
     New-Item -ItemType File -Path (Join-Path $directory $name) | Out-Null
 }
 
-# Start-Process on Windows puts these file handles directly in STARTUPINFO.
-# Unlike ProcessStartInfo redirection, it creates no parent-owned pipe readers.
+# Restrict inheritance to NUL stdin and the two log files. Start-Process's
+# broad inheritance also leaks the outer CI step's otherwise unused pipes.
 # The quoted values are Windows file paths, which cannot contain a double quote.
+if ($null -eq ('Grate.MsiTests.MsiLifecycleNativeProcess' -as [type])) {
+    Add-Type -Path (Join-Path $PSScriptRoot 'MsiLifecycle.NativeProcess.cs') -ErrorAction Stop
+}
 $workerArguments = @(
     '-NoLogo', '-NoProfile', '-NonInteractive', '-MTA', '-File', ('"{0}"' -f $worker),
     '-Settings', ('"{0}"' -f $settings), '-Script', ('"{0}"' -f $resolvedScript)
@@ -62,9 +65,10 @@ function Write-SupervisorPhase {
 
 try {
     Write-SupervisorPhase 'BeforeStart'
-    $process = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') -ArgumentList $workerArguments `
-        -NoNewWindow -PassThru -RedirectStandardOutput (Join-Path $directory 'stdout.log') `
-        -RedirectStandardError (Join-Path $directory 'stderr.log')
+    $process = [Grate.MsiTests.MsiLifecycleNativeProcess]::Start(
+        (Join-Path $PSHOME 'pwsh.exe'), ($workerArguments -join ' '),
+        (Join-Path $directory 'stdout.log'), (Join-Path $directory 'stderr.log'),
+        $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.Path)
     $result.ProcessId = $process.Id
     Write-SupervisorPhase 'AfterStart'
     # Preserve the full worker budget; termination has a separate ten-second bound.

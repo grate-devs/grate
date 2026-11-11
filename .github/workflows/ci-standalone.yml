@@ -49,6 +49,8 @@ jobs:
           ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
           ./installers/msi/Test-InstallerLifecycle.Assertions.Tests.ps1
           ./installers/msi/Test-InstallerLifecycle.Process.Tests.ps1
+          ./installers/msi/tests/support/Test-MsiLifecycleNativeProcess.Tests.ps1 -OutputDirectory "${{ runner.temp }}/msi-native-controls"
+          ./installers/msi/tests/Test-MsiLifecycleOuterPipes.Tests.ps1 -OutputDirectory "${{ runner.temp }}/msi-outer-pipes"
           ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
@@ -110,5 +112,8 @@ jobs:
             installers/deb/*.deb
             ${{ runner.temp }}/grate-msi-lifecycle/
             ${{ runner.temp }}/grate-msi-lifecycle-supervisor/
+            ${{ runner.temp }}/msi-native-controls/
+            ${{ runner.temp }}/msi-outer-pipes/
+            ${{ runner.temp }}/lifecycle/
             ${{ runner.temp }}/grate-debian-lifecycle/
             !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/
