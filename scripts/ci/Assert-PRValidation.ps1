@@ -11,11 +11,12 @@ $ErrorActionPreference = 'Stop'
 
 # This inventory is deliberately independent of the workflow's matrix. Removing a
 # lane from YAML must not silently redefine the work required for a green check.
-$requiredGroups = @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')
+$requiredGroups = @('build-code', 'test', 'cli-distribution-build', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')
 $requiredJobs = @(
     'Build'
     'NuGet libraries and installed tool'
     'PR validation policy'
+    'Prepare CLI artifacts'
     'Run tests (ubuntu-latest, Basic_tests)'
     'Run tests (ubuntu-latest, SqlServer)'
     'Run tests (ubuntu-latest, SqlServerCaseSensitive)'
@@ -73,6 +74,10 @@ function Get-RequiredApiJobName {
         }
         '^NuGet libraries and installed tool$' {
             'Packages'
+            break
+        }
+        '^Prepare CLI artifacts$' {
+            'CLI distribution build'
             break
         }
         '^Run tests \((?:ubuntu|windows)-latest, Basic_tests\)$' {
@@ -151,13 +156,26 @@ foreach ($name in $requiredJobs) {
     $stepNames = @(switch -CaseSensitive -Wildcard ($name) {
         'Build' { 'Restore dependencies'; 'Build' }
         'PR validation policy' { 'Check build-independent contracts' }
+        'Prepare CLI artifacts' {
+            'Prepare standalone, tool and test payloads'
+            foreach ($profile in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+                "Upload profile $profile"
+            }
+            foreach ($database in @('Sqlite', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Oracle')) {
+                "Upload tests $database"
+            }
+        }
         'NuGet libraries and installed tool' {
             'Check standalone verification command contract'
             'Verify packages across supported frameworks'
         }
         'Run tests (ubuntu-latest,*' { 'Test on Linux' }
         'Run tests (windows-latest,*' { 'Test on Windows' }
-        'CLI database *' { 'Test published CLI and installed tool against database' }
+        'CLI database *' {
+            'Download selected distribution payload'
+            'Download selected test payload'
+            'Test published CLI and installed tool against database'
+        }
     })
     if ($name.StartsWith('CLI ', [StringComparison]::Ordinal) -and !$name.StartsWith('CLI database ', [StringComparison]::Ordinal)) {
         $stepNames += 'Verify self-contained runtime and execution'

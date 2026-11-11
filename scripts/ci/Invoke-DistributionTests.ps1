@@ -8,141 +8,16 @@ param(
     [string]$Database,
     [Parameter(Mandatory)]
     [string]$OutputDirectory,
-    [string]$RuntimeIdentifier = 'linux-x64'
+    [string]$RuntimeIdentifier = 'linux-x64',
+    [string]$PreparedDistributionDirectory,
+    [string]$PreparedTestsDirectory
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/Distribution.Common.ps1"
-
-function Publish-DistributionCli {
-    param(
-        [string]$Distribution,
-        [string]$Framework,
-        [string]$RuntimeIdentifier,
-        [string]$Version,
-        [string]$OutputDirectory
-    )
-
-    $publishArguments = @(
-        'publish', 'src/grate/grate.csproj', '-c', 'Release', '-f', $Framework,
-        '-r', $RuntimeIdentifier, '--self-contained', 'true',
-        "-p:TargetFrameworks=$Framework", "-p:GrateDistribution=$Distribution",
-        "-p:ArtifactsPath=$OutputDirectory/cli-build", "-p:Version=$Version",
-        '-o', "$OutputDirectory/standalone"
-    )
-    dotnet @publishArguments
-
-    $dependencyFiles = @(Get-ChildItem -LiteralPath "$OutputDirectory/cli-build/bin/grate" -Filter grate.deps.json -Recurse)
-    if ($dependencyFiles.Count -ne 1) {
-        throw 'Expected exactly one self-contained CLI dependency manifest.'
-    }
-    $dependencies = Get-Content -LiteralPath $dependencyFiles[0].FullName -Raw | ConvertFrom-Json -AsHashtable
-    Assert-DistributionDependencies -Dependencies $dependencies -Distribution $Distribution
-    Copy-Item -LiteralPath $dependencyFiles[0].FullName -Destination "$OutputDirectory/grate.deps.json"
-}
-
-function Assert-DistributionToolPackage {
-    param(
-        [string]$PackagePath,
-        [string[]]$Frameworks,
-        [string]$Distribution
-    )
-
-    $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
-    try {
-        foreach ($framework in $Frameworks) {
-            $prefix = "tools/$framework/any"
-            $dependencyEntry = $archive.GetEntry("$prefix/grate.deps.json")
-            $settingsEntry = $archive.GetEntry("$prefix/DotnetToolSettings.xml")
-            if (!$dependencyEntry -or !$settingsEntry) {
-                throw "Missing $framework tool payload."
-            }
-            $reader = [IO.StreamReader]::new($dependencyEntry.Open())
-            try {
-                $dependencies = $reader.ReadToEnd() | ConvertFrom-Json -AsHashtable
-                Assert-DistributionDependencies -Dependencies $dependencies -Distribution $Distribution
-            } finally {
-                $reader.Dispose()
-            }
-            $reader = [IO.StreamReader]::new($settingsEntry.Open())
-            try {
-                [xml]$settings = $reader.ReadToEnd()
-                if ($settings.DotNetCliTool.Commands.Command.Name -cne 'grate') {
-                    throw 'Every distribution must expose the command grate.'
-                }
-            } finally {
-                $reader.Dispose()
-            }
-        }
-    } finally {
-        $archive.Dispose()
-    }
-}
-
-function Build-DistributionTool {
-    param(
-        [string]$Distribution,
-        [string[]]$Frameworks,
-        [string]$Version,
-        [string]$PackageId,
-        [string]$OutputDirectory
-    )
-
-    $packArguments = @(
-        'pack', 'src/grate/grate.csproj', '-c', 'Release',
-        '-p:PackAsTool=true', '-p:SelfContained=false',
-        "-p:GrateDistribution=$Distribution", "-p:ArtifactsPath=$OutputDirectory/tool-build",
-        "-p:PackageVersion=$Version", '-o', "$OutputDirectory/packages"
-    )
-    dotnet @packArguments
-    $packageParameters = @{
-        PackagePath = "$OutputDirectory/packages/$PackageId.$Version.nupkg"
-        Frameworks = $Frameworks
-        Distribution = $Distribution
-    }
-    Assert-DistributionToolPackage @packageParameters
-}
-
-function Install-DistributionTool {
-    param(
-        [string]$PackageId,
-        [string]$Version,
-        [string]$Framework,
-        [string]$OutputDirectory
-    )
-
-    # Only the freshly built package may satisfy this installation.
-    $feed = [Security.SecurityElement]::Escape("$OutputDirectory/packages")
-    "<configuration><packageSources><clear/><add key=`"local`" value=`"$feed`"/></packageSources></configuration>" |
-        Set-Content -LiteralPath "$OutputDirectory/NuGet.Config" -Encoding utf8NoBOM
-    $savedPackages = $env:NUGET_PACKAGES
-    try {
-        $env:NUGET_PACKAGES = "$OutputDirectory/tool-cache"
-        $installArguments = @(
-            'tool', 'install', $PackageId, '--version', $Version, '--framework', $Framework,
-            '--tool-path', "$OutputDirectory/tool", '--configfile', "$OutputDirectory/NuGet.Config"
-        )
-        dotnet @installArguments
-    } finally {
-        $env:NUGET_PACKAGES = $savedPackages
-    }
-}
-
-function Build-DistributionTests {
-    param(
-        [string]$Database,
-        [string]$Framework,
-        [string]$OutputDirectory
-    )
-
-    # Tests retain normal All references; only the explicitly selected executable is slim.
-    $buildArguments = @(
-        'build', "unittests/CommandLine/CommandLine.$Database/CommandLine.$Database.csproj",
-        '-c', 'Release', "-p:TargetFrameworks=$Framework", "-p:ArtifactsPath=$OutputDirectory/test-build"
-    )
-    dotnet @buildArguments
-}
+. "$PSScriptRoot/Distribution.Build.ps1"
+. "$PSScriptRoot/Distribution.Artifacts.ps1"
 
 function Invoke-DistributionSuites {
     param(
@@ -185,6 +60,13 @@ $databaseDistributions = @{
 if ($Distribution -ne 'All' -and $Distribution -ne $databaseDistributions[$Database]) {
     throw "The $Database suite cannot validate a $Distribution distribution."
 }
+if ([bool]$PreparedDistributionDirectory -ne [bool]$PreparedTestsDirectory) {
+    throw 'Prepared distribution and test directories must be supplied together.'
+}
+if ($PreparedDistributionDirectory) {
+    $PreparedDistributionDirectory = [IO.Path]::GetFullPath($PreparedDistributionDirectory)
+    $PreparedTestsDirectory = [IO.Path]::GetFullPath($PreparedTestsDirectory)
+}
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $output) {
@@ -194,29 +76,62 @@ $savedExecutable = $env:GrateExecutablePath
 $savedPackages = $env:NUGET_PACKAGES
 Push-Location $repository
 try {
-    $frameworks = @((dotnet msbuild src/grate/grate.csproj -nologo -getProperty:TargetFrameworks).Trim() -split ';')
+    $frameworks = @(Get-DistributionFrameworks)
     $framework = $frameworks[-1]
     $version = '0.0.0-ci.' + [Guid]::NewGuid().ToString('N')
     $packageId = if ($Distribution -eq 'All') { 'grate' } else { 'grate-' + $Distribution.ToLowerInvariant() }
-    $publishParameters = @{
-        Distribution = $Distribution
-        Framework = $framework
-        RuntimeIdentifier = $RuntimeIdentifier
-        Version = $version
-        OutputDirectory = $output
-    }
-    Publish-DistributionCli @publishParameters
+    if ($PreparedDistributionDirectory) {
+        $expectedDistribution = Get-DistributionPayloadIdentity -Kind 'Distribution' -RuntimeIdentifier $RuntimeIdentifier -Frameworks $frameworks
+        $expectedDistribution.Distribution = $Distribution
+        $expectedDistribution.PackageId = $packageId
+        $prepared = Read-DistributionPayloadManifest -Directory $PreparedDistributionDirectory -ExpectedIdentity $expectedDistribution
+        if ([string]$prepared.Version -cnotmatch '^0\.0\.0-ci\.[a-f0-9]{32}$') {
+            throw 'Prepared payload has an invalid package version.'
+        }
+        $version = $prepared.Version
+        $expectedTests = Get-DistributionPayloadIdentity -Kind 'Tests' -RuntimeIdentifier $RuntimeIdentifier -Frameworks $frameworks
+        $expectedTests.Database = $Database
+        $expectedTests.Distribution = 'All'
+        Read-DistributionPayloadManifest -Directory $PreparedTestsDirectory -ExpectedIdentity $expectedTests | Out-Null
 
-    $toolParameters = @{
-        Distribution = $Distribution
-        Frameworks = $frameworks
-        Version = $version
-        PackageId = $packageId
-        OutputDirectory = $output
+        Copy-DistributionPayload -Source "$PreparedDistributionDirectory/standalone" -Destination "$output/standalone"
+        Copy-DistributionPayload -Source "$PreparedDistributionDirectory/packages" -Destination "$output/packages"
+        Copy-Item -LiteralPath "$PreparedDistributionDirectory/grate.deps.json" -Destination "$output/grate.deps.json"
+        Copy-DistributionPayload -Source "$PreparedTestsDirectory/payload" `
+            -Destination "$output/test-build/bin/CommandLine.$Database/release_$framework"
+        $dependencies = Get-Content -LiteralPath "$output/grate.deps.json" -Raw | ConvertFrom-Json -AsHashtable
+        Assert-DistributionDependencies -Dependencies $dependencies -Distribution $Distribution
+        Assert-DistributionToolPackage -PackagePath "$output/packages/$packageId.$version.nupkg" `
+            -Frameworks $frameworks -Distribution $Distribution
+        if (!$IsWindows) {
+            # Artifact transport resets files to 0644; restore the published CLI's execute bit.
+            $executable = "$output/standalone/grate"
+            $mode = [IO.File]::GetUnixFileMode($executable)
+            [IO.File]::SetUnixFileMode($executable, $mode -bor [IO.UnixFileMode]::UserExecute)
+        }
+    } else {
+        $publishParameters = @{
+            Distribution = $Distribution
+            Framework = $framework
+            RuntimeIdentifier = $RuntimeIdentifier
+            Version = $version
+            OutputDirectory = $output
+        }
+        Publish-DistributionCli @publishParameters
+
+        $toolParameters = @{
+            Distribution = $Distribution
+            Frameworks = $frameworks
+            Version = $version
+            PackageId = $packageId
+            OutputDirectory = $output
+        }
+        Build-DistributionTool @toolParameters
     }
-    Build-DistributionTool @toolParameters
     Install-DistributionTool -PackageId $packageId -Version $version -Framework $framework -OutputDirectory $output
-    Build-DistributionTests -Database $Database -Framework $framework -OutputDirectory $output
+    if (!$PreparedTestsDirectory) {
+        Build-DistributionTests -Database $Database -Framework $framework -OutputDirectory $output
+    }
 
     $suiteParameters = @{
         Distribution = $Distribution
