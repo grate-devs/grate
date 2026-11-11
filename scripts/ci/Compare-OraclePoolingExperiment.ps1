@@ -25,9 +25,6 @@ function Read-OracleSuite {
             throw 'Result has no test definition.'
         }
         $name = [string]$result.testName
-        if ($method.name -ceq 'The_table_name_casings_are_converted_if_needed') {
-            $name = $name.ToLowerInvariant()
-        }
         @($method.className, $method.name, $name, $result.outcome) | ConvertTo-Json -Compress
     })
     $counters = $xml.TestRun.ResultSummary.Counters
@@ -59,5 +56,5 @@ if (@(Compare-Object -ReferenceObject $baseline.Records -DifferenceObject $scope
     Baseline = $baseline | Select-Object Total,Passed,Skipped,TestSeconds,RunnerIntervalSeconds
     Scoped = $scoped | Select-Object Total,Passed,Skipped,TestSeconds,RunnerIntervalSeconds
     TestTimeChangePercent = 100 * ($scoped.TestSeconds / $baseline.TestSeconds - 1)
-    IdentityComparison = 'Identical class/method/display/outcome multisets; only the existing randomized casing arguments normalized'
+    IdentityComparison = 'Exact class/method/display/outcome multisets; deterministic distinct casing inputs in both variants'
 } | ConvertTo-Json -Depth 6 | Tee-Object -FilePath (Join-Path $ResultsDirectory 'comparison.json')

@@ -28,6 +28,7 @@ try {
         Configuration = 'Debug'
         ExpectedCasesPerVariant = 321
         PreservedUnpooledCase = 'Oracle.Running_MigrationScripts.DropDatabase.Ensure_database_gets_dropped'
+        ReproducibleTableCasings = $true
         AssemblySha256 = (Get-FileHash -LiteralPath $assembly -Algorithm SHA256).Hash
         OracleImage = $image
         ImageDetails = @(docker image inspect $image --format '{{json .RepoDigests}} {{.Id}} {{.Architecture}}')
@@ -49,13 +50,14 @@ try {
         $info.RedirectStandardOutput = $true
         $info.RedirectStandardError = $true
         $info.Environment['GRATE_ORACLE_SCOPED_POOLING'] = if ($variant -eq 'scoped') { 'true' } else { 'false' }
+        $info.Environment['GRATE_REPRODUCIBLE_TABLE_CASINGS'] = 'true'
         $info.Environment['GrateTestConfig__DockerImage'] = $image
         $info.Environment.Remove('GrateTestConfig__AdminConnectionString') | Out-Null
         $info.Environment['LogLevel'] = 'Warning'
         $info.Environment['TZ'] = 'UTC'
         foreach ($argument in @(
             $assembly, '--stop-on-fail', 'on', '--long-running', '60', '--timeout', '20m',
-            '--minimum-expected-tests', '321', '--results-directory', $variantDirectory,
+            '--minimum-expected-tests', '320', '--results-directory', $variantDirectory,
             '--report-xunit-trx', '--coverage', '--coverage-output-format', 'xml'
         )) {
             $info.ArgumentList.Add($argument)

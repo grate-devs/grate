@@ -1,4 +1,6 @@
-﻿using System.Reflection;
+﻿using System.Data.Common;
+using System.Reflection;
+using System.Text;
 using Oracle.ManagedDataAccess.Client;
 using Xunit.v3;
 
@@ -27,15 +29,34 @@ internal static class OracleTestConnectionPools
 
         if (UnpooledScope.Value)
         {
-            return new OracleConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString;
+            return PreservePasswordKey(new OracleConnectionStringBuilder(connectionString) { Pooling = false });
         }
 
-        return new OracleConnectionStringBuilder(connectionString)
+        return PreservePasswordKey(new OracleConnectionStringBuilder(connectionString)
         {
             Pooling = true,
             MinPoolSize = 0,
             MaxPoolSize = 4
-        }.ConnectionString;
+        });
+    }
+
+    private static string PreservePasswordKey(OracleConnectionStringBuilder connection)
+    {
+        // Oracle's builder serializes PASSWORD in uppercase, while existing custom
+        // bootstrap tests recognize Password/Pwd literally. Reinsert the parsed
+        // value, rather than replacing text that could also occur in a password.
+        var parsed = new DbConnectionStringBuilder { ConnectionString = connection.ConnectionString };
+        var serialized = new StringBuilder();
+        foreach (string key in parsed.Keys)
+        {
+            // Keep Oracle's uppercase key convention for other legacy consumers,
+            // including the provider's database-name parsing of USER ID.
+            var serializedKey = string.Equals(key, "Password", StringComparison.OrdinalIgnoreCase)
+                ? "Password"
+                : key.ToUpperInvariant();
+            DbConnectionStringBuilder.AppendKeyValuePair(serialized, serializedKey, (string)parsed[key]);
+        }
+        return serialized.ToString();
     }
 
     internal static void ClearUserPool(string connectionString)
