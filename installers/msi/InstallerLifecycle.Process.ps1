@@ -32,7 +32,20 @@ function Invoke-InstallerLifecycleProcess {
     $commandPath = Join-Path $OutputDirectory "$Name.command.json"
     $command | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $commandPath
 
+    function Write-CommandPhase {
+        param(
+            [string]$Phase
+        )
+        $command.phase = $Phase
+        $command | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $commandPath
+        @{
+            Phase = $Phase
+            Utc = [DateTime]::UtcNow.ToString('o')
+        } | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $OutputDirectory "$Name.process-phases.jsonl")
+    }
+
     try {
+        Write-CommandPhase 'BeforeStart'
         [void]$process.Start()
         $started = $true
         $command.processId = $process.Id
@@ -40,12 +53,19 @@ function Invoke-InstallerLifecycleProcess {
         $command | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $commandPath
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
+        Write-CommandPhase 'BeforeWait'
         $command.timedOut = !$process.WaitForExit($TimeoutMilliseconds)
+        Write-CommandPhase 'AfterWait'
         if ($command.timedOut) {
             # The CI VM is disposable. Avoid potentially blocking process-tree
             # enumeration; the outer supervisor also bounds the whole harness.
+            Write-CommandPhase 'BeforeKill'
             $process.Kill()
-            if (!$process.WaitForExit(10000)) {
+            Write-CommandPhase 'AfterKill'
+            Write-CommandPhase 'BeforeTerminationWait'
+            $terminated = $process.WaitForExit(10000)
+            Write-CommandPhase 'AfterTerminationWait'
+            if (!$terminated) {
                 throw "$Name did not terminate within ten seconds. See $OutputDirectory."
             }
         }
@@ -53,12 +73,14 @@ function Invoke-InstallerLifecycleProcess {
         try {
             # Descendants and Windows Installer services can retain inherited
             # pipe handles after the process exits. Process timeout is not enough.
+            Write-CommandPhase 'BeforeDrain'
             [void][Threading.Tasks.Task]::WhenAll([Threading.Tasks.Task[]]@($stdout, $stderr)).WaitAsync(
                 [TimeSpan]::FromMilliseconds($DrainTimeoutMilliseconds)).GetAwaiter().GetResult()
         }
         catch {
             $command.streamDrainFailure = $_.Exception.Message
         }
+        Write-CommandPhase 'AfterDrain'
 
         $output = if ($stdout.IsCompletedSuccessfully) {
             $stdout.GetAwaiter().GetResult()
@@ -94,8 +116,9 @@ function Invoke-InstallerLifecycleProcess {
         if ($started -and $process.HasExited) {
             $command.exitCode = $process.ExitCode
         }
-        $command.completedUtc = [DateTime]::UtcNow.ToString('o')
-        $command | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $commandPath
+        Write-CommandPhase 'BeforeDispose'
         $process.Dispose()
+        $command.completedUtc = [DateTime]::UtcNow.ToString('o')
+        Write-CommandPhase 'AfterDispose'
     }
 }
