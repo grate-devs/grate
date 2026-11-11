@@ -84,6 +84,8 @@ function Invoke-OuterPipeCase {
     } | ConvertTo-Json | Set-Content -LiteralPath $settings
     $start = [Diagnostics.ProcessStartInfo]::new($pwsh)
     $start.UseShellExecute = $false
+    # Match the outer process configuration used by the Actions runner.
+    $start.CreateNoWindow = $true
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
     foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $outerScript, '-Settings', $settings)) {
