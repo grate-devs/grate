@@ -148,7 +148,7 @@ The Linux Oracle provider lane enables `GRATE_ORACLE_SCOPED_POOLING=true`.
 It clears test-host pools before and after each case and releases the selected
 user's idle pool before fixture cleanup drops that user. The dedicated production
 DROP test keeps its original unpooled input. Imported CLI/Docker suites keep their
-existing connection behavior. `GRATE_REPRODUCIBLE_TABLE_CASINGS=true` selects
+existing pooling policy. `GRATE_REPRODUCIBLE_TABLE_CASINGS=true` selects
 27 distinct, reproducible casing combinations for that lane; other lanes retain
 their existing inputs. Both flags default to off outside that CI lane.
 
@@ -157,6 +157,12 @@ cancellation code (`ORA-01013`) in the failure's cause chain as well as the
 failed-history/no-success contract. Positive controls run the same sleep SQL with
 a generous timeout and require successful history, so a syntax error cannot
 establish timeout coverage.
+
+Oracle container fixtures set `DISABLE_OOB=ON` in the server's resolved
+`sqlnet.ora` after startup scripts finish and before test sessions open. This
+allows cancellation through Docker's proxied connections, including the XE 18
+image. Configuration failures fail fixture initialization, and existing file
+symlinks are preserved. Externally configured Oracle servers are not modified.
 
 [integration-tests.yml](../../.github/workflows/integration-tests.yml) actively runs
 net11 Linux x64 self-contained CLI tests against SQL Server 2017/2019/2022/2025,
