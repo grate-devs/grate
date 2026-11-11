@@ -6,17 +6,22 @@ decision or a supported Aspire integration.
 
 ## Recommendation
 
-Proceed with a runnable PostgreSQL example using Aspire's existing container
-resource APIs. Defer publishing a dedicated hosting package until the example
-reveals repeated configuration or lifecycle problems that justify a public API.
-The immediate benefit is a documented database → migration → application startup
-sequence and one place to inspect migration status and console output.
+Proceed with a small grate hosting package that extends an Aspire database
+resource with `AddGrateMigration().WithScriptsFolder(scripts)`. Include a runnable
+PostgreSQL example and smoke checks as verification of that package.
 
-A package would initially wrap image selection, a script mount, environment
-variables, and dependencies. Those are useful defaults, but they do not yet
-justify a new package compatibility and release commitment. Revisit that choice
-if multiple consumers need the same validated configuration, additional providers
-make the wiring cumbersome, or a deployment target requires reusable behavior.
+The [maintainer's proposed API](https://github.com/grate-devs/grate/pull/957#discussion_r4543597501)
+identifies the value: the database resource already supplies enough context to
+infer the connection, provider and readiness dependency. The package can apply
+grate's image, environment and script-mount conventions once, so consumers only
+declare the script location and which applications must wait for completion.
+This removes repeated configuration and gives those defaults a testable contract.
+An example alone still makes every consumer maintain the same wiring.
+
+Keep the package a thin adapter over the existing container contract, with
+explicit overrides and no migration engine of its own. Package compatibility,
+versioning and release maintenance are costs of this recommendation, to be
+bounded by an initial PostgreSQL implementation rather than all-provider support.
 
 ## Use cases and existing behavior
 
@@ -45,24 +50,74 @@ enough to describe the intended orchestration without changing grate's core.
 
 | Approach | Benefit | Cost and limitation | Assessment |
 | --- | --- | --- | --- |
-| Generic container plus documented example | Reuses the shipped image, existing configuration and Aspire lifecycle APIs; separates AppHost and grate runtimes | Consumers declare provider, mount and environment mapping; image pulls and container runtime required | Start here |
-| Dedicated hosting package | Can validate settings and offer common provider-specific defaults | Own an Aspire dependency range, public API, package release, image-version policy and provider/lifecycle tests | Defer until the example establishes recurring needs |
+| Generic container plus documented example | Reuses the shipped image, existing configuration and Aspire lifecycle APIs; separates AppHost and grate runtimes | Each consumer repeats provider, mount, environment and dependency wiring | Useful fallback and description of package internals |
+| Dedicated hosting package | Infers database context and applies grate defaults through a short fluent API; validates and tests those conventions centrally | Own an Aspire dependency range, public API, package release, image-version policy and provider/lifecycle tests | Recommended first delivery, with a runnable example |
 | Local CLI/executable resource | Uses an installed tool or checkout; avoids a second container for migrations | Tool/runtime installation, version selection, working directory, host networking and secret argument handling vary by machine | Useful documented alternative, outside the first example |
 | Consumer-owned worker calling grate libraries | Full control over configuration and host lifecycle | Adds a project and couples the consumer's runtime, dependencies, logging and cancellation to grate's library API | Consider when application-specific migration code is already necessary |
 | Separate delivery-pipeline migration | Explicit deployment gate, credentials and operational ownership | Does not itself provide local AppHost startup coordination | Retain for deployments; complementary to a local example |
 
 Aspire documents [external executable resources](https://aspire.dev/app-host/executable-resources/)
 and [custom resource extension points](https://aspire.dev/extensibility/custom-resources/).
-If a hosting package is later justified, keep it a thin AppHost adapter around the
+Keep the hosting package a thin AppHost adapter around the
 container contract. Aspire dependencies must not enter grate's core or database
 providers. Do not introduce an application client integration just to run a
 finite migration job.
 
-## Proposed local usage
+## Proposed package API
+
+The extension methods below are a proposed public API, not implemented or
+available in a released package. `database` is initially an Aspire PostgreSQL
+database resource; `scripts` identifies the consumer's SQL directory.
+
+```csharp
+var migrate = database
+    .AddGrateMigration()
+    .WithScriptsFolder(scripts);
+
+builder.AddProject<Projects.Api>("api")
+    .WithReference(database)
+    .WaitForCompletion(migrate);
+```
+
+`AddGrateMigration` should return an Aspire resource builder for a finite
+grate container resource, compatible with `WaitForCompletion` and normal
+container customization. The caller still chooses which applications wait for
+it; creating the migration must not add startup dependencies to every database
+consumer implicitly.
+
+| Setting | Proposed default | Override contract |
+| --- | --- | --- |
+| Aspire resource name | `<database-resource-name>-grate`; reject duplicate names | Explicit name for multiple named migration resources |
+| Runtime container name | Aspire's generated name for the migration resource | Normal container-name customization; avoid a fixed global name that collides across AppHosts |
+| Image and version | `gratedevs/grate` and a package-owned, tested release tag; initially evaluate `2.2.0` | Explicit image/registry and tag or digest using a compatible entrypoint contract |
+| Connection string | Database resource's deferred connection expression | Explicit deferred expression or runtime secret reference |
+| Database type | From the typed database resource; PostgreSQL maps to `postgresql` | Explicit provider setting, validated rather than inferred from connection-string text |
+| Database creation | `CREATE_DATABASE=false`; Aspire owns creation | Explicit creation setting; caller then owns the altered creation/permission contract |
+| Environment | `LOCAL` | Explicit grate environment selection |
+| Script mount | `WithScriptsFolder` resolves the source against the AppHost directory, mounts read-only at `/db` | Explicit source, target and mount settings, keeping the CLI script path aligned with the target |
+| Readiness dependency | Wait for the supplied database resource | Explicit dependency/readiness override; an opt-out must be deliberate |
+
+Provide a documented options/configuration surface for these overrides, alongside
+normal container builder methods where appropriate. Exact option names remain
+implementation design; the two-call default above is the proposed consumer
+contract. Reject missing/nonexistent script sources before running a migration.
+Define whether repeated script configuration replaces the earlier mount, and test
+it; do not accumulate conflicting mounts or depend on duplicate CLI options to
+override the image entrypoint's defaults.
+
+Use provider-specific overloads initially. An arbitrary resource exposing a
+connection string does not reliably identify the database provider. Unsupported
+resource types need an explicit provider contract or a clear unsupported result.
+Neither a resource name nor a password should be recovered by parsing a rendered
+connection string. Keep Aspire dependencies in the hosting package, outside the
+grate core and database-provider libraries.
+
+## Equivalent container wiring
 
 This is a partial AppHost illustration, not a copy-and-run sample. `Projects.Api`
 belongs to the consuming application, and `db/up` contains its PostgreSQL scripts.
-The follow-up example must pin and verify compatible Aspire packages and images,
+This shows the wiring that the proposed package would encapsulate. The follow-up
+must verify the extension API produces the equivalent resource configuration,
 including container-to-container connection-string resolution.
 
 ```csharp
@@ -103,6 +158,13 @@ example pin, not a claim that it contains every feature in the current checkout.
 Select the tested release tag or digest when implementing the runnable example;
 do not use `latest` as its reproducibility policy.
 
+This illustration uses a fresh, ephemeral database. The retained-data example
+must configure a PostgreSQL data volume and a stable password supplied through
+secret configuration, and document how to remove that volume. Keep persistence
+under the caller's database configuration; `AddGrateMigration` must not silently
+change the database's lifetime. See Aspire's
+[PostgreSQL hosting guidance](https://aspire.dev/integrations/databases/postgres/postgres-host/).
+
 ## Lifecycle, settings and failure contract
 
 - Wait for database readiness before starting grate. Wait for successful grate
@@ -130,7 +192,8 @@ do not use `latest` as its reproducibility policy.
 - Forward only documented settings. The container entrypoint already supplies
   noninteractive mode, `/db` and `/output`; it defaults migration version,
   environment, creation and transaction settings. The example should set its
-  intended values explicitly and explain how additional CLI options are passed.
+  intended values explicitly; the package must apply its defaults and overrides
+  deterministically and explain how additional CLI options are passed.
   See [configuration](../ConfigurationOptions/index.md) and
   [script policies](../ScriptTypes/index.md).
 - Use console output and exit state as the first observability surface. A console
@@ -152,24 +215,29 @@ Start with PostgreSQL because an existing container example supplies a small
 SQL fixture and an observable result. Consider SQL Server next after verifying
 its connection expression, database readiness, TLS settings and an available
 container architecture. Do not imply that all grate providers are supported by
-this initial Aspire example. MariaDB/MySQL, Oracle and SQLite need separate
+this initial package. MariaDB/MySQL, Oracle and SQLite need separate
 provider-specific examples and evidence; SQLite also has a shared-file boundary
 instead of a database-server lifecycle.
 
-The example would be maintained with grate's consumer examples. Updates need a
+The package's runnable example belongs with grate's consumer examples. Updates need a
 small pinned compatibility matrix: Aspire/AppHost, grate image, database image,
-host platform and container architecture. A package would additionally need a
+host platform and container architecture. The package also needs a
 chosen name and owner, supported Aspire range, public API compatibility checks,
 release automation, and an image update policy independent of its own version.
-Neither route should rebuild or fork grate's migration implementation.
+Choose its package identity and supported dependency range before publication;
+implementation and local package verification do not themselves publish it.
+Do not rebuild or fork grate's migration implementation.
 
 ## Bounded first follow-up and verification
 
-[Follow-up #956](https://github.com/grate-devs/grate/issues/956) tracks a
-standalone PostgreSQL AppHost example with a minimal dependent API,
+[Follow-up #956](https://github.com/grate-devs/grate/issues/956) tracks the thin
+hosting package and a standalone PostgreSQL AppHost example using its extension
+API, with a minimal dependent API,
 one-time SQL fixture, pinned dependencies, setup/cleanup instructions and a
 repeatable PowerShell smoke check. Keep it outside the core provider tests.
-The follow-up should prove these outcomes against disposable local resources:
+First verify the resource model's inferred defaults, every advertised override,
+name collisions, missing scripts and unsupported resource types. Then prove
+these outcomes against disposable local resources:
 
 1. Fresh database: SQL creates a table and seed row; the API starts afterward and
    returns that row. Assert actual database state as well as process success.
@@ -184,8 +252,8 @@ The follow-up should prove these outcomes against disposable local resources:
    the same scripts are selected. Check diagnostics for credential disclosure.
 
 This is a verification plan, not a record of executed checks. Link actual spike
-and follow-up results from the issue or PR. A package decision can then use the
-example's duplication and failure cases as evidence.
+and follow-up results from the issue or PR. The existing container spike does not
+establish that the proposed extension methods compile or honor these contracts.
 
 ## Deployment boundary
 
