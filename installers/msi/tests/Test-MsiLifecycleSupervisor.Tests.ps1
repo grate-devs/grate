@@ -1,16 +1,19 @@
 #!/usr/bin/env pwsh
 param(
     [string]$SupervisorPath = (Join-Path $PSScriptRoot 'support/Invoke-MsiLifecycle.ps1'),
-    [ValidateSet('Success', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'WorkerHang', 'DescendantSuccess', 'DescendantTimeout')]
-    [string[]]$Cases = @('Success', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'WorkerHang', 'DescendantSuccess', 'DescendantTimeout')
+    [ValidateSet('Success', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'ScriptFailureStaleNonzero', 'WorkerHang', 'DescendantSuccess', 'DescendantTimeout')]
+    [string[]]$Cases = @('Success', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'ScriptFailureStaleNonzero', 'WorkerHang', 'DescendantSuccess', 'DescendantTimeout')
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '../InstallerLifecycle.Diagnostics.ps1')
 $directory = Join-Path $env:RUNNER_TEMP ('lifecycle/supervisor contract evidence/' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $directory -Force | Out-Null
 $result = @{
     Succeeded = $false
     Cases = @()
+    StartupFailures = @()
+    CleanupFailures = @()
 }
 $workerScript = Join-Path $directory 'worker-test.ps1'
 @'
@@ -61,6 +64,10 @@ if ($Mode -eq 'ScriptFailureNull') {
     Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
     throw 'Synthetic worker failure without a native exit code'
 }
+if ($Mode -eq 'ScriptFailureStaleNonzero') {
+    $global:LASTEXITCODE = 37
+    throw 'Synthetic worker failure after an unrelated native exit'
+}
 Write-Output 'Worker completed'
 '@ | Set-Content -LiteralPath $workerScript
 
@@ -93,7 +100,19 @@ try {
     exit 1
 }
 '@ | Set-Content -LiteralPath $runner
-    $start = [Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'pwsh.exe'))
+    $runnerExecutable = Join-Path $PSHOME 'pwsh.exe'
+    if ($Mode -like 'StartupFailure*') {
+        # These are the two valid BeforeStart record shapes when native launch
+        # fails. The executable is genuinely absent; Process.Start is not mocked.
+        New-Item -ItemType Directory -Path "$output-supervisor" | Out-Null
+        $startupRecord = @{ Phase = 'BeforeStart' }
+        if ($Mode -eq 'StartupFailureNullPid') {
+            $startupRecord.ProcessId = $null
+        }
+        $startupRecord | ConvertTo-Json | Set-Content -LiteralPath "$output-supervisor/process.json"
+        $runnerExecutable = Join-Path $directory 'nonexistent-supervisor-runner.exe'
+    }
+    $start = [Diagnostics.ProcessStartInfo]::new($runnerExecutable)
     $start.UseShellExecute = $false
     foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $runner, '-Settings', $caseSettings)) {
         $start.ArgumentList.Add($argument)
@@ -101,6 +120,7 @@ try {
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $start
     $watch = [Diagnostics.Stopwatch]::StartNew()
+    $primaryFailure = $null
     try {
         [void]$process.Start()
         # Independent watchdog: old supervisors must fail this assertion rather
@@ -186,31 +206,93 @@ try {
         if ($observation.Phase -ne 'Completed' -or !$observation.CompletedUtc -or $observation.ElapsedSeconds -gt 25) {
             throw "$Mode did not finish disposal and evidence within its whole-operation bound."
         }
+        $requiredPhases = @('BeforeStart', 'AfterStart', 'BeforeWait', 'AfterWait')
+        if ($ExpectedTimeout) {
+            $requiredPhases += @('BeforeKill', 'AfterKill', 'BeforeTerminationWait', 'AfterTerminationWait')
+        }
+        $requiredPhases += @('BeforeDispose', 'Completed')
+        Assert-InstallerLifecyclePhaseOrder -Path "$output-supervisor/phases.jsonl" -RequiredPhases $requiredPhases
+        $diagnostics = Get-Content -LiteralPath "$output-supervisor/diagnostics.json" -Raw | ConvertFrom-Json
+        if (@($diagnostics.Failures).Count) {
+            throw "$Mode retained unexpected diagnostic failures."
+        }
         $result.Cases += @{
             Mode = $Mode
             ExitCode = $observation.ExitCode
             TimedOut = $observation.TimedOut
             ElapsedSeconds = $watch.Elapsed.TotalSeconds
         }
+    } catch {
+        $primaryFailure = $_.Exception
+        throw
     } finally {
-        foreach ($pidFile in @("$output-supervisor/process.json", "$output/descendant.pid")) {
-            if (Test-Path -LiteralPath $pidFile) {
-                $ownedId = if ($pidFile.EndsWith('.json')) {
-                    (Get-Content -LiteralPath $pidFile -Raw | ConvertFrom-Json).ProcessId
-                } else {
-                    [int](Get-Content -LiteralPath $pidFile)
-                }
-                $owned = Get-Process -Id $ownedId -ErrorAction SilentlyContinue
-                if ($owned -and !$owned.HasExited) {
-                    $owned.Kill()
+        $cleanupFailures = [Collections.Generic.List[Exception]]::new()
+        $cleanupObservation = @{
+            Mode = $Mode
+            RunnerDisposed = $false
+            SkippedProcessIds = 0
+        }
+        try {
+            foreach ($pidFile in @("$output-supervisor/process.json", "$output/descendant.pid")) {
+                try {
+                    if (!(Test-Path -LiteralPath $pidFile)) {
+                        continue
+                    }
+                    $ownedId = if ($pidFile.EndsWith('.json')) {
+                        (Get-Content -LiteralPath $pidFile -Raw | ConvertFrom-Json).ProcessId
+                    } else {
+                        Get-Content -LiteralPath $pidFile
+                    }
+                    $parsedId = 0
+                    if (![int]::TryParse([string]$ownedId, [ref]$parsedId) -or $parsedId -le 0) {
+                        $cleanupObservation.SkippedProcessIds++
+                        continue
+                    }
+                    $owned = Get-Process -Id $parsedId -ErrorAction SilentlyContinue
+                    if ($owned -and !$owned.HasExited) {
+                        $owned.Kill()
+                    }
+                } catch {
+                    $cleanupFailures.Add($_.Exception)
                 }
             }
+        } finally {
+            try {
+                $process.Dispose()
+                $cleanupObservation.RunnerDisposed = $true
+            } catch {
+                $cleanupFailures.Add($_.Exception)
+            }
         }
-        $process.Dispose()
+        Write-InstallerLifecycleDiagnostic -Path (Join-Path $directory "$Mode.cleanup.json") -Value $cleanupObservation -Failures $cleanupFailures
+        $result.CleanupFailures += @($cleanupFailures | ForEach-Object Message)
+        if (!$primaryFailure -and $cleanupFailures.Count) {
+            throw [AggregateException]::new('Supervisor test cleanup failed.', $cleanupFailures)
+        }
     }
 }
 
 try {
+    foreach ($mode in @('StartupFailureMissingPid', 'StartupFailureNullPid')) {
+        $failure = $null
+        try {
+            Invoke-SupervisorCase $mode 0 $false
+        } catch {
+            $failure = $_.Exception
+        }
+        $cause = $failure
+        while ($null -ne $cause -and $null -ne $cause.InnerException) {
+            $cause = $cause.InnerException
+        }
+        if ($cause -isnot [ComponentModel.Win32Exception] -or $cause.NativeErrorCode -ne 2) {
+            throw 'The original native startup failure was masked by test cleanup.'
+        }
+        $cleanup = Get-Content -LiteralPath (Join-Path $directory "$mode.cleanup.json") -Raw | ConvertFrom-Json
+        if (!$cleanup.RunnerDisposed -or $cleanup.SkippedProcessIds -ne 1) {
+            throw 'Startup failure did not dispose the runner and safely ignore its absent/null PID.'
+        }
+        $result.StartupFailures += $cleanup
+    }
     foreach ($case in $Cases) {
         $expectedExit = if ($case -in @('Success', 'DescendantSuccess')) { 0 } else { 1 }
         Invoke-SupervisorCase $case $expectedExit ($case -in @('WorkerHang', 'DescendantTimeout'))
