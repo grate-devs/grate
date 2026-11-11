@@ -63,6 +63,8 @@ jobs:
         run: ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/$env:MSI_PACKAGE_ID-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -Distribution '${{ matrix.distribution }}' -ExpectedArchitecture ('${{ matrix.rid }}' -replace 'win-', '')
       - name: Verify installed MSI, major upgrade and uninstall
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        # Leave room in the job for diagnostics if worker supervision stalls.
+        timeout-minutes: 8
         shell: pwsh
         run: |
           $parameters = @{

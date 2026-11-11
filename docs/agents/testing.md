@@ -162,6 +162,14 @@ the provider suites on all supported frameworks. CLI overrides retain their
 explicit skips for inaccessible in-process exception details; see the reports
 for exact execution and skip counts.
 
+The standalone Windows matrix verifies all six MSI distributions natively on
+x64 and ARM64. Its lifecycle worker has a 360-second execution budget, followed
+by bounded termination, inside an independent eight-minute CI step. Failures
+remain failures and the following artifact step retains partial installer logs,
+worker output and supervisor phase records. The supervisor regression suite also
+exercises a live descendant that retains native output handles; run it on both
+Windows architectures before claiming that output capture and cleanup are bounded.
+
 For a handoff, record source/artifact identity, selected test layers and counts,
 TFM, host/RID, database version/image, CLI publish form or package/image identity,
 commands and outcomes, skips/early returns, and remaining matrix gaps. Reuse passing
