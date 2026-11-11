@@ -77,12 +77,12 @@ the release tag supplies the package version.
 | Destination | Stable, for example `2.2.0` | Prerelease, for example `2.2.0-rc.1` |
 | --- | --- | --- |
 | GitHub release files | Upload packages, checksums and manifest | Same |
-| NuGet tool and six libraries | Publish exact version | Publish exact version including suffix |
+| Six NuGet tools and six libraries | Publish exact version | Publish exact version including suffix |
 | Docker `gratedevs/grate` | Version tag and `latest` | Version tag only |
 | Docker compatibility `erikbra/grate` | Same version digest and `latest` | Same version digest only |
-| WinGet | Prepare six identity candidates for separate submission | Skip |
+| WinGet | Prepare six candidates; the post-release Windows pipeline validates and opens manifest PRs | Skip |
 | Homebrew `erikbra/cask` | Update six casks; retain six source-formula candidates | Skip |
-| Chocolatey | Retain six x64 package candidates; separate submission | Retain candidates; no automatic publication |
+| Chocolatey | Retain six x64 packages; the post-release Windows pipeline validates and submits them | Retain candidates; no automatic publication |
 
 GitHub is `grate-devs/grate`; the Docker organization is **`gratedevs`** without a
 hyphen. A repository move does not rename packages in other registries.
@@ -286,12 +286,49 @@ on the architectures being claimed.
 
 ### WinGet, Homebrew and Chocolatey
 
+The separate `publish-windows-channels.yml` pipeline follows a successful stable
+release workflow. It verifies that the original run, immutable tag and public
+release agree, then downloads that run's existing WinGet and Chocolatey candidates.
+It checks the actual published GitHub files before installing the packages on
+disposable Windows runners. SQLite probes use the selected release commit's
+native dependency policy. Chocolatey All also upgrades a real earlier approved
+public package, preserving migration data and history before cleanup.
+It does not rebuild the application or rerun the
+GitHub/NuGet/Docker/Homebrew publishers. Publication credentials are confined to
+the submission jobs after the Windows checks pass.
+
+Use its manual dispatch for an already published release or a bounded retry.
+Select the original release run and stable version; keep publication disabled
+when only verifying. Inspect existing public packages and manifest PRs before
+retrying. Successful submission is distinct from upstream acceptance and public
+installation. Record each channel's actual outcome and pending moderation.
+See [credential configuration](ReleaseConfiguration.md#publication-identities-and-configuration).
+
+For a verification-only run from macOS, Linux or Windows with GitHub CLI:
+
+```sh
+gh workflow run publish-windows-channels.yml --repo grate-devs/grate --ref main \
+  -f version="$RELEASE_TAG" -f release_run_id="$RELEASE_RUN_ID" -f publish=false
+```
+
+`RELEASE_RUN_ID` is the original successful release-event build, not this
+channel workflow or a PR validation run. Set `publish=true` only for an intended
+submission. Expired original artifacts stop promotion; rebuilding the application
+is not an implicit recovery step.
+
 - **WinGet:** for a stable release, download the
   `winget-migration-candidate-VERSION` and five `winget-PROFILE-candidate-VERSION`
   Actions artifacts. They contain `grate-devs.grate` and
   `grate-devs.grate.{SQLite,SQLServer,MariaDB,PostgreSQL,Oracle}` candidates,
-  schema results and provenance. Review/install-test
-  those final files before a separate submission to `microsoft/winget-pkgs`.
+  schema results and provenance. The post-release pipeline validates and
+  install-tests those final files before submitting one package/version per PR
+  to `microsoft/winget-pkgs`. Existing matching submissions are reused.
+  Discovery searches PR titles for the package identifier, then checks the
+  changed manifest paths and contents. A discovered submission for a different
+  version stops for explicit reconciliation. Before submission, also inspect
+  open upstream PRs for grate in their title or description and check their
+  manifest paths; a competing PR with an unrelated title can escape automatic
+  discovery.
   A generated candidate is not an accepted/public package. After acceptance,
   verify the new ID through the public `winget` source. Follow the
   [MSI and portable transition instructions](https://github.com/grate-devs/grate/blob/main/installers/winget/MIGRATION.md);
@@ -305,9 +342,10 @@ on the architectures being claimed.
   Formula/core submission is separate; check acceptance before announcing
   public formula installation. Uninstall an existing variant before switching.
 - **Chocolatey:** download all six `chocolatey-PACKAGEID-VERSION` artifacts.
-  The workflow packages candidates but has no feed publication job. Follow the
-  [package recipe](Packaging.md#package-manager-updates-after-a-release),
-  install-test the final `.nupkg` files and verify submitted packages separately.
+  The release build retains candidates; the post-release Windows pipeline
+  install-tests and submits the same `.nupkg` files to the community feed.
+  Inspect an existing version instead of overwriting it. Verify moderation,
+  package availability and installation separately from upload acceptance.
 
 ## 6. Recover a failed or partial release
 

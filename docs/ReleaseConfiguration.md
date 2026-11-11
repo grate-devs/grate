@@ -16,11 +16,12 @@ registry destination or investigating an authentication failure. The
 | Destination | Name used by the workflow | Owner/access boundary |
 | --- | --- | --- |
 | Source, Actions and GitHub releases | `grate-devs/grate` | Repository permissions |
-| NuGet | `grate` and six `grate.*` libraries | NuGet package ownership and trusted publisher |
+| NuGet | Six CLI tools and six `grate.*` libraries | NuGet package ownership and trusted publisher |
 | Canonical Docker image | `gratedevs/grate` | Docker organization OIDC connection |
 | Docker compatibility image | `erikbra/grate` | Retained legacy credential during transition |
-| WinGet | Candidate `grate-devs.grate`; historical `erikbra.grate` unchanged | Separate community-repository submission/acceptance |
-| Homebrew cask | `erikbra/homebrew-cask`, `Casks/grate.rb` | Separate GitHub repository write access |
+| WinGet | Six `grate-devs.grate` profile identities; historical `erikbra.grate` unchanged | Manifest PRs to the community repository; Microsoft controls acceptance |
+| Chocolatey | `grate` and five `grate-<database>` profile packages | Community repository maintainer account and moderation |
+| Homebrew cask | Six profile casks in `erikbra/homebrew-cask` | Separate GitHub repository write access |
 
 Moving the source repository does not move registry ownership or grant CI access.
 Keep compatibility names during the agreed transition. The Homebrew formula/core
@@ -39,6 +40,8 @@ values into documentation, issue comments or logs.
 | Canonical Docker | `docker-hub` environment; `DOCKERHUB_OIDC_CONNECTIONID` variable | OIDC connection permits canonical pull/push and the intended workflow refs |
 | Compatibility Docker | `DOCKER_HUB_USER` / `DOCKER_HUB_TOKEN` | Pull/push to the legacy repository, valid lifetime and an owner for rotation |
 | WinGet preparation | Read-only repository token | Can read public release metadata/templates; no submission PAT is used |
+| WinGet submission | Repository secret `WINGET_GH_PAT` | Can write the `erikbra/winget-pkgs` fork and open PRs to `microsoft/winget-pkgs`; does not grant upstream approval or merge rights |
+| Chocolatey submission | Repository secret `CHOCOLATEY_API_KEY` | Community account has publication rights for the intended IDs; push destination is `https://push.chocolatey.org/` |
 | Homebrew cask | `homebrew-cask` environment; `HOMEBREW_TAP_TOKEN` | Contents write access to `erikbra/homebrew-cask`, including its applicable repository rules |
 
 Keep ordinary build/test jobs free of publication credential references.
@@ -46,6 +49,14 @@ Environment association does not make a repository secret environment-scoped;
 the release resolver and job conditions also enforce publication eligibility.
 Inspect the actual environment rules rather than assuming a named environment
 has an approval configured. Respect those rules when dispatching diagnostics.
+
+Configure the Windows-channel credentials under **Settings → Secrets and
+variables → Actions → Repository secrets** in `grate-devs/grate`. Retrieve the
+Chocolatey API key from the signed-in [Chocolatey account page](https://community.chocolatey.org/account).
+Keep its value out of chat, source files and command output. The separate
+`publish-windows-channels.yml` workflow exposes these credentials only to the
+corresponding submission jobs after verification; its Windows installation jobs
+use read-only GitHub access. A maintainer does not need a Windows machine.
 
 The NuGet job intentionally has no environment association. Adding one changes
 its OIDC subject and requires a matching NuGet trusted-publisher change. Do not
