@@ -1,0 +1,68 @@
+name: Aspire PostgreSQL prototype
+
+on:
+  pull_request:
+    paths:
+      - 'src/grate.aspire.hosting/**'
+      - 'unittests/Aspire.Hosting/**'
+      - 'examples/aspire/**'
+      - 'scripts/Verify-AspirePackage.ps1'
+      - 'grate.aspire.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'NuGet.Config'
+      - 'global.json'
+      - '.github/workflows/aspire-integration.yml'
+      - '.github/actions/preflight/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aspire-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Build-independent checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/preflight
+
+  verify:
+    name: Package and PostgreSQL smoke checks
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '10.0.x'
+      - name: Build the isolated Aspire solution
+        run: dotnet build grate.aspire.slnx -c Release
+      - name: Verify the resource model
+        shell: pwsh
+        run: |
+          dotnet unittests/Aspire.Hosting/bin/Release/net10.0/grate.aspire.hosting.tests.dll --minimum-expected-tests 1 --report-xunit-trx --results-directory "${{ runner.temp }}/aspire-model-results"
+      - name: Verify a consumer of the packed library
+        shell: pwsh
+        run: ./scripts/Verify-AspirePackage.ps1
+      - name: Exercise the PostgreSQL application graph
+        shell: pwsh
+        run: ./examples/aspire/Smoke.ps1 -NoBuild
+      - name: Upload resource-model results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: aspire-resource-model-results
+          path: ${{ runner.temp }}/aspire-model-results
+          retention-days: 3

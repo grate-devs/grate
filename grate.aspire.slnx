@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/grate.aspire.hosting/grate.aspire.hosting.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="unittests/Aspire.Hosting/Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/aspire/AppHost/AppHost.csproj" />
+    <Project Path="examples/aspire/Api/Api.csproj" />
+    <Project Path="examples/aspire/Smoke/Smoke.csproj" />
+  </Folder>
+</Solution>

@@ -1,8 +1,9 @@
 # Aspire integration assessment
 
 Proposal for [#955](https://github.com/grate-devs/grate/issues/955).
-This is an evaluation and a proposed first delivery, not an accepted architecture
-decision or a supported Aspire integration.
+This design now has an [unpublished PostgreSQL prototype](../Aspire.md) and a
+[runnable example](https://github.com/grate-devs/grate/blob/main/examples/aspire/README.md). It is not a released
+integration or a production deployment commitment.
 
 ## Recommendation
 
@@ -37,10 +38,10 @@ The primary user is a developer running an Aspire AppHost locally:
 - With several consumers of one database, declare one migration resource and
   make each consumer wait for it, rather than migrate once per application.
 
-grate already has a [PostgreSQL Compose example](../../examples/docker/postgresql/README.md)
-and a [container entrypoint](../../installers/docker/entrypoint.sh) that accepts
+grate already has a [PostgreSQL Compose example](https://github.com/grate-devs/grate/blob/main/examples/docker/postgresql/README.md)
+and a [container entrypoint](https://github.com/grate-devs/grate/blob/main/installers/docker/entrypoint.sh) that accepts
 `APP_CONNSTRING`, `DATABASE_TYPE`, and other migration settings. Its
-[CLI](../../src/grate/Program.cs) returns zero after success and a nonzero result
+[CLI](https://github.com/grate-devs/grate/blob/main/src/grate/Program.cs) returns zero after success and a nonzero result
 after a migration exception. Aspire's
 [completion dependency](https://aspire.dev/hub/glossary/waitforcompletion/)
 waits for the expected exit code, zero by default. These existing boundaries are
@@ -63,10 +64,11 @@ container contract. Aspire dependencies must not enter grate's core or database
 providers. Do not introduce an application client integration just to run a
 finite migration job.
 
-## Proposed package API
+## Prototype package API
 
-The extension methods below are a proposed public API, not implemented or
-available in a released package. `database` is initially an Aspire PostgreSQL
+The extension methods below are implemented in
+[`grate.aspire.hosting`](https://github.com/grate-devs/grate/blob/main/src/grate.aspire.hosting/NuGet.md), but are not
+available in a released package. `database` is an Aspire PostgreSQL
 database resource; `scripts` identifies the consumer's SQL directory.
 
 ```csharp
@@ -79,31 +81,35 @@ builder.AddProject<Projects.Api>("api")
     .WaitForCompletion(migrate);
 ```
 
-`AddGrateMigration` should return an Aspire resource builder for a finite
+`AddGrateMigration` returns an Aspire resource builder for a finite
 grate container resource, compatible with `WaitForCompletion` and normal
 container customization. The caller still chooses which applications wait for
 it; creating the migration must not add startup dependencies to every database
 consumer implicitly.
 
-| Setting | Proposed default | Override contract |
+| Setting | Prototype default | Override contract |
 | --- | --- | --- |
 | Aspire resource name | `<database-resource-name>-grate`; reject duplicate names | Explicit name for multiple named migration resources |
 | Runtime container name | Aspire's generated name for the migration resource | Normal container-name customization; avoid a fixed global name that collides across AppHosts |
 | Image and version | `gratedevs/grate` and a package-owned, tested release tag; initially use `2.3.0` | Explicit image/registry and tag or digest using a compatible entrypoint contract |
 | Connection string | Database resource's deferred connection expression | Explicit deferred expression or runtime secret reference |
-| Database type | From the typed database resource; PostgreSQL maps to `postgresql` | Explicit provider setting, validated rather than inferred from connection-string text |
+| Database type | Typed PostgreSQL resource maps to `postgresql` | `WithEnvironment("DATABASE_TYPE", ...)`; grate validates the value at invocation |
 | Database creation | `CREATE_DATABASE=false`; Aspire owns creation | Explicit creation setting; caller then owns the altered creation/permission contract |
 | Environment | `LOCAL` | Explicit grate environment selection |
 | Script mount | `WithScriptsFolder` resolves the source against the AppHost directory, mounts read-only at `/db` | Explicit source, target and mount settings, keeping the CLI script path aligned with the target |
 | Readiness dependency | Wait for the supplied database resource | Explicit dependency/readiness override; an opt-out must be deliberate |
 
-Provide a documented options/configuration surface for these overrides, alongside
-normal container builder methods where appropriate. Exact option names remain
-implementation design; the two-call default above is the proposed consumer
-contract. Reject missing/nonexistent script sources before running a migration.
-Define whether repeated script configuration replaces the earlier mount, and test
-it; do not accumulate conflicting mounts or depend on duplicate CLI options to
-override the image entrypoint's defaults.
+The prototype uses normal container builder methods for image and environment
+overrides. `AddGrateMigration(name, waitForDatabase)` controls naming and readiness;
+`WithScriptsFolder(path, containerPath, isReadOnly)` controls the script mount.
+The latter validates the source directory and replaces its earlier owned mount.
+See the [usage guide](../Aspire.md) for concrete customization examples.
+
+The package supplies a fixed shell launcher that executes `/app/grate` directly,
+instead of appending conflicting options to the image's fixed `/db` entrypoint.
+Script targets are positional arguments, never interpolated shell source. This
+requires override images to contain `/bin/sh`, `/app/grate` and the compatible CLI
+contract; a container with an arbitrary entrypoint is insufficient.
 
 Use provider-specific overloads initially. An arbitrary resource exposing a
 connection string does not reliably identify the database provider. Unsupported
@@ -116,9 +122,9 @@ grate core and database-provider libraries.
 
 This is a partial AppHost illustration, not a copy-and-run sample. `Projects.Api`
 belongs to the consuming application, and `db/up` contains its PostgreSQL scripts.
-This shows the wiring that the proposed package would encapsulate. The follow-up
-must verify the extension API produces the equivalent resource configuration,
-including container-to-container connection-string resolution.
+This describes the default behavior encapsulated by the package. The prototype's
+launcher also supports different script targets; the generic example below uses
+the image's ordinary entrypoint and its fixed `/db` convention.
 
 ```csharp
 var builder = DistributedApplication.CreateBuilder(args);
@@ -206,8 +212,8 @@ Propose an Aspire 13.6.x C# AppHost targeting `net10.0`, initially pinning the
 AppHost SDK and hosting packages to 13.6.5. Aspire's [prerequisites](https://aspire.dev/get-started/prerequisites/)
 require the .NET 10 SDK for C# AppHosts and a container runtime for container
 resources. This proposed baseline is separate from grate's
-[library target frameworks](../../Directory.Build.props) and
-[source-build SDK](../../global.json); it does not change either contract.
+[library target frameworks](https://github.com/grate-devs/grate/blob/main/Directory.Build.props) and
+[source-build SDK](https://github.com/grate-devs/grate/blob/main/global.json); it does not change either contract.
 Building a repository-hosted example must account for the repository's SDK and
 central package settings rather than silently inheriting unsuitable defaults.
 
@@ -230,7 +236,7 @@ Do not rebuild or fork grate's migration implementation.
 
 ## Bounded first follow-up and verification
 
-[Follow-up #956](https://github.com/grate-devs/grate/issues/956) tracks the thin
+[Issue #956](https://github.com/grate-devs/grate/issues/956) tracks the thin
 hosting package and a standalone PostgreSQL AppHost example using its extension
 API, with a minimal dependent API,
 one-time SQL fixture, pinned dependencies, setup/cleanup instructions and a
@@ -251,9 +257,11 @@ these outcomes against disposable local resources:
 5. Script path containing spaces and launch from another working directory:
    the same scripts are selected. Check diagnostics for credential disclosure.
 
-This is a verification plan, not a record of executed checks. Link actual spike
-and follow-up results from the issue or PR. The existing container spike does not
-establish that the proposed extension methods compile or honor these contracts.
+The prototype includes resource-model tests, a packed-library consumer check,
+and repeatable PostgreSQL smoke checks for these boundaries. Keep their actual
+results, environment and limitations in the implementation PR. The earlier
+container-only spike is not evidence for the extension API; use the new checks
+when assessing the implementation.
 
 ## Deployment boundary
 
