@@ -89,7 +89,7 @@ consumer implicitly.
 | --- | --- | --- |
 | Aspire resource name | `<database-resource-name>-grate`; reject duplicate names | Explicit name for multiple named migration resources |
 | Runtime container name | Aspire's generated name for the migration resource | Normal container-name customization; avoid a fixed global name that collides across AppHosts |
-| Image and version | `gratedevs/grate` and a package-owned, tested release tag; initially evaluate `2.2.0` | Explicit image/registry and tag or digest using a compatible entrypoint contract |
+| Image and version | `gratedevs/grate` and a package-owned, tested release tag; initially use `2.3.0` | Explicit image/registry and tag or digest using a compatible entrypoint contract |
 | Connection string | Database resource's deferred connection expression | Explicit deferred expression or runtime secret reference |
 | Database type | From the typed database resource; PostgreSQL maps to `postgresql` | Explicit provider setting, validated rather than inferred from connection-string text |
 | Database creation | `CREATE_DATABASE=false`; Aspire owns creation | Explicit creation setting; caller then owns the altered creation/permission contract |
@@ -130,7 +130,7 @@ var database = builder.AddPostgres("postgres")
 var scripts = Path.GetFullPath(Path.Combine(
     builder.AppHostDirectory, "db"));
 
-var migrate = builder.AddContainer("migrate", "gratedevs/grate", "2.2.0")
+var migrate = builder.AddContainer("migrate", "gratedevs/grate", "2.3.0")
     .WithEnvironment("APP_CONNSTRING", database.Resource.ConnectionStringExpression)
     .WithEnvironment("DATABASE_TYPE", "postgresql")
     .WithEnvironment("CREATE_DATABASE", "false")
@@ -153,10 +153,10 @@ contract. Passing a reference alone does not supply that entrypoint variable.
 The expression must remain deferred so Aspire resolves the correct address for
 the consuming container; do not substitute a host-side `localhost` connection.
 
-The image version above matches the existing Compose example. It is a proposed
-example pin, not a claim that it contains every feature in the current checkout.
-Select the tested release tag or digest when implementing the runnable example;
-do not use `latest` as its reproducibility policy.
+The image version above pins the [2.3.0 release](https://github.com/grate-devs/grate/releases/tag/2.3.0),
+not every feature in the current checkout. The package should own and test its
+default image version, with explicit consumer overrides. Update the tested tag
+or digest deliberately; do not resolve `latest` automatically at runtime.
 
 This illustration uses a fresh, ephemeral database. The retained-data example
 must configure a PostgreSQL data volume and a stable password supplied through
