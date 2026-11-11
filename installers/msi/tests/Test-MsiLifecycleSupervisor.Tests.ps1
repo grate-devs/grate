@@ -121,8 +121,10 @@ try {
     $process.StartInfo = $start
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $primaryFailure = $null
+    $runnerStarted = $false
     try {
         [void]$process.Start()
+        $runnerStarted = $true
         # Independent watchdog: old supervisors must fail this assertion rather
         # than block the test on descendant-held pipes or Process.Dispose.
         if (!$process.WaitForExit(25000)) {
@@ -229,8 +231,11 @@ try {
         $cleanupFailures = [Collections.Generic.List[Exception]]::new()
         $cleanupObservation = @{
             Mode = $Mode
+            RunnerStarted = $runnerStarted
+            RunnerExitConfirmed = $false
             RunnerDisposed = $false
             SkippedProcessIds = 0
+            OwnedProcesses = @()
         }
         try {
             foreach ($pidFile in @("$output-supervisor/process.json", "$output/descendant.pid")) {
@@ -248,9 +253,36 @@ try {
                         $cleanupObservation.SkippedProcessIds++
                         continue
                     }
-                    $owned = Get-Process -Id $parsedId -ErrorAction SilentlyContinue
-                    if ($owned -and !$owned.HasExited) {
-                        $owned.Kill()
+                    $owned = $null
+                    $ownedCleanup = @{
+                        ProcessId = $parsedId
+                        PresentAtCleanup = $false
+                        KillRequested = $false
+                        ExitConfirmed = $false
+                        Disposed = $false
+                    }
+                    try {
+                        $owned = Get-Process -Id $parsedId -ErrorAction SilentlyContinue
+                        $ownedCleanup.PresentAtCleanup = ($null -ne $owned)
+                        if ($null -ne $owned) {
+                            if (!$owned.HasExited) {
+                                $ownedCleanup.KillRequested = $true
+                                $owned.Kill()
+                            }
+                            if (!$owned.WaitForExit(5000)) {
+                                throw "Owned supervisor-test process $parsedId did not terminate within five seconds."
+                            }
+                        }
+                        $ownedCleanup.ExitConfirmed = $true
+                    } finally {
+                        try {
+                            if ($null -ne $owned) {
+                                $owned.Dispose()
+                                $ownedCleanup.Disposed = $true
+                            }
+                        } finally {
+                            $cleanupObservation.OwnedProcesses += $ownedCleanup
+                        }
                     }
                 } catch {
                     $cleanupFailures.Add($_.Exception)
@@ -258,10 +290,24 @@ try {
             }
         } finally {
             try {
-                $process.Dispose()
-                $cleanupObservation.RunnerDisposed = $true
+                if ($runnerStarted) {
+                    if (!$process.HasExited) {
+                        $process.Kill()
+                    }
+                    if (!$process.WaitForExit(5000)) {
+                        throw 'Supervisor-test runner did not terminate within five seconds.'
+                    }
+                    $cleanupObservation.RunnerExitConfirmed = $true
+                }
             } catch {
                 $cleanupFailures.Add($_.Exception)
+            } finally {
+                try {
+                    $process.Dispose()
+                    $cleanupObservation.RunnerDisposed = $true
+                } catch {
+                    $cleanupFailures.Add($_.Exception)
+                }
             }
         }
         Write-InstallerLifecycleDiagnostic -Path (Join-Path $directory "$Mode.cleanup.json") -Value $cleanupObservation -Failures $cleanupFailures
@@ -288,7 +334,7 @@ try {
             throw 'The original native startup failure was masked by test cleanup.'
         }
         $cleanup = Get-Content -LiteralPath (Join-Path $directory "$mode.cleanup.json") -Raw | ConvertFrom-Json
-        if (!$cleanup.RunnerDisposed -or $cleanup.SkippedProcessIds -ne 1) {
+        if ($cleanup.RunnerStarted -or !$cleanup.RunnerDisposed -or $cleanup.SkippedProcessIds -ne 1) {
             throw 'Startup failure did not dispose the runner and safely ignore its absent/null PID.'
         }
         $result.StartupFailures += $cleanup
@@ -296,6 +342,20 @@ try {
     foreach ($case in $Cases) {
         $expectedExit = if ($case -in @('Success', 'DescendantSuccess')) { 0 } else { 1 }
         Invoke-SupervisorCase $case $expectedExit ($case -in @('WorkerHang', 'DescendantTimeout'))
+        $cleanup = Get-Content -LiteralPath (Join-Path $directory "$case.cleanup.json") -Raw | ConvertFrom-Json
+        if (!$cleanup.RunnerStarted -or !$cleanup.RunnerExitConfirmed -or !$cleanup.RunnerDisposed -or @($cleanup.OwnedProcesses | Where-Object {
+                    !$_.ExitConfirmed -or ($_.PresentAtCleanup -and !$_.Disposed)
+                }).Count) {
+            throw "$case did not confirm termination and disposal of its owned processes."
+        }
+        if ($case -like 'Descendant*') {
+            $descendantId = [int](Get-Content -LiteralPath (Join-Path $directory "$case/descendant.pid"))
+            $descendantCleanup = @($cleanup.OwnedProcesses | Where-Object ProcessId -EQ $descendantId)
+            if ($descendantCleanup.Count -ne 1 -or !$descendantCleanup[0].KillRequested -or
+                !$descendantCleanup[0].ExitConfirmed -or !$descendantCleanup[0].Disposed) {
+                throw "$case did not establish bounded termination and disposal of its live descendant."
+            }
+        }
     }
     $result.Succeeded = $true
     Write-Host 'PASS: success, native failure, timeout and live descendant handles retain evidence and return within the supervisor bound.'
