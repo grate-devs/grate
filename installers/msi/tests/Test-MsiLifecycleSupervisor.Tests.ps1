@@ -131,6 +131,29 @@ try {
             }
             throw "$Mode supervisor did not return within its whole-operation bound."
         }
+        if ($Mode -like 'Descendant*') {
+            $descendantId = $null
+            $descendant = $null
+            if (Test-Path -LiteralPath "$output/descendant.pid") {
+                $descendantId = [int](Get-Content -LiteralPath "$output/descendant.pid")
+                $descendant = Get-Process -Id $descendantId -ErrorAction SilentlyContinue
+            }
+            $triggerObservation = @{
+                Utc = [DateTime]::UtcNow.ToString('o')
+                Mode = $Mode
+                ElapsedSeconds = $watch.Elapsed.TotalSeconds
+                WorkerEntered = (Test-Path -LiteralPath "$output/entered.txt")
+                DescendantReady = (Test-Path -LiteralPath "$output/descendant-ready.txt")
+                DescendantPid = $descendantId
+                DescendantAlive = ($null -ne $descendant -and !$descendant.HasExited)
+                SupervisorExited = $process.HasExited
+            }
+            $triggerObservation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory "$Mode.trigger.json")
+            if (!$triggerObservation.WorkerEntered -or !$triggerObservation.DescendantReady -or
+                !$triggerObservation.DescendantAlive -or !$triggerObservation.SupervisorExited) {
+                throw "$Mode inherited-handle trigger was not established before capture assertions."
+            }
+        }
         $observation = Get-Content -LiteralPath "$output-supervisor/process.json" -Raw | ConvertFrom-Json
         if ($process.ExitCode -ne $ExpectedExitCode -or $observation.TimedOut -ne $ExpectedTimeout) {
             throw "$Mode supervisor returned the wrong exit/timeout outcome."
@@ -154,13 +177,6 @@ try {
             throw "$Mode did not retain PowerShell output."
         }
         if ($Mode -like 'Descendant*') {
-            if (!(Test-Path -LiteralPath "$output/descendant-ready.txt")) {
-                throw 'The inherited-handle trigger was not established.'
-            }
-            $descendant = Get-Process -Id ([int](Get-Content -LiteralPath "$output/descendant.pid")) -ErrorAction SilentlyContinue
-            if (!$descendant -or $descendant.HasExited) {
-                throw 'Descendant exited before the bounded-return assertion.'
-            }
             foreach ($stream in @('stdout', 'stderr')) {
                 if ((Get-Content -LiteralPath "$output-supervisor/$stream.log" -Raw) -notlike "*Descendant $stream marker*") {
                     throw "Live descendant did not inherit the $stream log handle."

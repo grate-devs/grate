@@ -51,17 +51,32 @@ jobs:
             } catch {
               $failure = $_.Exception.Message
             }
-            if ($failure -notlike '*supervisor did not return within its whole-operation bound*') {
-              throw "Historical proof did not reproduce the deadline defect: $failure"
+            if ($failure -notlike '*DescendantSuccess did not retain partial native stdout evidence*') {
+              throw "Historical proof did not reproduce the output-retention defect: $failure"
             }
-            $observations = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/lifecycle" -Filter DescendantSuccess.watchdog.json -Recurse)
-            if ($observations.Count -ne 1) { throw 'Missing independent watchdog observation.' }
+            $observations = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/lifecycle" -Filter DescendantSuccess.trigger.json -Recurse)
+            if ($observations.Count -ne 1) { throw 'Missing independent trigger observation.' }
             $trigger = Get-Content -LiteralPath $observations[0].FullName -Raw | ConvertFrom-Json
-            if (!$trigger.WorkerEntered -or !$trigger.DescendantReady -or !$trigger.DescendantAlive -or !$trigger.SupervisorAlive) {
+            if (!$trigger.WorkerEntered -or !$trigger.DescendantReady -or !$trigger.DescendantAlive -or !$trigger.SupervisorExited) {
               throw 'Historical trigger was not established before cleanup.'
+            }
+            foreach ($stream in @('stdout', 'stderr')) {
+              $path = Join-Path $observations[0].DirectoryName "DescendantSuccess-supervisor/$stream.log"
+              $text = Get-Content -LiteralPath $path -Raw
+              if ($text -notlike '*Stream drain exceeded its bound or failed*' -or $text.Contains("Descendant $stream marker")) {
+                throw 'Historical output-loss evidence does not match the reported defect.'
+              }
             }
           } else {
             & ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
+            $reports = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/lifecycle" -Filter result.json -Recurse)
+            if ($reports.Count -ne 1) { throw 'Expected one complete regression report.' }
+            $report = Get-Content -LiteralPath $reports[0].FullName -Raw | ConvertFrom-Json
+            $expected = @('DescendantSuccess', 'DescendantTimeout', 'NativeFailure', 'ScriptFailure', 'ScriptFailureNull', 'Success', 'WorkerHang')
+            $actual = @($report.Cases.Mode | Sort-Object)
+            if (!$report.Succeeded -or $actual.Count -ne 7 -or (Compare-Object $expected $actual)) {
+              throw 'All seven exact supervisor scenarios must pass.'
+            }
           }
           [pscustomobject]@{
             Source = $env:GITHUB_SHA
@@ -135,6 +150,7 @@ jobs:
           name: actual-oracle-msi-${{ matrix.arch }}
           path: |
             ${{ runner.temp }}/grate-msi-lifecycle/**/*.json
+            ${{ runner.temp }}/grate-msi-lifecycle/**/*.jsonl
             ${{ runner.temp }}/grate-msi-lifecycle/**/*.log
             ${{ runner.temp }}/grate-msi-lifecycle/**/*.txt
             ${{ runner.temp }}/grate-msi-lifecycle-supervisor/**
