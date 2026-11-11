@@ -138,7 +138,9 @@ same requirement when running downloaded test DLLs with `dotnet test --test-modu
 
 [ci.yml](../../.github/workflows/ci.yml) runs Basic_tests and all six provider suites
 on Ubuntu, including SqlServerCaseSensitive; `build.yml` omits the case-sensitive
-suite. Their test commands select no single TFM. Build output is not execution proof.
+suite. Linux Oracle runs the complete provider suite in four separate TFM jobs;
+the other lanes still select no single TFM. Oracle report artifacts include the
+TFM so the combined report retains every lane. Build output is not execution proof.
 `build.yml` publishes net11 self-contained RIDs `win-x64`, `win-x86`, `win-arm64`,
 `linux-musl-x64`, `linux-musl-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, and
 `osx-arm64` (the last on macOS). Docker builds target `linux/amd64,linux/arm64` using

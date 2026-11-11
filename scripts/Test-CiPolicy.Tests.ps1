@@ -22,23 +22,48 @@ function Assert-CiPhaseCoverage {
     )
 
     $expectedDatabaseLanes = @(
-        'ubuntu-latest/SqlServer/'
-        'ubuntu-latest/SqlServerCaseSensitive/'
-        'ubuntu-latest/PostgreSQL/'
-        'ubuntu-latest/MariaDB/'
-        'ubuntu-latest/Sqlite/'
-        'ubuntu-latest/Oracle/'
-        'windows-latest/Sqlite/'
-        'windows-latest/SqlServer/SqlServer.Basic_tests.*'
-        'windows-latest/SqlServerCaseSensitive/SqlServerCaseSensitive.Basic_tests.*'
-        'windows-latest/MariaDB/MariaDB.Basic_tests.*'
-        'windows-latest/Oracle/Oracle.Basic_tests.*'
+        'ubuntu-latest/SqlServer//'
+        'ubuntu-latest/SqlServerCaseSensitive//'
+        'ubuntu-latest/PostgreSQL//'
+        'ubuntu-latest/MariaDB//'
+        'ubuntu-latest/Sqlite//'
+        'ubuntu-latest/Oracle//net8.0'
+        'ubuntu-latest/Oracle//net9.0'
+        'ubuntu-latest/Oracle//net10.0'
+        'ubuntu-latest/Oracle//net11.0'
+        'windows-latest/Sqlite//'
+        'windows-latest/SqlServer/SqlServer.Basic_tests.*/'
+        'windows-latest/SqlServerCaseSensitive/SqlServerCaseSensitive.Basic_tests.*/'
+        'windows-latest/MariaDB/MariaDB.Basic_tests.*/'
+        'windows-latest/Oracle/Oracle.Basic_tests.*/'
     )
     $actualDatabaseLanes = @($Phases.test.strategy.matrix.include | ForEach-Object {
-        "$($_.os)/$($_.category)/$($_.test_filter)"
+        "$($_.os)/$($_.category)/$($_.test_filter)/$($_['framework'])"
     })
     if ((@($expectedDatabaseLanes | Sort-Object) -join ',') -cne (@($actualDatabaseLanes | Sort-Object) -join ',')) {
-        throw 'Preserve all eleven library database/platform/filter lanes.'
+        throw 'Preserve all fourteen library database/platform/filter/framework lanes.'
+    }
+    $buildProperties = [xml](Get-Content -LiteralPath "$repositoryRoot/Directory.Build.props" -Raw)
+    $targetFrameworks = @($buildProperties.SelectNodes('/Project/PropertyGroup/TargetFrameworks') |
+        ForEach-Object { $_.InnerText -split ';' })
+    $oracleFrameworks = @($Phases.test.strategy.matrix.include | Where-Object { $_.os -ceq 'ubuntu-latest' -and $_.category -ceq 'Oracle' } | ForEach-Object framework)
+    if ((@($oracleFrameworks | Sort-Object) -join ',') -cne (@($targetFrameworks | Sort-Object) -join ',')) {
+        throw 'Every supported target framework must have one Linux Oracle lane.'
+    }
+    if ($Phases.test.name -cne '${{ matrix.name }}') {
+        throw 'Use explicit database job identities so adding the framework does not rename other lanes.'
+    }
+    foreach ($lane in $Phases.test.strategy.matrix.include) {
+        $expectedName = "Run tests ($($lane.os), $($lane.category)"
+        if ($lane['framework']) {
+            $expectedName += ", $($lane.framework)"
+        } elseif ($lane.test_filter) {
+            $expectedName += ", $($lane.test_filter)"
+        }
+        $expectedName += ')'
+        if ($lane.name -cne $expectedName) {
+            throw 'Preserve explicit database job identities and distinct Oracle TFM names.'
+        }
     }
     foreach ($id in @('build-code', 'fast-tests', 'analyze', 'test', 'packages')) {
         $setup = Get-ActionStep $Phases[$id] 'actions/setup-dotnet'
@@ -50,8 +75,13 @@ function Assert-CiPhaseCoverage {
     }
     foreach ($id in @('fast-tests', 'test')) {
         $upload = Get-ActionStep $Phases[$id] 'actions/upload-artifact'
+        $expectedArtifactName = if ($id -ceq 'test') {
+            '${{ matrix.os }} ${{ matrix.category }}${{ matrix.framework && format('' {0}'', matrix.framework) || '''' }} XML test results'
+        } else {
+            '${{ matrix.os }} ${{ matrix.category }} XML test results'
+        }
         if ($upload.if -cne 'always()' -or $upload.with.'retention-days' -ne 1 -or
-            $upload.with.name -cne '${{ matrix.os }} ${{ matrix.category }} XML test results') {
+            $upload.with.name -cne $expectedArtifactName) {
             throw 'Retain both test tiers under their existing artifact names on failure.'
         }
     }
@@ -71,6 +101,12 @@ function Assert-CiPhaseCoverage {
         throw 'Preserve the supported 360-second MSI supervisor budget.'
     }
     $linux = $Phases.test.steps | Where-Object { $_['name'] -ceq 'Test on Linux' }
+    if (!$linux.run.Contains('${{ matrix.framework && format(''--framework {0}'', matrix.framework) || '''' }}') -or
+        !$linux.run.Contains('--project "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj"') -or
+        !$linux.run.Contains('--max-parallel-test-modules 1') -or
+        $linux.run -match '--filter(?:\s|-)') {
+        throw 'Run the complete Linux project suite, selecting only the Oracle lane framework.'
+    }
     if (!$linux.run.Contains('monitor-test-containers.ps1') -or !$linux.run.Contains('trap stop_diagnostics EXIT') -or
         $linux.env.TEST_TIMEOUT -cne '${{ matrix.category == ''Oracle'' && ''40m'' || ''20m'' }}' -or
         $linux.env.MONITOR_TIMEOUT -cne '${{ matrix.category == ''Oracle'' && ''42m'' || ''25m'' }}' -or
@@ -249,7 +285,29 @@ $optionalLeaf.standalone['continue-on-error'] = $true
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $optionalLeaf } -ExpectedMessage 'required leaf execution'
 $missingProvider = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
 $missingProvider.test.strategy.matrix.include = @($missingProvider.test.strategy.matrix.include | Where-Object category -CNE 'Oracle')
-Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $missingProvider } -ExpectedMessage 'all eleven library'
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $missingProvider } -ExpectedMessage 'all fourteen library'
+$missingOracleFramework = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+$missingOracleFramework.test.strategy.matrix.include = @($missingOracleFramework.test.strategy.matrix.include | Where-Object { $_['framework'] -cne 'net8.0' })
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $missingOracleFramework } -ExpectedMessage 'all fourteen library'
+$duplicateOracleFramework = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+$duplicateOracleFramework.test.strategy.matrix.include += @($duplicateOracleFramework.test.strategy.matrix.include | Where-Object { $_['framework'] -ceq 'net8.0' })
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $duplicateOracleFramework } -ExpectedMessage 'all fourteen library'
+$wrongOracleFramework = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+($wrongOracleFramework.test.strategy.matrix.include | Where-Object { $_['framework'] -ceq 'net8.0' }).framework = 'net7.0'
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $wrongOracleFramework } -ExpectedMessage 'all fourteen library'
+$missingFrameworkSelection = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+$linuxStep = $missingFrameworkSelection.test.steps | Where-Object { $_['name'] -ceq 'Test on Linux' }
+$linuxStep.run = $linuxStep.run.Replace('${{ matrix.framework && format(''--framework {0}'', matrix.framework) || '''' }}', '')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $missingFrameworkSelection } -ExpectedMessage 'complete Linux project suite'
+$filteredOracleSuite = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+($filteredOracleSuite.test.steps | Where-Object { $_['name'] -ceq 'Test on Linux' }).run += ' --filter-class Oracle.Basic_tests.*'
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $filteredOracleSuite } -ExpectedMessage 'complete Linux project suite'
+$collidingArtifacts = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+(Get-ActionStep $collidingArtifacts.test 'actions/upload-artifact').with.name = '${{ matrix.os }} ${{ matrix.category }} XML test results'
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $collidingArtifacts } -ExpectedMessage 'artifact names on failure'
+$renamedDatabaseLane = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+$renamedDatabaseLane.test.strategy.matrix.include[0].name = 'Other database lane'
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $renamedDatabaseLane } -ExpectedMessage 'explicit database job identities'
 $missingRuntime = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
 (Get-ActionStep $missingRuntime.test 'actions/setup-dotnet').with.'dotnet-version' = "8.0.x`n10.0.x"
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $missingRuntime } -ExpectedMessage 'earlier runtime setup'
