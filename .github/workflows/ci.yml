@@ -1,4 +1,4 @@
-name: Oracle ARM64 MSI diagnostic replay
+name: Oracle ARM64 MSI live checkpoints
 on:
   workflow_dispatch:
 permissions:
@@ -34,8 +34,9 @@ jobs:
           "MSI_PACKAGE_ID=$($identity.PackageId)" | Out-File -FilePath $env:GITHUB_ENV -Append
           ./installers/msi/Create-Installer.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate.exe" -Version $env:STANDALONE_VERSION -Distribution Oracle -arch arm64
           ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/$($identity.PackageId)-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -Distribution Oracle -ExpectedArchitecture arm64
-      - name: Replay unchanged lifecycle with phase observation
-        timeout-minutes: 9
+      - name: Launch detached unchanged lifecycle diagnostic
+        id: launch
+        timeout-minutes: 2
         shell: pwsh
         run: |
           $parameters = @{
@@ -45,16 +46,69 @@ jobs:
             Distribution = 'Oracle'
             OutputDirectory = "${{ runner.temp }}/grate-msi-lifecycle"
           }
-          ./installers/msi/tests/support/Invoke-MsiLifecycleDiagnosticReplay.ps1 -Parameters $parameters -DeadlineSeconds 450
+          ./installers/msi/tests/support/Start-MsiDiagnosticReplayDetached.ps1 -Parameters $parameters -DeadlineSeconds 450
+      - name: Capture checkpoint one while replay may be active
+        if: always()
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath "${{ runner.temp }}/grate-msi-lifecycle-detached/launch.json") {
+            Start-Sleep -Seconds 45
+          }
+          ./installers/msi/tests/support/Copy-MsiReplayCheckpoint.ps1 -LifecycleDirectory "${{ runner.temp }}/grate-msi-lifecycle" -OutputDirectory "${{ runner.temp }}/msi-checkpoint-1"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
+        timeout-minutes: 2
         with:
-          name: oracle-arm64-msi-replay
-          path: |
-            ${{ runner.temp }}/grate-msi-lifecycle-replay/**
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.json
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.jsonl
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.log
-            ${{ runner.temp }}/grate-msi-lifecycle/**/*.txt
-            ${{ runner.temp }}/grate-msi-lifecycle-supervisor/**
+          name: oracle-arm64-msi-checkpoint-1
+          path: ${{ runner.temp }}/msi-checkpoint-1/**
+          retention-days: 3
+      - name: Capture checkpoint two while replay may be active
+        if: always()
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath "${{ runner.temp }}/grate-msi-lifecycle-detached/launch.json") {
+            Start-Sleep -Seconds 45
+          }
+          ./installers/msi/tests/support/Copy-MsiReplayCheckpoint.ps1 -LifecycleDirectory "${{ runner.temp }}/grate-msi-lifecycle" -OutputDirectory "${{ runner.temp }}/msi-checkpoint-2"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        timeout-minutes: 2
+        with:
+          name: oracle-arm64-msi-checkpoint-2
+          path: ${{ runner.temp }}/msi-checkpoint-2/**
+          retention-days: 3
+      - name: Require atomic full replay completion
+        if: ${{ always() && steps.launch.outcome == 'success' }}
+        timeout-minutes: 9
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $directory = "${{ runner.temp }}/grate-msi-lifecycle-detached"
+          $launch = Get-Content -LiteralPath "$directory/launch.json" -Raw | ConvertFrom-Json
+          $limit = ([DateTime]$launch.StartedUtc).ToUniversalTime().AddSeconds($launch.DeadlineSeconds + 30)
+          $completionPath = "$directory/entry-completion.json"
+          while (!(Test-Path -LiteralPath $completionPath)) {
+            if ([DateTime]::UtcNow -ge $limit) {
+              throw 'Atomic MSI replay completion was not published within its deadline; partial phase checkpoints remain diagnostic only.'
+            }
+            Start-Sleep -Seconds 1
+          }
+          $completion = Get-Content -LiteralPath $completionPath -Raw | ConvertFrom-Json
+          if (!$completion.Succeeded -or !$completion.ReplayReturned -or !$completion.CompletedUtc) {
+            throw 'Detached MSI replay failed or returned without complete lifecycle evidence.'
+          }
+          Write-Host 'Unchanged MSI lifecycle completed; atomic replay completion verified.'
+      - name: Capture final phase state
+        if: always()
+        timeout-minutes: 2
+        shell: pwsh
+        run: ./installers/msi/tests/support/Copy-MsiReplayCheckpoint.ps1 -LifecycleDirectory "${{ runner.temp }}/grate-msi-lifecycle" -OutputDirectory "${{ runner.temp }}/msi-checkpoint-final"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        timeout-minutes: 2
+        with:
+          name: oracle-arm64-msi-checkpoint-final
+          path: ${{ runner.temp }}/msi-checkpoint-final/**
           retention-days: 3
