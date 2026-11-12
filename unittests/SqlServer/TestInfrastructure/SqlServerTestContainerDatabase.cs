@@ -42,7 +42,8 @@ public record SqlServerTestContainerDatabase(
         $"Data Source={Hostname},{Port};Initial Catalog=master;User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=5";
 
     public override string ConnectionString(string database) =>
-        $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=5"; // timeout = 5s will increase the test execution time, however, it will reduce the risk of transient connection issues in CI environments, which can be more common with SQL Server containers, especially in SQL Server 2025
+        SqlServerScopedPooling.TargetConnectionString(
+            $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=5");
 
     public override string UserConnectionString(string database) =>
         $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=zorro;Password=batmanZZ4;Encrypt=false;Pooling=false;Connect Timeout=5"; // timeout = 5s will increase the test execution time, however, it will reduce the risk of transient connection issues in CI environments, which can be more common with SQL Server containers, especially in SQL Server 2025

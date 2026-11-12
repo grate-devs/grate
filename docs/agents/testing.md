@@ -82,6 +82,23 @@ configuration: `GrateTestConfig__AdminConnectionString` selects an external data
 `GrateTestConfig__DockerImage` overrides the **database** image. Inspect inherited
 environment values before running. `LogLevel` controls test logging; CI uses `TZ=UTC`.
 
+The ordinary SQL Server CI lanes enable `GRATE_SQLSERVER_SCOPED_POOLING=true`.
+The serial test hook clears pools before and after each case; only target-database
+SA fixture connections use pooling, with `Min Pool Size=0`, `Max Pool Size=4` per
+connection string and `Pool Blocking Period=NeverBlock`. Admin and test-user
+connections retain their original policy. Restore cases with raw database-drop
+cleanup and the snapshot-isolation regression retain their original unpooled
+connections. Changing `READ_COMMITTED_SNAPSHOT` requires exclusive connection
+access, which idle pooled sessions can block. The readiness tests still force
+`AlwaysBlock` to exercise cached login failures. External fixtures and linked
+CLI/Docker suites retain their connection strings and pool state. Case-sensitive
+SQL Server retains its
+own fixture policy. The flag is optional for local runs.
+
+Those CI lanes also set `GRATE_REPRODUCIBLE_TABLE_CASINGS=true`, retaining original,
+lowercase and distinct mixed-case bootstrap inputs without random collisions.
+Other lanes and local runs keep the existing random mixed-case input by default.
+
 [CommandLineGrateMigrator](../../unittests/CommandLine/CommandLine.Common/TestInfrastructure/CommandLineGrateMigrator.cs)
 launches `GrateExecutablePath`, falling back to the assembly attribute generated in
 `CommandLine.Common.csproj`. Set an absolute path deliberately, for example:

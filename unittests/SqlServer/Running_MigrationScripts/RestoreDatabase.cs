@@ -6,6 +6,7 @@ using TestCommon.TestInfrastructure;
 namespace SqlServer.Running_MigrationScripts;
 
 [Collection(nameof(SqlServerGrateTestContext))]
+[UnpooledSqlServer] // Raw DROP cleanup requires disposed target sessions to close.
 public class RestoreDatabase(SqlServerGrateTestContext testContext, ITestOutputHelper testOutput)
     : SqlServerScriptsBase(testContext, testOutput)
 {

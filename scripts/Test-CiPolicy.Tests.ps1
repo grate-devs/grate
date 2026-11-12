@@ -40,6 +40,15 @@ function Assert-CiPhaseCoverage {
     if ((@($expectedDatabaseLanes | Sort-Object) -join ',') -cne (@($actualDatabaseLanes | Sort-Object) -join ',')) {
         throw 'Preserve all eleven library database/platform/filter lanes.'
     }
+    foreach ($stepName in @('Test on Linux', 'Test on Windows')) {
+        $step = $Phases.test.steps | Where-Object { $_['name'] -ceq $stepName }
+        foreach ($name in @('GRATE_SQLSERVER_SCOPED_POOLING', 'GRATE_REPRODUCIBLE_TABLE_CASINGS')) {
+            if ($null -eq $step -or !$step.ContainsKey('env') -or !$step.env.ContainsKey($name) -or
+                $step.env[$name] -cne '${{ matrix.category == ''SqlServer'' && ''true'' || ''false'' }}') {
+                throw 'Enable case-scoped pooling and fixed casing inputs only in ordinary SQL Server lanes.'
+            }
+        }
+    }
     foreach ($id in @('build-code', 'fast-tests', 'analyze', 'test', 'packages')) {
         $setup = Get-ActionStep $Phases[$id] 'actions/setup-dotnet'
         $versions = @($setup.with.'dotnet-version' -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -267,6 +276,23 @@ foreach ($deadline in @($null, 30)) {
         $lifecycle['timeout-minutes'] = $deadline
     }
     Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $unboundedInstaller } -ExpectedMessage 'independent eight-minute step deadline'
+}
+
+foreach ($stepName in @('Test on Linux', 'Test on Windows')) {
+    foreach ($name in @('GRATE_SQLSERVER_SCOPED_POOLING', 'GRATE_REPRODUCIBLE_TABLE_CASINGS')) {
+        foreach ($value in @($null, 'false', 'true', '${{ matrix.category == ''Oracle'' && ''true'' || ''false'' }}')) {
+            $wrongPoolingScope = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+            $step = $wrongPoolingScope.test.steps | Where-Object { $_['name'] -ceq $stepName }
+            if ($null -eq $value) {
+                $step.env.Remove($name)
+            } else {
+                $step.env[$name] = $value
+            }
+            Assert-Rejected -Action {
+                Assert-WorkflowPolicy -Workflow $workflow -Phases $wrongPoolingScope
+            } -ExpectedMessage 'only in ordinary SQL Server lanes'
+        }
+    }
 }
 
 Write-Host "PASS: staged wiring, all-success aggregate, $rejectionCount per-job rejection cases, empty input and scheduling mutations."
