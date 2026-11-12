@@ -89,6 +89,9 @@ jobs:
           }
           @{ ExitCode = $exitCode; ExpectedRejection = $true } |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'result.json')
+          # GitHub's pwsh wrapper propagates the most recent native exit code.
+          # The nonzero mutant was required and verified above.
+          exit 0
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
