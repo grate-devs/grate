@@ -85,12 +85,15 @@ public sealed class Scoped_pooling(IConfiguration configuration)
     {
         var restore = typeof(Running_MigrationScripts.RestoreDatabase).GetMethod("Restores_both_files_and_migrates");
         var failure = typeof(Reported_issues.RestoreFailure).GetMethod("Unknown_logical_file_leaves_existing_database_in_multi_user_mode");
+        var snapshot = typeof(Reported_issues.Run_after_create_database_232).GetMethod("Bug232_Timeout_v1U002E4U002E0_Regression");
         var markedMethod = typeof(Scoped_pooling).GetMethod(nameof(Unpooled_method), BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(restore);
         Assert.NotNull(failure);
+        Assert.NotNull(snapshot);
         Assert.NotNull(markedMethod);
         Assert.True(SqlServerScopedPooling.IsUnpooledCase(restore));
         Assert.True(SqlServerScopedPooling.IsUnpooledCase(failure));
+        Assert.True(SqlServerScopedPooling.IsUnpooledCase(snapshot));
         Assert.True(SqlServerScopedPooling.IsUnpooledCase(markedMethod));
 
         if (string.Equals(Environment.GetEnvironmentVariable("GRATE_REPRODUCIBLE_TABLE_CASINGS"), "true", StringComparison.OrdinalIgnoreCase))
