@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory,
-    [ValidateSet('Observer', 'Pooling')]
+    [ValidateSet('Observer', 'Pooling', 'Diagnose')]
     [string]$Experiment = 'Observer',
     [ValidateRange(1, 10000)]
     [int]$ExpectedTests = 276,
@@ -138,7 +138,7 @@ function Get-CapturedText {
 
 function Get-MeasurementScenarios {
     param(
-        [ValidateSet('Observer', 'Pooling')]
+        [ValidateSet('Observer', 'Pooling', 'Diagnose')]
         [string]$Experiment
     )
 
@@ -147,6 +147,9 @@ function Get-MeasurementScenarios {
             @{ Name = 'OFF'; Profile = $false; Pooling = $false }
             @{ Name = 'ON'; Profile = $true; Pooling = $false }
         )
+    }
+    if ($Experiment -ceq 'Diagnose') {
+        return @{ Name = 'DIAGNOSE'; Profile = $true; Pooling = $true }
     }
     return @(
         @{ Name = 'BASELINE-1'; Profile = $true; Pooling = $false }
@@ -391,6 +394,11 @@ function Invoke-MeasurementSelfTest {
             $poolingScenarios[0].Pooling -or !$poolingScenarios[1].Pooling -or
             !$poolingScenarios[2].Pooling -or $poolingScenarios[3].Pooling) {
             throw 'Pooling comparison must preserve the observer and vary pooling in ABBA order.'
+        }
+        $diagnosticScenarios = @(Get-MeasurementScenarios -Experiment Diagnose)
+        if ($diagnosticScenarios.Count -ne 1 -or $diagnosticScenarios[0].Name -cne 'DIAGNOSE' -or
+            !$diagnosticScenarios[0].Profile -or !$diagnosticScenarios[0].Pooling) {
+            throw 'Diagnostic mode must run one observed candidate without claiming a comparison.'
         }
         $profileFixture = @{
             SchemaVersion = 1
@@ -641,7 +649,7 @@ if (Test-Path -LiteralPath $output) {
 New-Item -ItemType Directory -Path $output | Out-Null
 $raw = Join-Path ([IO.Path]::GetTempPath()) ('sqlserver-measure-raw-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $raw | Out-Null
-$environmentNames = @('GrateTestConfig__DockerImage', 'GRATE_SQLSERVER_PROFILE_OUTPUT', 'GRATE_SQLSERVER_SCOPED_POOLING', 'GRATE_REPRODUCIBLE_TABLE_CASINGS', 'LogLevel', 'TZ')
+$environmentNames = @('GrateTestConfig__DockerImage', 'GRATE_SQLSERVER_PROFILE_OUTPUT', 'GRATE_SQLSERVER_PROFILE_PROGRESS_OUTPUT', 'GRATE_SQLSERVER_SCOPED_POOLING', 'GRATE_REPRODUCIBLE_TABLE_CASINGS', 'LogLevel', 'TZ')
 $savedEnvironment = @{}
 foreach ($name in $environmentNames) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
@@ -651,8 +659,10 @@ $inventories = [Collections.Generic.List[object]]::new()
 $profileSummary = @()
 $design = if ($Experiment -ceq 'Observer') {
     'One sequential observer OFF/ON pair; fresh fixture containers; no optimization claim or noise estimate.'
-} else {
+} elseif ($Experiment -ceq 'Pooling') {
     'Two baseline/candidate comparisons in ABBA order; observer ON throughout; same prepared binary and fresh fixture containers.'
+} else {
+    'Diagnostic single candidate with case journal and four-minute test deadline; no performance comparison.'
 }
 $status = 'incomplete'
 $script:MeasurementDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes(35)
@@ -725,17 +735,20 @@ try {
         $directory = "$raw/runs/$observer"
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         $env:GRATE_SQLSERVER_PROFILE_OUTPUT = if ($scenario.Profile) { "$directory/sqlclient-profile.json" } else { $null }
+        $env:GRATE_SQLSERVER_PROFILE_PROGRESS_OUTPUT = if ($Experiment -ceq 'Diagnose') { "$directory/case-progress.log" } else { $null }
         $env:GRATE_SQLSERVER_SCOPED_POOLING = if ($scenario.Pooling) { 'true' } else { 'false' }
+        $testTimeout = if ($Experiment -ceq 'Diagnose') { '4m' } else { '12m' }
+        $commandTimeout = if ($Experiment -ceq 'Diagnose') { 300 } else { 840 }
         $arguments = @(
             'test', '--project', $project, '--framework', 'net11.0',
             '--no-build', '--no-restore', '--max-parallel-test-modules', '1',
             '--minimum-expected-tests', [string]$ExpectedTests, '--stop-on-fail', 'on',
-            '--long-running', '60', '--timeout', '12m',
+            '--long-running', '60', '--timeout', $testTimeout,
             '--report-xunit-trx', '--coverage', '--coverage-output-format', 'xml',
             '--results-directory', "$directory/results"
         )
         Write-Host "Running $observer ($ExpectedTests cases, coverage and normal CI Warning logging)."
-        $command = Invoke-CapturedCommand -Command 'dotnet' -Arguments $arguments -LogDirectory "$directory/command" -TimeoutSeconds 840
+        $command = Invoke-CapturedCommand -Command 'dotnet' -Arguments $arguments -LogDirectory "$directory/command" -TimeoutSeconds $commandTimeout
         $run = [ordered]@{
             Observer = $observer
             Arguments = $arguments

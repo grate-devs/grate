@@ -14,28 +14,43 @@ namespace SqlServer.Diagnostics;
 internal static class SqlServerProfile
 {
     private static SqlServerProfileSession? session;
+    private static SqlServerCaseJournal? journal;
 
     internal static void StartFromEnvironment()
     {
-        if (session is not null)
-        {
-            return;
-        }
         var output = Environment.GetEnvironmentVariable("GRATE_SQLSERVER_PROFILE_OUTPUT");
-        if (string.IsNullOrWhiteSpace(output))
+        if (session is null && !string.IsNullOrWhiteSpace(output))
         {
-            return;
+            var active = new SqlServerProfileSession(Path.GetFullPath(output));
+            session = active;
+            active.Start();
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => active.Export();
         }
-        var active = new SqlServerProfileSession(Path.GetFullPath(output));
-        session = active;
-        active.Start();
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => active.Export();
+        var progress = Environment.GetEnvironmentVariable("GRATE_SQLSERVER_PROFILE_PROGRESS_OUTPUT");
+        if (journal is null && !string.IsNullOrWhiteSpace(progress))
+        {
+            var active = new SqlServerCaseJournal(Path.GetFullPath(progress), () => session?.Collector.ObserverError());
+            journal = active;
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => active.EnforceExitCode();
+        }
     }
 
-    internal static void Before(string id, MethodInfo method) => session?.Collector.BeginTest(
-        id, method.DeclaringType?.FullName ?? "unknown", method.Name);
+    internal static void Before(string id, MethodInfo method)
+    {
+        if (session is null && journal is null)
+        {
+            return;
+        }
+        var className = method.DeclaringType?.FullName ?? "unknown";
+        session?.Collector.BeginTest(id, className, method.Name);
+        journal?.Before(id, className, method.Name);
+    }
 
-    internal static void After() => session?.Collector.EndTest();
+    internal static void After()
+    {
+        session?.Collector.EndTest();
+        journal?.After();
+    }
 }
 
 public sealed class SqlServerProfileTestAttribute : BeforeAfterTestAttribute

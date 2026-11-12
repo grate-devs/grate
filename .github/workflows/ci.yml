@@ -7,7 +7,7 @@ on:
       experiment:
         type: choice
         description: Measurement design
-        options: [Observer, Pooling]
+        options: [Observer, Pooling, Diagnose]
         default: Observer
       expected_tests:
         type: number
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   measure:
-    name: SQL Server observer OFF and ON
+    name: SQL Server controlled measurements
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
