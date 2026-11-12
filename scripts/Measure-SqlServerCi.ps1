@@ -697,7 +697,7 @@ try {
         Configuration = 'Debug'
         Framework = 'net11.0'
         BuildFrameworks = @('net8.0', 'net9.0', 'net10.0', 'net11.0')
-        LogLevel = 'Trace'
+        LogLevel = 'Warning'
         ReproducibleTableCasings = $true
         ExpectedTests = $ExpectedTests
         Experiment = $Experiment
@@ -717,7 +717,7 @@ try {
     $assemblyHash = (Get-FileHash -LiteralPath $assembly -Algorithm SHA256).Hash
     $env:GrateTestConfig__DockerImage = $digest
     $env:GRATE_REPRODUCIBLE_TABLE_CASINGS = 'true'
-    $env:LogLevel = 'Trace'
+    $env:LogLevel = 'Warning'
     $env:TZ = 'UTC'
     $scenarios = @(Get-MeasurementScenarios -Experiment $Experiment)
     foreach ($scenario in $scenarios) {
@@ -734,7 +734,7 @@ try {
             '--report-xunit-trx', '--coverage', '--coverage-output-format', 'xml',
             '--results-directory', "$directory/results"
         )
-        Write-Host "Running $observer ($ExpectedTests cases, coverage and Trace logging)."
+        Write-Host "Running $observer ($ExpectedTests cases, coverage and normal CI Warning logging)."
         $command = Invoke-CapturedCommand -Command 'dotnet' -Arguments $arguments -LogDirectory "$directory/command" -TimeoutSeconds 840
         $run = [ordered]@{
             Observer = $observer
@@ -843,7 +843,7 @@ try {
             $report.Add(("| {0} | {1:F3} | {2} | {3} | {4} | {5} | {6} |" -f $run.Observer, $run.StopwatchSeconds, $trxSeconds, $passed, $failed, $skipped, $run.ExitCode))
         }
         $report.Add('')
-        $report.Add('Runs use the same prepared Debug/net11 binary, pinned SQL Server RepoDigest, fixed table casing, Trace logging, XML coverage and fresh fixture containers. Exact raw sorted display-name and class/method/name multisets are compared before identity redaction. Full four-TFM CI remains required.')
+        $report.Add('Runs use the same prepared Debug/net11 binary, pinned SQL Server RepoDigest, fixed table casing, normal CI Warning logging, XML coverage and fresh fixture containers. Exact raw sorted display-name and class/method/name multisets are compared before identity redaction. Full four-TFM CI remains required.')
         if ($profileSummary.Count -gt 0) {
             $report.Add('')
             $report.Add('| Scenario | SQL Client operation | Batch category | Started | Succeeded | Failed | Summed interval ms |')
