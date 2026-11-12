@@ -17,6 +17,7 @@ public class Database(BigQueryGrateTestContext testContext, ITestOutputHelper te
     [Fact(Skip = "BigQuery has no version to select")]
     public override Task Is_up_and_running_with_appropriate_database_version() => Task.CompletedTask;
 
-    [Fact(Skip = "The BigQuery emulator answers CREATE SCHEMA without creating the dataset")]
-    public override Task Is_created_with_custom_script_if_custom_create_database_folder_exists() => Task.CompletedTask;
+    [Fact(Skip = "The BigQuery emulator answers CREATE SCHEMA without creating the dataset",
+        SkipWhen = nameof(BigQueryTestTarget.IsEmulator), SkipType = typeof(BigQueryTestTarget))]
+    public override Task Is_created_with_custom_script_if_custom_create_database_folder_exists() => base.Is_created_with_custom_script_if_custom_create_database_folder_exists();
 }

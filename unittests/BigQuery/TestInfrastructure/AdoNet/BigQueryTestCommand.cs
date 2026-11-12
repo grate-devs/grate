@@ -47,10 +47,13 @@ public sealed class BigQueryTestCommand(BigQueryTestConnection connection) : DbC
     {
         var conn = (BigQueryTestConnection)(DbConnection ?? throw new InvalidOperationException("The command has no connection"));
 
+        // The workarounds below are for the emulator - real BigQuery runs the tests' SQL as written
+        var onEmulator = conn.Settings.Endpoint is not null;
+
         // The emulator answers CREATE SCHEMA and DROP SCHEMA without doing anything, so the tests' datasets are
         // made and dropped through the API
         var schema = SchemaStatement.Match(CommandText);
-        if (schema.Success)
+        if (onEmulator && schema.Success)
         {
             var settings = conn.Settings.WithDataset(schema.Groups["dataset"].Value).ToString();
             var change = schema.Groups["verb"].Value.Equals("CREATE", StringComparison.OrdinalIgnoreCase)
@@ -71,7 +74,8 @@ public sealed class BigQueryTestCommand(BigQueryTestConnection connection) : DbC
 
         try
         {
-            return conn.Client.ExecuteQuery(Qualified(CommandText, conn.Settings.Dataset), parameters, options);
+            var sql = onEmulator ? Qualified(CommandText, conn.Settings.Dataset) : CommandText;
+            return conn.Client.ExecuteQuery(sql, parameters, options);
         }
         catch (GoogleApiException ex)
         {
@@ -84,7 +88,8 @@ public sealed class BigQueryTestCommand(BigQueryTestConnection connection) : DbC
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // The emulator reads an unqualified table from the first dataset that has one by that name, whatever the
-    // default dataset - so the tests' queries name the connection's dataset themselves
+    // default dataset - so the tests' queries name the connection's dataset themselves. The rewrite reads the SQL as
+    // text, so it also changes a string literal or a comment that looks like a table (BigQueryTestCommandTests)
     private static readonly Regex UnqualifiedTable = new(
         @"\b(?<keyword>FROM|JOIN|INTO|UPDATE)\s+(?<table>(?!INFORMATION_SCHEMA\b)[A-Za-z_][A-Za-z0-9_]*)\b(?![.(])",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -93,7 +98,7 @@ public sealed class BigQueryTestCommand(BigQueryTestConnection connection) : DbC
         @"(?<![.`\w])INFORMATION_SCHEMA\.",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static string Qualified(string sql, string? dataset)
+    internal static string Qualified(string sql, string? dataset)
     {
         if (dataset is null)
         {
