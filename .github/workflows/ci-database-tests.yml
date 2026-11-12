@@ -96,10 +96,10 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
-        # Only the ordinary SQL Server test host owns these pool lifetimes.
+        # Only the ordinary provider test hosts own these pool lifetimes.
         GRATE_SQLSERVER_SCOPED_POOLING: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
-        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
-        # The 35-minute budget can expire during the fourth sequential Oracle TFM.
+        GRATE_ORACLE_SCOPED_POOLING: ${{ matrix.category == 'Oracle' && 'true' || 'false' }}
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ (matrix.category == 'SqlServer' || matrix.category == 'Oracle') && 'true' || 'false' }}
         # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
         TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
         MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
