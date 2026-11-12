@@ -62,10 +62,12 @@ Assert-FileHandleClosed $partialOutput
 
 $worker = Join-Path $OutputDirectory 'native worker with spaces.ps1'
 @'
-param([string]$Observation, [string]$Mode)
+param([string]$Observation, [string]$Ready, [string]$Mode)
 [Console]::Out.WriteLine('Native helper stdout marker')
 [Console]::Error.WriteLine('Native helper stderr marker')
 [Environment]::CurrentDirectory | Set-Content -LiteralPath $Observation
+# Observation must be complete before the parent may terminate this worker.
+'Ready' | Set-Content -LiteralPath $Ready
 if ($Mode -eq 'Hang') { [Threading.Thread]::Sleep(60000) }
 exit 37
 '@ | Set-Content -LiteralPath $worker
@@ -73,7 +75,8 @@ foreach ($mode in @('RapidExit', 'Hang')) {
     $stdout = Join-Path $OutputDirectory "$mode.stdout.log"
     $stderr = Join-Path $OutputDirectory "$mode.stderr.log"
     $observation = Join-Path $OutputDirectory "$mode.cwd.txt"
-    $arguments = '-NoLogo -NoProfile -NonInteractive -File "{0}" -Observation "{1}" -Mode {2}' -f $worker, $observation, $mode
+    $ready = Join-Path $OutputDirectory "$mode.ready.txt"
+    $arguments = '-NoLogo -NoProfile -NonInteractive -File "{0}" -Observation "{1}" -Ready "{2}" -Mode {3}' -f $worker, $observation, $ready, $mode
     $process = $null
     try {
         $process = [Grate.MsiTests.MsiLifecycleNativeProcess]::Start($pwsh, $arguments, $stdout, $stderr, $workingDirectory)
@@ -82,7 +85,7 @@ foreach ($mode in @('RapidExit', 'Hang')) {
         }
         if ($mode -eq 'Hang') {
             $watch = [Diagnostics.Stopwatch]::StartNew()
-            while (!(Test-Path -LiteralPath $observation)) {
+            while (!(Test-Path -LiteralPath $ready)) {
                 if ($watch.Elapsed.TotalSeconds -gt 5) {
                     throw 'Controlled native worker did not become ready.'
                 }
