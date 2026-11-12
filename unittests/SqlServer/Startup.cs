@@ -4,14 +4,18 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using SqlServer.TestInfrastructure;
+using SqlServer.Diagnostics;
 
 [assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
+[assembly: SqlServerProfileTest]
 
 namespace SqlServer;
 
 // ReSharper disable once UnusedType.Global
 public class Startup : TestCommon.Startup<SqlServerTestContainerDatabase, SqlServerExternalDatabase, SqlServerGrateTestContext>
 {
+    public Startup() => SqlServerProfile.StartFromEnvironment();
+
     protected override void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context)
     {
         services

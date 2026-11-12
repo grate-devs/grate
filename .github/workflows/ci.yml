@@ -1,126 +1,40 @@
-# Build, security analysis, and the full database/runtime test matrix for PRs.
-name: CI · Build and tests
+# EXPERIMENT ONLY: selected net11 profiling does not replace the full CI matrix.
+name: Experiment · SQL Server profile
 
 on:
-  # Feature branches are validated through PRs; main also needs a CodeQL baseline.
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
-  schedule:
-    # Refresh the main baseline with new queries without rerunning the test matrix.
-    - cron: '23 5 * * 1'
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Replace obsolete test runs without letting a manual branch run cancel a PR's
-# merge-ref validation. Publishing on main is handled by build.yml separately.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  validation-policy:
-    name: PR validation policy
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+  measure:
+    name: SQL Server observer OFF and ON
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: Check build-independent contracts
-      uses: ./.github/actions/preflight
-
-  pr-validation:
-    # Keep this name stable: the proposed main ruleset consumes it.
-    name: PR validation
-    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
-    needs: [validation-policy, build-code, test, cli-distributions, packages, standalone, docker]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: Require every build, test and package producer
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ github.token }}
-        NEEDS_JSON: ${{ toJSON(needs) }}
-      run: ./scripts/ci/Invoke-PRValidation.ps1
-
-  build-code:
-    name: Build
-    needs: validation-policy
-    uses: ./.github/workflows/ci-build.yml
-
-  fast-tests:
-    name: Isolated tests
-    needs: validation-policy
-    uses: ./.github/workflows/ci-fast-tests.yml
-
-  analyze:
-    name: Security analysis
-    needs: [build-code, fast-tests, validation-policy]
-    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    uses: ./.github/workflows/ci-security-analysis.yml
-
-  test:
-    name: Database tests
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-database-tests.yml
-
-  cli-distributions:
-    name: CLI distributions
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-cli-distributions.yml
-
-  report:
-    name: Test report
-    needs: [fast-tests, test, cli-distributions]
-    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
-    uses: ./.github/workflows/ci-report.yml
-
-  packages:
-    name: Packages
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-packages.yml
-
-  standalone:
-    name: Standalone CLI
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-standalone.yml
-
-  docker:
-    name: Docker
-    needs: [build-code, fast-tests, validation-policy]
-    uses: ./.github/workflows/ci-docker.yml
-
-  ci-result:
-    name: CI result
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # A skipped dependent job can look green in isolation. Only this aggregate
-    # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
-    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
-    steps:
-      - uses: actions/checkout@v7
-      - name: Require successful results from every CI phase
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup pinned SDK and supported runtimes
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Check measurement controls
         shell: pwsh
-        env:
-          CI_NEEDS_JSON: ${{ toJSON(needs) }}
-        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON
+        run: ./scripts/Measure-SqlServerCi.ps1 -SelfTest
+      - name: Measure the same prepared Debug binary
+        shell: pwsh
+        run: ./scripts/Measure-SqlServerCi.ps1 -OutputDirectory "${{ runner.temp }}/sqlserver-profile"
+      - name: Retain sanitized measurement evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sqlserver-profile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sqlserver-profile/
+          if-no-files-found: error
+          retention-days: 7
