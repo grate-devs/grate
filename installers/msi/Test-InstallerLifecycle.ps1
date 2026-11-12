@@ -21,13 +21,43 @@ if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLo
 
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
+$phaseFailures = [Collections.Generic.List[Exception]]::new()
+function Write-LifecyclePhase {
+    param(
+        [string]$Phase
+    )
+    $observation = @{
+        Phase = $Phase
+        Utc = [DateTime]::UtcNow.ToString('o')
+    }
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $OutputDirectory 'worker-phase.json') -Value $observation -Failures $phaseFailures
+    Write-InstallerLifecycleDiagnostic -Path (Join-Path $OutputDirectory 'worker-phases.jsonl') -Value $observation -Failures $phaseFailures -Append
+}
+
 $MsiPath = (Resolve-Path -LiteralPath $MsiPath).Path
 $PublishedExecutable = (Resolve-Path -LiteralPath $PublishedExecutable).Path
 $repository = Split-Path (Split-Path $PSScriptRoot)
+Write-LifecyclePhase 'BeforeInstallerComCreation'
 $installer = New-Object -ComObject WindowsInstaller.Installer
+Write-LifecyclePhase 'AfterInstallerComCreation'
 
 function Invoke-ComMember($Target, [string]$Name, [Reflection.BindingFlags]$Flags, [object[]]$Arguments) {
-    $Target.GetType().InvokeMember($Name, $Flags, $null, $Target, $Arguments)
+    Write-LifecyclePhase "BeforeCom.$Name"
+    try {
+        $Target.GetType().InvokeMember($Name, $Flags, $null, $Target, $Arguments)
+    } finally {
+        Write-LifecyclePhase "AfterCom.$Name"
+    }
+}
+
+function Release-LifecycleComObject {
+    param(
+        $Target,
+        [string]$Name
+    )
+    Write-LifecyclePhase "BeforeComRelease.$Name"
+    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($Target)
+    Write-LifecyclePhase "AfterComRelease.$Name"
 }
 
 function Read-MsiMetadata([string]$Path) {
@@ -38,19 +68,23 @@ function Read-MsiMetadata([string]$Path) {
             $view = Invoke-ComMember $database 'OpenView' InvokeMethod @("SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = '$name'")
             $record = $null
             try {
+                Write-LifecyclePhase "BeforeCom.ViewExecute.$name"
                 [void]$view.Execute()
+                Write-LifecyclePhase "AfterCom.ViewExecute.$name"
+                Write-LifecyclePhase "BeforeCom.ViewFetch.$name"
                 $record = $view.Fetch()
+                Write-LifecyclePhase "AfterCom.ViewFetch.$name"
                 if ($null -eq $record) { throw "The MSI has no $name property." }
                 $values[$name] = Invoke-ComMember $record 'StringData' GetProperty @(1)
             } finally {
-                if ($null -ne $record) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
-                [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view)
+                if ($null -ne $record) { Release-LifecycleComObject $record 'Record' }
+                Release-LifecycleComObject $view 'View'
             }
         }
         $summary = Invoke-ComMember $database 'SummaryInformation' GetProperty @(0)
         try { $values.Platform = (Invoke-ComMember $summary 'Property' GetProperty @(7)).Split(';')[0] }
-        finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($summary) }
-    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
+        finally { Release-LifecycleComObject $summary 'Summary' }
+    } finally { Release-LifecycleComObject $database 'Database' }
     return $values
 }
 
@@ -59,8 +93,13 @@ function Product-Info([string]$Name) { Invoke-ComMember $installer 'ProductInfo'
 function Marker-Present { $null -ne (Get-ItemProperty -LiteralPath $marker -Name installed -ErrorAction SilentlyContinue) }
 
 function Run-Process([string]$Executable, [string[]]$Arguments, [string]$Name, [int[]]$AllowedExitCodes = @(0)) {
-    Invoke-InstallerLifecycleProcess -Executable $Executable -Arguments $Arguments -Name $Name `
-        -AllowedExitCodes $AllowedExitCodes -OutputDirectory $OutputDirectory
+    Write-LifecyclePhase "BeforeProcess.$Name"
+    try {
+        Invoke-InstallerLifecycleProcess -Executable $Executable -Arguments $Arguments -Name $Name `
+            -AllowedExitCodes $AllowedExitCodes -OutputDirectory $OutputDirectory
+    } finally {
+        Write-LifecyclePhase "AfterProcess.$Name"
+    }
 }
 
 function Run-Msi([string[]]$Arguments, [string]$Name) {
@@ -290,7 +329,21 @@ try {
         } catch {
             $cleanupFailures.Add($_.Exception)
         }
-        [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
+        Release-LifecycleComObject $installer 'Installer'
+    }
+}
+Complete-InstallerLifecycleDiagnostics -Path (Join-Path $OutputDirectory 'worker-diagnostics.json') -Snapshot @{ Phase = 'CleanupFinished' } -Failures $phaseFailures
+$cleanupFailures.AddRange($phaseFailures)
+if (!$failure -and !$cleanupFailures.Count) {
+    try {
+        Assert-InstallerLifecyclePhaseOrder -Path (Join-Path $OutputDirectory 'worker-phases.jsonl') -RequiredPhases @(
+            'BeforeInstallerComCreation', 'AfterInstallerComCreation',
+            'BeforeCom.OpenDatabase', 'AfterCom.OpenDatabase',
+            'BeforeCom.ProductState', 'AfterCom.ProductState',
+            'BeforeComRelease.Installer', 'AfterComRelease.Installer'
+        )
+    } catch {
+        $cleanupFailures.Add($_.Exception)
     }
 }
 if ($failure -or $cleanupFailures.Count) {

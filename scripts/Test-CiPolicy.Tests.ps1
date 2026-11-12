@@ -67,8 +67,9 @@ function Assert-CiPhaseCoverage {
         throw 'Keep native CLI/installer and Docker diagnostics on failure.'
     }
     $lifecycle = $Phases.standalone.steps | Where-Object { $_['name'] -ceq 'Verify installed MSI, major upgrade and uninstall' }
-    if (!$lifecycle.run.Contains('-TimeoutSeconds 360')) {
-        throw 'Preserve the supported 360-second MSI supervisor budget.'
+    if (!$lifecycle.run.Contains('-TimeoutSeconds 360') -or
+        !$lifecycle.ContainsKey('timeout-minutes') -or $lifecycle.'timeout-minutes' -ne 8) {
+        throw 'Preserve the 360-second MSI supervisor budget and independent eight-minute step deadline.'
     }
     $linux = $Phases.test.steps | Where-Object { $_['name'] -ceq 'Test on Linux' }
     if (!$linux.run.Contains('monitor-test-containers.ps1') -or !$linux.run.Contains('trap stop_diagnostics EXIT') -or
@@ -256,5 +257,16 @@ Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $mis
 $lostDiagnostics = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
 (Get-ActionStep $lostDiagnostics.test 'actions/upload-artifact').if = 'success()'
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $lostDiagnostics } -ExpectedMessage 'artifact names on failure'
+
+foreach ($deadline in @($null, 30)) {
+    $unboundedInstaller = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+    $lifecycle = $unboundedInstaller.standalone.steps | Where-Object { $_['name'] -ceq 'Verify installed MSI, major upgrade and uninstall' }
+    if ($null -eq $deadline) {
+        $lifecycle.Remove('timeout-minutes')
+    } else {
+        $lifecycle['timeout-minutes'] = $deadline
+    }
+    Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $unboundedInstaller } -ExpectedMessage 'independent eight-minute step deadline'
+}
 
 Write-Host "PASS: staged wiring, all-success aggregate, $rejectionCount per-job rejection cases, empty input and scheduling mutations."
