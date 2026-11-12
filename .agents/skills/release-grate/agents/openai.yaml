@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release grate"
+  short_description: "Prepare and operate grate project releases"
+  default_prompt: "Use $release-grate to prepare a grate release and show the version, commit, checks, and publication plan."

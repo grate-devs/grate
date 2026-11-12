@@ -1,0 +1,65 @@
+# Reusable isolated tests phase. Scheduling and aggregate gates live in ci.yml.
+name: CI · Isolated tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  fast-tests:
+    name: Run tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            category: Basic_tests
+            test_filter: ''
+          - os: windows-latest
+            category: Basic_tests
+            test_filter: ''
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup .NET 11 and earlier
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Test on ${{ runner.os }}
+        shell: pwsh
+        env:
+          LogLevel: Warning
+          TZ: UTC
+          TEST_RESULTS_DIRECTORY: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $testArgs = @(
+            'test',
+            '--project', "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj",
+            '--max-parallel-test-modules', '1',
+            '--minimum-expected-tests', '1',
+            '--stop-on-fail', 'on',
+            '--long-running', '60',
+            '--timeout', '20m',
+            '--results-directory', $env:TEST_RESULTS_DIRECTORY,
+            '--report-xunit-trx',
+            '--xunit-info',
+            '--coverage',
+            '--coverage-output-format', 'xml'
+          )
+          dotnet @testArgs
+      - name: Upload Unit Test Results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
+          path: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}/
+          retention-days: 1

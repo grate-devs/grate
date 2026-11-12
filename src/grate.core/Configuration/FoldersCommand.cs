@@ -6,7 +6,16 @@ namespace grate.Configuration;
 
 internal static class FoldersCommand
 {
-    public static IFoldersConfiguration Parse(string? arg)
+    public static IFoldersConfiguration Parse(string? arg) => Parse(arg, requiredFolders: null);
+
+    public static (IFoldersConfiguration Configuration, IReadOnlyDictionary<string, MigrationsFolder> RequiredFolders)
+        ParseWithRequiredFolders(string? arg)
+    {
+        var requiredFolders = new Dictionary<string, MigrationsFolder>(StringComparer.InvariantCultureIgnoreCase);
+        return (Parse(arg, requiredFolders), requiredFolders);
+    }
+
+    private static IFoldersConfiguration Parse(string? arg, Dictionary<string, MigrationsFolder>? requiredFolders)
     {
         if (IsFile(arg))
         {
@@ -28,12 +37,13 @@ internal static class FoldersCommand
 
         return content switch
         {
-            { } => ParseNewCustomFoldersConfiguration(content),
+            { } => ParseNewCustomFoldersConfiguration(content, requiredFolders),
             _ => FoldersConfiguration.Default()
         };
     }
 
-    private static IFoldersConfiguration ParseNewCustomFoldersConfiguration(string s)
+    private static IFoldersConfiguration ParseNewCustomFoldersConfiguration(
+        string s, Dictionary<string, MigrationsFolder>? requiredFolders)
     {
         // Combine lines into a semicolon-separated string, if there were multiple lines
         var lines = (s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -48,10 +58,8 @@ internal static class FoldersCommand
         // 
         // If one of the folders is none of the default folders, we assume the intent is a totally
         // customised folder configuration.
-        IFoldersConfiguration foldersConfiguration =
-            configs.Select(c => c.key).All(key => KnownFolderKeys.Keys.Contains(key, StringComparer.InvariantCultureIgnoreCase))
-                ? FoldersConfiguration.Default()
-                : FoldersConfiguration.Empty;
+        var usesDefaultFolders = configs.All(c => KnownFolderKeys.Keys.Contains(c.key, StringComparer.InvariantCultureIgnoreCase));
+        var foldersConfiguration = usesDefaultFolders ? FoldersConfiguration.Default() : FoldersConfiguration.Empty;
 
         // Loop through all the config items, and apply them
         // 1) To the existing default folder with that name
@@ -59,7 +67,7 @@ internal static class FoldersCommand
         foreach ((string key, string config) in configs)
         {
             MigrationsFolder folder;
-            if (foldersConfiguration.CreateDatabase != null && 
+            if (foldersConfiguration.CreateDatabase != null &&
                 key.Equals(KnownFolderKeys.CreateDatabase, StringComparison.InvariantCultureIgnoreCase))
             {
                 folder = foldersConfiguration.CreateDatabase;
@@ -79,7 +87,11 @@ internal static class FoldersCommand
                     foldersConfiguration[key] = folder;
                 }
             }
-            ApplyConfig(folder, config);
+            var pathConfigured = ApplyConfig(folder, config);
+            if (requiredFolders is not null && (!usesDefaultFolders || pathConfigured))
+            {
+                requiredFolders[key] = folder;
+            }
         }
 
         return foldersConfiguration;
@@ -91,11 +103,12 @@ internal static class FoldersCommand
     /// <param name="folder">The folder to apply to</param>
     /// <param name="folderConfig">A string that describes the configuration, or short form with either
     /// only the folder name, or only the migration type</param>
+    /// <returns>Whether the configuration explicitly sets the folder path.</returns>
     /// <exception cref="InvalidFolderConfiguration"></exception>
     /// <example>relativePath:myCustomFolder,type:Once,connectionType:Admin</example>
     /// <example>Once</example>
     /// <example>AnyTime</example>
-    private static void ApplyConfig(MigrationsFolder folder, string folderConfig)
+    private static bool ApplyConfig(MigrationsFolder folder, string folderConfig)
     {
         // First, handle any special 'short form' types:
         if (!folderConfig.Contains(':'))
@@ -104,17 +117,16 @@ internal static class FoldersCommand
             {
                 var (setter, _) = GetProperty(nameof(MigrationsFolder.Type));
                 setter!.Invoke(folder, new object?[] { result });
-            }
-            else
-            {
-                var (setter, _) = GetProperty(nameof(MigrationsFolder.Path));
-                setter!.Invoke(folder, new object?[] { folderConfig });
+                return false;
             }
 
-            return;
+            var (pathSetter, _) = GetProperty(nameof(MigrationsFolder.Path));
+            pathSetter!.Invoke(folder, new object?[] { folderConfig });
+            return true;
         }
 
 
+        var pathConfigured = false;
         var tokens = folderConfig.Split(',');
         foreach (var token in tokens)
         {
@@ -133,7 +145,10 @@ internal static class FoldersCommand
                             : value;
 
             setter.Invoke(folder, new[] { parsed });
+            pathConfigured |= key.Equals(nameof(MigrationsFolder.Path), StringComparison.OrdinalIgnoreCase);
         }
+
+        return pathConfigured;
     }
 
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)]

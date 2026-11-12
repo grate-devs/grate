@@ -5,6 +5,12 @@ no EF migrations. It gives you full flexibility, and full control of your migrat
 all the fancy features of your particular database system. You are not constrained to any lowest common
 feature set of all supported databases.
 
+## Supported runtimes
+
+This tool includes .NET 8, 9, 10 and 11 assets. The .NET 11 build requires stable
+runtime `11.0.0` or a newer .NET 11 patch. Install a matching supported runtime
+and use an SDK to install the tool.
+
 ## Minimal example
 The only required argument to pass to grate is a **connection string** to tell it where to find your database. 
 It will deploy to that database, looking for sql scripts in the current directory.
@@ -29,3 +35,11 @@ for more configuration options, see the [documentation](https://grate-devs.githu
 Full documentation can be found at [https://grate-devs.github.io/grate/](https://grate-devs.github.io/grate/).
 
 
+
+## Coding-agent skill
+
+After installing this tool, run `grate skills install --global` to install its
+bundled `use-grate` skill for Codex and Claude Code. For a project-local tool,
+run `dotnet tool run grate -- skills install --local` from the repository.
+See the [agent skill guide](https://grate-devs.github.io/grate/agent-skill/) for
+locations and updating existing copies. Installation does not contact a database.

@@ -27,6 +27,17 @@ public class MigrationStatus_ : IDisposable
         Assert.Equal("script_that_is_run.sql", Assert.Single(grateMigrator.MigrationResult.ScriptsRun));
     }
 
+    [Fact]
+    public async Task Recording_history_does_not_report_SQL_execution_or_change_up_to_date_status()
+    {
+        var grateMigrator = CreateMigrator([("ignored_script.sql", "-- HistoryRecorded")]);
+
+        await grateMigrator.Migrate();
+
+        Assert.Empty(grateMigrator.MigrationResult.ScriptsRun);
+        Assert.True(grateMigrator.MigrationResult.IsUpToDate);
+    }
+
     private static GrateMigrator CreateMigrator(List<(string, string)> scripts)
     {
         foreach (var (filename, content) in scripts)
@@ -57,7 +68,7 @@ public class MigrationStatus_ : IDisposable
             .Returns(info =>
             {
                 var sql = info.ArgAt<string>(0);
-                return sql.Contains("ThisIsRun");
+                return (SqlRun: sql.Contains("ThisIsRun"), HistoryRecorded: sql.Contains("HistoryRecorded"));
             });
 
         dbMigrator.Configuration = config;

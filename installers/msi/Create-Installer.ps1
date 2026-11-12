@@ -1,75 +1,98 @@
-#!/bin/env pwsh
+#!/usr/bin/env pwsh
 
 param (
     [Parameter(Mandatory=$true)] [string]$grateExe,
-    [Parameter(Mandatory=$true)] [string]$version, 
-    [string]$upgradeCode = [Guid]::NewGuid()
+    [Parameter(Mandatory=$true)] [string]$version,
+    [string]$ReleaseVersion = $version,
+    [ValidateSet('x64', 'arm64')] [string]$arch = 'x64',
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')]
+    [string]$Distribution = 'All',
+    [string]$upgradeCode,
+    [switch]$TestFailBeforeFinalize
 )
 
-$Root = Resolve-Path "$($PSScriptRoot)";
-
-# Download and extract WIX
-$wixZip = "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip"
-$localZip = "win311-binaries.zip"
+$ErrorActionPreference = 'Stop'
+if (!$IsWindows) { throw 'MSI generation requires Windows, WiX and Visual Studio C++ build tools.' }
+& (Join-Path $PSScriptRoot 'helpers/Test-InstallerAuthoring.ps1')
+$identity = & (Join-Path $PSScriptRoot 'helpers/Get-InstallerIdentity.ps1') -Version $version -Architecture $arch -ReleaseVersion $ReleaseVersion -Distribution $Distribution
+$arch = $identity.Architecture
+$Distribution = $identity.Distribution
+if ($upgradeCode -and $upgradeCode -ne $identity.UpgradeCode) { throw 'The MSI UpgradeCode must match the stable architecture family in identity-contract.json.' }
+$upgradeCode = $identity.UpgradeCode
+$grateExe = (Resolve-Path -LiteralPath $grateExe).Path
+$payload = [Diagnostics.FileVersionInfo]::GetVersionInfo($grateExe)
+# Informational +commit metadata does not distinguish published releases. Refuse
+# dropping a prerelease suffix merely because Windows Installer needs a number.
+. (Join-Path $PSScriptRoot 'helpers/InstallerPayloadPolicy.ps1')
+Assert-MsiPayloadIdentity -ProductVersion $payload.ProductVersion -ProductName $payload.ProductName -Identity $identity
 
 function Recreate {
-	param ($dirName)
-
-	$dir = Join-Path $Root $dirName;
-
-	If (Test-Path($dir)) {
-	   $null = Remove-Item -Recurse $dir
-	}
-	mkdir $dir;
+    param ([string]$dirName)
+    $dir = Join-Path $PSScriptRoot $dirName
+    if (Test-Path -LiteralPath $dir) {
+        Remove-Item -LiteralPath $dir -Recurse -Force
+    }
+    return (New-Item -Path $dir -ItemType Directory).FullName
 }
 
-$wixDir = Recreate "wix"
-$tmpDir = Recreate "tmp"
+$wixDir = Recreate 'wix'
+$tmpDir = Recreate 'tmp'
+& (Join-Path $PSScriptRoot 'native/Build-UpgradeActions.ps1') -Architecture $arch -Distribution $Distribution -OutputDirectory (Join-Path $tmpDir 'upgrade-actions') | ForEach-Object { Write-Host $_ }
+$upgradeActions = Join-Path $tmpDir 'upgrade-actions/GrateUpgradeActions.dll'
+if (!(Test-Path -LiteralPath $upgradeActions)) { throw 'The native MSI upgrade action was not built.' }
 
-$client = New-Object System.Net.WebClient;
-$localFile = (Join-Path $tmpDir $localZip);
-
-try {
-   $client.DownloadFile($wixZip, $localFile);
-} catch {
-   Write-Error "Error: " + $_
-   $error[0].Exception.ToString()
+# WiX 3.14 supports ARM64 MSI packages; 3.11's candle only supports ARM32.
+$wixZip = 'https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip'
+$localZip = Join-Path $tmpDir 'wix314-binaries.zip'
+# Retry release-asset HTTP failures and client timeouts without retrying checksum failures.
+$maximumDownloadAttempts = 4
+for ($attempt = 1; $attempt -le $maximumDownloadAttempts; $attempt++) {
+    try {
+        Invoke-WebRequest -Uri $wixZip -OutFile $localZip -TimeoutSec 60
+        break
+    }
+    catch {
+        if ($attempt -eq $maximumDownloadAttempts) {
+            throw
+        }
+        Write-Warning "WiX download attempt $attempt of $maximumDownloadAttempts failed; retrying in 5 seconds."
+        Start-Sleep -Seconds 5
+    }
 }
-
-Expand-Archive -Path  $localFile -DestinationPath $wixDir
-
-
-$candle = Join-Path $wixDir "candle.exe"
-$light = Join-Path $wixDir "light.exe"
-
-
-# Create an MSI
-
-$wxs = Join-Path $tmpDir "grate-$version.wxs"
-$wixobj = Join-Path $tmpDir "grate-$version.wixobj"
-$msi = Join-Path $tmpDir "grate-$version.msi"
-
-$originalWxs = Join-Path $Root "grate.wxs"
-
-((Get-Content -path $originalWxs -Raw) `
-	-replace '%%%VERSION%%%',$version `
-	-replace '%%%UPGRADECODE%%%',$upgradeCode `
-	-replace '%%%GRATEEXE%%%',$grateExe `
-	) | Set-Content -Path $wxs
-
-#$null = & $candle -nologo -arch x64 $wxs -o $wixobj
-
-$candleRes = ""
-$lightRes = ""
-
-try {
-  $candleRes = & $candle -nologo -arch x64 $wxs -o $wixobj 
-  $lightRes = & $light -nologo -wx0204 -wx1076 $wixobj -o $msi
+$expectedHash = '6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31'
+if ((Get-FileHash -LiteralPath $localZip -Algorithm SHA256).Hash -ne $expectedHash) {
+    throw 'WiX archive checksum does not match the pinned release.'
 }
-catch {}
+Expand-Archive -LiteralPath $localZip -DestinationPath $wixDir
 
-Exit 0;
+$wxs = Join-Path $tmpDir "$($identity.PackageId)-$version.wxs"
+$wixobj = Join-Path $tmpDir "$($identity.PackageId)-$version.wixobj"
+$msi = Join-Path $tmpDir "$($identity.PackageId)-$version.msi"
+$template = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'grate.wxs') -Raw
+if ($TestFailBeforeFinalize) {
+    # A separate local test MSI only. The release template has no failure hook.
+    $template = $template.Replace('</InstallExecuteSequence>', "<Custom Action='FailRollbackVerification' Before='InstallFinalize'>1</Custom></InstallExecuteSequence>").
+        Replace('</Product>', "<CustomAction Id='FailRollbackVerification' Error='Injected rollback verification failure.' /></Product>")
+}
+$template.Replace('%%%VERSION%%%', $version).
+    Replace('%%%RELEASEVERSION%%%', $ReleaseVersion).
+    Replace('%%%PRODUCTCODE%%%', $identity.ProductCode).
+    Replace('%%%PRODUCTNAME%%%', $identity.ProductName).
+    Replace('%%%DISTRIBUTION%%%', $identity.Distribution).
+    Replace('%%%EXECUTABLECOMPONENT%%%', $identity.ExecutableComponent).
+    Replace('%%%PATHCOMPONENT%%%', $identity.PathComponent).
+    Replace('%%%REGISTRYKEY%%%', $identity.RegistryKey).
+    Replace('%%%UPGRADECODE%%%', $upgradeCode).
+    Replace('%%%UPGRADEACTIONS%%%', [System.Security.SecurityElement]::Escape($upgradeActions)).
+    Replace('%%%GRATEEXE%%%', [System.Security.SecurityElement]::Escape($grateExe)) |
+    Set-Content -LiteralPath $wxs
 
-#echo "lightRes: $lightRes"
-#echo "candleRes: $candleRes"
-
+& (Join-Path $wixDir 'candle.exe') -nologo -arch $arch $wxs -o $wixobj
+if ($LASTEXITCODE -ne 0) { throw "WiX candle failed with exit code $LASTEXITCODE." }
+# ICE91 is advisory for this per-user-only package: files intentionally live in
+# LocalAppDataFolder. Keep it visible, without promoting LGHT1076 to an error.
+# Test-InstallerAuthoring guards that exception's scope before building.
+# https://learn.microsoft.com/windows/win32/msi/ice91
+& (Join-Path $wixDir 'light.exe') -nologo -wx0204 $wixobj -o $msi
+if ($LASTEXITCODE -ne 0) { throw "WiX light failed with exit code $LASTEXITCODE." }
+if (-not (Test-Path -LiteralPath $msi)) { throw "MSI was not created: $msi" }

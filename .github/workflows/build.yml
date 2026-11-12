@@ -1,5 +1,5 @@
-# Heavyweight build and test
-name: Build and Publish
+# Build every release format. Publishing is enabled only for a GitHub release.
+name: Release · Build artifacts
 
 on:
   push:
@@ -7,394 +7,336 @@ on:
       - main
     paths-ignore:
       - docs/
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build.yml"
+      - ".github/workflows/release-*.yml"
+      - ".github/actions/setup-dotnet-macos-arm64/**"
+      - "Directory.*"
+      - "GitVersion.yml"
+      - "scripts/release/**"
+      - "scripts/verify-packages.ps1"
+      - "scripts/ci/Distribution.Common.ps1"
+      - "installers/**"
+      - "src/**"
+  release:
+    types: [published]
   workflow_dispatch:
-  
+    inputs:
+      release_tag:
+        description: "Existing release tag; also select this tag as the workflow ref"
+        required: false
+        type: string
+      publish:
+        description: "Publish to the existing GitHub release and external registries"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-release-${{ github.event.release.tag_name || inputs.release_tag || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   set-version-number:
-    name: Set version number
+    name: Resolve release context
+    needs: validate-release-policy
     runs-on: ubuntu-latest
     outputs:
-      nuGetVersion: ${{ steps.gitversion.outputs.majorMinorPatch }}
-      semVer: ${{ steps.gitversion.outputs.fullSemVer }}
-      is-release: ${{ steps.gitversion.outputs.versionSourceDistance == 0 }}
-      #is-release: 'true'
-    
+      nuGetVersion: ${{ steps.release-context.outputs.core_version }}
+      semVer: ${{ steps.release-context.outputs.version }}
+      is-release: ${{ steps.release-context.outputs.publish }}
+      is-prerelease: ${{ steps.release-context.outputs.prerelease }}
+      release-tag: ${{ steps.release-context.outputs.release_tag }}
     steps:
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
+    - uses: actions/checkout@v7
       with:
-        dotnet-version: 10.0.x
-        
-    - name: Checkout
-      uses: actions/checkout@v7
-      with:
+        ref: ${{ github.sha }}
         fetch-depth: 0
-        
+        persist-credentials: false
+    - name: Setup .NET 11 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+      with:
+        global-json-file: global.json
+        dotnet-version: 10.0.x
     - name: Install GitVersion
+      if: ${{ github.event_name != 'release' && inputs.release_tag == '' }}
       uses: gittools/actions/gitversion/setup@v4.7.0
       with:
         versionSpec: '6.x'
-        
-    - name: Determine Version
+    - name: Determine version
+      if: ${{ github.event_name != 'release' && inputs.release_tag == '' }}
       id: gitversion
       uses: gittools/actions/gitversion/execute@v4.7.0
-    
-    
-    - name: Display Version Information
+    - name: Resolve and validate release context
+      id: release-context
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        RELEASE_ACTION: ${{ github.event.action }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+        RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        RELEASE_DRAFT: ${{ github.event.release.draft }}
+        MANUAL_TAG: ${{ inputs.release_tag }}
+        MANUAL_PUBLISH: ${{ inputs.publish }}
+        GITVERSION_SEMVER: ${{ steps.gitversion.outputs.semVer }}
+        GH_TOKEN: ${{ github.token }}
+      shell: pwsh
+      run: ./scripts/release/resolve_release_context.ps1
+    # Keep the event ref/cache scope and executed source together. Inputs never select a checkout.
+    - name: Verify release tag identifies the event commit
+      env:
+        RELEASE_TAG: ${{ steps.release-context.outputs.release_tag }}
+      shell: bash
       run: |
-        echo "MajorMinorPatch: ${{ steps.gitversion.outputs.MajorMinorPatch }}"
-        echo "versionSourceDistance: ${{ steps.gitversion.outputs.versionSourceDistance }}"
-        echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
-        echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
+        set -euo pipefail
+        if [[ -n "$RELEASE_TAG" ]]; then
+          commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          if [[ "$commit" != "$GITHUB_SHA" ]]; then
+            echo "::error::Release tag must identify the workflow event commit."
+            exit 1
+          fi
+        fi
+
+  validate-release-policy:
+    name: Test release policy without publishing
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - name: Check build-independent contracts
+      uses: ./.github/actions/preflight
 
   build-netcore-tool:
-    needs: set-version-number
     name: Build .NET Core (global) tool
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-tools.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
 
-    runs-on: ubuntu-latest
-
-    permissions:
-      id-token: write  # Required to get Github JWT to auth to Nuget
-      contents: write
-      
-    steps:
-    - uses: actions/checkout@v7
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
-      with:
-        dotnet-version: 10.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet pack ./src/grate/grate.csproj -p:SelfContained=true -p:PackAsTool=true -p:PackageOutputPath=/tmp/grate/nupkg -p:version=${{ needs.set-version-number.outputs.nuGetVersion }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }} #SelfContained for #714
-      
-    - name: Upload published tool artifact
-      uses: actions/upload-artifact@v7
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      with:
-        name: grate-dotnet-tool-${{ needs.set-version-number.outputs.nuGetVersion }}
-        path: /tmp/grate/nupkg/*
-          
-    # Get a short-lived NuGet API key
-    - name: NuGet login (OIDC → temp API key)
-      uses: NuGet/login@v1
-      id: login
-      with:
-        user: ${{ secrets.NUGET_USER }}
-    
-    - name: Push to Nuget.org
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: dotnet nuget push /tmp/grate/nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}} --skip-duplicate
-  
   build-nuget-package:
-    needs: set-version-number
     name: Build Nuget
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-libraries.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      core-version: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
+  # Keep the NuGet credential job here: its trusted-publisher policy identifies
+  # build.yml via job_workflow_ref. Reusable publishers would change that claim.
+  publish-nuget:
+    name: Publish NuGet packages
+    needs:
+      - set-version-number
+      - release-ready
+      - publish-github-release
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package: [
-                "grate.bigquery",
-                "grate.core",
-                "grate.mariadb",
-                "grate.oracle",
-                "grate.postgresql",
-                "grate.sqlite",
-                "grate.sqlserver"
-              ]
     permissions:
-      id-token: write  # Required to get Github JWT to auth to Nuget
       contents: read
-      
+      id-token: write
+
     steps:
     - uses: actions/checkout@v7
-    
-    - name: Setup .NET 10 and earlier
-      uses: actions/setup-dotnet@v6
       with:
-         dotnet-version: |
-          8.0.x
-          9.0.x
-          10.0.x 
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - name: Setup .NET CLI from the selected source
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830
+      with:
+        global-json-file: global.json
+        dotnet-version: 10.0.x
+    - name: Download NuGet packages
+      uses: actions/download-artifact@v8
+      with:
+        pattern: nuget-*-${{ needs.set-version-number.outputs.semVer }}
+        path: artifacts/nuget
+        merge-multiple: true
 
-    - name: Restore dependencies
-      run: dotnet restore
-
-    - name: Pack Nuget package ${{ matrix.package }}
-      run: dotnet pack ./src/${{ matrix.package }} -c Release --include-symbols -o /tmp/grate/nupkg /p:Version=${{ env.VERSION }} -p:PackageVersion=${{ needs.set-version-number.outputs.semVer }}
+    - name: Validate NuGet publishing identity
+      shell: bash
       env:
-        VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
-      
-    # Get a short-lived NuGet API key
-    - name: NuGet login (OIDC → temp API key)
-      uses: NuGet/login@v1
+        NUGET_USER: ${{ secrets.NUGET_USER }}
+      run: |
+        set -euo pipefail
+        if [ -z "$NUGET_USER" ]; then
+          echo "::error::NUGET_USER is not configured for NuGet trusted publishing."
+          exit 1
+        fi
+
+    - name: NuGet login (OIDC)
       id: login
+      uses: NuGet/login@v1
       with:
         user: ${{ secrets.NUGET_USER }}
-      
-    - name: Push to Nuget.org
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: dotnet nuget push /tmp/grate/nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}} --skip-duplicate
+
+    - name: Push packages to NuGet.org
+      shell: pwsh
+      env:
+        NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        VERSION: ${{ needs.set-version-number.outputs.semVer }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        . ./scripts/release/distribution_profiles.ps1
+        $packages = @(Get-GrateReleaseNugetPackages -Directory artifacts/nuget -Version $env:VERSION)
+        foreach ($package in $packages) {
+          dotnet nuget push $package --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY --skip-duplicate
+        }
 
   build-standalone:
-    name: Build cli
-    needs: set-version-number
-
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [ "win-x64", "win-x86", "win-arm64",
-                "linux-musl-x64", "linux-musl-arm64", "linux-x64", "linux-arm64",
-                "osx-x64" 
-              ]
-    permissions:
-      contents: write
-    steps:
-    - uses: actions/checkout@v7
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
-      with:
-        dotnet-version: 10.0.x
-
-    - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
-        TargetFramework: net10.0
-
-
-    - name: Upload self-contained ${{ matrix.arch }}
-      #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
-        path: ./publish/${{ matrix.arch }}/self-contained/*
-
-    - name: Publish artifact ${{ matrix.arch }}
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: |
-        name=grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}.zip
-        zip -j $name ./publish/${{ matrix.arch }}/self-contained/*
-        gh release upload ${{ needs.set-version-number.outputs.semVer }} $name --clobber
-      env:
-        GH_TOKEN: ${{ github.token }}
-
+    name: Build CLI archives
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-cli.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      runner: ubuntu-latest
+      runtime-identifiers: '["win-x64","win-x86","win-arm64","linux-musl-x64","linux-musl-arm64","linux-x64","linux-arm64","osx-x64"]'
+      native-arm-sdk: false
 
   build-standalone-mac-arm64:
-    name: Build cli
-    needs: set-version-number
+    name: Build CLI archives
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-cli.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      runner: macos-15
+      runtime-identifiers: '["osx-arm64"]'
+      native-arm-sdk: true
 
-    # Use macos-15 to build osx-arm64, it runs on M1, see 
-    # https://github.blog/changelog/2024-01-30-github-actions-introducing-the-new-m1-macos-runner-available-to-open-source/
-    #
-    # I've earlier had problems with that the trimmed, self-contained binary for osx-arm64 that was built on Linux
-    # did not work when opened on an actual mac with arm64.
-
-    runs-on: macos-15
-    strategy:
-      matrix:
-        arch: [ "osx-arm64" ]
-
-    permissions:
-      contents: write
-    steps:
-    - uses: actions/checkout@v7
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
-      with:
-        dotnet-version: 10.0.x
-
-    - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
-        TargetFramework: net10.0
-
-    - name: Upload self-contained ${{ matrix.arch }}
-      #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
-        path: ./publish/${{ matrix.arch }}/self-contained/*
-    
-    - name: Publish artifact ${{ matrix.arch }}
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: |
-        name=grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}.zip
-        zip -j $name ./publish/${{ matrix.arch }}/self-contained/*
-        gh release upload ${{ needs.set-version-number.outputs.semVer }} $name --clobber
-      env:
-        GH_TOKEN: ${{ github.token }}
-  
   build-msi:
     name: Build MSI
-    needs: 
-     - set-version-number
-     - build-standalone
-    runs-on: windows-latest
-    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-    strategy:
-      matrix:
-        arch: [ "win-x64", "win-arm64" ]
-
-    permissions:
-      contents: write
-    steps:
-    - uses: actions/checkout@v7
-    - uses: actions/download-artifact@v8
-      with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
-        path: ${{ matrix.arch }}/
-
-    - name: Create msi
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: ./installers/msi/Create-Installer.ps1 -grateExe ./${{ matrix.arch }}/grate.exe -Version "${{ needs.set-version-number.outputs.nuGetVersion }}"
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
-
-    - name: Upload MSI ${{ matrix.arch }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.nuGetVersion }}
-        path: ./installers/msi/tmp/*.msi
-    
-    - name: Publish artifact ${{ matrix.arch }}
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      shell: pwsh
-      run: |
-        $name = "grate-msi-${{ matrix.arch }}-${{ needs.set-version-number.outputs.nuGetVersion }}.msi"
-        $msiFile = Get-ChildItem -Path ./installers/msi/tmp -Filter *.msi | Select-Object -First 1
-        Copy-Item $msiFile.FullName -Destination $name
-        gh release upload ${{ needs.set-version-number.outputs.semVer }} $name --clobber
-      env:
-        GH_TOKEN: ${{ github.token }}
-
+    needs: [set-version-number, build-standalone]
+    uses: ./.github/workflows/release-msi.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      core-version: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
   build-docker-image:
-    name: Build and push docker image
-    needs: 
-     - set-version-number
-     #- build-standalone ## no need, we build directly from source
+    name: Build and verify Docker OCI archive without publishing
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-docker-build.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
 
-    runs-on: ubuntu-latest
+  build-chocolatey:
+    name: Build Chocolatey package
+    needs: [set-version-number, build-standalone]
+    uses: ./.github/workflows/release-chocolatey.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
 
-    #if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-    env:
-      #REGISTRY: ghcr.io
-      IMAGE_NAME: grate
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-      with:
-        driver: docker-container
-
-    - name: Log in to the Container registry
-      uses: docker/login-action@v4
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      with:
-        #registry: ${{ env.REGISTRY }}
-        username: ${{ secrets.DOCKER_HUB_USER}}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
-
-    - name: Extract metadata (tags, labels) for Docker
-      id: meta
-      uses: docker/metadata-action@v6
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      with:
-        tags: |
-          type=semver,pattern={{version}}
-          type=semver,pattern={{version}},value=${{ needs.set-version-number.outputs.semVer }}
-          type=ref,event=tag
-
-        #images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        images: ${{ secrets.DOCKER_HUB_USER}}/${{ env.IMAGE_NAME }}
-
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v7
-      with:
-        file: ./installers/docker/Dockerfile
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        build-args: |
-          VERSION=${{ needs.set-version-number.outputs.nuGetVersion }}
+  build-slim-docker-images:
+    name: Build and verify Docker archive
+    needs: [set-version-number]
+    uses: ./.github/workflows/release-docker-slim-build.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
 
   build-deb:
     name: Build Debian package
-    needs: 
-     - set-version-number
-     - build-standalone
-    runs-on: ubuntu-latest
+    needs: [set-version-number, build-standalone]
+    uses: ./.github/workflows/release-debian.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+
+  release-ready:
+    name: Release contract ready
+    needs: [set-version-number, validate-release-policy, build-netcore-tool, build-nuget-package, build-standalone, build-standalone-mac-arm64, build-msi, build-docker-image, build-slim-docker-images, build-chocolatey, build-deb]
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-validate.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
+      required-results: ${{ toJSON(needs) }}
+
+  publish-github-release:
+    name: Publish assets to the existing GitHub release
+    needs: [set-version-number, release-ready]
     if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-    strategy:
-      matrix:
-        arch: [ "linux-arm64", "linux-x64" ]
     permissions:
       contents: write
-    steps:
-    - uses: actions/checkout@v7
-    - uses: actions/download-artifact@v8
-      with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
-        path: ${{ matrix.arch }}/
+    uses: ./.github/workflows/release-github.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
 
-    - id: get-arch
-      name: Get architecture
-      run: |
-        arch=$(echo ${{ matrix.arch }} | cut -d- -f2 | sed 's/x64/amd64/')
-        echo "::set-output name=arch::$arch"
+  publish-docker:
+    name: Publish canonical Docker image and compatibility digest
+    needs: [set-version-number, build-docker-image, release-ready, publish-github-release]
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/release-docker-publish.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
+      expected-digest: ${{ needs.build-docker-image.outputs.digest }}
+    secrets:
+      DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
 
-    - name: Create dpkg # Linux with powershell script? really? YES! :D
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: ./installers/deb/Create-Package.ps1 -grateExe ./${{ matrix.arch }}/grate -Version "${{ needs.set-version-number.outputs.nuGetVersion }}" -arch ${{ steps.get-arch.outputs.arch}}
-      env:
-        VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
+  publish-slim-docker:
+    name: Publish verified Docker archive
+    needs: [set-version-number, build-slim-docker-images, release-ready, publish-github-release]
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/release-docker-slim-publish.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
 
-    - name: Upload .dpkg ${{ steps.get-arch.outputs.arch }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: grate_${{ needs.set-version-number.outputs.nuGetVersion }}-1_${{ steps.get-arch.outputs.arch}}.deb
-        path: ./installers/deb/grate_${{ needs.set-version-number.outputs.nuGetVersion }}-1_${{ steps.get-arch.outputs.arch }}.deb
-    
-    - name: Publish artifact ${{ matrix.arch }}
-      if: ${{ needs.set-version-number.outputs.is-release == 'true' }}
-      run: |
-        nameOld=./installers/deb/grate_${{ needs.set-version-number.outputs.nuGetVersion }}-1_${{ steps.get-arch.outputs.arch }}.deb
-        name=grate_${{ needs.set-version-number.outputs.nuGetVersion }}_${{ steps.get-arch.outputs.arch }}.deb
-        mv $nameOld $name
-        gh release upload ${{ needs.set-version-number.outputs.semVer }} $name --clobber
-      env:
-        GH_TOKEN: ${{ github.token }}
+  prepare-winget:
+    name: Prepare WinGet candidates (no submission)
+    needs: [set-version-number, release-ready, publish-github-release]
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' && needs.set-version-number.outputs.is-prerelease != 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-winget.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
+
+  publish-homebrew:
+    name: Update all Homebrew casks and retain formula candidates
+    needs: [set-version-number, release-ready, publish-github-release]
+    if: ${{ needs.set-version-number.outputs.is-release == 'true' && needs.set-version-number.outputs.is-prerelease != 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-homebrew.yml
+    with:
+      version: ${{ needs.set-version-number.outputs.semVer }}
+      release-tag: ${{ needs.set-version-number.outputs.release-tag }}
+      publish: ${{ needs.set-version-number.outputs.is-release }}
+      prerelease: ${{ needs.set-version-number.outputs.is-prerelease }}
+    secrets:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
   test:
     name: Run tests
-
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        category: [ "Basic_tests", "SqlServer", "PostgreSQL", "MariaDB", "Sqlite", "Oracle", "BigQuery"  ]
-
-    steps:
-    - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
-      uses: actions/setup-dotnet@v6
-      with:
-         dotnet-version: |
-          8.0.x
-          9.0.x
-          10.0.x
-    - name: Test
-      run: |
-        dotnet test \
-        --project unittests/${{ matrix.category }} \
-        --coverage \
-        --coverage-output-format xml \
-        --coverage-output /tmp/test-results/${{ matrix.category }}.xml
-      env:
-        LogLevel: Warning
-        TZ: UTC
+    needs: [set-version-number]
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish != true) }}
+    uses: ./.github/workflows/release-tests.yml

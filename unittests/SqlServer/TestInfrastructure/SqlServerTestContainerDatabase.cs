@@ -1,4 +1,5 @@
-﻿using DotNet.Testcontainers.Containers;
+﻿using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
 using Microsoft.Extensions.Logging;
 using TestCommon.TestInfrastructure;
@@ -24,7 +25,15 @@ public record SqlServerTestContainerDatabase(
             .WithEnvironment("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
             .WithPassword(AdminPassword)
             .WithPortBinding(InternalPort, true)
+            .WithNetwork(Network)
+            .WithNetworkAliases(NetworkAlias)
             .WithEnvironment("MSSQL_COLLATION", "Danish_Norwegian_CI_AS")
+            // SELECT 1 succeeds before MSSQL_COLLATION finishes reindexing the
+            // system databases. Test connections can prevent its exclusive lock
+            // and shut the server down with errors 5030/3434 (exit 255).
+            .WithWaitStrategy(Wait.ForUnixContainer()
+                .UntilMessageIsLogged("The default collation was successfully changed.",
+                    wait => wait.WithTimeout(TimeSpan.FromMinutes(2))))
             .WithLogger(Logger)
             .Build();
     }
@@ -33,7 +42,8 @@ public record SqlServerTestContainerDatabase(
         $"Data Source={Hostname},{Port};Initial Catalog=master;User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=5";
 
     public override string ConnectionString(string database) =>
-        $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=5"; // timeout = 5s will increase the test execution time, however, it will reduce the risk of transient connection issues in CI environments, which can be more common with SQL Server containers, especially in SQL Server 2025
+        SqlServerScopedPooling.TargetConnectionString(
+            $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=sa;Password={AdminPassword};Encrypt=false;Pooling=false;Connect Timeout=5");
 
     public override string UserConnectionString(string database) =>
         $"Data Source={Hostname},{Port};Initial Catalog={database};User Id=zorro;Password=batmanZZ4;Encrypt=false;Pooling=false;Connect Timeout=5"; // timeout = 5s will increase the test execution time, however, it will reduce the risk of transient connection issues in CI environments, which can be more common with SQL Server containers, especially in SQL Server 2025

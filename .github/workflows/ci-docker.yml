@@ -1,0 +1,77 @@
+# Reusable docker phase. Scheduling and aggregate gates live in ci.yml.
+name: CI · Docker
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: ${{ matrix.name }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, os: ubuntu-latest, distribution: All, name: 'Alpine amd64' }
+          - { arch: arm64, os: ubuntu-24.04-arm, distribution: All, name: 'Alpine arm64' }
+          - { arch: amd64, os: ubuntu-latest, distribution: SQLite, name: 'Alpine SQLite amd64' }
+          - { arch: arm64, os: ubuntu-24.04-arm, distribution: SQLite, name: 'Alpine SQLite arm64' }
+          - { arch: amd64, os: ubuntu-latest, distribution: SQLServer, name: 'Alpine SQLServer amd64' }
+          - { arch: arm64, os: ubuntu-24.04-arm, distribution: SQLServer, name: 'Alpine SQLServer arm64' }
+          - { arch: amd64, os: ubuntu-latest, distribution: MariaDB, name: 'Alpine MariaDB amd64' }
+          - { arch: arm64, os: ubuntu-24.04-arm, distribution: MariaDB, name: 'Alpine MariaDB arm64' }
+          - { arch: amd64, os: ubuntu-latest, distribution: PostgreSQL, name: 'Alpine PostgreSQL amd64' }
+          - { arch: arm64, os: ubuntu-24.04-arm, distribution: PostgreSQL, name: 'Alpine PostgreSQL arm64' }
+          - { arch: amd64, os: ubuntu-latest, distribution: Oracle, name: 'Alpine Oracle amd64' }
+          - { arch: arm64, os: ubuntu-24.04-arm, distribution: Oracle, name: 'Alpine Oracle arm64' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build native image for verification
+        run: docker build --build-arg VERSION=0.0.1 --build-arg GRATE_DISTRIBUTION=${{ matrix.distribution }} -f installers/docker/Dockerfile -t grate-package-test:local .
+      - name: Verify selected profile and bundled skill
+        if: matrix.distribution != 'All'
+        shell: pwsh
+        run: ./installers/docker/Test-Distribution.ps1 -Image grate-package-test:local -Distribution '${{ matrix.distribution }}' -OutputDirectory '${{ runner.temp }}/grate-selected-profile'
+      - name: Verify Alpine globalization, migration and bundled skill
+        if: matrix.distribution == 'All' || matrix.distribution == 'SQLite'
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/grate-docker-smoke"
+          mkdir -p "$work/sql/up" "$work/output" "$work/skill"
+          echo 'CREATE TABLE package_smoke (id INTEGER PRIMARY KEY); INSERT INTO package_smoke VALUES (1); CREATE TEMP TABLE package_check (value INTEGER CHECK(value = 1)); INSERT INTO package_check SELECT CASE WHEN COUNT(*) = 1 AND MIN(id) = 1 THEN 1 ELSE 0 END FROM package_smoke;' > "$work/sql/up/001_create.sql"
+          docker run --rm --entrypoint /app/grate grate-package-test:local --help
+          for _ in 1 2; do
+            docker run --rm -e LANG=nb_NO.UTF-8 -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local \
+              --databasetype sqlite --connectionstring 'Data Source=/smoke/smoke.db' --files /smoke/sql --output /smoke/output --silent
+          done
+          test -s "$work/smoke.db"
+          test "$(find "$work/output" -path '*/itemsRan/up/001_create.sql' | wc -l)" -eq 1
+          docker run --rm -v "$work:/smoke" --entrypoint /app/grate grate-package-test:local skills install --local --path /smoke/skill
+          test -s "$work/skill/.agents/skills/use-grate/SKILL.md"
+      - name: Ensure SQLite client for entrypoint verification
+        if: matrix.distribution == 'All'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (!(Get-Command sqlite3 -ErrorAction SilentlyContinue)) {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends sqlite3
+          }
+          sqlite3 --version
+      - name: Verify default image entrypoint
+        if: matrix.distribution == 'All'
+        shell: pwsh
+        run: ./installers/docker/Test-Entrypoint.ps1 -Image grate-package-test:local -OutputDirectory "${{ runner.temp }}/grate-entrypoint-results"
+      - name: Upload entrypoint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: grate-entrypoint-${{ matrix.distribution }}-${{ matrix.arch }}
+          retention-days: 3
+          path: ${{ runner.temp }}/grate-entrypoint-results/

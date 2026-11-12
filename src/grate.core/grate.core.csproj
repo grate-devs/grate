@@ -25,6 +25,7 @@
     <InternalsVisibleTo Include="CommandLine.Sqlite" />
     <InternalsVisibleTo Include="CommandLine.BigQuery" />
     <InternalsVisibleTo Include="CommandLine.SqlServer" />
+    <InternalsVisibleTo Include="CommandLine.SqlServerCaseSensitive" />
 
     <InternalsVisibleTo Include="Docker.MariaDB" />
     <InternalsVisibleTo Include="Docker.Oracle" />

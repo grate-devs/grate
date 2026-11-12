@@ -1,0 +1,18 @@
+{
+  "SchemaVersion": 1,
+  "ProductName": "grate",
+  "Manufacturer": "grate-devs",
+  "LegacyProductCode": "{E281998A-D8A2-4926-AAA3-066EFA4B2E74}",
+  "LegacyManufacturer": "erikbra",
+  "ProductCodeNamespace": "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
+  "ProductCodeNamePrefix": "https://github.com/grate-devs/grate/msi/product/win-",
+  "DistributionIdentityNamePrefix": "https://github.com/grate-devs/grate/msi/distribution/v1/",
+  "Architectures": {
+    "x64": {
+      "UpgradeCode": "{74CFECA2-37A1-5F6C-8739-E5ACA5116FC1}"
+    },
+    "arm64": {
+      "UpgradeCode": "{7A63E6FC-F222-55A6-9F18-1F017FBDCD09}"
+    }
+  }
+}

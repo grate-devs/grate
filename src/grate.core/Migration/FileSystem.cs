@@ -20,18 +20,11 @@ internal static class FileSystem
                         GetFileNameWithoutExtension(f.FullName)),
                     CurrentCultureIgnoreCase);
     }
-    
+
     public static DirectoryInfo CreateRandomTempDirectory()
     {
-        var dummyFile = Path.GetTempFileName();
-        File.Delete(dummyFile);
-
-        if (Directory.Exists(dummyFile))
-        {
-            Directory.Delete(dummyFile, true);
-        }
-
-        var scriptsDir = Directory.CreateDirectory(dummyFile);
-        return scriptsDir;
+        // Create the directory exclusively, without converting a temporary file
+        // or deleting a directory that already belongs to another caller.
+        return Directory.CreateTempSubdirectory("grate-");
     }
 }

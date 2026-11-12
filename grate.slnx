@@ -1,0 +1,56 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="CodeAnalysis.ruleset" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="NuGet.Config" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/grate.bigquery/grate.bigquery.csproj" />
+    <Project Path="src/grate.core/grate.core.csproj" />
+    <Project Path="src/grate.mariadb/grate.mariadb.csproj" />
+    <Project Path="src/grate.oracle/grate.oracle.csproj" />
+    <Project Path="src/grate.postgresql/grate.postgresql.csproj" />
+    <Project Path="src/grate.sqlite/grate.sqlite.csproj" />
+    <Project Path="src/grate.sqlserver/grate.sqlserver.csproj" />
+    <Project Path="src/grate/grate.csproj" />
+  </Folder>
+  <Folder Name="/Unit tests/">
+    <Project Path="unittests/Basic_tests/Basic_tests.csproj" />
+    <Project Path="unittests/BigQuery/BigQuery.csproj" />
+    <Project Path="unittests/MariaDB/MariaDB.csproj" />
+    <Project Path="unittests/Oracle/Oracle.csproj" />
+    <Project Path="unittests/PostgreSQL/PostgreSQL.csproj" />
+    <Project Path="unittests/Sqlite/Sqlite.csproj" />
+    <Project Path="unittests/SqlServer/SqlServer.csproj" />
+    <Project Path="unittests/SqlServerCaseSensitive/SqlServerCaseSensitive.csproj" />
+    <Project Path="unittests/TestCommon/TestCommon.csproj" />
+  </Folder>
+  <Folder Name="/Unit tests/Command line tests/">
+    <File Path="unittests/CommandLine/IncludeTests.targets" />
+    <Project Path="unittests/CommandLine/CommandLine.BigQuery/CommandLine.BigQuery.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.Common/CommandLine.Common.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.MariaDB/CommandLine.MariaDB.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.Oracle/CommandLine.Oracle.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.PostgreSQL/CommandLine.PostgreSQL.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.Sqlite/CommandLine.Sqlite.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.SqlServer/CommandLine.SqlServer.csproj" />
+    <Project Path="unittests/CommandLine/CommandLine.SqlServerCaseSensitive/CommandLine.SqlServerCaseSensitive.csproj" />
+  </Folder>
+  <Folder Name="/Unit tests/Docker tests/">
+    <Project Path="unittests/Docker/Docker.BigQuery/Docker.BigQuery.csproj" />
+    <Project Path="unittests/Docker/Docker.Common/Docker.Common.csproj" />
+    <Project Path="unittests/Docker/Docker.MariaDB/Docker.MariaDB.csproj" />
+    <Project Path="unittests/Docker/Docker.Oracle/Docker.Oracle.csproj" />
+    <Project Path="unittests/Docker/Docker.PostgreSQL/Docker.PostgreSQL.csproj" />
+    <Project Path="unittests/Docker/Docker.Sqlite/Docker.Sqlite.csproj" />
+    <Project Path="unittests/Docker/Docker.SqlServer/Docker.SqlServer.csproj" />
+  </Folder>
+</Solution>

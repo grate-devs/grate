@@ -1,11 +1,14 @@
-using Oracle.ManagedDataAccess.Client;
+﻿using Oracle.ManagedDataAccess.Client;
 using TestCommon.TestInfrastructure;
+using Oracle.TestInfrastructure;
 
 namespace Oraclde.TestInfrastructure;
 
 public class OracleExternalDatabase(GrateTestConfig grateTestConfig) : ITestDatabase
 {
-    public string AdminConnectionString { get; } = grateTestConfig.AdminConnectionString ?? throw new ArgumentNullException(nameof(grateTestConfig));
+    private readonly string _adminConnectionString = grateTestConfig.AdminConnectionString ?? throw new ArgumentNullException(nameof(grateTestConfig));
+
+    public string AdminConnectionString => OracleTestConnectionPools.Configure(_adminConnectionString);
 
     public string ConnectionString(string database)
     {
@@ -26,5 +29,5 @@ public class OracleExternalDatabase(GrateTestConfig grateTestConfig) : ITestData
         };
         return builder.ConnectionString;
     }
-    
+
 }

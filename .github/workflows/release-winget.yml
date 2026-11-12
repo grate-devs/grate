@@ -1,0 +1,105 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · winget
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      release-tag:
+        type: string
+        required: true
+      publish:
+        type: string
+        required: true
+      prerelease:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    if: ${{ startsWith(github.workflow_ref, format('{0}/.github/workflows/build.yml@', github.repository)) && inputs.publish == 'true' && inputs.prerelease != 'true' }}
+    name: Prepare WinGet ${{ matrix.distribution }} candidate (no submission)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - name: Select WinGet candidate identity
+      id: profile
+      shell: pwsh
+      run: |
+        $identifier = 'grate-devs.grate'
+        $path = 'grate'
+        $artifact = 'winget-migration-candidate-${{ inputs.version }}'
+        if ('${{ matrix.distribution }}' -ne 'All') {
+          $identifier += '.${{ matrix.distribution }}'
+          $path += '/${{ matrix.distribution }}'
+          $artifact = 'winget-${{ matrix.distribution }}-candidate-${{ inputs.version }}'
+        }
+        "WINGET_PACKAGE_ID=$identifier" | Out-File -FilePath $env:GITHUB_ENV -Append
+        "WINGET_PACKAGE_PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Append
+        "artifact-name=$artifact" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+    - name: Prepare new-ID manifests from the final published assets
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+        WINGET_CREATE_GITHUB_TOKEN: ${{ github.token }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $tool = Join-Path $env:RUNNER_TEMP 'wingetcreate.exe'
+        Invoke-WebRequest 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $tool
+        if ((Get-FileHash $tool -Algorithm SHA256).Hash -ne '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA') {
+          throw 'wingetcreate checksum does not match the pinned release.'
+        }
+        ./installers/winget/Create-Installer.ps1 -version $env:VERSION -releaseTag $env:RELEASE_TAG -Distribution '${{ matrix.distribution }}' -wingetCreate $tool -PrepareMigration -outputDirectory "$env:RUNNER_TEMP/winget-candidate"
+        @'
+        ## WinGet migration candidate
+
+        Prepared the ${{ matrix.distribution }} candidate from the matching published stable release assets.
+        No manifest was submitted. Historical erikbra.grate versions stay unchanged.
+        Schema validation follows in this job. Installation of the final files, upstream acceptance,
+        and verification through the public winget source remain separate #800 steps.
+        See installers/winget/MIGRATION.md for the supported MSI and portable transitions.
+        '@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+    - name: Schema-validate the complete new-ID candidate
+      shell: pwsh
+      env:
+        VERSION: ${{ inputs.version }}
+        SOURCE_COMMIT: ${{ github.sha }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $winget = ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+        $candidate = "$env:RUNNER_TEMP/winget-candidate"
+        & $winget validate --manifest "$candidate/manifests/g/grate-devs/$env:WINGET_PACKAGE_PATH/$env:VERSION" --disable-interactivity *>&1 | Tee-Object -FilePath "$candidate/schema.log"
+        if ($LASTEXITCODE -ne 0) { throw 'Final WinGet migration candidate failed schema validation.' }
+        @{
+          SourceCommit=$env:SOURCE_COMMIT; Version=$env:VERSION; ReleaseTag=$env:RELEASE_TAG
+          RunId=$env:GITHUB_RUN_ID; RunAttempt=$env:GITHUB_RUN_ATTEMPT
+          PackageIdentifier=$env:WINGET_PACKAGE_ID; Distribution='${{ matrix.distribution }}'; Submitted=$false; SchemaValidated=$true
+          WingetVersion='1.29.380'; WingetCreateVersion='1.12.13.0'
+          WingetCreateSha256=(Get-FileHash "$env:RUNNER_TEMP/wingetcreate.exe" -Algorithm SHA256).Hash
+        } | ConvertTo-Json | Set-Content "$candidate/provenance.json"
+    - name: Retain WinGet candidate for review
+      if: ${{ always() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      with:
+        name: ${{ steps.profile.outputs.artifact-name }}
+        path: ${{ runner.temp }}/winget-candidate/
+        if-no-files-found: error

@@ -11,7 +11,7 @@ internal static class TextWriterExtensions
         textWriter.Write(message);
         ResetColorsIfEnabled(textWriter);
     }
-        
+
     public static void WriteColoredMessageLine(this TextWriter textWriter, string? message,
         GrateConsoleColor foreground, GrateConsoleColor? background = null)
     {
@@ -19,8 +19,8 @@ internal static class TextWriterExtensions
         textWriter.WriteLine(message);
         ResetColorsIfEnabled(textWriter);
     }
-        
-            
+
+
     private static void SetColorsIfEnabled(TextWriter textWriter, GrateConsoleColor foreground, GrateConsoleColor? background = null)
     {
         if (!DisableAnsiColors)
@@ -29,7 +29,7 @@ internal static class TextWriterExtensions
         }
     }
 
-        
+
     private static void ResetColorsIfEnabled(TextWriter textWriter)
     {
         if (!DisableAnsiColors)
@@ -37,7 +37,7 @@ internal static class TextWriterExtensions
             ResetColors(textWriter);
         }
     }
-        
+
     private static void ResetColors(TextWriter textWriter)
     {
         textWriter.Write(GrateConsoleColor.Foreground.Default.AnsiColorCode); // reset to default foreground color
@@ -53,14 +53,17 @@ internal static class TextWriterExtensions
         textWriter.Write(foregroundColorAnsiCode);
     }
 
-    private static bool DisableAnsiColors => !SupportsAnsiColors || Console.IsOutputRedirected;
-        
+    private static bool DisableAnsiColors => Console.IsOutputRedirected
+        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"))
+        || string.Equals(Environment.GetEnvironmentVariable("TERM"), "dumb", StringComparison.OrdinalIgnoreCase)
+        || !SupportsAnsiColors;
+
     private static bool SupportsAnsiColors => _supportsAnsiColors ??= GetSupportsAnsiColors();
 
     private static bool GetSupportsAnsiColors()
     {
         try
-            // Calling Console.GetCursorPosition() sometimes fails if the console has not been written to yet
+        // Calling Console.GetCursorPosition() sometimes fails if the console has not been written to yet
         {
             lock (Console.Out)
             {

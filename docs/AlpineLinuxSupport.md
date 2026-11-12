@@ -21,8 +21,8 @@ docker pull erikbra/grate:latest
 ```
 
 The Docker image:
-- Uses Alpine 3 as the base image
-- Includes all necessary dependencies (icu-libs for globalization)
+- Builds from pinned .NET 11 GA SDK/runtime-deps images on Alpine 3.24
+- Includes the .NET native dependencies and icu-libs for globalization
 - Supports multiple architectures (amd64, arm64)
 - Is published to Docker Hub on every release
 
@@ -59,8 +59,10 @@ sudo chmod +x /usr/local/bin/grate
 For Alpine users who prefer to build from source:
 
 ```sh
-# Install .NET SDK
-apk add dotnet-sdk icu-libs
+# Install ICU and the stable .NET 11 SDK pinned in global.json.
+# Check the SDK version available from Alpine's package repositories.
+apk add icu-libs
+# Follow https://dotnet.microsoft.com/download/dotnet/11.0 for SDK installation.
 
 # Clone and build
 git clone https://github.com/grate-devs/grate.git

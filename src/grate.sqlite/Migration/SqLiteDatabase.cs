@@ -8,6 +8,7 @@ using grate.Sqlite.Infrastructure;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 namespace grate.Sqlite.Migration;
+
 public record SqliteDatabase : AnsiSqlDatabase
 {
     public override string MasterDatabaseName => "master";
@@ -17,13 +18,26 @@ public record SqliteDatabase : AnsiSqlDatabase
     public SqliteDatabase(ILogger<SqliteDatabase> logger)
         : base(logger, Syntax)
     { }
-    
+
     public static string Type => "sqlite";
     public static ISyntax Syntax { get; } = new SqliteSyntax();
 
     public override bool SupportsDdlTransactions => false;
     public override bool SupportsSchemas => false;
-    protected override DbConnection GetSqlConnection(string? connectionString) => new SqliteConnection(connectionString);
+    protected override DbConnection GetSqlConnection(string? connectionString)
+    {
+        if (Config?.DryRun == true)
+        {
+            // SQLite's default ReadWriteCreate mode creates a file even when only querying migration history.
+            var builder = new SqliteConnectionStringBuilder(connectionString);
+            if (builder.Mode != SqliteOpenMode.Memory)
+            {
+                builder.Mode = SqliteOpenMode.ReadOnly;
+            }
+            connectionString = builder.ConnectionString;
+        }
+        return new SqliteConnection(connectionString);
+    }
 
     protected override string ExistsSql(string tableSchema, string fullTableName) =>
         $@"

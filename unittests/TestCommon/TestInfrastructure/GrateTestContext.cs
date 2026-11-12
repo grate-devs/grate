@@ -16,7 +16,7 @@ public abstract record GrateTestContext(IGrateMigrator Migrator, ITestDatabase T
     public string UserConnectionString(string database) => TestDatabase.UserConnectionString(database);
 
     public virtual IGrateTestContext External => this with { TestDatabase = TestDatabase.External };
-    
+
     public async ValueTask InitializeAsync()
     {
         if (TestDatabase is IAsyncLifetime asyncLifetime)
@@ -32,19 +32,19 @@ public abstract record GrateTestContext(IGrateMigrator Migrator, ITestDatabase T
             await asyncLifetime.DisposeAsync();
         }
     }
-    
-    public async Task DropDatabase(string databaseName)
+
+    public virtual async Task DropDatabase(string databaseName)
     {
         var sql = Syntax.DropDatabase(databaseName);
-        using var conn = GetDbConnection(AdminConnectionString);
+        using var conn = External.CreateAdminDbConnection();
         await conn.ExecuteAsync(sql);
     }
 
     public abstract ISyntax Syntax { get; }
     public abstract Type DbExceptionType { get; }
-    
+
     public abstract Type DatabaseType { get; }
-    
+
     public abstract bool SupportsTransaction { get; }
     public abstract SqlStatements Sql { get; }
     public abstract string ExpectedVersionPrefix { get; }

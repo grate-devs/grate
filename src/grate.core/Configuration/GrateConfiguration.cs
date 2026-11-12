@@ -5,8 +5,8 @@ using Microsoft.Extensions.Logging;
 namespace grate.Configuration;
 
 /// <summary>
-/// This is the 'schema' that System.CommandLine parses into for the MigrateCommand.
-/// This means that this object's properties should align with the options and arguments in `MigrateCommand` by convention.
+/// Configuration shared by CLI migrations and programmatic use.
+/// The CLI maps parsed option values explicitly onto this configuration.
 /// </summary>
 public record GrateConfiguration
 {
@@ -15,7 +15,7 @@ public record GrateConfiguration
     /// </summary>
 
     public IFoldersConfiguration? Folders { get; init; } = FoldersConfiguration.Default();
-  
+
     /// <summary>
     /// The folder used by grate to find the scripts. The subfolders must follow the naming convention of grate. See grate default folder structure for more information.
     /// </summary>
@@ -162,6 +162,62 @@ public record GrateConfiguration
     /// If specified, location of the backup file to use when restoring
     /// </summary>
     public string? Restore { get; init; }
+
+    /// <summary>
+    /// Optional SQL Server file destinations to use when restoring <see cref="Restore"/>.
+    /// </summary>
+    public IReadOnlyList<RestoreFileMove> RestoreMoves { get; init; } = [];
+
+    internal string? ValidateRestoreMoves(bool supportsRestoreMoves)
+    {
+        if (RestoreMoves is null)
+        {
+            return "Restore file mappings must be a list.";
+        }
+
+        if (RestoreMoves.Count == 0)
+        {
+            return null;
+        }
+
+        if (!supportsRestoreMoves)
+        {
+            return "Restore file mappings are supported only for SQL Server.";
+        }
+
+        if (string.IsNullOrWhiteSpace(Restore))
+        {
+            return "Restore file mappings require a backup path (--restore).";
+        }
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var move in RestoreMoves)
+        {
+            if (move is null || !HasValidRestoreMoveValues(move))
+            {
+                return "Each restore file mapping needs a logical name and a destination path.";
+            }
+
+            if (!names.Add(move.LogicalName))
+            {
+                return $"Restore file '{move.LogicalName}' is mapped more than once.";
+            }
+
+            if (!paths.Add(move.DestinationPath))
+            {
+                return $"Restore destination '{move.DestinationPath}' is used more than once.";
+            }
+        }
+
+        return null;
+    }
+
+    private static bool HasValidRestoreMoveValues(RestoreFileMove move) =>
+        !string.IsNullOrWhiteSpace(move.LogicalName) &&
+        !string.IsNullOrWhiteSpace(move.DestinationPath) &&
+        !move.LogicalName.Contains('\0') &&
+        !move.DestinationPath.Contains('\0');
 
     /// <summary>
     /// By default, scripts are ordered by relative path including subdirectories. This option searches subdirectories, but order is based on filename alone.

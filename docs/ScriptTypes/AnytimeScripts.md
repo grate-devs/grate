@@ -5,19 +5,25 @@ parent: Script types
 ---
 # Anytime Scripts
 
-Anytime scripts are scripts that are run anytime they have changes. That means grate automatically detects new files and changes in files and runs when it finds changes.
+By default, grate runs anytime scripts when they are new or have changed.
 
 ## Folders
-Scripts in the following folders are treated as `Anytime` scripts by default:
+The following migration folders use the `AnyTime` type by default.
 
-* AlterDatabase
-* RunBeforeUp
-* RunFirstAfterUpdate
-* Functions
-* Views
-* Sprocs
-* Indexes
-* RunAfterOtherAnyTimeScripts
+* `alterDatabase`
+* `runAfterCreateDatabase`
+* `runBeforeUp`
+* `runFirstAfterUp`
+* `functions`
+* `views`
+* `sprocs`
+* `triggers`
+* `indexes`
+* `runAfterOtherAnyTimeScripts`
+
+Grate processes `runAfterCreateDatabase` only on the run that creates the database. A dry run that previews database creation also includes this folder.
+
+See [Default folder configuration](../ConfigurationOptions/FolderConfiguration.md#default-folder-configuration) for the full migration order and database setup behavior.
 
 ## Notes
 

@@ -1,5 +1,5 @@
 # Heavyweight integration tests
-name: Integration tests
+name: CI · Integration tests
 
 on:
   push:
@@ -14,14 +14,33 @@ on:
       - docs/
   workflow_dispatch:
 
+# This workflow only builds and tests; superseded revisions need not retain
+# their large database matrix while the newest revision waits for runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   id-token: write # This is required for requesting the JWT
   contents: read  # This is required for actions/checkout
 
   
 jobs:
+  preflight:
+    name: Build-independent checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/preflight
+
   set-version-number:
     name: Set version number
+    needs: preflight
     runs-on: ubuntu-latest
     outputs:
       nuGetVersion: ${{ steps.gitversion.outputs.majorMinorPatch }}
@@ -30,14 +49,16 @@ jobs:
       #is-release: 'true'
     
     steps:
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
-      with:
-        dotnet-version: 10.0.x
     - name: Checkout
       uses: actions/checkout@v7
       with:
         fetch-depth: 0
+
+    - name: Setup .NET 11 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+      with:
+        global-json-file: global.json
+        dotnet-version: 10.0.x
     - name: Install GitVersion
       uses: gittools/actions/gitversion/setup@v4.7.0
       with:
@@ -47,12 +68,13 @@ jobs:
       uses: gittools/actions/gitversion/execute@v4.7.0
       
   build-standalone:
-    name: Build cli
+    name: Build ${{ matrix.distribution }} cli
     needs: set-version-number
 
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
         arch: 
           # - win-x64
           # - win-x86
@@ -64,20 +86,26 @@ jobs:
           # - osx-x64
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
+    - name: Setup .NET 11 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish -f net10.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      run: dotnet publish -f net11.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -p:GrateDistribution=${{ matrix.distribution }} -p:ArtifactsPath=${{ runner.temp }}/cli-build -o ./publish/${{ matrix.arch }}/self-contained
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
+
+    - name: Show GitHub Actions annotations for SQLite migrations
+      if: matrix.distribution == 'All' || matrix.distribution == 'SQLite'
+      shell: pwsh
+      run: ./examples/ci-logging/smoke.ps1 -Grate "./publish/${{ matrix.arch }}/self-contained/grate"
 
     - name: Upload self-contained ${{ matrix.arch }}
       uses: actions/upload-artifact@v7
       with:
-        name: grate-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
+        name: grate-${{ matrix.distribution }}-${{ matrix.arch }}-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: ./publish/${{ matrix.arch }}/self-contained/*
 
   build-standalone-mac-arm64:
@@ -98,13 +126,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
+    - name: Setup .NET 11 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: Publish self-contained ${{ matrix.arch }}
-      run: dotnet publish -f net10.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
+      run: dotnet publish -f net11.0 ./src/grate/grate.csproj -r ${{ matrix.arch }} -c release --self-contained -p:SelfContained=true -o ./publish/${{ matrix.arch }}/self-contained
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
 
@@ -127,18 +156,19 @@ jobs:
           #- osx-x64
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
-      uses: actions/setup-dotnet@v6
+    - name: Setup .NET 11 and earlier
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+         global-json-file: global.json
          dotnet-version: |
           8.0.x
           9.0.x
-          10.0.x 
+          10.0.x
 
     - name: Build Test DLLs ${{ matrix.arch }}
       run: |
         dotnet restore -r ${{ matrix.arch }} unittests/UnitTests.slnf
-        dotnet publish -f net10.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
+        dotnet publish -f net11.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
 
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
@@ -161,9 +191,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Setup .NET 10 and earlier
-      uses: actions/setup-dotnet@v6
+    - name: Setup .NET 11 and earlier
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: |
           8.0.x
           9.0.x
@@ -172,7 +203,7 @@ jobs:
     - name: Build Test DLLs ${{ matrix.arch }}
       run: |
         dotnet restore -r ${{ matrix.arch }} unittests/UnitTests.slnf
-        dotnet publish -f net10.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
+        dotnet publish -f net11.0 -r ${{ matrix.arch }} -c release --no-restore ./unittests/UnitTests.slnf -o ./integration-tests/${{ matrix.arch }}
 
       env:
         VERSION: ${{ needs.set-version-number.outputs.nuGetVersion }}
@@ -257,9 +288,10 @@ jobs:
             echo EOFAAA
           } >> "$GITHUB_OUTPUT"
 
-  docker-integration-tests:
-    name: ${{ matrix.database.name }}
-    continue-on-error: true
+  cli-database-integration-tests:
+    # These are published CLI tests against database containers. Image execution
+    # is covered by the native Alpine profile jobs in ci.yml.
+    name: ${{ matrix.variant }} CLI / ${{ matrix.database.name }}
     timeout-minutes: 25
 
     needs:
@@ -270,70 +302,104 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        variant: [All, Slim]
         database:
           - name: "SqlServer 2025"
             type: SqlServer
+            distribution: SQLServer
             image: "mcr.microsoft.com/mssql/server:2025-latest"
           - name: "SqlServer 2022"
             type: SqlServer
+            distribution: SQLServer
             image: "mcr.microsoft.com/mssql/server:2022-latest"
           - name: "SqlServer 2019" 
             type: SqlServer
+            distribution: SQLServer
             image: "mcr.microsoft.com/mssql/server:2019-CU26-ubuntu-20.04"
           - name: "SqlServer 2017" 
             type: SqlServer
+            distribution: SQLServer
             image: "mcr.microsoft.com/mssql/server:2017-latest"
+          - name: "SqlServer case-sensitive 2022"
+            type: SqlServerCaseSensitive
+            distribution: SQLServer
+            image: "mcr.microsoft.com/mssql/server:2022-latest"
           - name: "PostgreSQL 18" 
             type: PostgreSQL
+            distribution: PostgreSQL
             image: "postgres:18"
           - name: "PostgreSQL 17" 
             type: PostgreSQL
+            distribution: PostgreSQL
             image: "postgres:17"
           - name: "PostgreSQL 16" 
             type: PostgreSQL
+            distribution: PostgreSQL
             image: "postgres:16"
           - name: "PostgreSQL 15" 
             type: PostgreSQL
+            distribution: PostgreSQL
             image: "postgres:15"
           - name: "PostgreSQL 14" 
             type: PostgreSQL
+            distribution: PostgreSQL
             image: "postgres:14"
           - name: "PostgreSQL 13" 
             type: PostgreSQL
+            distribution: PostgreSQL
             image: "postgres:13"
           - name: "PostgreSQL 12" 
             type: PostgreSQL
+            distribution: PostgreSQL
             image: "postgres:12"
           - name: "MariaDB 13" 
             type: MariaDB
+            distribution: MariaDB
             image: "mariadb:13.0-rc"
           - name: "MariaDB 12" 
             type: MariaDB
+            distribution: MariaDB
             image: "mariadb:12"
           - name: "MariaDB 11" 
             type: MariaDB
+            distribution: MariaDB
             image: "mariadb:11"
           - name: "MariaDB 10.4" 
             type: MariaDB
+            distribution: MariaDB
             image: "mariadb:10.4"
           - name: "MariaDB 10.10" 
             type: MariaDB
+            distribution: MariaDB
             image: "mariadb:10.10"
           - name: "Sqlite" 
             type: Sqlite
+            distribution: SQLite
             image: "irrelevant"
           - name: "Oracle Free latest" 
             type: Oracle
+            distribution: Oracle
             image: "gvenzl/oracle-free:latest-faststart"
           - name: "Oracle XE latest" 
             type: Oracle
+            distribution: Oracle
             image: "gvenzl/oracle-xe:latest-faststart"
           - name: "Oracle XE 18" 
             type: Oracle
+            distribution: Oracle
             image: "gvenzl/oracle-xe:18-faststart"
           - name: "BigQuery emulator"
             type: BigQuery
+            distribution: All
             image: "ghcr.io/goccy/bigquery-emulator:0.8.1"
+        exclude:
+          # BigQuery is only in the all-in-one CLI, so it has no slim CLI to test
+          - variant: Slim
+            database:
+              name: "BigQuery emulator"
+              type: BigQuery
+              distribution: All
+              image: "ghcr.io/goccy/bigquery-emulator:0.8.1"
 
 
     runs-on: ubuntu-latest
@@ -352,7 +418,7 @@ jobs:
     - uses: actions/download-artifact@v8
       name: Download executables
       with:
-        name: grate-linux-x64-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
+        name: grate-${{ matrix.variant == 'All' && 'All' || matrix.database.distribution }}-linux-x64-self-contained-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: executables/linux-x64
 
     - uses: actions/download-artifact@v8
@@ -361,9 +427,10 @@ jobs:
         name: integration-tests-linux-x64-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: integration-tests/linux-x64
 
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
+    - name: Setup .NET 11 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: chmod u+x
@@ -372,18 +439,28 @@ jobs:
         GrateExecutablePath: ${{ github.workspace }}/executables/linux-x64/grate
 
     - name: Docker Test CmdLine
-      if: ${{ !cancelled() }}
       shell: pwsh
       run: |
-        dotnet test --test-modules integration-tests/linux-x64/CommandLine.${{ matrix.database.type }}.dll `
-          --coverage `
-          --coverage-output-format xml `
-          --coverage-output "/tmp/test-results/docker/CommandLine.${{ matrix.database.name }}.xml"
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        . ./scripts/ci/Distribution.Common.ps1
+        Assert-DistributionExecutable -Executable $env:GrateExecutablePath -Distribution $env:GRATE_DISTRIBUTION
+        $testArguments = @(
+          'test', '--test-modules', 'integration-tests/linux-x64/CommandLine.${{ matrix.database.type }}.dll',
+          '--minimum-expected-tests', '1', '--timeout', '20m', '--long-running', '60',
+          '--results-directory', '/tmp/test-results/cli', '--report-xunit-trx',
+          '--coverage', '--coverage-output-format', 'xml', '--coverage-output', 'coverage.xml'
+        )
+        dotnet @testArguments
+        if ($LASTEXITCODE -ne 0) {
+          throw "CommandLine tests failed with exit code $LASTEXITCODE."
+        }
       env:
         LogLevel: Information
         GrateExecutablePath: ${{ github.workspace }}/executables/linux-x64/grate
         TZ: UTC
         GrateTestConfig__DockerImage: ${{ matrix.database.image }} 
+        GRATE_DISTRIBUTION: ${{ matrix.variant == 'All' && 'All' || matrix.database.distribution }}
 
     - name: Docker Test Docker
       # TODO: We need to integrate build of a docker image to test into the pipeline, and push it to the local registry,
@@ -405,10 +482,9 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: "docker ${{ matrix.database.name }} XML test results"
+        name: "${{ matrix.variant }} CLI ${{ matrix.database.name }} XML test results"
         path: |
-          /tmp/test-results/docker/CommandLine.${{ matrix.database.name }}.xml
-          /tmp/test-results/docker/Docker.${{ matrix.database.name }}.xml
+          /tmp/test-results/cli/
         retention-days: 1
 
   integration-test:
@@ -476,9 +552,10 @@ jobs:
         name: integration-tests-${{ matrix.os.arch }}-${{ needs.set-version-number.outputs.nuGetVersion }}
         path: integration-tests/${{ matrix.os.arch }}
 
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v6
+    - name: Setup .NET 11 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
       with:
+        global-json-file: global.json
         dotnet-version: 10.0.x
 
     - name: chmod u+x
@@ -550,7 +627,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Create test report
     #needs: integration-test
-    needs: docker-integration-tests
+    needs: cli-database-integration-tests
     if: always()
 
     steps:
@@ -560,9 +637,9 @@ jobs:
           path: test-results
 
       - name: Setup .NET # Required to execute ReportGenerator
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
         with:
-          dotnet-version: 10.x
+          dotnet-version: 10.0.x
 
       - name: Create HTML test report
         uses: danielpalme/ReportGenerator-GitHub-Action@v5

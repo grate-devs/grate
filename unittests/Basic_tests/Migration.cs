@@ -7,7 +7,7 @@ namespace Basic_tests;
 
 public class Migration
 {
-    private readonly MockGrateLogger  _logger;
+    private readonly MockGrateLogger _logger;
     private readonly MockGrateLoggerFactory _loggerFactory;
 
     public Migration()

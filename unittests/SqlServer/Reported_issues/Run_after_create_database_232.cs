@@ -13,6 +13,9 @@ namespace SqlServer.Reported_issues;
 /// Create tests to reproduce the issue and then fix the issue, and keep the test to ensure it doesn't regress.
 /// </summary>
 [Collection(nameof(SqlServerGrateTestContext))]
+// Preserve the original unpooled fixture: RCSI needs exclusive database access,
+// which idle pooled sessions block. The historical pooling intent below remains unverified.
+[UnpooledSqlServer]
 public class Run_after_create_database_232(SqlServerGrateTestContext context, ITestOutputHelper testOutput) : MigrationsScriptsBase(context, testOutput)
 {
     private const string Bug232Sql = @"
@@ -40,15 +43,15 @@ ALTER DATABASE {{DatabaseName}} SET READ_COMMITTED_SNAPSHOT ON";
 
         var parent = CreateRandomTempDirectory();
         var knownFolders = FoldersConfiguration.Default();
-        
+
         // Use autonomous transactions for the RunAfterCreateDatabase folder makes this work without having to 
         // disable connection pooling
         knownFolders[RunAfterCreateDatabase] = knownFolders[RunAfterCreateDatabase]! with { TransactionHandling = TransactionHandling.Autonomous };
-        
+
         var path = new DirectoryInfo(Path.Combine(parent.ToString(), knownFolders[RunAfterCreateDatabase]?.Path ?? throw new Exception("Config Fail")));
 
         WriteSql(path, "token.sql", Bug232Sql);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -59,7 +62,7 @@ ALTER DATABASE {{DatabaseName}} SET READ_COMMITTED_SNAPSHOT ON";
         {
             await migrator.Migrate();
         }
-        
+
         // Now drop it and do it again
         config = config with
         {
@@ -70,8 +73,8 @@ ALTER DATABASE {{DatabaseName}} SET READ_COMMITTED_SNAPSHOT ON";
         {
             await migrator.Migrate();
         }
-        
+
         //await Context.DropDatabase(db);
     }
-    
+
 }

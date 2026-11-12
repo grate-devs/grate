@@ -1,0 +1,149 @@
+# Reusable database tests phase. Scheduling and aggregate gates live in ci.yml.
+name: CI · Database tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run tests
+
+    runs-on: ${{ matrix.os }}
+    # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
+    timeout-minutes: ${{ matrix.category == 'Oracle' && 45 || 30 }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            category: SqlServer
+            test_filter: ''
+          - os: ubuntu-latest
+            category: SqlServerCaseSensitive
+            test_filter: ''
+          - os: ubuntu-latest
+            category: PostgreSQL
+            test_filter: ''
+          - os: ubuntu-latest
+            category: MariaDB
+            test_filter: ''
+          - os: ubuntu-latest
+            category: Sqlite
+            test_filter: ''
+          - os: ubuntu-latest
+            category: Oracle
+            test_filter: ''
+          - os: ubuntu-latest
+            category: BigQuery
+            test_filter: ''
+          - os: windows-latest
+            category: Sqlite
+            test_filter: ''
+          - os: windows-latest
+            category: SqlServer
+            test_filter: SqlServer.Basic_tests.*
+          - os: windows-latest
+            category: SqlServerCaseSensitive
+            test_filter: SqlServerCaseSensitive.Basic_tests.*
+          - os: windows-latest
+            category: MariaDB
+            test_filter: MariaDB.Basic_tests.*
+          - os: windows-latest
+            category: Oracle
+            test_filter: Oracle.Basic_tests.*
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: Setup .NET 11 and earlier
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
+      with:
+        global-json-file: global.json
+        dotnet-version: |
+          8.0.x
+          9.0.x
+          10.0.x
+    - name: Test on Linux
+      if: runner.os == 'Linux'
+      shell: bash
+      # SDK 11 multi-TFM discovery requires an absolute project-file path.
+      # The Sqlite lane also executes the SQL examples shipped with the skill.
+      # Avoid starting a database container for each TFM concurrently on the same runner.
+      run: |
+        # Keep host state and database crash logs even if a runtime never starts.
+        timeout --kill-after=5s "$MONITOR_TIMEOUT" pwsh -NoLogo -NoProfile -File .github/scripts/monitor-test-containers.ps1 \
+          -ResultsDirectory "/tmp/test-results/${{ matrix.category }}" &
+        diagnostics_pid=$!
+        stop_diagnostics() {
+          test_exit_code=$?
+          trap - EXIT
+          kill "$diagnostics_pid" 2>/dev/null || true
+          wait "$diagnostics_pid" 2>/dev/null || true
+          exit "$test_exit_code"
+        }
+        trap stop_diagnostics EXIT
+
+        dotnet test \
+        --project "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
+        --max-parallel-test-modules 1 \
+        --stop-on-fail on \
+        --long-running 60 \
+        --timeout "$TEST_TIMEOUT" \
+        --results-directory /tmp/test-results/${{ matrix.category }} \
+        --report-xunit-trx \
+        --coverage \
+        --coverage-output-format xml
+      env:
+        LogLevel: Warning
+        TZ: UTC
+        # Only the ordinary provider test hosts own these pool lifetimes.
+        GRATE_SQLSERVER_SCOPED_POOLING: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
+        GRATE_ORACLE_SCOPED_POOLING: ${{ matrix.category == 'Oracle' && 'true' || 'false' }}
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ (matrix.category == 'SqlServer' || matrix.category == 'Oracle') && 'true' || 'false' }}
+        # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
+        TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
+        MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
+
+    - name: Test on Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $outDir = Join-Path "${{ runner.temp }}" "test-results/${{ matrix.category }}"
+        New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+
+        $testArgs = @(
+          "--project", "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj",
+          "--max-parallel-test-modules", "1",
+          "--minimum-expected-tests", "1",
+          "--stop-on-fail", "on",
+          "--long-running", "60",
+          "--timeout", "20m",
+          "--results-directory", $outDir,
+          "--report-xunit-trx",
+          "--xunit-info",
+          "--coverage",
+          "--coverage-output-format", "xml"
+        )
+
+        if ("${{ matrix.test_filter }}") {
+          $testArgs += @("--filter-class", "${{ matrix.test_filter }}")
+        }
+
+        dotnet test @testArgs
+      env:
+        LogLevel: Warning
+        TZ: UTC
+        GRATE_SQLSERVER_SCOPED_POOLING: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
+
+    - name: Upload Unit Test Results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
+        path: |
+          ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}/
+        retention-days: 1

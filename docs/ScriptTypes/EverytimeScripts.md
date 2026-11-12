@@ -12,9 +12,11 @@ If you name your file with `.EVERYTIME.`, grate will run that file everytime, re
 This is handy when you are using a script to drop and insert data or you need certain scripts to run everytime (say they do some sort of autowiring).
 
 ## Folders
-Scripts in the following folders are treated as `Everytime` scripts by default, and do not require special naming:
+The following migration folders use the `EveryTime` type by default and accept ordinary `.sql` filenames.
 
-* Permissions
+* `beforeMigration`
+* `permissions`
+* `afterMigration`
 
 
 ## Where not to use

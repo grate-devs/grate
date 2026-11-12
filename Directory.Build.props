@@ -14,15 +14,24 @@
     <CodeAnalysisRuleset>$(MSBuildThisFileDirectory)CodeAnalysis.ruleset</CodeAnalysisRuleset>
     <EnableXlfLocalization>false</EnableXlfLocalization>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+    <!-- Keep dependency checks consistent when building only net8.0 or net9.0. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <RestoreEnablePackagePruning>true</RestoreEnablePackagePruning>
     <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
 
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <!-- Keep every net11.0 distribution on the stable .NET 11 runtime, including
+       self-contained publishes that restore runtime packs independently of the SDK. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <RuntimeFrameworkVersion>11.0.0</RuntimeFrameworkVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -34,7 +43,7 @@
 grate - sql for the 20s
     
 grate is a no-code, low-fi database migration tool, inspired heavily by RoundhousE. It's written from the ground
-up using modern .NET 8/9/10. </Description>
+up using modern .NET 8/9/10/11. </Description>
     <Copyright>© Erik A. Brandstadmoen. All rights reserved.</Copyright>
     <PackageProjectUrl>https://grate-devs.github.io/grate/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/grate-devs/grate</RepositoryUrl>

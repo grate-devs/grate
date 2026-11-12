@@ -7,7 +7,7 @@ namespace grate.Exceptions;
 /// <summary>
 /// One script failed due to errors
 /// </summary>
-public abstract class ScriptFailed: MigrationException
+public abstract class ScriptFailed : MigrationException
 {
     public ScriptFailed(MigrationsFolder folder, string file, string? scriptText, Exception cause)
         : base(folder, file, null, cause)
@@ -23,41 +23,41 @@ public abstract class ScriptFailed: MigrationException
 
     public string? ScriptText { get; }
     public DbException? DbException { get; set; }
-    
+
     private static string GetErrorMessage(MigrationsFolder folder, string file, Exception cause)
     {
         return
             $"Error in folder {folder.Path}: Script '{file}' failed due to error: {cause.Message}";
     }
-    
-    private string GetShortErrorMessage() => 
+
+    private string GetShortErrorMessage() =>
         $"{File}: {InnerExceptionMessage}" +
-        (ErrorSnippet is { } ? $"\n{ErrorSnippet}" : ""); 
+        (ErrorSnippet is { } ? $"\n{ErrorSnippet}" : "");
 
     public override string Message => GetShortErrorMessage();
 
     protected virtual string? InnerExceptionMessage => InnerException?.Message;
-        
+
     public override string ToString() =>
-            GetErrorMessage(Folder, File, this.InnerException!) + "\n" 
+            GetErrorMessage(Folder, File, this.InnerException!) + "\n"
          + string.Join('\n', ScriptErrors.Select(item => $" * {item.Key}: {item.Value}"));
 
     public override IDictionary Data => ScriptErrors.ToDictionary(item => item.Key, item => item.Value);
 
     public IDictionary<string, object?> ScriptErrors
-        => DbException is { } 
-            ? GetDbScriptErrors() 
+        => DbException is { }
+            ? GetDbScriptErrors()
             : GetGenericErrorDetails();
 
     protected virtual int Position => 0;
-    
+
     protected virtual (int? line, int position) LineAndPosition
     {
         get
         {
             var line = 0;
             var pos = 0;
-            
+
             if (ScriptText is { })
             {
                 for (var i = 0; i < Position && i < ScriptText.Length; i++)
@@ -73,11 +73,11 @@ public abstract class ScriptFailed: MigrationException
                     }
                 }
             }
-            
+
             return (line, pos);
         }
     }
-    
+
     protected virtual string? LineWithError
     {
         get
@@ -101,7 +101,7 @@ public abstract class ScriptFailed: MigrationException
         {
             var (line, pos) = LineAndPosition;
             var textPrefix = $"({line},{pos}): ";
-            
+
             var prefix = new String(' ', pos + textPrefix.Length - 1);
             return $"({line},{pos}): " + LineWithError + "\n" +
                 prefix + "^ " + InnerExceptionMessage;

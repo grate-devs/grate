@@ -1,0 +1,43 @@
+# Called by build.yml; source checkout always uses the caller's immutable event SHA.
+name: Release · tools
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: Build .NET Core (global) tool
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+    - name: Setup .NET 11 and .NET 10
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; #830 redirect sanitization
+      with:
+        global-json-file: global.json
+        dotnet-version: 10.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      shell: pwsh
+      run: dotnet pack ./src/grate/grate.csproj -c Release -p:SelfContained=false -p:PackAsTool=true -p:GrateDistribution=${{ matrix.distribution }} -p:ArtifactsPath=/tmp/grate/build -p:PackageOutputPath=/tmp/grate/nupkg -p:Version=${{ inputs.version }} -p:PackageVersion=${{ inputs.version }}
+
+    - name: Upload published tool artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ matrix.distribution == 'All' && format('nuget-grate-tool-{0}', inputs.version) || format('nuget-grate-tool-{0}-{1}', matrix.distribution, inputs.version) }}
+        path: /tmp/grate/nupkg/*
+        if-no-files-found: error

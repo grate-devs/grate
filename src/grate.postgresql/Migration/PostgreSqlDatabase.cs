@@ -17,7 +17,7 @@ public record PostgreSqlDatabase : AnsiSqlDatabase
     public PostgreSqlDatabase(ILogger<PostgreSqlDatabase> logger)
         : base(logger, Syntax)
     { }
-    
+
     public static string Type => "postgresql";
     public static ISyntax Syntax { get; } = new PostgreSqlSyntax();
 

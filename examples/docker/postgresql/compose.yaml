@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for the local example}"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  migrate:
+    image: gratedevs/grate:2.2.0
+    environment:
+      DATABASE_TYPE: postgresql
+      CREATE_DATABASE: "true"
+      APP_CONNSTRING: "Host=db;Port=5432;Database=grate_example;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for the local example}"
+    volumes:
+      - ./db:/db:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

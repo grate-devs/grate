@@ -1,0 +1,41 @@
+class @FORMULA_CLASS@ < Formula
+  desc "@DESCRIPTION@"
+  homepage "https://grate-devs.github.io/grate/"
+  url "https://github.com/grate-devs/grate/archive/refs/tags/@RELEASE_TAG@.tar.gz"
+  sha256 "@SOURCE_SHA256@"
+  license "MIT"
+  head "https://github.com/grate-devs/grate.git", branch: "main"
+
+  depends_on "dotnet"
+@CONFLICTS@
+
+  def install
+    ENV["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
+    ENV["DOTNET_NOLOGO"] = "1"
+
+    # Use Homebrew's supported SDK rather than the feature band pinned upstream.
+    rm "global.json"
+
+    dotnet = Formula["dotnet"]
+    framework = "net#{dotnet.version.major_minor}"
+    args = %W[
+      --configuration Release
+      --framework #{framework}
+      --output #{libexec}
+      --no-self-contained
+      --use-current-runtime
+      -p:AppHostRelativeDotNet=#{dotnet.opt_libexec.relative_path_from(libexec)}
+      -p:DebugType=None
+      -p:TargetFrameworks=#{framework}
+      -p:GrateDistribution=@DISTRIBUTION@
+    ]
+    args << "-p:Version=#{version}" if build.stable?
+
+    system "dotnet", "publish", "src/grate/grate.csproj", *args
+    bin.install_symlink libexec/"grate"
+  end
+
+  test do
+@TEST_BODY@
+  end
+end

@@ -7,21 +7,21 @@ using NSubstitute;
 
 namespace Basic_tests.Infrastructure;
 
-public record MockDbMigrator: IDbMigrator
+public record MockDbMigrator : IDbMigrator
 {
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     object ICloneable.Clone() => this with { };
 
     public GrateConfiguration Configuration { get; set; } = null!;
-    
+
     public IDatabase Database { get; set; } = new MockDatabase();
     // This doesn't work in .NET 6 - so we must create an explicit implementation of IDatabase
     //public IDatabase Database { get; set; } = Substitute.For<IDatabase>();
-    
+
     public ILogger Logger { get; set; } = Substitute.For<ILogger>();
 
-    public  Task InitializeConnections()
+    public Task InitializeConnections()
     {
         return Task.CompletedTask;
     }
@@ -76,10 +76,10 @@ public record MockDbMigrator: IDbMigrator
         throw new NotImplementedException();
     }
 
-    public virtual Task<bool> RunSql(string sql, string scriptName, MigrationsFolder folder, long versionId, GrateEnvironment? environment,
+    public virtual Task<(bool SqlRun, bool HistoryRecorded)> RunSql(string sql, string scriptName, MigrationsFolder folder, long versionId, GrateEnvironment? environment,
         ConnectionType connectionType, TransactionHandling transactionHandling)
     {
-        return Task.FromResult(false);
+        return Task.FromResult((SqlRun: false, HistoryRecorded: false));
     }
 
     public virtual Task<bool> RunSqlWithoutLogging(string sql, string scriptName, GrateEnvironment? environment, ConnectionType connectionType,

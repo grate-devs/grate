@@ -13,8 +13,7 @@ public class FolderConfiguration_
     [Fact]
     public async Task Default()
     {
-        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=/tmp");
-        _ = cfg?.SqlFilesDirectory ?? new DirectoryInfo("/tmp");
+        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=" + Path.GetTempPath());
 
         var expected = Folders.Default;
         var actual = cfg?.Folders;
@@ -39,8 +38,7 @@ public class FolderConfiguration_
     [MemberData(nameof(FoldersCommandLines))]
     public async Task Default_With_Overrides(string commandLine, KnownFolderNames folderConfig)
     {
-        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=/tmp", commandLine);
-        _ = cfg?.SqlFilesDirectory ?? new DirectoryInfo("/tmp");
+        var cfg = await ParseGrateConfiguration("--sqlfilesdirectory=" + Path.GetTempPath(), commandLine);
         var expected = FoldersConfiguration.Default(folderConfig);
 
         var actual = cfg?.Folders;
@@ -72,7 +70,7 @@ public class FolderConfiguration_
         {
             {
                 "Mostly defaults",
-                "/tmp/jalla",
+                Path.GetTempPath(),
                 @"--folders=folder1=type:Once;folder2=type:EveryTime;folder3=type:AnyTime",
                 new FoldersConfiguration(
                     new MigrationsFolder("folder1", MigrationType.Once),
@@ -115,8 +113,9 @@ public class FolderConfiguration_
 
     private static Task<GrateConfiguration?> ParseGrateConfiguration(params string[] commandline)
     {
-        var migrateCommand = new MigrateCommand(null!);
-        var parseResult = migrateCommand.Parse(commandline);
+        var migrateCommand = new MigrateCommand((_, _) => Task.FromResult(0));
+        var parseResult = migrateCommand.Parse(["--connectionstring", "unused", .. commandline]);
+        Assert.Empty(parseResult.Errors);
 
         return Task.FromResult<GrateConfiguration?>(migrateCommand.GetConfiguration(parseResult));
     }

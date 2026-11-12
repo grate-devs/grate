@@ -4,56 +4,79 @@ nav_order: 1
 ---
 
 # grate
-SQL scripts migration runner 
+
+SQL scripts migration runner
+
+**Database migrations in plain SQL.**
 
 ## What is grate?
 
 grate is a SQL scripts migration runner, using plain, old SQL for migrations. No meta-language, no code, no config,
 no EF migrations. It gives you full flexibility, and full control of your migrations, and lets you use
-all the fancy features of your particular database system. You are not constrained to any lowest common 
+all the fancy features of your particular database system. You are not constrained to any lowest common
 feature set of all supported databases.
 
-### grate supports the following DBMSs
+Use it from the command line, in CI/CD, in a container, or through its .NET
+libraries. Start with [getting started](GettingStarted.md) or choose an
+[installation option](GettingGrate.md).
 
-* Microsoft SQL server
-* PostgreSQL
-* MariaDB/MySQL
-* Sqlite
-* Oracle
-* Google BigQuery (see [BigQuery](BigQuery.md))
+## Supported databases
 
+SQL Server (including Azure SQL), PostgreSQL, MariaDB/MySQL, SQLite, Oracle, and
+Google BigQuery (see [BigQuery](BigQuery.md)).
+grate runs on Windows, Linux, and macOS.
+
+## How scripts run
+
+Different kinds of SQL changes need different execution policies:
+
+- [One-time scripts](ScriptTypes/OneTimeScripts.md), such as schema changes in
+  `up`, run once per database. Changing an applied script fails the migration
+  by default.
+- [Anytime scripts](ScriptTypes/AnytimeScripts.md), such as views and stored
+  procedures, run when new or changed. Write them so they can run again.
+- [Everytime scripts](ScriptTypes/EverytimeScripts.md), such as permissions and
+  migration hooks, run on every migration.
+
+Folders run in a defined order, with scripts sorted alphabetically within them.
+Use the defaults or [configure your own folder layout](ConfigurationOptions/FolderConfiguration.md).
+The [migration tables](MigrationTables.md) record script names, hashes, and versions.
 
 ## Prerequisites
 
-grate is built with .NET, but is compiled as a self-contained executable, which means there are no big
-prerequisites for running grate. ICU is required (e.g. libicu on Debian Linux)
+Standalone executables bundle the .NET runtime; .NET tools and libraries use an
+installed runtime. See [installation and runtime requirements](GettingGrate.md)
+for your distribution and platform.
 
-
-## Goal
-
-The goal of grate is to be largely backwards compatible with RoundhousE, which is an amazing tool. It is initiated by the main
-maintainer of RoundhousE for the last three years, please see this issue in the RoundhousE repo for details: [https://github.com/chucknorris/roundhouse/issues/438](https://github.com/chucknorris/roundhouse/issues/438).
-
-While early versions of grate may not support every last RoundhousE feature, those features that are implemented should work identically, or with only very small changes.  For detailed information see the [migration](MigratingFromRoundhousE.md) documentation.
+Source builds use the stable .NET 11 SDK selected by `global.json`. Self-contained
+builds and Docker images use .NET 11 GA, including Linux/musl binaries. See the
+[SDK and bundled runtime guidance](Packaging.md#moving-to-net-11-ga).
 
 ## Why the name grate?
 
 grate is short for migrate. And it's also pronounced the same way as _great_, so, there you go. 
 
 ## Documentation
+
 * [Getting started](GettingStarted.md)
 * [Getting grate](GettingGrate.md)
 * [Migrating from RoundhousE](MigratingFromRoundhousE.md)
 * [Configuration Options](ConfigurationOptions/index.md)
+* [Migration tables](MigrationTables.md)
 * [Environment scripts](EnvironmentScripts.md)
 * [Token replacement](TokenReplacement.md)
 * [Response files](ConfigurationOptions/ResponseFiles.md)
+* [Agent skill](AgentSkill.md)
 
-## Status
+## Coming from RoundhousE?
 
-grate is catching up on RoundhousE features, there are a couple of features missing, they are documented in unit tests. But I've successfully replaced 
-RoundhousE with grate in a 5-year-in-development folder of SQL scripts, without any issues. 
+grate grew out of experience maintaining RoundhousE and carries forward its
+SQL-first workflow. See [migrating from RoundhousE](MigratingFromRoundhousE.md)
+for compatibility details and the changes to make when moving an existing project.
 
 ## Contributing
+
+Maintainers can follow the [release process](ReleaseProcess.md) to prepare,
+publish, verify, and recover a release.
 
 Head over to the [github page]({{ site.github.repository_url }}), and please see [CONTRIBUTING.md]({{ site.github.repository_url }}/blob/main/CONTRIBUTING.md)

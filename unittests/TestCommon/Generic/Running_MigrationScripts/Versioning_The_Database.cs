@@ -7,13 +7,13 @@ using static grate.Configuration.KnownFolderKeys;
 namespace TestCommon.Generic.Running_MigrationScripts;
 
 // ReSharper disable once InconsistentNaming
-public abstract class Versioning_The_Database(IGrateTestContext context, ITestOutputHelper testOutput) 
+public abstract class Versioning_The_Database(IGrateTestContext context, ITestOutputHelper testOutput)
     : MigrationsScriptsBase(context, testOutput)
 {
-    protected Versioning_The_Database(): this(null!, null!)
+    protected Versioning_The_Database() : this(null!, null!)
     {
     }
-    
+
     [Fact]
     [Trait("Category", "Versioning")]
     public async Task Returns_the_new_version_id()
@@ -23,26 +23,31 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         var parent = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(parent, knownFolders[Sprocs]);
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
             .WithSqlFilesDirectory(parent)
             .Build();
-        
+
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
             await migrator.Migrate();
 
-            // Version again
-            var version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
-            Assert.Equal(2, version);
+            var firstVersionId = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
+            var secondVersionId = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.5");
 
-            // And again
-            version = await migrator.GetDbMigrator().VersionTheDatabase("1.2.3.4");
-            Assert.Equal(3, version);
+            var table = Context.Syntax.TableWithSchema(config.SchemaName, config.VersionTableName);
+            using var connection = Context.External.CreateDbConnection(db);
+            var versions = (await connection.QueryAsync<(long id, string version)>(
+                $"SELECT id, version FROM {table}")).ToArray();
+
+            // Generated identifiers may have gaps, for example when Oracle ages out a sequence cache.
+            Assert.Equal(Assert.Single(versions, row => row.version == "1.2.3.4").id, firstVersionId);
+            Assert.Equal(Assert.Single(versions, row => row.version == "1.2.3.5").id, secondVersionId);
+            Assert.NotEqual(firstVersionId, secondVersionId);
         }
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -67,9 +72,10 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
 
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await migrator.Migrate(); // shouldn't touch anything because of --dryrun
-        var addedTable = await migrator.GetDbMigrator().Database.VersionTableExists();
+        var database = migrator.GetDbMigrator().Database;
+        var addedTable = await database.DatabaseExists() && await database.VersionTableExists();
         Assert.False(addedTable); // we didn't even add the grate infrastructure
-        
+
         //await Context.DropDatabase(db);
     }
 
@@ -85,7 +91,7 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         CreateDummySql(parent, knownFolders[Up]);
 
         long newVersionId = 0;
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithFolders(knownFolders)
@@ -110,10 +116,10 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         Assert.Equal(2, entries.Count());
         var version = entries.Single(x => x.version == dbVersion);
         Assert.Equal(MigrationStatus.InProgress, version.status);
-        
+
         //await Context.DropDatabase(db);
     }
-        
+
     [Fact]
     [Trait("Category", "Versioning")]
     public async Task Migrating_creates_a_new_version_record()
@@ -224,10 +230,10 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         }
 
         Assert.Equal(repositoryPath, loggedRepositoryPath);
-        
+
         //await Context.DropDatabase(db);
     }
-    
+
 
     [Fact]
     [Trait("Category", "Versioning")]
@@ -237,19 +243,19 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         var database = TestConfig.RandomDatabase();
         var sqlFolder = CreateRandomTempDirectory();
         var newVersion = "1.0.0.0-alpha";
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(database))
             .WithVersion(newVersion)
             .WithSqlFilesDirectory(sqlFolder)
             .Build();
-        
+
         await using var migrator = Context.Migrator.WithConfiguration(config);
         await migrator.Migrate();
         var currentVersion = await migrator.GetDbMigrator().Database.GetCurrentVersion();
         Assert.NotEqual(newVersion, currentVersion);
         Assert.Equal(AnsiSqlDatabase.NotVersioning, currentVersion);
-        
+
         await Context.DropDatabase(database);
     }
 
@@ -265,13 +271,13 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         var originalVersion = "1.0.0.0-alpha";
 
         var db = TestConfig.RandomDatabase();
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(db))
             .WithSqlFilesDirectory(sqlFolder)
             .WithVersion(originalVersion)
             .Build();
-        
+
         GrateConfiguration newConfig;
 
         await using (var migrator = Context.Migrator.WithConfiguration(config))
@@ -306,7 +312,7 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
         var sqlFolder = CreateRandomTempDirectory();
         var knownFolders = Folders.Default;
         CreateDummySql(sqlFolder, knownFolders[Up], "1_up.sql");
-        
+
         var config = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
             .WithConnectionString(Context.ConnectionString(TestConfig.RandomDatabase()))
             .WithSqlFilesDirectory(sqlFolder)
@@ -319,7 +325,7 @@ public abstract class Versioning_The_Database(IGrateTestContext context, ITestOu
             await migrator.Migrate();
 
             CreateDummySql(sqlFolder, knownFolders[Sprocs], "2_sproc.sql");
-        
+
             newConfig = GrateConfigurationBuilder.Create(Context.DefaultConfiguration)
                 .WithSqlFilesDirectory(sqlFolder)
                 // important: should be use the same database as with previous run.

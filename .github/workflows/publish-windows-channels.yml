@@ -1,0 +1,253 @@
+name: Release · Publish Windows channels
+
+on:
+  workflow_run:
+    workflows: ['Release · Build artifacts']
+    types: [completed]
+  pull_request:
+    paths:
+      - '.github/workflows/publish-windows-channels.yml'
+      - 'scripts/release/*windows_channel*.ps1'
+      - 'scripts/release/submit_chocolatey.ps1'
+      - 'scripts/release/submit_winget.ps1'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Published stable tag/version to promote'
+        type: string
+        required: true
+      release_run_id:
+        description: 'Original successful release-event build run; existing artifacts are reused'
+        type: string
+        required: true
+      publish:
+        description: 'Submit the fully verified candidates to WinGet and Chocolatey'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: windows-channels-${{ github.event.workflow_run.head_branch || inputs.version || github.head_ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'release' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && !contains(github.event.workflow_run.head_branch, '-'))
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      release-run-id: ${{ steps.resolve.outputs.release-run-id }}
+      source-commit: ${{ steps.resolve.outputs.source-commit }}
+      expected-sqlite-version: ${{ steps.resolve.outputs.expected-sqlite-version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Resolve immutable published release and successful original artifacts
+        id: resolve
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL_VERSION: ${{ inputs.version }}
+          CHANNEL_RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+          CHANNEL_PUBLISH: ${{ inputs.publish }}
+        run: ./scripts/release/resolve_windows_channels.ps1 -Version $env:CHANNEL_VERSION -ReleaseRunId $env:CHANNEL_RELEASE_RUN_ID
+      - name: Exercise release-context rejection checks
+        shell: pwsh
+        run: |
+          ./scripts/release/test_windows_channel_context.ps1
+          ./scripts/release/test_windows_channel_evidence.ps1
+          ./scripts/release/test_windows_channel_uninstall.ps1
+          ./scripts/release/test_windows_channel_sqlite_policy.ps1
+          ./scripts/release/test_windows_channel_chocolatey_baseline.ps1
+          ./scripts/release/test_submit_winget.ps1
+          ./scripts/release/test_submit_chocolatey.ps1
+
+  winget-verify:
+    needs: resolve
+    name: WinGet ${{ matrix.distribution }} ${{ matrix.case.type }} ${{ matrix.case.arch }}
+    runs-on: ${{ matrix.case.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+        case:
+          - {type: zip, arch: x86, runner: windows-latest}
+          - {type: zip, arch: x64, runner: windows-latest}
+          - {type: zip, arch: arm64, runner: windows-11-arm}
+          - {type: wix, arch: x64, runner: windows-2022}
+          - {type: wix, arch: arm64, runner: windows-11-arm}
+    defaults:
+      run:
+        shell: pwsh -NoLogo -NoProfile -NonInteractive -MTA -Command ". '{0}'"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Select original profile artifact
+        id: profile
+        run: |
+          $name = if ('${{ matrix.distribution }}' -eq 'All') { 'winget-migration-candidate' } else { 'winget-${{ matrix.distribution }}-candidate' }
+          "artifact=$name-${{ needs.resolve.outputs.version }}" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ${{ steps.profile.outputs.artifact }}
+          run-id: ${{ needs.resolve.outputs.release-run-id }}
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Verify actual public payload through the exact WinGet submission manifests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $winget = ./installers/winget/helpers/Initialize-LifecycleRunner.ps1 -OutputDirectory "$env:RUNNER_TEMP/winget-cli"
+          ./scripts/release/verify_windows_channel.ps1 -Version '${{ needs.resolve.outputs.version }}' -ReleaseRunId '${{ needs.resolve.outputs.release-run-id }}' -Distribution '${{ matrix.distribution }}' -Channel winget -Architecture '${{ matrix.case.arch }}' -InstallerType '${{ matrix.case.type }}' -CandidateDirectory ./candidate -OutputDirectory "$env:RUNNER_TEMP/channel-evidence" -Winget $winget
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: windows-channel-verify-winget-${{ matrix.distribution }}-${{ matrix.case.type }}-${{ matrix.case.arch }}
+          path: |
+            ${{ runner.temp }}/channel-evidence/**/*.json
+            ${{ runner.temp }}/channel-evidence/**/*.log
+            ${{ runner.temp }}/channel-evidence/**/*.yaml
+          retention-days: 14
+          if-no-files-found: warn
+
+  chocolatey-verify:
+    needs: resolve
+    name: Chocolatey ${{ matrix.distribution }} x64
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Select original profile artifact
+        id: profile
+        shell: pwsh
+        run: |
+          . ./scripts/release/distribution_profiles.ps1
+          $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+          "artifact=chocolatey-$($profile.PackageId)-${{ needs.resolve.outputs.version }}" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ${{ steps.profile.outputs.artifact }}
+          run-id: ${{ needs.resolve.outputs.release-run-id }}
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Install, exercise and uninstall the original Chocolatey package
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/release/verify_windows_channel.ps1 -Version '${{ needs.resolve.outputs.version }}' -ReleaseRunId '${{ needs.resolve.outputs.release-run-id }}' -Distribution '${{ matrix.distribution }}' -Channel chocolatey -CandidateDirectory ./candidate -OutputDirectory "$env:RUNNER_TEMP/channel-evidence"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: windows-channel-verify-chocolatey-${{ matrix.distribution }}
+          path: |
+            ${{ runner.temp }}/channel-evidence/**/*.json
+            ${{ runner.temp }}/channel-evidence/**/*.log
+            ${{ runner.temp }}/channel-evidence/**/*.yaml
+          retention-days: 14
+          if-no-files-found: warn
+
+  verified:
+    if: always() && needs.resolve.result != 'skipped'
+    needs: [resolve, winget-verify, chocolatey-verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject failed, cancelled or missing verification
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        shell: pwsh
+        run: |
+          $results = $env:RESULTS | ConvertFrom-Json
+          foreach ($job in @('resolve', 'winget-verify', 'chocolatey-verify')) {
+            if ($results.$job.result -cne 'success') { throw "Required channel validation did not pass: $job" }
+          }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: windows-channel-verify-*
+          path: evidence
+      - name: Verify the complete 36-lane evidence inventory
+        shell: pwsh
+        run: ./scripts/release/verify_windows_channel_evidence.ps1 -EvidenceDirectory ./evidence -Version '${{ needs.resolve.outputs.version }}' -ReleaseRunId '${{ needs.resolve.outputs.release-run-id }}' -SourceCommit '${{ needs.resolve.outputs.source-commit }}' -ExpectedSQLiteVersion '${{ needs.resolve.outputs.expected-sqlite-version }}' -OutputPath ./verified.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: windows-channel-verification-gate
+          path: verified.json
+          if-no-files-found: error
+
+  submit-winget:
+    needs: [resolve, verified]
+    if: github.repository == 'grate-devs/grate' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: winget-*-candidate-${{ needs.resolve.outputs.version }}
+          run-id: ${{ needs.resolve.outputs.release-run-id }}
+          github-token: ${{ github.token }}
+          path: candidates
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: windows-channel-verification-gate
+          path: verification
+      - name: Submit or reconcile the six WinGet pull requests
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_GH_PAT }}
+        run: ./scripts/release/submit_winget.ps1 -Version '${{ needs.resolve.outputs.version }}' -ReleaseRunId '${{ needs.resolve.outputs.release-run-id }}' -SourceCommit '${{ needs.resolve.outputs.source-commit }}' -ValidationRunId '${{ github.run_id }}' -CandidateDirectory ./candidates -EvidencePath ./verification/verified.json -OutputDirectory ./submission
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: winget-submission-record
+          path: submission/
+          if-no-files-found: warn
+
+  submit-chocolatey:
+    needs: [resolve, verified]
+    if: github.repository == 'grate-devs/grate' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: chocolatey-*-${{ needs.resolve.outputs.version }}
+          run-id: ${{ needs.resolve.outputs.release-run-id }}
+          github-token: ${{ github.token }}
+          path: candidates
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: windows-channel-verification-gate
+          path: verification
+      - name: Submit only the exact six Windows-tested packages
+        shell: pwsh
+        env:
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/release/submit_chocolatey.ps1 -Version '${{ needs.resolve.outputs.version }}' -ReleaseRunId '${{ needs.resolve.outputs.release-run-id }}' -SourceCommit '${{ needs.resolve.outputs.source-commit }}' -CandidateDirectory ./candidates -EvidencePath ./verification/verified.json -OutputDirectory ./submission
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: chocolatey-submission-record
+          path: submission/
+          if-no-files-found: warn

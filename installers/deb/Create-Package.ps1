@@ -1,67 +1,74 @@
 #!/usr/bin/env pwsh
 
-param ( 
-     [Parameter(Mandatory=$true)] [string] $grateExe,
-     [Parameter(Mandatory=$true)] [string] $version,
-     [Parameter(Mandatory=$true)] [string] $arch
+param (
+    [Parameter(Mandatory=$true)] [string] $grateExe,
+    [Parameter(Mandatory=$true)] [string] $version,
+    [Parameter(Mandatory=$true)] [string] $arch,
+    [ValidateSet('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')] [string] $Distribution = 'All',
+    [string] $OutputDirectory = $PSScriptRoot
 )
 
-$Root = Resolve-Path "$($PSScriptRoot)";
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$grateExe = (Resolve-Path -LiteralPath $grateExe).Path
+$OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
+New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
-$pkgVersion = "${version}-1";
-
-function Recreate {
-	param ($dirName)
-
-	$dir = Join-Path $Root $dirName;
-
-	If (Test-Path($dir)) {
-	   $null = Remove-Item -Recurse $dir
-	}
-	New-Item -Path $dir -Type Directory;
+$packageName = switch ($Distribution) {
+    'All' { 'grate' }
+    'SQLite' { 'grate-sqlite' }
+    'SQLServer' { 'grate-sqlserver' }
+    'MariaDB' { 'grate-mariadb' }
+    'PostgreSQL' { 'grate-postgresql' }
+    'Oracle' { 'grate-oracle' }
 }
+$packageFamily = @(
+    'grate', 'grate-sqlite', 'grate-sqlserver', 'grate-mariadb', 'grate-postgresql', 'grate-oracle'
+)
+$conflicts = ($packageFamily | Where-Object { $_ -ne $packageName }) -join ', '
+$description = if ($Distribution -eq 'All') { 'SQL for the 20s' } else { "SQL for the 20s ($Distribution only)" }
 
-$debianDir = Recreate "debian"
+# Debian sorts ~ before the final version; preserve hyphens inside identifiers.
+$pkgVersion = ($version -replace '^([0-9]+\.[0-9]+\.[0-9]+)-', '$1~') + '-1'
+$staging = Join-Path ([IO.Path]::GetTempPath()) ('grate-debian-' + [Guid]::NewGuid().ToString('N'))
+try {
+    $debianDir = Join-Path $staging $packageName
+    $binDir = Join-Path $debianDir 'usr/bin'
+    New-Item -ItemType Directory -Path $debianDir -Force | Out-Null
+    $templateDir = Join-Path $PSScriptRoot 'template'
+    Copy-Item -Path "$templateDir/*" -Destination $debianDir -Recurse
+    New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+    Copy-Item -LiteralPath $grateExe -Destination "$binDir/grate"
+    & chmod a+x "$binDir/grate"
 
+    $controlDir = Join-Path $debianDir 'DEBIAN'
+    $control = Get-Content -LiteralPath "$controlDir/control" -Raw
+    $control.Replace('%%%VERSION%%%', $pkgVersion).Replace('%%%ARCH%%%', $arch).
+        Replace('%%%PACKAGE%%%', $packageName).Replace('%%%CONFLICTS%%%', $conflicts).
+        Replace('%%%DESCRIPTION%%%', $description) | Set-Content -LiteralPath "$controlDir/control"
+    foreach ($script in @('postinst', 'prerm')) {
+        (Get-Content -LiteralPath "$controlDir/$script" -Raw).Replace('%%%PACKAGE%%%', $packageName) |
+            Set-Content -LiteralPath "$controlDir/$script"
+        & chmod 0755 "$controlDir/$script"
+    }
 
-# Create a dpkg
+    $docRoot = Join-Path $debianDir 'usr/share/doc'
+    if ($packageName -ne 'grate') {
+        Move-Item -LiteralPath "$docRoot/grate" -Destination "$docRoot/$packageName"
+    }
+    $manFile = Join-Path $debianDir 'usr/share/man/man1/grate.1'
+    $changelog = Join-Path $docRoot "$packageName/changelog"
+    & gzip -n --best $manFile
+    & gzip -n --best $changelog
+    & ln -s changelog.gz "${changelog}.Debian.gz"
 
-$DEBIAN=New-Item -Type Directory -Path $(Join-Path $debianDir "DEBIAN")
-$binDir=New-Item -Type Directory -Path $(Join-Path $debianDir "usr/bin")
-
-$templateDir = Join-Path $Root template
-$templateControl = Join-Path $templateDir DEBIAN
-
-$controlTemplateFile = Join-Path $templateControl control
-$controlDest = Join-Path $DEBIAN control
-
-cp $grateExe $binDir
-$executable = $(basename $grateExe)
-chmod a+x $(Join-Path $binDir $executable)
-
-cp -R $templateDir/* $debianDir
-
-((Get-Content -path $controlTemplateFile -Raw) `
-	-replace '%%%VERSION%%%',$pkgVersion `
-	-replace '%%%ARCH%%%',$arch `
-	) | Set-Content -Path $controlDest
-
-
-$manFile = Join-Path $debianDir usr share man man1 grate.1
-$changelog = Join-Path $debianDir usr share doc grate changelog
-
-#groff -man -Tascii $manFile
-gzip -n --best $manFile
-gzip -n --best $changelog
-ln -s changelog.gz "${changelog}.Debian.gz"
-
-#(Get-Item $manFile).LastWriteTime=("12 December 2016 14:00:00")
-
-
-fakeroot dpkg-deb --build $debianDir
-
-$built = Join-Path $Root debian.deb
-$final = Join-Path $Root "grate_${pkgVersion}_${arch}.deb"
-
-mv $built $final
-
+    # Keep the SemVer filename expected by callers; Debian reads Version metadata.
+    $filename = "${packageName}_${version}-1_${arch}.deb"
+    $built = Join-Path $staging $filename
+    & dpkg-deb --root-owner-group --build $debianDir $built
+    Move-Item -LiteralPath $built -Destination (Join-Path $OutputDirectory $filename) -Force
+} finally {
+    if (Test-Path -LiteralPath $staging) {
+        Remove-Item -LiteralPath $staging -Recurse -Force
+    }
+}
