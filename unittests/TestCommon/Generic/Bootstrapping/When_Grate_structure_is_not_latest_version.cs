@@ -240,13 +240,18 @@ public abstract class When_Grate_structure_is_not_latest_version(IGrateTestConte
         return data;
     }
 
-    private static IEnumerable<string> DifferentPermutations(string original) =>
-        [
-            original,
-            original.ToLower(),
-            //original.ToUpper(),
-            new string(original.ToCharArray().Select(c => Random.Shared.Next(2) == 0 ? c : Char.ToUpper(c)).ToArray())
-        ];
+    private static IEnumerable<string> DifferentPermutations(string original)
+    {
+        var reproducible = string.Equals(Environment.GetEnvironmentVariable("GRATE_REPRODUCIBLE_TABLE_CASINGS"),
+            "true", StringComparison.OrdinalIgnoreCase);
+        var mixed = reproducible
+            ? new string(original.Select((character, index) => index % 2 == 0
+                ? char.ToLowerInvariant(character)
+                : char.ToUpperInvariant(character)).ToArray())
+            : new string(original.ToCharArray().Select(c => Random.Shared.Next(2) == 0 ? c : Char.ToUpper(c)).ToArray());
+
+        return [original, original.ToLower(), mixed];
+    }
 
     private async Task RunMigration(IGrateMigrator migrator)
     {

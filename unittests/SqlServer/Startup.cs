@@ -14,6 +14,9 @@ public class Startup : TestCommon.Startup<SqlServerTestContainerDatabase, SqlSer
 {
     protected override void ConfigureExtraServices(IServiceCollection services, HostBuilderContext context)
     {
+        // Match TestCommon.Startup's fixture selection. External fixtures retain
+        // their connection strings and pool state even if opt-in is inherited.
+        SqlServerScopedPooling.ConfigureFixture(context.Configuration["GrateTestConfig:AdminConnectionString"] is null);
         services
             .AddGrate()
             .UseSqlServer();
