@@ -33,8 +33,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     private const int MaxAttempts = 5;
 
     private ILogger _logger = logger;
-    private BigQueryClient? _client;
-    private bool _ownsClient;
+    private SharedClient? _client;
     private GrateConfiguration? _config;
     private BigQueryConnectionSettings? _settings;
     private string _schemaName = "";
@@ -88,12 +87,15 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         _versionTableName = configuration.VersionTableName;
         _config = configuration;
 
-        // a clone keeps its original's client - grate clones the database for each of its internal migrations
-        if (_client is null)
+        // a clone shares its original's client while both reach the same project, location and endpoint - grate
+        // clones the database for each of its internal migrations, and a library can configure a clone for another
+        if (_client is not null && !_client.Serves(_settings))
         {
-            _client = await BigQueryClientFactory.CreateAsync(_settings);
-            _ownsClient = true;
+            _client.Release();
+            _client = null;
         }
+
+        _client ??= new SharedClient(await BigQueryClientFactory.CreateAsync(_settings), _settings);
     }
 
     public Task OpenConnection() => Task.CompletedTask;
@@ -349,11 +351,8 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
 
         _deferredWrites.Clear();
 
-        // only the database that made the client disposes it - its clones end inside its migration
-        if (_ownsClient)
-        {
-            _client?.Dispose();
-        }
+        // the last of a database and its clones to be disposed disposes the client
+        _client?.Release();
         _client = null;
 
         GC.SuppressFinalize(this);
@@ -363,14 +362,14 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     {
         // a clone shares the client, but nothing one migration has read or still has to write
         var clone = (BigQueryDatabase)MemberwiseClone();
-        clone._ownsClient = false;
+        clone._client = _client?.Share();
         clone._scriptsRun = null;
         clone._deferredWrites = [];
         return clone;
     }
 
     private BigQueryClient Client =>
-        _client ?? throw new InvalidOperationException($"{nameof(InitializeConnections)} has not run");
+        _client?.Client ?? throw new InvalidOperationException($"{nameof(InitializeConnections)} has not run");
 
     private BigQueryConnectionSettings Settings =>
         _settings ?? throw new InvalidOperationException($"{nameof(InitializeConnections)} has not run");
@@ -480,6 +479,37 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         public void Dispose()
         {
             // nothing to close
+        }
+    }
+
+    /// <summary>
+    /// A <see cref="BigQueryClient"/> that a database shares with its clones. The client is bound to a project, a
+    /// default location and an endpoint (the dataset is named on each call), and the last database to let it go
+    /// disposes it.
+    /// </summary>
+    private sealed class SharedClient(BigQueryClient client, BigQueryConnectionSettings settings)
+    {
+        private int _users = 1;
+
+        public BigQueryClient Client { get; } = client;
+
+        public bool Serves(BigQueryConnectionSettings other) =>
+            other.ProjectId == settings.ProjectId
+            && other.Location == settings.Location
+            && other.Endpoint == settings.Endpoint;
+
+        public SharedClient Share()
+        {
+            Interlocked.Increment(ref _users);
+            return this;
+        }
+
+        public void Release()
+        {
+            if (Interlocked.Decrement(ref _users) == 0)
+            {
+                Client.Dispose();
+            }
         }
     }
 }
