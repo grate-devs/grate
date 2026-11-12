@@ -2,6 +2,10 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory,
+    [ValidateSet('Observer', 'Pooling')]
+    [string]$Experiment = 'Observer',
+    [ValidateRange(1, 10000)]
+    [int]$ExpectedTests = 276,
     [switch]$SelfTest
 )
 
@@ -130,6 +134,26 @@ function Get-CapturedText {
     $result = Invoke-CapturedCommand -Command $Command -Arguments $Arguments -LogDirectory $LogDirectory
     Assert-CommandSucceeded -Result $result -Label $Command
     return (Get-Content -LiteralPath (Join-Path $LogDirectory 'stdout.log') -Raw).Trim()
+}
+
+function Get-MeasurementScenarios {
+    param(
+        [ValidateSet('Observer', 'Pooling')]
+        [string]$Experiment
+    )
+
+    if ($Experiment -ceq 'Observer') {
+        return @(
+            @{ Name = 'OFF'; Profile = $false; Pooling = $false }
+            @{ Name = 'ON'; Profile = $true; Pooling = $false }
+        )
+    }
+    return @(
+        @{ Name = 'BASELINE-1'; Profile = $true; Pooling = $false }
+        @{ Name = 'CANDIDATE-1'; Profile = $true; Pooling = $true }
+        @{ Name = 'CANDIDATE-2'; Profile = $true; Pooling = $true }
+        @{ Name = 'BASELINE-2'; Profile = $true; Pooling = $false }
+    )
 }
 
 function Read-MeasurementTrx {
@@ -322,7 +346,9 @@ function Read-MeasurementProfile {
         }
     }
     foreach ($row in $profile.Data.Aggregates) {
-        if ($row.Started -ne ($row.Succeeded + $row.Failed) -or $row.Started -lt 0 -or $row.Succeeded -lt 0 -or $row.Failed -lt 0) {
+        if ($row.Started -ne ($row.Succeeded + $row.Failed) -or $row.Started -lt 0 -or $row.Succeeded -lt 0 -or $row.Failed -lt 0 -or
+            $row.ProviderDuplicateErrors -lt 0 -or $row.ProviderDuplicateErrors -gt $row.Failed -or
+            ($row.Operation -cne 'Open' -and $row.ProviderDuplicateErrors -ne 0)) {
             throw 'Profiler operation start/terminal totals do not match.'
         }
     }
@@ -337,6 +363,15 @@ function Read-MeasurementProfile {
     if ($logicalOpens -ne $profile.Data.SuccessfulLogicalOpens) {
         throw 'Profiler successful-open total does not match aggregate rows.'
     }
+    $logicalOperations = ($profile.Data.Aggregates | Measure-Object Started -Sum).Sum
+    $providerDuplicates = ($profile.Data.Aggregates | Measure-Object ProviderDuplicateErrors -Sum).Sum
+    if ($profile.Data.KnownDuplicateAsyncOpenErrors -lt 0 -or
+        $providerDuplicates -ne $profile.Data.KnownDuplicateAsyncOpenErrors -or
+        $profile.Data.BeforeCallbacks -ne $logicalOperations -or
+        $profile.Data.TerminalCallbacks -ne ($logicalOperations + $providerDuplicates) -or
+        $profile.Data.Callbacks -ne ($profile.Data.BeforeCallbacks + $profile.Data.TerminalCallbacks)) {
+        throw 'Raw profiler callbacks, logical operations and explicit provider duplicates do not reconcile.'
+    }
     return $profile
 }
 
@@ -344,6 +379,87 @@ function Invoke-MeasurementSelfTest {
     $temporary = Join-Path ([IO.Path]::GetTempPath()) ('sqlserver-measure-controls-' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $temporary | Out-Null
     try {
+        $observerScenarios = @(Get-MeasurementScenarios -Experiment Observer)
+        if (($observerScenarios.Name -join '|') -cne 'OFF|ON' -or
+            $observerScenarios[0].Profile -or !$observerScenarios[1].Profile -or
+            @($observerScenarios | Where-Object Pooling).Count -ne 0) {
+            throw 'Observer comparison must vary profiling only, with pooling disabled throughout.'
+        }
+        $poolingScenarios = @(Get-MeasurementScenarios -Experiment Pooling)
+        if (($poolingScenarios.Name -join '|') -cne 'BASELINE-1|CANDIDATE-1|CANDIDATE-2|BASELINE-2' -or
+            @($poolingScenarios | Where-Object { !$_.Profile }).Count -ne 0 -or
+            $poolingScenarios[0].Pooling -or !$poolingScenarios[1].Pooling -or
+            !$poolingScenarios[2].Pooling -or $poolingScenarios[3].Pooling) {
+            throw 'Pooling comparison must preserve the observer and vary pooling in ABBA order.'
+        }
+        $profileFixture = @{
+            SchemaVersion = 1
+            Errors = 0
+            Incomplete = $false
+            ListenerCount = 1
+            BuildConfiguration = 'Debug'
+            ProcessArchitecture = 'X64'
+            RuntimeVersion = '11.0.0'
+            Data = @{
+                Errors = 0
+                PendingOperations = 0
+                SuccessfulLogicalOpens = 1
+                KnownDuplicateAsyncOpenErrors = 1
+                BeforeCallbacks = 3
+                TerminalCallbacks = 4
+                Callbacks = 7
+                Aggregates = @(
+                    @{
+                        Operation = 'Open'
+                        Started = 2
+                        Succeeded = 1
+                        Failed = 1
+                        ProviderDuplicateErrors = 1
+                        Scope = 'test'
+                        CaseId = ('A' * 64)
+                        ClassName = 'Fixture'
+                        MethodName = 'Control'
+                    }
+                    @{
+                        Operation = 'Command'
+                        Started = 1
+                        Succeeded = 1
+                        Failed = 0
+                        ProviderDuplicateErrors = 0
+                        Scope = 'fixture-between-teardown'
+                        CaseId = $null
+                        ClassName = $null
+                        MethodName = $null
+                    }
+                )
+            }
+        }
+        $fixtureJson = $profileFixture | ConvertTo-Json -Depth 8
+        $fixturePath = Join-Path $temporary 'profile-fixture.json'
+        Set-Content -LiteralPath $fixturePath -Value $fixtureJson
+        Read-MeasurementProfile -Path $fixturePath | Out-Null
+        foreach ($mutate in @(
+            { param($value) $value.Errors = 1 }
+            { param($value) $value.Incomplete = $true }
+            { param($value) $value.Data.TerminalCallbacks = 3 }
+            { param($value) $value.Data.KnownDuplicateAsyncOpenErrors = 0 }
+            { param($value) $value.Data.Aggregates[0].ProviderDuplicateErrors = 0 }
+            { param($value) $value.Data.Aggregates[1].ProviderDuplicateErrors = 1 }
+            { param($value) $value.Data.Callbacks = 6 }
+        )) {
+            $value = $fixtureJson | ConvertFrom-Json -AsHashtable
+            & $mutate $value
+            $value | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $fixturePath
+            $rejected = $false
+            try {
+                Read-MeasurementProfile -Path $fixturePath | Out-Null
+            } catch {
+                $rejected = $true
+            }
+            if (!$rejected) {
+                throw 'An invalid profile callback/duplicate reconciliation was accepted.'
+            }
+        }
         try {
             $script:MeasurementDeadlineUtc = [DateTimeOffset]::UtcNow.AddSeconds(70)
             $bounded = Get-MeasurementCommandTimeout -RequestedSeconds 300 -CleanupTimeoutSeconds 10
@@ -525,7 +641,7 @@ if (Test-Path -LiteralPath $output) {
 New-Item -ItemType Directory -Path $output | Out-Null
 $raw = Join-Path ([IO.Path]::GetTempPath()) ('sqlserver-measure-raw-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $raw | Out-Null
-$environmentNames = @('GrateTestConfig__DockerImage', 'GRATE_SQLSERVER_PROFILE_OUTPUT', 'GRATE_REPRODUCIBLE_TABLE_CASINGS', 'LogLevel', 'TZ')
+$environmentNames = @('GrateTestConfig__DockerImage', 'GRATE_SQLSERVER_PROFILE_OUTPUT', 'GRATE_SQLSERVER_SCOPED_POOLING', 'GRATE_REPRODUCIBLE_TABLE_CASINGS', 'LogLevel', 'TZ')
 $savedEnvironment = @{}
 foreach ($name in $environmentNames) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
@@ -533,6 +649,11 @@ foreach ($name in $environmentNames) {
 $runs = [Collections.Generic.List[object]]::new()
 $inventories = [Collections.Generic.List[object]]::new()
 $profileSummary = @()
+$design = if ($Experiment -ceq 'Observer') {
+    'One sequential observer OFF/ON pair; fresh fixture containers; no optimization claim or noise estimate.'
+} else {
+    'Two baseline/candidate comparisons in ABBA order; observer ON throughout; same prepared binary and fresh fixture containers.'
+}
 $status = 'incomplete'
 $script:MeasurementDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes(35)
 Push-Location $repository
@@ -578,8 +699,9 @@ try {
         BuildFrameworks = @('net8.0', 'net9.0', 'net10.0', 'net11.0')
         LogLevel = 'Trace'
         ReproducibleTableCasings = $true
-        ExpectedTests = 276
-        Design = 'One sequential OFF/ON pair; fresh fixture containers; no causal optimization claim or noise estimate.'
+        ExpectedTests = $ExpectedTests
+        Experiment = $Experiment
+        Design = $design
     }
     $metadata | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath "$raw/metadata.json" -Encoding utf8NoBOM
 
@@ -597,19 +719,22 @@ try {
     $env:GRATE_REPRODUCIBLE_TABLE_CASINGS = 'true'
     $env:LogLevel = 'Trace'
     $env:TZ = 'UTC'
-    foreach ($observer in @('OFF', 'ON')) {
+    $scenarios = @(Get-MeasurementScenarios -Experiment $Experiment)
+    foreach ($scenario in $scenarios) {
+        $observer = $scenario.Name
         $directory = "$raw/runs/$observer"
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
-        $env:GRATE_SQLSERVER_PROFILE_OUTPUT = if ($observer -ceq 'ON') { "$directory/sqlclient-profile.json" } else { $null }
+        $env:GRATE_SQLSERVER_PROFILE_OUTPUT = if ($scenario.Profile) { "$directory/sqlclient-profile.json" } else { $null }
+        $env:GRATE_SQLSERVER_SCOPED_POOLING = if ($scenario.Pooling) { 'true' } else { 'false' }
         $arguments = @(
             'test', '--project', $project, '--framework', 'net11.0',
             '--no-build', '--no-restore', '--max-parallel-test-modules', '1',
-            '--minimum-expected-tests', '276', '--stop-on-fail', 'on',
+            '--minimum-expected-tests', [string]$ExpectedTests, '--stop-on-fail', 'on',
             '--long-running', '60', '--timeout', '12m',
             '--report-xunit-trx', '--coverage', '--coverage-output-format', 'xml',
             '--results-directory', "$directory/results"
         )
-        Write-Host "Running observer $observer (276 cases, coverage and Trace logging)."
+        Write-Host "Running $observer ($ExpectedTests cases, coverage and Trace logging)."
         $command = Invoke-CapturedCommand -Command 'dotnet' -Arguments $arguments -LogDirectory "$directory/command" -TimeoutSeconds 840
         $run = [ordered]@{
             Observer = $observer
@@ -620,7 +745,8 @@ try {
             LogsDrained = $command.LogsDrained
             StopwatchSeconds = $command.StopwatchSeconds
             AssemblySha256 = $assemblyHash
-            ProfilerOutputEnabled = ($observer -ceq 'ON')
+            ProfilerOutputEnabled = $scenario.Profile
+            ScopedPooling = $scenario.Pooling
         }
         $runs.Add($run)
         Assert-CommandSucceeded -Result $command -Label "Observer $observer"
@@ -631,8 +757,12 @@ try {
         if ($trxFiles.Count -ne 1) {
             throw "Observer $observer must emit exactly one TRX file."
         }
-        $counts = Read-MeasurementTrx -Path $trxFiles[0].FullName
+        $counts = Read-MeasurementTrx -Path $trxFiles[0].FullName -ExpectedCount $ExpectedTests
         $inventories.Add($counts)
+        if ($inventories.Count -gt 1) {
+            Assert-SameTestNames -First $inventories[0].Names -Second $counts.Names
+            Assert-SameTestNames -First $inventories[0].Identities -Second $counts.Identities
+        }
         $run.TrxWallSeconds = $counts.TrxWallSeconds
         $run.Total = $counts.Total
         $run.Passed = $counts.Passed
@@ -659,13 +789,16 @@ try {
             throw "Observer $observer did not emit XML coverage."
         }
         $run.CoverageFiles = @($coverage | ForEach-Object { [IO.Path]::GetRelativePath($raw, $_.FullName) })
-        if ($observer -ceq 'ON') {
+        if ($scenario.Profile) {
             $profile = Read-MeasurementProfile -Path "$directory/sqlclient-profile.json"
             $run.ObserverMilliseconds = $profile.Data.ObserverMilliseconds
             $run.SuccessfulLogicalOpens = $profile.Data.SuccessfulLogicalOpens
             $run.DistinctOpenConnectionIds = $profile.Data.DistinctOpenConnectionIds
-            $profileSummary = @($profile.Data.Aggregates | Group-Object Operation, BatchCategory | ForEach-Object {
+            $run.KnownDuplicateAsyncOpenErrors = $profile.Data.KnownDuplicateAsyncOpenErrors
+            $run.RawCallbacks = $profile.Data.Callbacks
+            $profileSummary += @($profile.Data.Aggregates | Group-Object Operation, BatchCategory | ForEach-Object {
                 [pscustomobject]@{
+                    Scenario = $observer
                     Operation = $_.Group[0].Operation
                     BatchCategory = $_.Group[0].BatchCategory
                     Started = ($_.Group | Measure-Object Started -Sum).Sum
@@ -677,25 +810,24 @@ try {
         }
         Write-Host ("Observer {0}: {1} passed, Stopwatch {2:N3}s, TRX {3:N3}s." -f $observer, $counts.Passed, $command.StopwatchSeconds, $counts.TrxWallSeconds)
     }
-    Assert-SameTestNames -First $runs[0].TestNames -Second $runs[1].TestNames
-    Assert-SameTestNames -First $inventories[0].Identities -Second $inventories[1].Identities
     $status = 'complete'
 } finally {
     try {
         [ordered]@{
             SchemaVersion = 1
             Status = $status
+            Experiment = $Experiment
             ExactRawTestNameMultisetMatches = ($status -ceq 'complete')
             Runs = $runs.ToArray()
             ProfileSummary = $profileSummary
-            Interpretation = 'One OFF/ON observer-overhead pair only; selected net11 profiling does not replace full four-TFM CI or establish an optimization effect.'
+            Interpretation = "$design Selected net11 measurements do not replace full four-TFM CI."
         } | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath "$raw/measurement.json" -Encoding utf8NoBOM
         $report = [Collections.Generic.List[string]]::new()
-        $report.Add('# SQL Server observer measurement')
+        $report.Add('# SQL Server CI measurement')
         $report.Add('')
-        $report.Add("Status: $status. One sequential OFF/ON pair measures observer overhead only; it supplies neither a causal optimization effect nor a noise estimate.")
+        $report.Add("Status: $status. $design")
         $report.Add('')
-        $report.Add('| Observer | Stopwatch seconds | TRX seconds | Passed | Failed | Skipped | Exit |')
+        $report.Add('| Scenario | Stopwatch seconds | TRX seconds | Passed | Failed | Skipped | Exit |')
         $report.Add('| --- | ---: | ---: | ---: | ---: | ---: | ---: |')
         foreach ($run in $runs) {
             $trxSeconds = '-'
@@ -711,16 +843,16 @@ try {
             $report.Add(("| {0} | {1:F3} | {2} | {3} | {4} | {5} | {6} |" -f $run.Observer, $run.StopwatchSeconds, $trxSeconds, $passed, $failed, $skipped, $run.ExitCode))
         }
         $report.Add('')
-        $report.Add('Both runs use the same prepared Debug/net11 binary, pinned SQL Server RepoDigest, fixed table casing, Trace logging, XML coverage and fresh fixture containers. Exact raw sorted display-name and class/method/name multisets are compared before identity redaction. Full four-TFM CI remains required.')
+        $report.Add('Runs use the same prepared Debug/net11 binary, pinned SQL Server RepoDigest, fixed table casing, Trace logging, XML coverage and fresh fixture containers. Exact raw sorted display-name and class/method/name multisets are compared before identity redaction. Full four-TFM CI remains required.')
         if ($profileSummary.Count -gt 0) {
             $report.Add('')
-            $report.Add('| SQL Client operation | Batch category | Started | Succeeded | Failed | Summed interval ms |')
-            $report.Add('| --- | --- | ---: | ---: | ---: | ---: |')
+            $report.Add('| Scenario | SQL Client operation | Batch category | Started | Succeeded | Failed | Summed interval ms |')
+            $report.Add('| --- | --- | --- | ---: | ---: | ---: | ---: |')
             foreach ($row in $profileSummary) {
-                $report.Add(("| {0} | {1} | {2} | {3} | {4} | {5:F3} |" -f $row.Operation, $row.BatchCategory, $row.Started, $row.Succeeded, $row.Failed, $row.Milliseconds))
+                $report.Add(("| {0} | {1} | {2} | {3} | {4} | {5} | {6:F3} |" -f $row.Scenario, $row.Operation, $row.BatchCategory, $row.Started, $row.Succeeded, $row.Failed, $row.Milliseconds))
             }
             $report.Add('')
-            $report.Add('Intervals include client work and waits between callbacks; sums are not server CPU or elapsed wall time. Expected SQL failures remain visible. Distinct connection IDs are reuse hints, not login counts. Per-test/method and fixture attribution is in runs/ON/sqlclient-profile.json.')
+            $report.Add('Intervals include client work and waits between callbacks; sums are not server CPU or elapsed wall time. Expected SQL failures remain visible. Distinct connection IDs are reuse hints, not login counts. Per-test/method and fixture attribution is retained in each profiled scenario directory.')
         }
         $report | Set-Content -LiteralPath "$raw/report.md" -Encoding utf8NoBOM
         Export-SanitizedEvidence -Source $raw -Destination $output

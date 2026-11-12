@@ -17,6 +17,8 @@ internal static class SqlServerProfileSelfChecks
         All_typed_command_and_transaction_terminals_export_numeric_errors_only();
         Unmatched_duplicate_mismatched_unknown_and_throwing_callbacks_remain_visible();
         Batch_categories_ignore_quoted_text_and_reproducible_casings_retain_all_rows();
+        await Actual_provider_async_open_duplicate_is_reported_once_per_logical_failure();
+        Extra_mismatched_and_success_duplicates_remain_errors();
     }
 
     private static async Task Correlates_async_open_terminals_with_the_before_scope_and_counts_reuse()
@@ -160,6 +162,95 @@ internal static class SqlServerProfileSelfChecks
         {
             Environment.SetEnvironmentVariable("GRATE_REPRODUCIBLE_TABLE_CASINGS", original);
         }
+    }
+
+    private static async Task Actual_provider_async_open_duplicate_is_reported_once_per_logical_failure()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "grate-sql-profile-control-" + Guid.NewGuid().ToString("N") + ".json");
+        var session = new SqlServerProfileSession(output);
+        session.Start();
+        try
+        {
+            using var connection = new SqlConnection();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => connection.OpenAsync(CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(3), CancellationToken.None));
+            var snapshot = session.Collector.Snapshot();
+            Assert.Equal(0, snapshot.Errors);
+            Assert.False(snapshot.Incomplete);
+            Assert.Equal(1, snapshot.KnownDuplicateAsyncOpenErrors);
+            Assert.Equal(1, snapshot.BeforeCallbacks);
+            Assert.Equal(2, snapshot.TerminalCallbacks);
+            var row = Assert.Single(snapshot.Aggregates);
+            Assert.Equal(1, row.Started);
+            Assert.Equal(1, row.Failed);
+            Assert.Equal(1, row.ProviderDuplicateErrors);
+        }
+        finally
+        {
+            session.Export();
+            File.Delete(output);
+        }
+    }
+
+    private static void Extra_mismatched_and_success_duplicates_remain_errors()
+    {
+        foreach (var fault in new[] { "DifferentException", "WrongApi", "WrongOperation", "Success" })
+        {
+            var control = new SqlServerProfileCollector();
+            using var controlConnection = new SqlConnection();
+            using var controlCommand = new SqlCommand("SELECT 1", controlConnection);
+            var controlId = Guid.NewGuid();
+            var controlError = SqlFailure(18456, "secret-original");
+            Send(control, SqlClientConnectionOpenBefore.Name, Payload<SqlClientConnectionOpenBefore>(controlId, "InternalOpenAsync", 0L, controlConnection, "version"));
+            Send(control, SqlClientConnectionOpenError.Name, Payload<SqlClientConnectionOpenError>(controlId, "InternalOpenAsync", 0L, Guid.Empty, controlConnection, "version", controlError));
+            if (fault == "Success")
+            {
+                Send(control, SqlClientConnectionOpenAfter.Name, Payload<SqlClientConnectionOpenAfter>(controlId, "OpenAsyncComplete", 0L, Guid.NewGuid(), controlConnection, "version", null));
+            }
+            else if (fault == "WrongOperation")
+            {
+                Send(control, SqlClientCommandError.Name, Payload<SqlClientCommandError>(controlId, "OpenAsyncComplete", 0L, null, null, controlCommand, new AggregateException(controlError)));
+            }
+            else
+            {
+                var error = fault == "DifferentException" ? SqlFailure(18456, "secret-other") : controlError;
+                var api = fault == "WrongApi" ? "unexpected" : "OpenAsyncComplete";
+                Send(control, SqlClientConnectionOpenError.Name, Payload<SqlClientConnectionOpenError>(controlId, api, 0L, Guid.Empty, controlConnection, "version", new AggregateException(error)));
+            }
+            Assert.Equal(1, control.Snapshot().Errors);
+            Assert.Equal(0, control.Snapshot().KnownDuplicateAsyncOpenErrors);
+        }
+        var collector = new SqlServerProfileCollector();
+        using var connection = new SqlConnection();
+        using var command = new SqlCommand("SELECT 1", connection);
+        var id = Guid.NewGuid();
+        var original = SqlFailure(18456, "secret-original");
+        collector.BeginTest("first-case", "OriginalClass", "OriginalMethod");
+        Send(collector, SqlClientConnectionOpenBefore.Name, Payload<SqlClientConnectionOpenBefore>(id, "InternalOpenAsync", 0L, connection, "version"));
+        Send(collector, SqlClientConnectionOpenError.Name, Payload<SqlClientConnectionOpenError>(id, "InternalOpenAsync", 0L, Guid.Empty, connection, "version", original));
+        collector.EndTest();
+        collector.BeginTest("next-case", "NextClass", "NextMethod");
+        var duplicate = Payload<SqlClientConnectionOpenError>(id, "OpenAsyncComplete", 0L, Guid.Empty, connection, "version", new AggregateException(original));
+        Send(collector, SqlClientConnectionOpenError.Name, duplicate);
+        var valid = collector.Snapshot();
+        Assert.Equal(0, valid.Errors);
+        Assert.Equal(1, valid.KnownDuplicateAsyncOpenErrors);
+        Assert.Equal(1, Assert.Single(valid.Aggregates).SqlErrorNumbers[18456]);
+        Assert.Equal("OriginalMethod", Assert.Single(valid.Aggregates).MethodName);
+        Send(collector, SqlClientConnectionOpenError.Name, duplicate);
+        Send(collector, SqlClientConnectionOpenError.Name, Payload<SqlClientConnectionOpenError>(id, "OpenAsyncComplete", 0L, Guid.Empty, connection, "version", new AggregateException(SqlFailure(18456, "secret-different"))));
+        Send(collector, SqlClientConnectionOpenAfter.Name, Payload<SqlClientConnectionOpenAfter>(id, "op", 0L, Guid.NewGuid(), connection, "version", null));
+        Send(collector, SqlClientCommandError.Name, Payload<SqlClientCommandError>(id, "op", 0L, null, null, command, original));
+        Send(collector, SqlClientConnectionOpenError.Name, Payload<SqlClientConnectionOpenError>(Guid.Empty, "OpenAsyncComplete", 0L, Guid.Empty, connection, "version", new AggregateException(original)));
+        Send(collector, SqlClientConnectionOpenError.Name, Payload<SqlClientConnectionOpenError>(id, "unrecognized-operation", 0L, Guid.Empty, connection, "version", new AggregateException(original)));
+        var invalid = collector.Snapshot();
+        Assert.Equal(6, invalid.Errors);
+        Assert.Equal(6, invalid.UnmatchedTerminal);
+        Assert.Equal(1, invalid.KnownDuplicateAsyncOpenErrors);
+        Assert.Equal(1, invalid.UnmatchedEmptyOperationIds);
+        Assert.Equal(5, invalid.UnmatchedTerminalByOperation["Open"]);
+        Assert.Equal(1, invalid.UnmatchedTerminalByOperation["Command"]);
+        Assert.DoesNotContain("secret-", JsonSerializer.Serialize(invalid));
     }
 
     private static void Send(SqlServerProfileCollector collector, string name, object payload) => collector.OnNext(new(name, payload));

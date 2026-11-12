@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -122,6 +123,7 @@ internal sealed class SqlServerProfileSession(string output) : IObserver<Diagnos
                     ConnectionReuse = "Distinct non-empty successful OpenAfter.ConnectionId values are physical-session hints, not server login counts. Per-row distinct counts are not additive.",
                     Attribution = "Scope captured at Before; case ID is SHA256(xUnit UniqueID); class is the method's declaring type. Outside the Before/After hook includes fixture/between/teardown work; no display names or theory arguments.",
                     DatabaseRole = "Configured ConnectionString.InitialCatalog at Before, not live server context after USE; a Master connection can execute in a target database.",
+                    ProviderDuplicateErrors = "SqlClient 7.1.1 can emit InternalOpenAsync error followed by OpenAsyncComplete AggregateException for the same operation and original exception. One such exact repeat is counted separately, without counting the logical open twice; all unexpected repeats remain Errors.",
                     Categories = "Generic lexical batch keywords outside comments/quoted text/variable identifiers, including table/login/database DDL; priority RESTORE, DROP, CREATE, ALTER, Other."
                 },
                 Data = snapshot
@@ -148,7 +150,14 @@ internal enum ProfileDatabase { Default, Master, Target }
 internal enum ProfileUser { Sa, TestUser, Integrated, Other }
 internal sealed record ProfileScope(string Kind, string? CaseId, string? ClassName, string? MethodName);
 internal sealed record ProfileKey(ProfileScope Scope, ProfileOperation Operation, ProfileDatabase Database, ProfileUser User, ProfileBatch Batch);
-internal sealed record ProfilePending(ProfileOperation Operation, long Started, ProfileAggregate Aggregate);
+internal sealed record ProfilePending(ProfileOperation Operation, long Started, ProfileAggregate Aggregate, bool AsyncOpen);
+internal sealed class CompletedAsyncOpenFailure(long errorIdentity, ProfileAggregate aggregate)
+{
+    internal long ErrorIdentity { get; } = errorIdentity;
+    internal ProfileAggregate Aggregate { get; } = aggregate;
+    internal bool DuplicateSeen;
+}
+internal sealed record ProfileErrorIdentity(long Value);
 
 internal sealed class ProfileAggregate(ProfileKey key)
 {
@@ -159,6 +168,7 @@ internal sealed class ProfileAggregate(ProfileKey key)
     internal double Milliseconds;
     internal double MaximumMilliseconds;
     internal long NonSqlErrors;
+    internal long ProviderDuplicateErrors;
     internal Dictionary<int, long> SqlErrorNumbers { get; } = [];
     internal HashSet<Guid> ConnectionIds { get; } = [];
 }
@@ -176,6 +186,9 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
     private readonly object gate = new();
     private readonly Dictionary<Guid, ProfilePending> pending = [];
     private readonly Dictionary<ProfileKey, ProfileAggregate> aggregates = [];
+    private readonly Dictionary<Guid, CompletedAsyncOpenFailure> completedAsyncOpenFailures = [];
+    private readonly ConditionalWeakTable<Exception, ProfileErrorIdentity> errorIdentities = new();
+    private readonly Dictionary<ProfileOperation, long> unmatchedByOperation = [];
     private readonly HashSet<Guid> openConnectionIds = [];
     private ProfileScope current = Infrastructure;
     private long observerErrors;
@@ -186,6 +199,11 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
     private long emptyConnectionIds;
     private long callbacks;
     private long callbackTicks;
+    private long beforeCallbacks;
+    private long terminalCallbacks;
+    private long knownDuplicateAsyncOpenErrors;
+    private long unmatchedEmptyOperationIds;
+    private long nextErrorIdentity;
 
     internal static bool IsEnabled(string name) => EventNames.Contains(name);
 
@@ -220,13 +238,13 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
                 switch (item.Value)
                 {
                     case SqlClientConnectionOpenBefore value:
-                        Before(value.OperationId, ProfileOperation.Open, value.Connection, null, timestamp);
+                        Before(value.OperationId, ProfileOperation.Open, value.Connection, null, timestamp, value.Operation);
                         break;
                     case SqlClientConnectionOpenAfter value:
                         Terminal(value.OperationId, ProfileOperation.Open, null, value.ConnectionId, timestamp);
                         break;
                     case SqlClientConnectionOpenError value:
-                        Terminal(value.OperationId, ProfileOperation.Open, value.Exception, null, timestamp);
+                        Terminal(value.OperationId, ProfileOperation.Open, value.Exception, null, timestamp, value.Operation);
                         break;
                     case SqlClientCommandBefore value:
                         Before(value.OperationId, ProfileOperation.Command, value.Command.Connection, value.Command.CommandText, timestamp);
@@ -272,8 +290,9 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
         }
     }
 
-    private void Before(Guid id, ProfileOperation operation, SqlConnection? connection, string? sql, long timestamp)
+    private void Before(Guid id, ProfileOperation operation, SqlConnection? connection, string? sql, long timestamp, string? apiOperation = null)
     {
+        beforeCallbacks++;
         if (id == Guid.Empty || pending.ContainsKey(id))
         {
             duplicateBefore++;
@@ -295,14 +314,31 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
             aggregates.Add(key, aggregate);
         }
         aggregate.Started++;
-        pending.Add(id, new(operation, timestamp, aggregate));
+        pending.Add(id, new(operation, timestamp, aggregate, operation == ProfileOperation.Open && apiOperation == "InternalOpenAsync"));
     }
 
-    private void Terminal(Guid id, ProfileOperation operation, Exception? error, Guid? connectionId, long timestamp)
+    private void Terminal(Guid id, ProfileOperation operation, Exception? error, Guid? connectionId, long timestamp, string? apiOperation = null)
     {
+        terminalCallbacks++;
         if (!pending.TryGetValue(id, out var entry))
         {
+            if (operation == ProfileOperation.Open && apiOperation == "OpenAsyncComplete" &&
+                error is AggregateException { InnerExceptions.Count: 1 } &&
+                completedAsyncOpenFailures.TryGetValue(id, out var completed) && !completed.DuplicateSeen &&
+                completed.ErrorIdentity == ErrorIdentity(error))
+            {
+                completed.DuplicateSeen = true;
+                completed.Aggregate.ProviderDuplicateErrors++;
+                knownDuplicateAsyncOpenErrors++;
+                return;
+            }
             unmatchedTerminal++;
+            unmatchedByOperation.TryGetValue(operation, out var unmatched);
+            unmatchedByOperation[operation] = unmatched + 1;
+            if (id == Guid.Empty)
+            {
+                unmatchedEmptyOperationIds++;
+            }
             return;
         }
         if (entry.Operation != operation)
@@ -334,6 +370,12 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
         else
         {
             aggregate.Failed++;
+            if (entry.AsyncOpen && apiOperation == "InternalOpenAsync")
+            {
+                // Weak identity keys do not keep exception objects alive. The
+                // completion record retains only a collision-free numeric token.
+                completedAsyncOpenFailures[id] = new(ErrorIdentity(error), aggregate);
+            }
             var sqlError = false;
             for (var exception = error; exception is not null; exception = exception.InnerException)
             {
@@ -354,6 +396,15 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
         }
     }
 
+    private long ErrorIdentity(Exception error)
+    {
+        while (error is AggregateException { InnerExceptions.Count: 1 } aggregate)
+        {
+            error = aggregate.InnerExceptions[0];
+        }
+        return errorIdentities.GetValue(error, _ => new(++nextErrorIdentity)).Value;
+    }
+
     internal ProfileSnapshot Snapshot()
     {
         lock (gate)
@@ -363,7 +414,7 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
                 value.Key.Scope.Kind, value.Key.Scope.CaseId, value.Key.Scope.ClassName, value.Key.Scope.MethodName,
                 value.Key.Operation.ToString(), value.Key.Database.ToString(), value.Key.User.ToString(), value.Key.Batch.ToString(),
                 value.Started, value.Succeeded, value.Failed, value.Milliseconds, value.MaximumMilliseconds,
-                value.ConnectionIds.Count, value.NonSqlErrors, new Dictionary<int, long>(value.SqlErrorNumbers)))
+                value.ConnectionIds.Count, value.NonSqlErrors, new Dictionary<int, long>(value.SqlErrorNumbers), value.ProviderDuplicateErrors))
                 .OrderBy(row => row.Scope, StringComparer.Ordinal)
                 .ThenBy(row => row.CaseId, StringComparer.Ordinal)
                 .ThenBy(row => row.Operation, StringComparer.Ordinal)
@@ -376,7 +427,8 @@ internal sealed class SqlServerProfileCollector : IObserver<KeyValuePair<string,
                 unknownPayload, emptyConnectionIds, Interlocked.Read(ref callbacks),
                 Interlocked.Read(ref callbackTicks) * 1000d / Stopwatch.Frequency,
                 rows.Where(row => row.Operation == nameof(ProfileOperation.Open)).Sum(row => row.Succeeded),
-                openConnectionIds.Count, rows);
+                openConnectionIds.Count, rows, beforeCallbacks, terminalCallbacks, knownDuplicateAsyncOpenErrors,
+                unmatchedEmptyOperationIds, unmatchedByOperation.ToDictionary(item => item.Key.ToString(), item => item.Value));
         }
     }
 
@@ -432,10 +484,11 @@ internal sealed record ProfileRow(
     string Scope, string? CaseId, string? ClassName, string? MethodName,
     string Operation, string DatabaseRole, string UserRole, string BatchCategory,
     long Started, long Succeeded, long Failed, double Milliseconds, double MaximumMilliseconds,
-    int DistinctConnectionIds, long NonSqlErrors, IReadOnlyDictionary<int, long> SqlErrorNumbers);
+    int DistinctConnectionIds, long NonSqlErrors, IReadOnlyDictionary<int, long> SqlErrorNumbers, long ProviderDuplicateErrors);
 
 internal sealed record ProfileSnapshot(
     long Errors, bool Incomplete, int PendingOperations, long ObserverErrors, long DuplicateBefore,
     long UnmatchedTerminal, long MismatchedOperation, long UnknownPayload, long EmptyConnectionIds,
     long Callbacks, double ObserverMilliseconds, long SuccessfulLogicalOpens, int DistinctOpenConnectionIds,
-    ProfileRow[] Aggregates);
+    ProfileRow[] Aggregates, long BeforeCallbacks, long TerminalCallbacks, long KnownDuplicateAsyncOpenErrors,
+    long UnmatchedEmptyOperationIds, IReadOnlyDictionary<string, long> UnmatchedTerminalByOperation);
