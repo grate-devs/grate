@@ -7,8 +7,11 @@ function New-Fixture {
     # A contract fixture, not a call to the production inventory. Matrix names
     # match the checks GitHub emits, including Windows provider filter arguments.
     $names = @('Build', 'NuGet libraries and installed tool', 'PR validation policy')
-    foreach ($category in @('Basic_tests', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Sqlite', 'Oracle')) {
+    foreach ($category in @('Basic_tests', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Sqlite')) {
         $names += "Run tests (ubuntu-latest, $category)"
+    }
+    foreach ($framework in @('net8.0', 'net9.0', 'net10.0', 'net11.0')) {
+        $names += "Run tests (ubuntu-latest, Oracle, $framework)"
     }
     $names += 'Run tests (windows-latest, Basic_tests)', 'Run tests (windows-latest, Sqlite)'
     foreach ($category in @('SqlServer', 'SqlServerCaseSensitive', 'MariaDB', 'Oracle')) {
@@ -38,7 +41,7 @@ function New-Fixture {
         }
         $names += "CLI database All / $database", "CLI database $slim / $database"
     }
-    if ($names.Count -ne 94) { throw 'Fixture must contain 94 required jobs.' }
+    if ($names.Count -ne 97) { throw 'Fixture must contain 97 required jobs.' }
     $needs = @{}
     foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
         $needs[$group] = @{ result = 'success' }
@@ -183,6 +186,28 @@ foreach ($name in (New-Fixture).jobs.name) {
     $fixture.jobs = @($fixture.jobs | Where-Object name -CNE $name)
     Assert-Rejected "missing $name" { Invoke-Gate $fixture } 'Missing required job'
 }
+foreach ($framework in @('net8.0', 'net9.0', 'net10.0', 'net11.0')) {
+    $name = "Run tests (ubuntu-latest, Oracle, $framework)"
+    foreach ($conclusion in @('failure', 'cancelled', 'skipped', 'timed_out')) {
+        $fixture = New-Fixture
+        ($fixture.jobs | Where-Object name -CEQ $name).conclusion = $conclusion
+        Assert-Rejected "Oracle $framework conclusion $conclusion" { Invoke-Gate $fixture } ([regex]::Escape("Required job '$name'"))
+    }
+    $fixture = New-Fixture
+    $fixture.jobs += ($fixture.jobs | Where-Object name -CEQ $name).Clone()
+    Assert-Rejected "duplicate Oracle $framework" { Invoke-Gate $fixture } 'Duplicate required job'
+}
+$fixture = New-Fixture
+$fixture.jobs = @($fixture.jobs | Where-Object { $_.name -cnotlike 'Run tests (ubuntu-latest, Oracle, *' })
+$fixture.jobs += @{
+    name = 'Run tests (ubuntu-latest, Oracle)'
+    status = 'completed'
+    conclusion = 'success'
+    run_id = 123
+    run_attempt = 1
+    steps = @(@{ name = 'Test on Linux'; status = 'completed'; conclusion = 'success' })
+}
+Assert-Rejected 'unsplit Oracle job cannot replace TFM lanes' { Invoke-Gate $fixture } 'Missing required job'
 $fixture = New-Fixture
 $fixture.jobs = @()
 Assert-Rejected 'empty job evidence' { Invoke-Gate $fixture } 'Missing required job'

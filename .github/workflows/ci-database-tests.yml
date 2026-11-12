@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   test:
-    name: Run tests
+    name: ${{ matrix.name }}
 
     runs-on: ${{ matrix.os }}
     # A stalled fixture must not occupy a runner until GitHub's six-hour limit.
@@ -22,36 +22,63 @@ jobs:
           - os: ubuntu-latest
             category: SqlServer
             test_filter: ''
+            name: Run tests (ubuntu-latest, SqlServer)
           - os: ubuntu-latest
             category: SqlServerCaseSensitive
             test_filter: ''
+            name: Run tests (ubuntu-latest, SqlServerCaseSensitive)
           - os: ubuntu-latest
             category: PostgreSQL
             test_filter: ''
+            name: Run tests (ubuntu-latest, PostgreSQL)
           - os: ubuntu-latest
             category: MariaDB
             test_filter: ''
+            name: Run tests (ubuntu-latest, MariaDB)
           - os: ubuntu-latest
             category: Sqlite
             test_filter: ''
+            name: Run tests (ubuntu-latest, Sqlite)
           - os: ubuntu-latest
             category: Oracle
             test_filter: ''
+            framework: net8.0
+            name: Run tests (ubuntu-latest, Oracle, net8.0)
+          - os: ubuntu-latest
+            category: Oracle
+            test_filter: ''
+            framework: net9.0
+            name: Run tests (ubuntu-latest, Oracle, net9.0)
+          - os: ubuntu-latest
+            category: Oracle
+            test_filter: ''
+            framework: net10.0
+            name: Run tests (ubuntu-latest, Oracle, net10.0)
+          - os: ubuntu-latest
+            category: Oracle
+            test_filter: ''
+            framework: net11.0
+            name: Run tests (ubuntu-latest, Oracle, net11.0)
           - os: windows-latest
             category: Sqlite
             test_filter: ''
+            name: Run tests (windows-latest, Sqlite)
           - os: windows-latest
             category: SqlServer
             test_filter: SqlServer.Basic_tests.*
+            name: Run tests (windows-latest, SqlServer, SqlServer.Basic_tests.*)
           - os: windows-latest
             category: SqlServerCaseSensitive
             test_filter: SqlServerCaseSensitive.Basic_tests.*
+            name: Run tests (windows-latest, SqlServerCaseSensitive, SqlServerCaseSensitive.Basic_tests.*)
           - os: windows-latest
             category: MariaDB
             test_filter: MariaDB.Basic_tests.*
+            name: Run tests (windows-latest, MariaDB, MariaDB.Basic_tests.*)
           - os: windows-latest
             category: Oracle
             test_filter: Oracle.Basic_tests.*
+            name: Run tests (windows-latest, Oracle, Oracle.Basic_tests.*)
 
     steps:
     - uses: actions/checkout@v7
@@ -85,6 +112,7 @@ jobs:
 
         dotnet test \
         --project "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj" \
+        ${{ matrix.framework && format('--framework {0}', matrix.framework) || '' }} \
         --max-parallel-test-modules 1 \
         --stop-on-fail on \
         --long-running 60 \
@@ -96,8 +124,8 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
-        # The 35-minute budget can expire during the fourth sequential Oracle TFM.
-        # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
+        # Preserve the Oracle deadline while measuring the per-TFM split.
+        # Keep diagnostics alive beyond the test deadline, within the job cap.
         TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
         MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
 
@@ -135,7 +163,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
+        name: "${{ matrix.os }} ${{ matrix.category }}${{ matrix.framework && format(' {0}', matrix.framework) || '' }} XML test results"
         path: |
           ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}/
         retention-days: 1
