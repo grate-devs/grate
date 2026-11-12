@@ -6,7 +6,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $repository = Split-Path $PSScriptRoot -Parent
-$packages = @('hosting', 'azure', 'oracle', 'mysql')
+$packages = @('hosting', 'azure', 'oracle', 'mysql', 'kubernetes')
 $workspace = Join-Path ([IO.Path]::GetTempPath()) "grate-aspire-package-$([Guid]::NewGuid().ToString('N'))"
 $feed = Join-Path $workspace 'feed'
 $consumer = Join-Path $workspace 'consumer'
@@ -36,6 +36,7 @@ try {
     <PackageReference Include="grate.aspire.azure" Version="$packageVersion" />
     <PackageReference Include="grate.aspire.oracle" Version="$packageVersion" />
     <PackageReference Include="grate.aspire.mysql" Version="$packageVersion" />
+    <PackageReference Include="grate.aspire.kubernetes" Version="$packageVersion" />
   </ItemGroup>
 </Project>
 "@
@@ -66,6 +67,9 @@ var mariadb = builder.AddMySql("mariadb").WithImage("mariadb", "12.3.3").AddData
 var mariadbMigration = mariadb.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
 var consumer = builder.AddContainer("consumer", "nginx", "stable")
     .WithGrateMigrationInitContainer(migration, environment: "PRODUCTION");
+// Use the target class explicitly when both deployment adapters are referenced.
+var kubernetesConsumer = Grate.Aspire.Kubernetes.GrateKubernetesExtensions.WithGrateMigrationInitContainer(
+    builder.AddContainer("kubernetes-consumer", "nginx", "stable"), mysqlMigration, environment: "PRODUCTION");
 if (migration.Resource.Name != "appdb-grate" ||
     sqlServerMigration.Resource.Name != "sqldb-grate" ||
     sqliteMigration.Resource.Name != "filedb-grate" ||
@@ -74,11 +78,13 @@ if (migration.Resource.Name != "appdb-grate" ||
     mariadbMigration.Resource.Name != "mariadbdb-grate" ||
     builder.Resources.OfType<GrateMigrationResource>().Count() != 6 ||
     !consumer.Resource.Annotations.OfType<WaitAnnotation>().Any(wait =>
-        wait.Resource == migration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0))
+        wait.Resource == migration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0) ||
+    !kubernetesConsumer.Resource.Annotations.OfType<WaitAnnotation>().Any(wait =>
+        wait.Resource == mysqlMigration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0))
 {
     throw new InvalidOperationException("The packaged API did not register one migration per provider.");
 }
-Console.WriteLine("PASS: isolated NuGet consumer registered all six databases and the ACA init-container API from four packages.");
+Console.WriteLine("PASS: isolated NuGet consumer registered all six databases and both deployment APIs from five packages.");
 '@
     Set-Content -LiteralPath (Join-Path $consumer 'Program.cs') -Value $program
     Push-Location $consumer

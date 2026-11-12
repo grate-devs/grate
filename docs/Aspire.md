@@ -1,16 +1,17 @@
 ---
-title: Aspire migrations and ACA init containers
+title: Aspire migrations and deployment init containers
 nav_order: 9
 ---
 
-# Aspire migrations and ACA init containers
+# Aspire migrations and deployment init containers
 
 The unpublished Aspire integration targets `net10.0` and Aspire 13.6.5, with
 `gratedevs/grate:2.3.0` as its default migration image. The
 [runnable examples](https://github.com/grate-devs/grate/blob/main/examples/aspire/README.md)
 cover PostgreSQL, SQL Server, SQLite, Oracle, MySQL and MariaDB. An optional Azure
 module packages SQL into an image and runs it as an Azure Container Apps init
-container before the application's main containers start.
+container before the application's main containers start. A separate Kubernetes
+adapter adds the same migration lifecycle to a Deployment or StatefulSet Pod.
 
 | Package in this checkout | Integration |
 | --- | --- |
@@ -18,10 +19,12 @@ container before the application's main containers start.
 | `grate.aspire.oracle` | Native `Aspire.Hosting.Oracle` database resources |
 | `grate.aspire.mysql` | Native `Aspire.Hosting.MySql` database resources, including a MariaDB server using the compatible resource |
 | `grate.aspire.azure` | Azure Container Apps init-container publishing |
+| `grate.aspire.kubernetes` | Kubernetes init-container publishing through native Aspire Helm charts |
 
 The optional database adapters use the same `Grate.Aspire.Hosting` namespace.
-SQLite uses `CommunityToolkit.Aspire.Hosting.Sqlite` 13.6.1; the other hosting
-packages use 13.6.5. These projects are separate from grate's migration engine
+SQLite uses `CommunityToolkit.Aspire.Hosting.Sqlite` 13.6.1; native database and
+Azure hosting packages use 13.6.5. Kubernetes uses its matching preview package,
+specified below. These projects are separate from grate's migration engine
 and its target frameworks. None of the Aspire packages has been published.
 
 ## Use the extension
@@ -217,6 +220,55 @@ uses an existing PostgreSQL database and includes offline publication checks.
 Those checks inspect native Bicep and pipeline dependencies and execute the
 packaged SQL locally; they do not deploy to Azure or establish live Azure behavior.
 
+## Kubernetes init containers
+
+Reference `grate.aspire.kubernetes` and select its namespace for a Kubernetes
+AppHost. The integration pins `Aspire.Hosting.Kubernetes`
+`13.6.5-preview.1.26559.7`, matching the Aspire 13.6.5 baseline:
+
+```csharp
+using Grate.Aspire.Hosting;
+using Grate.Aspire.Kubernetes;
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    var registry = builder.AddContainerRegistry("registry", "registry.example", "application");
+    builder.AddKubernetesEnvironment("k8s").WithContainerRegistry(registry);
+}
+var database = builder.AddConnectionString("appdb");
+var migration = database.AddGrateMigration(
+        GrateDatabaseProvider.PostgreSql, waitForDatabase: false)
+    .WithScriptsFolder("../db");
+
+builder.AddProject<Projects.Api>("api")
+    .WithReference(database)
+    .WithGrateMigrationInitContainer(migration, environment: "PRODUCTION");
+```
+
+Publishing puts grate in the application's `spec.template.spec.initContainers`.
+There is no separate migration Deployment, Service or Job. The migration keeps
+Aspire's native image build/push, and Helm deployment waits for that push. Configure
+the Kubernetes environment's container registry and the Pod's image-pull secrets
+for your cluster. Existing application configuration and Pod settings are preserved;
+migration-only configuration and secrets belong to the init container.
+
+The application explicitly selects its compute environment when several are
+available. Configure the scripts, base image and environment before the binding;
+changing the application's or migration's deployment environment afterward is
+rejected. `environment` selects grate scripts, independently of the Aspire CLI
+deployment environment. Connections remain deferred secret references. Local runs
+add the same successful completion wait as the ACA adapter.
+
+The init container runs for each new Pod, including rollout and scale-out. A failed
+migration blocks that Pod's main containers; it does not stop an existing healthy
+replica. It adds no database-wide lock or once-per-deployment guarantee. Coordinate
+concurrent migrations for a shared database. SQLite cloud publishing remains
+unsupported without a durable shared-file and locking contract.
+
+See the [Kubernetes example](https://github.com/grate-devs/grate/blob/main/examples/aspire/Kubernetes/README.md)
+for native publication, registry configuration, Helm rendering and verification.
+The adapter targets existing Kubernetes clusters; it does not provision a cluster.
+
 ## Other deployment boundaries
 
 `PublishAsGrateMigrationImage()` in the base package can package SQL for another
@@ -227,7 +279,7 @@ annotation into rollout ordering.
 | Target | Current integration boundary |
 | --- | --- |
 | Azure Container Apps | Optional init-container adapter described above |
-| Kubernetes | No grate init/Job adapter. The pinned publisher rejects bind mounts; without the mount, a normal container becomes a Deployment, not a finite migration Job |
+| Kubernetes | Optional per-Pod init-container adapter described above; no separate migration Job lifecycle |
 | Azure App Service | No grate predeployment adapter. Use an explicitly executed and awaited migration job or pipeline step |
 
 The Kubernetes observation uses `13.6.5-preview.1.26559.7`. See the pinned
@@ -246,11 +298,18 @@ provider matrix and release-package inventory. Build it, run the model tests,
 then execute the examples' smoke checks sequentially. See their README files for
 commands and cleanup.
 [`Verify-AspirePackage.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspirePackage.ps1) also restores and
-executes a separate consumer of the four locally packed packages.
+executes a separate consumer of the five locally packed packages.
 [`Verify-AspirePublication.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspirePublication.ps1)
 runs the offline ACA artifact and packaged-image checks. The dedicated Aspire
 workflow covers the resource models, all six database examples, isolated package
 consumption and offline publication without publishing packages or calling Azure.
+[`Verify-AspireKubernetesPublication.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspireKubernetesPublication.ps1)
+publishes and renders the native Helm chart, checking init-container configuration,
+secret isolation, image references and deployment dependencies.
+[`Verify-AspireKubernetesRuntime.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspireKubernetesRuntime.ps1)
+uses a disposable kind cluster with a separate kubeconfig to verify successful
+migration, retained history after a Pod restart, and blocked application startup
+after an SQL failure. It deletes only its own cluster and images.
 It bootstraps the native CLI/bundle before building. The reusable
 [`Install-AspireCli.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Install-AspireCli.ps1)
 pins 13.6.5 and verifies the release archive's SHA512 checksum. It accepts

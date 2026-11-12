@@ -1,7 +1,7 @@
 # Database migrations in Aspire
 
 This checkout-based prototype implements the API proposed in
-[#956](https://github.com/grate-devs/grate/issues/956). The four Aspire packages
+[#956](https://github.com/grate-devs/grate/issues/956). The five Aspire packages
 have not been published. The examples run the released `gratedevs/grate:2.3.0`
 image; AppHosts and APIs target .NET 10 with Aspire 13.6.5.
 
@@ -14,6 +14,7 @@ image; AppHosts and APIs target .NET 10 with Aspire 13.6.5.
 | [MySQL](MySql/README.md) | Optional `grate.aspire.mysql`; native Aspire provisions the database |
 | [MariaDB](MariaDb/README.md) | The same MySQL adapter and native resource with a MariaDB image; native Aspire provisions the database |
 | [Azure Container Apps](AzureContainerApps/README.md) | Optional `grate.aspire.azure`; an application init container uses packaged SQL and an existing external database |
+| [Kubernetes](Kubernetes/README.md) | Optional `grate.aspire.kubernetes`; a Pod init container uses packaged SQL and an existing external database |
 
 The consumer API is:
 

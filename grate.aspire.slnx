@@ -2,12 +2,14 @@
   <Folder Name="/src/">
     <Project Path="src/grate.aspire.hosting/grate.aspire.hosting.csproj" />
     <Project Path="src/grate.aspire.azure/grate.aspire.azure.csproj" />
+    <Project Path="src/grate.aspire.kubernetes/grate.aspire.kubernetes.csproj" />
     <Project Path="src/grate.aspire.oracle/grate.aspire.oracle.csproj" />
     <Project Path="src/grate.aspire.mysql/grate.aspire.mysql.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="unittests/Aspire.Hosting/Aspire.Hosting.csproj" />
     <Project Path="unittests/Aspire.Azure/Aspire.Azure.csproj" />
+    <Project Path="unittests/Aspire.Kubernetes/Aspire.Kubernetes.csproj" />
     <Project Path="unittests/Aspire.Oracle/Aspire.Oracle.csproj" />
     <Project Path="unittests/Aspire.MySql/Aspire.MySql.csproj" />
     <Project Path="unittests/Aspire.MariaDb/Aspire.MariaDb.csproj" />
@@ -43,5 +45,9 @@
     <Project Path="examples/aspire/MariaDb/AppHost/AppHost.csproj" />
     <Project Path="examples/aspire/MariaDb/Api/Api.csproj" />
     <Project Path="examples/aspire/MariaDb/Smoke/Smoke.csproj" />
+  </Folder>
+  <Folder Name="/examples/Kubernetes/">
+    <Project Path="examples/aspire/Kubernetes/AppHost/AppHost.csproj" />
+    <Project Path="examples/aspire/Kubernetes/PublicationChecks/PublicationChecks.csproj" />
   </Folder>
 </Solution>

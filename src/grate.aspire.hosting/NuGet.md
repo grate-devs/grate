@@ -106,6 +106,11 @@ the deployment target must still provide the migration lifecycle. The optional
 `grate.aspire.azure` adapter attaches an init container to a specific ACA
 application with `.WithGrateMigrationInitContainer(migration, environment: "PRODUCTION")`.
 It runs before each replica's main containers and does not serialize migrations
-across replicas or deployments. The native pipeline must build while the
+across replicas or deployments. The optional `grate.aspire.kubernetes` adapter
+offers the same binding from the `Grate.Aspire.Kubernetes` namespace for native
+Kubernetes Helm publishing. It runs as an init container per Pod, preserves native
+image build/push and waits for that push before Helm deployment. Import the
+namespace for the chosen target; use the explicit target class when both adapters
+are in scope. The native pipeline must build while the
 AppHost-owned temporary SQL context is alive; a legacy manifest export alone
 does not preserve that context for an independent later build.

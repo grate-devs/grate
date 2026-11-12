@@ -11,8 +11,8 @@ integration. Offline publication verification does not establish live Azure beha
 Use a small grate hosting package that extends an Aspire database resource with
 `AddGrateMigration().WithScriptsFolder(scripts)`. The implementation includes
 PostgreSQL, SQL Server and SQLite in the base package, optional native Oracle
-and MySQL/MariaDB adapters, and an optional Azure Container Apps init-container
-publisher. Runnable database examples and smoke checks verify the shared API.
+and MySQL/MariaDB adapters, and optional Azure Container Apps and Kubernetes
+init-container publishers. Runnable examples and smoke checks verify the shared API.
 
 The [maintainer's proposed API](https://github.com/grate-devs/grate/pull/957#discussion_r4543597501)
 identifies the value: the database resource already supplies enough context to
@@ -236,10 +236,10 @@ uses grate's existing `mariadb` provider; it does not introduce a new engine.
 Oracle's example selects the existing `FREEPDB1` service and documents its SYSTEM
 credentials and image initialization settings.
 
-The optional ACA module packages SQL and configures init containers. Do not infer
+The optional ACA and Kubernetes modules package SQL and configure init containers. Do not infer
 other deployment-target support from local resource behavior; the
 [deployment boundaries](../Aspire.md#other-deployment-boundaries) describe the
-remaining Kubernetes, App Service and SQLite limitations.
+remaining per-Pod concurrency, App Service and SQLite limitations.
 
 The package's runnable example belongs with grate's consumer examples. Updates need a
 small pinned compatibility matrix: Aspire/AppHost, grate image, database image,
@@ -273,7 +273,7 @@ these outcomes against disposable local resources:
 5. Script path containing spaces and launch from another working directory:
    the same scripts are selected. Check diagnostics for credential disclosure.
 
-The prototype includes resource-model tests, isolated consumption of all four
+The prototype includes resource-model tests, isolated consumption of all five
 packed packages, and repeatable database smoke checks. PostgreSQL exercises all
 the lifecycle boundaries above; other engines cover fresh setup, retained
 data/history and SQL failure, with credential failures for server databases.
@@ -315,18 +315,36 @@ that publication structure and local packaged SQL execution are checked; it does
 not establish a live registry push, Azure deployment or PostgreSQL execution in
 ACA. Keep those evidence boundaries visible in reviews.
 
+## Kubernetes publication
+
+The optional `grate.aspire.kubernetes` package exposes the same application binding
+from the `Grate.Aspire.Kubernetes` namespace. It reuses the SQL image packager and
+publishes grate as a normal finite init container in the application's Deployment
+or StatefulSet Pod. An image-only deployment target retains native image build and
+push without generating a standalone migration workload. The actual environment
+Helm-deployment step depends on the migration image push.
+
+The native publisher resolves image references and connection parameters at deploy
+time. Init-only configuration and secrets are isolated from the main container's
+environment sources; existing Pod settings, image-pull secrets and application
+configuration remain caller-controlled. Select the registry and compute environment
+before the binding. Local runs retain the explicit application's successful
+completion dependency. The example includes native Helm publication/rendering and
+a disposable kind-cluster verification path; it does not use an existing kubectl
+context or provision cloud infrastructure.
+
 ## Deployment ownership and remaining limits
 
-ACA init containers run for every replica startup, including restarts and
+ACA and Kubernetes init containers run for every replica/Pod startup, including restarts and
 scale-out. They block the replica's main containers on failure, but provide no
 once-per-deployment guarantee or database-wide lock. Concurrent replicas,
 applications and deployments can race. Serialize independent migrations for the
 same database or coordinate deployments externally. History does not provide a
 distributed lock, and everytime scripts may run on each invocation.
 
-There is no Kubernetes init/Job adapter or Azure App Service predeployment
-adapter. Use an explicitly executed and awaited migration job or delivery-pipeline
-step for those targets. SQLite cloud publishing requires a separate durable
+There is no separate Kubernetes migration Job lifecycle or Azure App Service
+predeployment adapter. Use an explicitly executed and awaited migration job or
+delivery-pipeline step where per-Pod initialization is unsuitable. SQLite cloud publishing requires a separate durable
 storage, path and locking contract and is explicitly rejected. Across targets,
 define credentials, connectivity, migration ownership and interruption/retry
 recovery. Keep migrations in an existing delivery pipeline when that already

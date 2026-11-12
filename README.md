@@ -86,7 +86,7 @@ Use the CLI locally and in CI/CD, run it in a container, or embed the
 | Run migrations in a pipeline | [GitHub Actions](.github/workflows/grate-workflow.yml), [Azure Pipelines](examples/AzureDevops/azure-pipelines.yml), and [CI logging](examples/ci-logging/README.md) |
 | Run migrations in containers or Kubernetes | [Docker](examples/docker/readme.md), [init containers](examples/k8s/initcontainer/README.md), and [multi-tenant deployments](examples/k8s/multitenancy/README.md) |
 | Prepare a database for automated tests | [Test integration example](examples/test-integration/sample-test-integration/readme.md) |
-| Try unpublished Aspire migrations for all supported databases or ACA init containers | [Aspire integration](docs/Aspire.md) |
+| Try unpublished Aspire migrations with ACA or Kubernetes init containers | [Aspire integration](docs/Aspire.md) |
 | Work with a coding agent | [Bundled use-grate skill](docs/AgentSkill.md) |
 
 ## Coming from RoundhousE?

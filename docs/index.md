@@ -66,7 +66,7 @@ grate is short for migrate. And it's also pronounced the same way as _great_, so
 * [Token replacement](TokenReplacement.md)
 * [Response files](ConfigurationOptions/ResponseFiles.md)
 * [Agent skill](AgentSkill.md)
-* [Aspire migrations and ACA init containers](Aspire.md)
+* [Aspire migrations and deployment init containers](Aspire.md)
 
 ## Coming from RoundhousE?
 
