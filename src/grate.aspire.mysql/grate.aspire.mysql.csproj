@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <IsPublishable>false</IsPublishable>
+    <PackageId>grate.aspire.mysql</PackageId>
+    <Description>MySQL Aspire hosting adapter for grate migrations.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.MySql" />
+    <ProjectReference Include="../grate.aspire.hosting/grate.aspire.hosting.csproj" />
+    <None Include="NuGet.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
