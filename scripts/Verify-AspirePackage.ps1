@@ -6,7 +6,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $repository = Split-Path $PSScriptRoot -Parent
-$project = Join-Path $repository 'src/grate.aspire.hosting/grate.aspire.hosting.csproj'
+$packages = @('hosting', 'azure', 'oracle', 'mysql')
 $workspace = Join-Path ([IO.Path]::GetTempPath()) "grate-aspire-package-$([Guid]::NewGuid().ToString('N'))"
 $feed = Join-Path $workspace 'feed'
 $consumer = Join-Path $workspace 'consumer'
@@ -16,7 +16,10 @@ New-Item -ItemType Directory -Path $feed, $consumer | Out-Null
 try {
     # For the documented SDK 10 fallback, invoke this script from outside the
     # checkout. This adapter targets net10 only; no grate core project is built.
-    dotnet pack $project -c Release --output $feed "-p:PackageVersion=$packageVersion"
+    foreach ($package in $packages) {
+        $project = Join-Path $repository "src/grate.aspire.$package/grate.aspire.$package.csproj"
+        dotnet pack $project -c Release --output $feed "-p:PackageVersion=$packageVersion"
+    }
     $projectContent = @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -30,12 +33,17 @@ try {
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="grate.aspire.hosting" Version="$packageVersion" />
+    <PackageReference Include="grate.aspire.azure" Version="$packageVersion" />
+    <PackageReference Include="grate.aspire.oracle" Version="$packageVersion" />
+    <PackageReference Include="grate.aspire.mysql" Version="$packageVersion" />
   </ItemGroup>
 </Project>
 "@
     Set-Content -LiteralPath (Join-Path $consumer 'Consumer.csproj') -Value $projectContent
     $program = @'
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Grate.Aspire.Azure;
 using Grate.Aspire.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
@@ -50,14 +58,27 @@ var sqlServerMigration = sqlServer.AddGrateMigration().WithScriptsFolder(AppCont
 var sqlite = builder.AddSqlite("filedb",
     databasePath: Path.Combine(AppContext.BaseDirectory, "sqlite-data"), databaseFileName: "app.db");
 var sqliteMigration = sqlite.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
+var oracle = builder.AddOracle("oracle").AddDatabase("oracledb", "FREEPDB1");
+var oracleMigration = oracle.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
+var mysql = builder.AddMySql("mysql").AddDatabase("mysqldb");
+var mysqlMigration = mysql.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
+var mariadb = builder.AddMySql("mariadb").WithImage("mariadb", "12.3.3").AddDatabase("mariadbdb");
+var mariadbMigration = mariadb.AddGrateMigration().WithScriptsFolder(AppContext.BaseDirectory);
+var consumer = builder.AddContainer("consumer", "nginx", "stable")
+    .WithGrateMigrationInitContainer(migration, environment: "PRODUCTION");
 if (migration.Resource.Name != "appdb-grate" ||
     sqlServerMigration.Resource.Name != "sqldb-grate" ||
     sqliteMigration.Resource.Name != "filedb-grate" ||
-    builder.Resources.OfType<GrateMigrationResource>().Count() != 3)
+    oracleMigration.Resource.Name != "oracledb-grate" ||
+    mysqlMigration.Resource.Name != "mysqldb-grate" ||
+    mariadbMigration.Resource.Name != "mariadbdb-grate" ||
+    builder.Resources.OfType<GrateMigrationResource>().Count() != 6 ||
+    !consumer.Resource.Annotations.OfType<WaitAnnotation>().Any(wait =>
+        wait.Resource == migration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0))
 {
     throw new InvalidOperationException("The packaged API did not register one migration per provider.");
 }
-Console.WriteLine("PASS: isolated NuGet consumer compiled and registered all three migration providers.");
+Console.WriteLine("PASS: isolated NuGet consumer registered all six databases and the ACA init-container API from four packages.");
 '@
     Set-Content -LiteralPath (Join-Path $consumer 'Program.cs') -Value $program
     Push-Location $consumer

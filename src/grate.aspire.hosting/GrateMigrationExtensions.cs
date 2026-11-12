@@ -66,6 +66,41 @@ public static class GrateMigrationExtensions
         return migration;
     }
 
+    /// <summary>Adds a migration for an existing server database with an explicitly selected provider.</summary>
+    /// <remarks>
+    /// This overload also supports connection-string parameters and managed database resources.
+    /// It never infers a provider from connection-string text. The existing target database
+    /// must already be provisioned; database creation remains disabled by default.
+    /// </remarks>
+    public static IResourceBuilder<GrateMigrationResource> AddGrateMigration<TResource>(
+        this IResourceBuilder<TResource> database,
+        GrateDatabaseProvider provider,
+        string? name = null,
+        bool waitForDatabase = true) where TResource : class, IResourceWithConnectionString
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        if (database.Resource is SqliteResource)
+        {
+            throw new NotSupportedException("Use the typed SQLite migration overload to configure its shared database directory.");
+        }
+
+        var databaseType = provider switch
+        {
+            GrateDatabaseProvider.PostgreSql => "postgresql",
+            GrateDatabaseProvider.SqlServer => "sqlserver",
+            GrateDatabaseProvider.Oracle => "oracle",
+            GrateDatabaseProvider.MySql or GrateDatabaseProvider.MariaDb => "mariadb",
+            _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Choose a supported server database provider.")
+        };
+        var migration = AddMigration(database, name, databaseType, database.Resource.ConnectionStringExpression);
+        if (waitForDatabase)
+        {
+            migration.WaitFor(database);
+        }
+
+        return migration;
+    }
+
     /// <summary>Adds a migration for a file-backed SQLite resource in a dedicated absolute directory.</summary>
     /// <remarks>
     /// The whole database directory is mounted read-write so SQLite journal and WAL files share
@@ -147,6 +182,10 @@ public static class GrateMigrationExtensions
         bool isReadOnly = true)
     {
         ArgumentNullException.ThrowIfNull(migration);
+        if (migration.Resource.ScriptsArePackaged)
+        {
+            throw new InvalidOperationException("Configure the scripts folder before publishing the migration image.");
+        }
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var target = NormalizeContainerPath(containerPath, nameof(containerPath));
         if (migration.Resource.DataMount is { } dataMount && ContainerPathsOverlap(target, dataMount.Target))

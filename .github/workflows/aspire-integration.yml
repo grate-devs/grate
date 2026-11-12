@@ -3,10 +3,11 @@ name: Aspire database migration prototype
 on:
   pull_request:
     paths:
-      - 'src/grate.aspire.hosting/**'
-      - 'unittests/Aspire.Hosting/**'
+      - 'src/grate.aspire.*/**'
+      - 'unittests/Aspire.*/**'
       - 'examples/aspire/**'
       - 'scripts/Verify-AspirePackage.ps1'
+      - 'scripts/Verify-AspirePublication.ps1'
       - 'scripts/Install-AspireCli.ps1'
       - 'grate.aspire.slnx'
       - 'Directory.Build.props'
@@ -36,10 +37,10 @@ jobs:
       - uses: ./.github/actions/preflight
 
   verify:
-    name: Package and database smoke checks
+    name: Models, packages and offline ACA publication
     needs: preflight
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,19 +60,23 @@ jobs:
       - name: Verify the resource model
         shell: pwsh
         run: |
-          dotnet unittests/Aspire.Hosting/bin/Release/net10.0/grate.aspire.hosting.tests.dll --minimum-expected-tests 30 --report-xunit-trx --results-directory "${{ runner.temp }}/aspire-model-results"
+          $suites = @(
+            @{ Project = 'Hosting'; Assembly = 'hosting'; Minimum = 50 }
+            @{ Project = 'Azure'; Assembly = 'azure'; Minimum = 20 }
+            @{ Project = 'Oracle'; Assembly = 'oracle'; Minimum = 6 }
+            @{ Project = 'MySql'; Assembly = 'mysql'; Minimum = 6 }
+            @{ Project = 'MariaDb'; Assembly = 'mariadb'; Minimum = 7 }
+          )
+          foreach ($suite in $suites) {
+            $assembly = "unittests/Aspire.$($suite.Project)/bin/Release/net10.0/grate.aspire.$($suite.Assembly).tests.dll"
+            dotnet $assembly --minimum-expected-tests $suite.Minimum --report-xunit-trx --results-directory "${{ runner.temp }}/aspire-model-results/$($suite.Project)"
+          }
       - name: Verify a consumer of the packed library
         shell: pwsh
         run: ./scripts/Verify-AspirePackage.ps1
-      - name: Exercise the PostgreSQL application graph
+      - name: Verify native ACA publication and the packaged migration image
         shell: pwsh
-        run: ./examples/aspire/Smoke.ps1 -Provider postgresql -NoBuild
-      - name: Exercise the SQLite file-sharing graph
-        shell: pwsh
-        run: ./examples/aspire/Smoke.ps1 -Provider sqlite -NoBuild
-      - name: Exercise the SQL Server application graph
-        shell: pwsh
-        run: ./examples/aspire/Smoke.ps1 -Provider sqlserver -NoBuild
+        run: ./scripts/Verify-AspirePublication.ps1 -NoBuild
       - name: Upload resource-model results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -79,3 +84,30 @@ jobs:
           name: aspire-resource-model-results
           path: ${{ runner.temp }}/aspire-model-results
           retention-days: 3
+
+  database:
+    name: Aspire ${{ matrix.provider }} runtime
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [postgresql, sqlite, sqlserver, oracle, mysql, mariadb]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '10.0.x'
+      - name: Install the pinned native Aspire CLI and bundle
+        shell: pwsh
+        run: |
+          $installation = ./scripts/Install-AspireCli.ps1 -Destination (Join-Path $env:RUNNER_TEMP 'aspire-cli')
+          "AspireCliPath=$($installation.CliPath)" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "AspireCliBundlePath=$($installation.BundlePath)" | Add-Content -LiteralPath $env:GITHUB_ENV
+      - name: Exercise the database application graph
+        shell: pwsh
+        run: ./examples/aspire/Smoke.ps1 -Provider '${{ matrix.provider }}'

@@ -1,15 +1,18 @@
 # Aspire integration assessment
 
-Proposal for [#955](https://github.com/grate-devs/grate/issues/955).
-This design now has an [unpublished three-provider prototype](../Aspire.md) and a
+Design for [#955](https://github.com/grate-devs/grate/issues/955) and
+[#956](https://github.com/grate-devs/grate/issues/956).
+This design has [unpublished database and ACA adapters](../Aspire.md) and a
 [runnable example](https://github.com/grate-devs/grate/blob/main/examples/aspire/README.md). It is not a released
-integration or a production deployment commitment.
+integration. Offline publication verification does not establish live Azure behavior.
 
 ## Recommendation
 
-Proceed with a small grate hosting package that extends an Aspire database
-resource with `AddGrateMigration().WithScriptsFolder(scripts)`. Include a runnable
-PostgreSQL, SQL Server and SQLite examples and smoke checks to verify the shared API.
+Use a small grate hosting package that extends an Aspire database resource with
+`AddGrateMigration().WithScriptsFolder(scripts)`. The implementation includes
+PostgreSQL, SQL Server and SQLite in the base package, optional native Oracle
+and MySQL/MariaDB adapters, and an optional Azure Container Apps init-container
+publisher. Runnable database examples and smoke checks verify the shared API.
 
 The [maintainer's proposed API](https://github.com/grate-devs/grate/pull/957#discussion_r4543597501)
 identifies the value: the database resource already supplies enough context to
@@ -22,7 +25,9 @@ An example alone still makes every consumer maintain the same wiring.
 Keep the package a thin adapter over the existing container contract, with
 explicit overrides and no migration engine of its own. Package compatibility,
 versioning and release maintenance are costs of this recommendation, to be
-bounded by these three local providers rather than all-provider or deployment support.
+bounded by the pinned Aspire baseline, supported resource types and explicitly
+implemented deployment adapter. Keep cloud orchestration separate from the base
+database integration.
 
 ## Use cases and existing behavior
 
@@ -55,7 +60,8 @@ enough to describe the intended orchestration without changing grate's core.
 | Dedicated hosting package | Infers database context and applies grate defaults through a short fluent API; validates and tests those conventions centrally | Own an Aspire dependency range, public API, package release, image-version policy and provider/lifecycle tests | Recommended first delivery, with a runnable example |
 | Local CLI/executable resource | Uses an installed tool or checkout; avoids a second container for migrations | Tool/runtime installation, version selection, working directory, host networking and secret argument handling vary by machine | Useful documented alternative, outside the first example |
 | Consumer-owned worker calling grate libraries | Full control over configuration and host lifecycle | Adds a project and couples the consumer's runtime, dependencies, logging and cancellation to grate's library API | Consider when application-specific migration code is already necessary |
-| Separate delivery-pipeline migration | Explicit deployment gate, credentials and operational ownership | Does not itself provide local AppHost startup coordination | Retain for deployments; complementary to a local example |
+| ACA application init container | Packages SQL and prevents a replica's primary containers from starting before successful migration | Runs on every replica startup; does not serialize database migrations across replicas or applications | Implemented as an optional adapter; requires deployment coordination |
+| Separate delivery-pipeline migration | Explicit deployment gate, credentials and operational ownership | Does not itself provide local AppHost startup coordination | Retain when a once-per-deployment migration owner or cross-application serialization is required |
 
 Aspire documents [external executable resources](https://aspire.dev/app-host/executable-resources/)
 and [custom resource extension points](https://aspire.dev/extensibility/custom-resources/).
@@ -67,9 +73,10 @@ finite migration job.
 ## Prototype package API
 
 The extension methods below are implemented in
-[`grate.aspire.hosting`](https://github.com/grate-devs/grate/blob/main/src/grate.aspire.hosting/NuGet.md), but are not
-available in a released package. `database` is an Aspire PostgreSQL, SQL Server,
-or toolkit SQLite resource; `scripts` identifies the consumer's SQL directory.
+[`grate.aspire.hosting`](https://github.com/grate-devs/grate/blob/main/src/grate.aspire.hosting/NuGet.md)
+and optional `grate.aspire.oracle` and `grate.aspire.mysql` packages, but are not
+available in released packages. `database` is a supported native database or
+toolkit SQLite resource; `scripts` identifies the consumer's SQL directory.
 
 ```csharp
 var migration = database
@@ -93,8 +100,8 @@ consumer implicitly.
 | Runtime container name | Aspire's generated name for the migration resource | Normal container-name customization; avoid a fixed global name that collides across AppHosts |
 | Image and version | `gratedevs/grate` and a package-owned, tested release tag; initially use `2.3.0` | Explicit image/registry and tag or digest using a compatible entrypoint contract |
 | Connection string | Database resource's deferred connection expression | Explicit deferred expression or runtime secret reference |
-| Database type | Typed resource selects `postgresql`, `sqlserver` or `sqlite` | `WithEnvironment("DATABASE_TYPE", ...)`; grate validates the value at invocation |
-| Database creation | `CREATE_DATABASE=false`; Aspire provisions server databases, SQLite uses a file-backed connection | Explicit creation setting; caller owns the altered creation/permission contract |
+| Database type | Typed resource selects `postgresql`, `sqlserver`, `sqlite`, `oracle` or `mariadb`; the latter covers MySQL and MariaDB | Explicit provider for other connection resources, or `WithEnvironment("DATABASE_TYPE", ...)`; grate validates the value at invocation |
+| Database creation | `CREATE_DATABASE=false`; native Aspire provisions PostgreSQL, SQL Server and MySQL/MariaDB databases. Oracle selects an existing service/PDB; SQLite uses a file-backed connection | Explicit creation setting; caller owns the altered creation/permission contract |
 | Environment | `LOCAL` | Explicit grate environment selection |
 | Script mount | `WithScriptsFolder` resolves the source against the AppHost directory, mounts read-only at `/db` | Explicit source, target and mount settings, keeping the CLI script path aligned with the target |
 | Readiness dependency | Wait for server database resources; SQLite has no server wait | Explicit dependency/readiness override on server overloads |
@@ -111,9 +118,10 @@ Script targets are positional arguments, never interpolated shell source. This
 requires override images to contain `/bin/sh`, `/app/grate` and the compatible CLI
 contract; a container with an arbitrary entrypoint is insufficient.
 
-Use provider-specific overloads initially. An arbitrary resource exposing a
-connection string does not reliably identify the database provider. Unsupported
-resource types need an explicit provider contract or a clear unsupported result.
+Typed overloads select the provider. An arbitrary resource exposing a connection
+string does not reliably identify it, so the base package also accepts an
+explicit `GrateDatabaseProvider` for `IResourceWithConnectionString` resources,
+including `AddConnectionString`. Such databases must already be provisioned.
 Neither a resource name nor a password should be recovered by parsing a rendered
 connection string. Keep Aspire dependencies in the hosting package, outside the
 grate core and database-provider libraries.
@@ -151,9 +159,11 @@ builder.AddProject<Projects.Api>("api")
 builder.Build().Run();
 ```
 
-The proposed ownership is explicit: Aspire provisions the local database; grate
-migrates that database. `CREATE_DATABASE=false` avoids a second database-creation
-owner. `WithReference(database)` configures the API connection, while
+The ownership in this PostgreSQL illustration is explicit: Aspire provisions the
+local database; grate migrates it. `CREATE_DATABASE=false` avoids a second
+database-creation owner. Oracle's native `AddDatabase` instead selects a service
+without creating a PDB or user; external connections also require an existing
+database. `WithReference(database)` configures the API connection, while
 `APP_CONNSTRING` maps the database expression to the existing grate entrypoint's
 contract. Passing a reference alone does not supply that entrypoint variable.
 The expression must remain deferred so Aspire resolves the correct address for
@@ -206,12 +216,12 @@ change the database's lifetime. See Aspire's
   process does not automatically become a source of structured Aspire traces or
   metrics. Keep secrets out of SQL tokens and verbose diagnostics as well.
 
-## Initial compatibility and maintenance scope
+## Compatibility and maintenance scope
 
-Propose an Aspire 13.6.x C# AppHost targeting `net10.0`, initially pinning the
+Use an Aspire 13.6.x C# AppHost targeting `net10.0`, pinning the
 AppHost SDK and hosting packages to 13.6.5. Aspire's [prerequisites](https://aspire.dev/get-started/prerequisites/)
 require the .NET 10 SDK for C# AppHosts and a container runtime for container
-resources. This proposed baseline is separate from grate's
+resources. This baseline is separate from grate's
 [library target frameworks](https://github.com/grate-devs/grate/blob/main/Directory.Build.props) and
 [source-build SDK](https://github.com/grate-devs/grate/blob/main/global.json); it does not change either contract.
 Building a repository-hosted example must account for the repository's SDK and
@@ -220,25 +230,31 @@ central package settings rather than silently inheriting unsuitable defaults.
 PostgreSQL and SQL Server share deferred connection and database readiness wiring.
 SQLite demonstrates the different shared-file boundary: writable database storage,
 no server wait, container-path remapping and Unix file ownership. It uses toolkit
-13.6.1 alongside Aspire 13.6.5. MariaDB/MySQL and Oracle remain outside this scope.
-Do not infer deployment-target support from local resource behavior; the
-[deployment matrix](../Aspire.md#deployment-providers) records the pinned publisher
-constraints and required job/SQL-delivery integration.
+13.6.1 alongside Aspire 13.6.5. Optional Oracle and MySQL/MariaDB adapters use
+native Aspire hosting packages at 13.6.5, preserving the same fluent API. MySQL
+uses grate's existing `mariadb` provider; it does not introduce a new engine.
+Oracle's example selects the existing `FREEPDB1` service and documents its SYSTEM
+credentials and image initialization settings.
+
+The optional ACA module packages SQL and configures init containers. Do not infer
+other deployment-target support from local resource behavior; the
+[deployment boundaries](../Aspire.md#other-deployment-boundaries) describe the
+remaining Kubernetes, App Service and SQLite limitations.
 
 The package's runnable example belongs with grate's consumer examples. Updates need a
 small pinned compatibility matrix: Aspire/AppHost, grate image, database image,
 host platform and container architecture. The package also needs a
 chosen name and owner, supported Aspire range, public API compatibility checks,
 release automation, and an image update policy independent of its own version.
-Choose its package identity and supported dependency range before publication;
+Confirm release ownership and the supported dependency range before publication;
 implementation and local package verification do not themselves publish it.
 Do not rebuild or fork grate's migration implementation.
 
-## Bounded first follow-up and verification
+## Implemented examples and verification
 
 [Issue #956](https://github.com/grate-devs/grate/issues/956) tracks the thin
-hosting package, now exercised by three provider AppHosts using its extension
-API, with a minimal dependent API,
+hosting package, now exercised by six database AppHosts using its extension API,
+with a minimal dependent API,
 one-time SQL fixture, pinned dependencies, setup/cleanup instructions and a
 repeatable PowerShell smoke check. Keep it outside the core provider tests.
 First verify the resource model's inferred defaults, every advertised override,
@@ -257,19 +273,61 @@ these outcomes against disposable local resources:
 5. Script path containing spaces and launch from another working directory:
    the same scripts are selected. Check diagnostics for credential disclosure.
 
-The prototype includes resource-model tests, a packed-library consumer check,
-and repeatable provider smoke checks for these boundaries. Keep their actual
+The prototype includes resource-model tests, isolated consumption of all four
+packed packages, and repeatable database smoke checks. PostgreSQL exercises all
+the lifecycle boundaries above; other engines cover fresh setup, retained
+data/history and SQL failure, with credential failures for server databases.
+Do not infer interruption or delayed-readiness evidence for another engine from
+the PostgreSQL scenarios. Keep actual
 results, environment and limitations in the implementation PR. The earlier
 container-only spike is not evidence for the extension API; use the new checks
 when assessing the implementation.
 
-## Deployment boundary
+## Azure Container Apps publication
 
-The first delivery covers local orchestration only. A bind mount is not a
-portable delivery artifact, and a local completion wait is not evidence of a
-target platform's rollout ordering. For deployment, package versioned SQL with a
-migration job or use the existing pipeline approach, supply deployment secrets,
-serialize changes per database, and gate application rollout on job success.
-Validate the specific publish target and recovery procedure separately before
-advertising deployment support. Leave migration execution in the delivery
-pipeline when that already provides the required ownership and ordering.
+The optional `grate.aspire.azure` package adds
+`application.WithGrateMigrationInitContainer(migration, environment: "PRODUCTION")`.
+It adds a successful local completion wait without changing the local migration's
+`LOCAL` environment. In publish mode, it packages SQL in a derived grate image,
+suppresses the standalone migration application, and adds an init container to
+the consumer's ACA template. Native image build/push steps remain in the pipeline;
+the actual consumer provisioning step depends on the migration image push.
+The application must select its ACA environment first if several are available.
+
+The deployment grate environment is explicit and belongs to the consumer binding.
+It does not follow implicitly from the Aspire CLI's deployment environment.
+Connections remain deferred secret references without published parameter
+defaults. Configure the scripts and base image before invoking the helper.
+
+The base `PublishAsGrateMigrationImage()` snapshots only `.sql` files, preserving
+relative paths and bytes. It rejects symlinks, extra runtime mounts and the local
+SQLite shared-file contract. Non-SQL configuration is not included. Aspire owns
+the temporary build context for its live native pipeline; a legacy standalone
+manifest export is not a portable build-context handoff after AppHost disposal.
+Packaging alone does not create a startup gate for an arbitrary publisher.
+
+The [ACA example](https://github.com/grate-devs/grate/blob/main/examples/aspire/AzureContainerApps/README.md)
+uses an existing PostgreSQL connection and includes offline publication checks.
+They exercise the native Bicep publisher and full pipeline dependencies, then
+build the derived image and execute portable packaged SQL locally with SQLite,
+including explicit production-versus-local environment selection. This proves
+that publication structure and local packaged SQL execution are checked; it does
+not establish a live registry push, Azure deployment or PostgreSQL execution in
+ACA. Keep those evidence boundaries visible in reviews.
+
+## Deployment ownership and remaining limits
+
+ACA init containers run for every replica startup, including restarts and
+scale-out. They block the replica's main containers on failure, but provide no
+once-per-deployment guarantee or database-wide lock. Concurrent replicas,
+applications and deployments can race. Serialize independent migrations for the
+same database or coordinate deployments externally. History does not provide a
+distributed lock, and everytime scripts may run on each invocation.
+
+There is no Kubernetes init/Job adapter or Azure App Service predeployment
+adapter. Use an explicitly executed and awaited migration job or delivery-pipeline
+step for those targets. SQLite cloud publishing requires a separate durable
+storage, path and locking contract and is explicitly rejected. Across targets,
+define credentials, connectivity, migration ownership and interruption/retry
+recovery. Keep migrations in an existing delivery pipeline when that already
+provides the required ordering and serialization.

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 [CmdletBinding()]
 param(
-    [ValidateSet('postgresql', 'sqlite', 'sqlserver')]
+    [ValidateSet('postgresql', 'sqlite', 'sqlserver', 'oracle', 'mysql', 'mariadb')]
     [string]$Provider = 'postgresql',
     [ValidateSet('all', 'success', 'retained', 'sql-failure', 'credentials-failure', 'readiness', 'interruption')]
     [string]$Scenario = 'all',
@@ -15,6 +15,9 @@ $PSNativeCommandUseErrorActionPreference = $true
 $providerDirectory = switch ($Provider) {
     'sqlite' { 'Sqlite/' }
     'sqlserver' { 'SqlServer/' }
+    'oracle' { 'Oracle/' }
+    'mysql' { 'MySql/' }
+    'mariadb' { 'MariaDb/' }
     default { '' }
 }
 $project = Join-Path $PSScriptRoot "${providerDirectory}Smoke/Smoke.csproj"

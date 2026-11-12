@@ -70,3 +70,42 @@ waiting for migration completion with `WaitForCompletion(migration)` for every
 provider. Native connection overrides are explicit escape hatches; changing a
 SQLite connection string does not relocate its automatically configured mount.
 Local orchestration is not a production rollout mechanism.
+
+## Existing server databases and portable script images
+
+For a connection-string parameter or managed database resource, select the
+provider explicitly instead of inferring it from the connection string:
+
+```csharp
+var database = builder.AddConnectionString("appdb");
+var migration = database
+    .AddGrateMigration(provider: GrateDatabaseProvider.PostgreSql)
+    .WithScriptsFolder("db")
+    .PublishAsGrateMigrationImage();
+```
+
+The enum also supports `SqlServer`, `Oracle`, `MySql` and `MariaDb`; the last two
+select grate's `mariadb` backend. Optional `grate.aspire.oracle` and
+`grate.aspire.mysql` packages add typed native database overloads. The target database must
+already exist; creation stays disabled. The explicit-provider overload does not
+support SQLite connection strings without the typed shared-file storage contract.
+
+`PublishAsGrateMigrationImage` affects publish mode only. It snapshots `.sql`
+files, preserving their relative paths and bytes, into a separate temporary build
+context and derives an image from the configured grate image, registry and tag or
+digest. Files such as `.env`, source Dockerfiles and `.dockerignore` are excluded.
+SQL scripts are image content: do not embed deployment credentials in SQL.
+Connection strings remain runtime environment/secret references.
+
+Local runs keep their bind mount. Published resources have no runtime scripts
+bind mount. Configure scripts and the base image before packaging; changing the
+scripts afterward, symbolic links, additional runtime mounts and competing
+Dockerfile builds are rejected. Shared-file SQLite requires a separate cloud
+storage design and is rejected in publish mode. This helper packages an image;
+the deployment target must still provide the migration lifecycle. The optional
+`grate.aspire.azure` adapter attaches an init container to a specific ACA
+application with `.WithGrateMigrationInitContainer(migration, environment: "PRODUCTION")`.
+It runs before each replica's main containers and does not serialize migrations
+across replicas or deployments. The native pipeline must build while the
+AppHost-owned temporary SQL context is alive; a legacy manifest export alone
+does not preserve that context for an independent later build.
