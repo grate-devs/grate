@@ -7,6 +7,7 @@ using TestCommon.TestInfrastructure;
 namespace SqlServer.Reported_issues;
 
 [Collection(nameof(SqlServerGrateTestContext))]
+[UnpooledSqlServer] // Raw DROP cleanup requires disposed target sessions to close.
 public class RestoreFailure(SqlServerGrateTestContext testContext)
 {
     [Fact]

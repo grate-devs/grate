@@ -13,6 +13,9 @@ namespace SqlServer.Reported_issues;
 /// Create tests to reproduce the issue and then fix the issue, and keep the test to ensure it doesn't regress.
 /// </summary>
 [Collection(nameof(SqlServerGrateTestContext))]
+// Preserve the original unpooled fixture: RCSI needs exclusive database access,
+// which idle pooled sessions block. The historical pooling intent below remains unverified.
+[UnpooledSqlServer]
 public class Run_after_create_database_232(SqlServerGrateTestContext context, ITestOutputHelper testOutput) : MigrationsScriptsBase(context, testOutput)
 {
     private const string Bug232Sql = @"

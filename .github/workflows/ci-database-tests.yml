@@ -96,11 +96,11 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
-        # Reuse connections only inside each Oracle test; linked CLI/Docker suites
-        # keep their existing isolated process/connection behavior.
+        # Only the ordinary provider test hosts own these pool lifetimes.
+        GRATE_SQLSERVER_SCOPED_POOLING: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
         GRATE_ORACLE_SCOPED_POOLING: ${{ matrix.category == 'Oracle' && 'true' || 'false' }}
-        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ matrix.category == 'Oracle' && 'true' || 'false' }}
-        # Keep diagnostics alive beyond the test deadline, within the Oracle job cap.
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ (matrix.category == 'SqlServer' || matrix.category == 'Oracle') && 'true' || 'false' }}
+        # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
         TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
         MONITOR_TIMEOUT: ${{ matrix.category == 'Oracle' && '42m' || '25m' }}
 
@@ -133,6 +133,8 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
+        GRATE_SQLSERVER_SCOPED_POOLING: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
 
     - name: Upload Unit Test Results
       if: always()

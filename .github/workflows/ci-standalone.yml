@@ -49,6 +49,8 @@ jobs:
           ./installers/msi/tests/Test-InstallerIdentity.Tests.ps1
           ./installers/msi/Test-InstallerLifecycle.Assertions.Tests.ps1
           ./installers/msi/Test-InstallerLifecycle.Process.Tests.ps1
+          ./installers/msi/tests/support/Test-MsiLifecycleNativeProcess.Tests.ps1 -OutputDirectory "${{ runner.temp }}/msi-native-controls"
+          ./installers/msi/tests/Test-MsiLifecycleOuterPipes.Tests.ps1 -OutputDirectory "${{ runner.temp }}/msi-outer-pipes"
           ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
       - name: Build MSI from verified Windows binary
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
@@ -63,6 +65,8 @@ jobs:
         run: ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/$env:MSI_PACKAGE_ID-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -Distribution '${{ matrix.distribution }}' -ExpectedArchitecture ('${{ matrix.rid }}' -replace 'win-', '')
       - name: Verify installed MSI, major upgrade and uninstall
         if: matrix.rid == 'win-x64' || matrix.rid == 'win-arm64'
+        # Leave room in the job for diagnostics if worker supervision stalls.
+        timeout-minutes: 8
         shell: pwsh
         run: |
           $parameters = @{
@@ -108,5 +112,8 @@ jobs:
             installers/deb/*.deb
             ${{ runner.temp }}/grate-msi-lifecycle/
             ${{ runner.temp }}/grate-msi-lifecycle-supervisor/
+            ${{ runner.temp }}/msi-native-controls/
+            ${{ runner.temp }}/msi-outer-pipes/
+            ${{ runner.temp }}/lifecycle/
             ${{ runner.temp }}/grate-debian-lifecycle/
             !${{ runner.temp }}/grate-msi-lifecycle/upgrade-payload/

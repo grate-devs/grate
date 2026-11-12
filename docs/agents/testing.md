@@ -82,6 +82,25 @@ configuration: `GrateTestConfig__AdminConnectionString` selects an external data
 `GrateTestConfig__DockerImage` overrides the **database** image. Inspect inherited
 environment values before running. `LogLevel` controls test logging; CI uses `TZ=UTC`.
 
+The ordinary SQL Server CI lanes enable `GRATE_SQLSERVER_SCOPED_POOLING=true`.
+The serial test hook clears pools before and after each case; only target-database
+SA fixture connections use pooling, with `Min Pool Size=0`, `Max Pool Size=4` per
+connection string and `Pool Blocking Period=NeverBlock`. Admin and test-user
+connections retain their original policy. Restore cases with raw database-drop
+cleanup and the snapshot-isolation regression retain their original unpooled
+connections. Changing `READ_COMMITTED_SNAPSHOT` requires exclusive connection
+access, which idle pooled sessions can block. The readiness tests still force
+`AlwaysBlock` to exercise cached login failures. External fixtures and linked
+CLI/Docker suites retain their connection strings and pool state. Case-sensitive
+SQL Server retains its
+own fixture policy. The flag is optional for local runs.
+
+The Linux SQL Server and Oracle steps, plus the Windows SQL Server step, set
+`GRATE_REPRODUCIBLE_TABLE_CASINGS=true`, retaining original, lowercase and distinct
+mixed-case bootstrap inputs without random collisions. Windows Oracle and all
+other lanes keep the existing random mixed-case input. Local runs default to off.
+These flags are scoped to test steps; the job environment does not override them.
+
 [CommandLineGrateMigrator](../../unittests/CommandLine/CommandLine.Common/TestInfrastructure/CommandLineGrateMigrator.cs)
 launches `GrateExecutablePath`, falling back to the assembly attribute generated in
 `CommandLine.Common.csproj`. Set an absolute path deliberately, for example:
@@ -148,9 +167,16 @@ The Linux Oracle provider lane enables `GRATE_ORACLE_SCOPED_POOLING=true`.
 It clears test-host pools before and after each case and releases the selected
 user's idle pool before fixture cleanup drops that user. The dedicated production
 DROP test keeps its original unpooled input. Imported CLI/Docker suites keep their
-existing pooling policy. `GRATE_REPRODUCIBLE_TABLE_CASINGS=true` selects
-27 distinct, reproducible casing combinations for that lane; other lanes retain
-their existing inputs. Both flags default to off outside that CI lane.
+existing pooling policy. The shared `GRATE_REPRODUCIBLE_TABLE_CASINGS=true` flag
+selects 27 distinct, reproducible casing combinations in the Linux Oracle lane,
+as it does in the SQL Server lanes described above. Windows Oracle enables
+neither Oracle scoped pooling nor reproducible casing. Both flags default to off
+for local Oracle runs.
+
+With `GRATE_ORACLE_SCOPED_POOLING` unset, externally configured Oracle connections
+retain their configured policy. Explicitly enabling it also opts external Oracle
+test-host connections into scoped pooling. The SQL Server flag applies only to
+its container fixture; external SQL Server connections retain their policy.
 
 In-process Oracle provider command/admin timeout tests require the Oracle
 cancellation code (`ORA-01013`) in the failure's cause chain as well as the
@@ -181,6 +207,17 @@ suite against both forms on net11.0. The existing library matrix still exercises
 the provider suites on all supported frameworks. CLI overrides retain their
 explicit skips for inaccessible in-process exception details; see the reports
 for exact execution and skip counts.
+
+The standalone Windows matrix verifies all six MSI distributions natively on
+x64 and ARM64. Its lifecycle worker has a 360-second execution budget, followed
+by bounded termination. An eight-minute step deadline requests runner cancellation;
+it does not guarantee that a blocked runner completes cancellation or uploads logs.
+The worker launcher explicitly permits inheritance of only NUL stdin and its two
+log-file handles. Native startup/resource controls and the supervisor regressions
+run on both architectures, including outer-pipe EOF while a descendant remains
+alive and an intentional inheritance control. Failures remain failures. The
+following artifact step retains partial installer logs, worker output, phase
+records and regression evidence whenever the runner can execute it.
 
 For a handoff, record source/artifact identity, selected test layers and counts,
 TFM, host/RID, database version/image, CLI publish form or package/image identity,

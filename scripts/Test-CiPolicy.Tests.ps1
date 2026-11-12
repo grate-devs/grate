@@ -40,6 +40,48 @@ function Assert-CiPhaseCoverage {
     if ((@($expectedDatabaseLanes | Sort-Object) -join ',') -cne (@($actualDatabaseLanes | Sort-Object) -join ',')) {
         throw 'Preserve all eleven library database/platform/filter lanes.'
     }
+    $expectedFlags = @{
+        'Test on Linux' = @{
+            GRATE_SQLSERVER_SCOPED_POOLING = '${{ matrix.category == ''SqlServer'' && ''true'' || ''false'' }}'
+            GRATE_ORACLE_SCOPED_POOLING = '${{ matrix.category == ''Oracle'' && ''true'' || ''false'' }}'
+            GRATE_REPRODUCIBLE_TABLE_CASINGS = '${{ (matrix.category == ''SqlServer'' || matrix.category == ''Oracle'') && ''true'' || ''false'' }}'
+        }
+        'Test on Windows' = @{
+            GRATE_SQLSERVER_SCOPED_POOLING = '${{ matrix.category == ''SqlServer'' && ''true'' || ''false'' }}'
+            GRATE_REPRODUCIBLE_TABLE_CASINGS = '${{ matrix.category == ''SqlServer'' && ''true'' || ''false'' }}'
+        }
+    }
+    $flagNames = @('GRATE_SQLSERVER_SCOPED_POOLING', 'GRATE_ORACLE_SCOPED_POOLING', 'GRATE_REPRODUCIBLE_TABLE_CASINGS')
+    $flagFailure = 'Preserve provider-specific pooling and casing flags in their test steps without job-level overrides.'
+    if ($Phases.test.ContainsKey('env')) {
+        foreach ($name in $flagNames) {
+            if ($Phases.test.env.ContainsKey($name)) {
+                throw $flagFailure
+            }
+        }
+    }
+    foreach ($stepName in $expectedFlags.Keys) {
+        $steps = @($Phases.test.steps | Where-Object { $_['name'] -ceq $stepName })
+        if ($steps.Count -ne 1 -or !$steps[0].ContainsKey('env')) {
+            throw $flagFailure
+        }
+        foreach ($name in $expectedFlags[$stepName].Keys) {
+            if (!$steps[0].env.ContainsKey($name) -or $steps[0].env[$name] -cne $expectedFlags[$stepName][$name]) {
+                throw $flagFailure
+            }
+        }
+    }
+    foreach ($step in $Phases.test.steps) {
+        if (!$step.ContainsKey('env')) {
+            continue
+        }
+        foreach ($name in $flagNames) {
+            if ($step.env.ContainsKey($name) -and (!$step.ContainsKey('name') -or
+                    !$expectedFlags.ContainsKey($step.name) -or !$expectedFlags[$step.name].ContainsKey($name))) {
+                throw $flagFailure
+            }
+        }
+    }
     foreach ($id in @('build-code', 'fast-tests', 'analyze', 'test', 'packages')) {
         $setup = Get-ActionStep $Phases[$id] 'actions/setup-dotnet'
         $versions = @($setup.with.'dotnet-version' -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -67,8 +109,9 @@ function Assert-CiPhaseCoverage {
         throw 'Keep native CLI/installer and Docker diagnostics on failure.'
     }
     $lifecycle = $Phases.standalone.steps | Where-Object { $_['name'] -ceq 'Verify installed MSI, major upgrade and uninstall' }
-    if (!$lifecycle.run.Contains('-TimeoutSeconds 360')) {
-        throw 'Preserve the supported 360-second MSI supervisor budget.'
+    if (!$lifecycle.run.Contains('-TimeoutSeconds 360') -or
+        !$lifecycle.ContainsKey('timeout-minutes') -or $lifecycle.'timeout-minutes' -ne 8) {
+        throw 'Preserve the 360-second MSI supervisor budget and independent eight-minute step deadline.'
     }
     $linux = $Phases.test.steps | Where-Object { $_['name'] -ceq 'Test on Linux' }
     if (!$linux.run.Contains('monitor-test-containers.ps1') -or !$linux.run.Contains('trap stop_diagnostics EXIT') -or
@@ -256,5 +299,62 @@ Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $mis
 $lostDiagnostics = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
 (Get-ActionStep $lostDiagnostics.test 'actions/upload-artifact').if = 'success()'
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $lostDiagnostics } -ExpectedMessage 'artifact names on failure'
+
+foreach ($deadline in @($null, 30)) {
+    $unboundedInstaller = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+    $lifecycle = $unboundedInstaller.standalone.steps | Where-Object { $_['name'] -ceq 'Verify installed MSI, major upgrade and uninstall' }
+    if ($null -eq $deadline) {
+        $lifecycle.Remove('timeout-minutes')
+    } else {
+        $lifecycle['timeout-minutes'] = $deadline
+    }
+    Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $unboundedInstaller } -ExpectedMessage 'independent eight-minute step deadline'
+}
+
+$sqlServerFlag = '${{ matrix.category == ''SqlServer'' && ''true'' || ''false'' }}'
+$oracleFlag = '${{ matrix.category == ''Oracle'' && ''true'' || ''false'' }}'
+$combinedCasingFlag = '${{ (matrix.category == ''SqlServer'' || matrix.category == ''Oracle'') && ''true'' || ''false'' }}'
+$wrongProviderFlag = '${{ matrix.category == ''SqlServerCaseSensitive'' && ''true'' || ''false'' }}'
+$flagCases = @(
+    @{ Step = 'Test on Linux'; Name = 'GRATE_SQLSERVER_SCOPED_POOLING'; Other = @($oracleFlag, $combinedCasingFlag) }
+    @{ Step = 'Test on Linux'; Name = 'GRATE_ORACLE_SCOPED_POOLING'; Other = @($sqlServerFlag, $combinedCasingFlag) }
+    @{ Step = 'Test on Linux'; Name = 'GRATE_REPRODUCIBLE_TABLE_CASINGS'; Other = @($sqlServerFlag, $oracleFlag) }
+    @{ Step = 'Test on Windows'; Name = 'GRATE_SQLSERVER_SCOPED_POOLING'; Other = @($oracleFlag, $combinedCasingFlag) }
+    @{ Step = 'Test on Windows'; Name = 'GRATE_REPRODUCIBLE_TABLE_CASINGS'; Other = @($oracleFlag, $combinedCasingFlag) }
+)
+foreach ($case in $flagCases) {
+    foreach ($value in (@($null, 'false', 'true', $wrongProviderFlag) + $case.Other)) {
+        $wrongPoolingScope = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+        $step = $wrongPoolingScope.test.steps | Where-Object { $_['name'] -ceq $case.Step }
+        if ($null -eq $value) {
+            $step.env.Remove($case.Name)
+        } else {
+            $step.env[$case.Name] = $value
+        }
+        Assert-Rejected -Action {
+            Assert-WorkflowPolicy -Workflow $workflow -Phases $wrongPoolingScope
+        } -ExpectedMessage 'provider-specific pooling and casing flags'
+    }
+}
+foreach ($name in @('GRATE_SQLSERVER_SCOPED_POOLING', 'GRATE_ORACLE_SCOPED_POOLING', 'GRATE_REPRODUCIBLE_TABLE_CASINGS')) {
+    foreach ($location in @('job', 'setup', 'windows-oracle')) {
+        if ($location -eq 'windows-oracle' -and $name -cne 'GRATE_ORACLE_SCOPED_POOLING') {
+            continue
+        }
+        $misplacedFlag = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+        if ($location -eq 'job') {
+            $misplacedFlag.test.env = @{ $name = 'false' }
+        } elseif ($location -eq 'setup') {
+            $step = Get-ActionStep $misplacedFlag.test 'actions/setup-dotnet'
+            $step.env = @{ $name = 'true' }
+        } else {
+            $step = $misplacedFlag.test.steps | Where-Object { $_['name'] -ceq 'Test on Windows' }
+            $step.env[$name] = $oracleFlag
+        }
+        Assert-Rejected -Action {
+            Assert-WorkflowPolicy -Workflow $workflow -Phases $misplacedFlag
+        } -ExpectedMessage 'provider-specific pooling and casing flags'
+    }
+}
 
 Write-Host "PASS: staged wiring, all-success aggregate, $rejectionCount per-job rejection cases, empty input and scheduling mutations."
