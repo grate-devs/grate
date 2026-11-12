@@ -28,12 +28,12 @@ public sealed class Cloned_databases : IAsyncDisposable
         // the clone's end leaves the original's client working
         await original.RunSql("SELECT 2", ConnectionType.Default, TransactionHandling.Default);
 
-        var cloneJob = Assert.Single(target.JobCreations, x => x.Sql == "SELECT 1");
+        var cloneJob = Assert.Single(target.Queries, x => x.Sql == "SELECT 1");
         Assert.Equal(project, cloneJob.Project);
         Assert.Equal(location, cloneJob.Location);
         var drop = Assert.Single(target.Requests, x => x.Method == "DELETE");
         Assert.Equal((project, StubDatabase.Dataset), (drop.Project, drop.Dataset));
-        var originalJob = Assert.Single(_first.JobCreations, x => x.Sql == "SELECT 2");
+        var originalJob = Assert.Single(_first.Queries, x => x.Sql == "SELECT 2");
         Assert.Equal(("project-a", null), (originalJob.Project, originalJob.Location));
     }
 

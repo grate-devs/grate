@@ -20,6 +20,7 @@ public class Failing_Scripts(BigQueryGrateTestContext testContext, ITestOutputHe
     protected override IDictionary<string, object?> ExpectedErrorDetails => new Dictionary<string, object?>
     {
         { "Message", null },
+        { "JobId", null },
         { "HttpStatusCode", 400 },
         { "Reason", "invalidQuery" },
         { "Location", null },

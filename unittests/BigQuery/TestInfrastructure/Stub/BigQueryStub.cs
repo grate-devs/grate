@@ -8,18 +8,19 @@ using System.Text.Json.Nodes;
 namespace BigQuery.TestInfrastructure.Stub;
 
 /// <summary>
-/// A local HTTP server in place of BigQuery's REST API, for the failures the emulator cannot make. It keeps the jobs it
-/// creates - a job id, or the request id of a <c>jobs.query</c>, creates one job - answers the requests a
-/// <c>BigQueryClient</c> makes for a query, and records every request. A test
-/// decides how each new job ends (<see cref="NewJob"/>) and which answers get lost (<see cref="LoseAnswerTo"/>).
+/// A local HTTP server in place of BigQuery's REST API, for the failures the emulator cannot make. It answers the
+/// requests the provider makes, keeps the jobs it creates - a <c>jobs.query</c> request id creates one job, however
+/// often it is sent - and records every request. A test decides how each new job ends (<see cref="NewJob"/>) and
+/// which answers get lost (<see cref="LoseAnswerTo"/>).
 /// </summary>
 public sealed class BigQueryStub : IAsyncDisposable
 {
     private readonly HttpListener _listener = new();
     private readonly Task _serving;
-    private readonly ConcurrentDictionary<string, (JsonObject Reference, JsonObject Configuration, StubJob Outcome)> _jobs = new();
-    private readonly ConcurrentQueue<StubRequest> _requests = new();
+    private readonly ConcurrentDictionary<string, (JsonObject Reference, StubJob Outcome)> _jobs = new();
     private readonly ConcurrentDictionary<string, string> _jobsByRequestId = new();
+    private readonly ConcurrentDictionary<string, int> _answers = new();
+    private readonly ConcurrentQueue<StubRequest> _requests = new();
 
     public BigQueryStub()
     {
@@ -47,10 +48,7 @@ public sealed class BigQueryStub : IAsyncDisposable
 
     public IReadOnlyList<StubRequest> Requests => _requests.ToArray();
 
-    /// <summary>
-    /// The requests that create a job: <c>jobs.insert</c>, or <c>jobs.query</c>, which runs a query in one request.
-    /// </summary>
-    public IReadOnlyList<StubRequest> JobCreations => Requests.Where(x => x.CreatesJob).ToArray();
+    public IReadOnlyList<StubRequest> Queries => Requests.Where(x => x.IsQuery).ToArray();
 
     public IReadOnlyList<StubRequest> Cancels => Requests.Where(x => x.IsCancel).ToArray();
 
@@ -103,57 +101,18 @@ public sealed class BigQueryStub : IAsyncDisposable
 
     private async Task<(HttpStatusCode, JsonNode?)> AnswerAsync(StubRequest request)
     {
-        if (request.IsJobInsert)
-        {
-            var reference = request.Body!["jobReference"]!.AsObject();
-            var jobId = (string)reference["jobId"]!;
-            reference["projectId"] ??= request.Project;
-
-            // BigQuery writes a query's results to a temporary table of its own
-            var configuration = (JsonObject)request.Body["configuration"]!.DeepClone();
-            configuration["query"]!["destinationTable"] = new JsonObject
-            {
-                ["projectId"] = request.Project,
-                ["datasetId"] = "_anonymous",
-                ["tableId"] = $"anon_{jobId}",
-            };
-
-            if (!_jobs.TryAdd(jobId, ((JsonObject)reference.DeepClone(), configuration, NewJob(request))))
-            {
-                return Error(HttpStatusCode.Conflict, "duplicate", $"Already Exists: Job {request.Project}:{jobId}");
-            }
-
-            return (HttpStatusCode.OK, Job(jobId));
-        }
-
-        if (request.IsStatelessQuery)
+        if (request.IsQuery)
         {
             // BigQuery answers a request id it has seen with the job it created for it
-            var requestId = (string?)request.Body!["requestId"] ?? Guid.NewGuid().ToString("N");
-            var created = _jobsByRequestId.GetOrAdd(requestId, _ => $"job_{Guid.NewGuid():N}");
-            if (!_jobs.ContainsKey(created))
-            {
-                var reference = new JsonObject
+            var created = _jobsByRequestId.GetOrAdd(request.RequestId ?? Guid.NewGuid().ToString(), _ => $"job_{Guid.NewGuid():N}");
+            _jobs.GetOrAdd(created, _ => (
+                new JsonObject
                 {
                     ["projectId"] = request.Project,
                     ["jobId"] = created,
-                    ["location"] = request.Body["location"]?.DeepClone(),
-                };
-                var configuration = new JsonObject
-                {
-                    ["query"] = new JsonObject
-                    {
-                        ["query"] = request.Sql,
-                        ["destinationTable"] = new JsonObject
-                        {
-                            ["projectId"] = request.Project,
-                            ["datasetId"] = "_anonymous",
-                            ["tableId"] = $"anon_{created}",
-                        },
-                    },
-                };
-                _jobs.TryAdd(created, (reference, configuration, NewJob(request)));
-            }
+                    ["location"] = request.Location,
+                },
+                NewJob(request)));
 
             return Results(created, "bigquery#queryResponse");
         }
@@ -172,12 +131,12 @@ public sealed class BigQueryStub : IAsyncDisposable
 
         if (request.IsQueryResults)
         {
-            if (!_jobs.ContainsKey(request.JobId!))
+            if (!_jobs.TryGetValue(request.JobId!, out var job))
             {
                 return NotFound($"Job {request.JobId}");
             }
 
-            if (_jobs[request.JobId!].Outcome.State == "RUNNING")
+            if (job.Outcome.State == "RUNNING")
             {
                 // BigQuery holds a read of a running job for a while before it answers
                 await Task.Delay(100);
@@ -196,9 +155,9 @@ public sealed class BigQueryStub : IAsyncDisposable
 
     private (HttpStatusCode, JsonNode?) Results(string jobId, string kind)
     {
-        var (reference, _, outcome) = _jobs[jobId];
+        var (reference, outcome) = _jobs[jobId];
 
-        if (outcome.State == "RUNNING")
+        if (State(jobId) == "RUNNING")
         {
             return (HttpStatusCode.OK, new JsonObject
             {
@@ -229,20 +188,15 @@ public sealed class BigQueryStub : IAsyncDisposable
 
     private JsonObject Job(string jobId)
     {
-        var (reference, configuration, outcome) = _jobs[jobId];
+        var (reference, outcome) = _jobs[jobId];
 
-        var status = new JsonObject { ["state"] = outcome.State };
-        if (outcome.ErrorReason is { } reason)
+        var state = State(jobId);
+        var status = new JsonObject { ["state"] = state };
+        if (state == "DONE" && outcome.ErrorReason is { } reason)
         {
             var error = new JsonObject { ["reason"] = reason, ["message"] = $"The job failed: {reason}" };
             status["errorResult"] = error;
             status["errors"] = new JsonArray(error.DeepClone());
-        }
-
-        var statistics = new JsonObject { ["creationTime"] = "1700000000000", ["startTime"] = "1700000000000" };
-        if (outcome.NumChildJobs is { } children)
-        {
-            statistics["numChildJobs"] = children.ToString();
         }
 
         return new JsonObject
@@ -250,10 +204,18 @@ public sealed class BigQueryStub : IAsyncDisposable
             ["kind"] = "bigquery#job",
             ["id"] = $"{reference["projectId"]}:{jobId}",
             ["jobReference"] = reference.DeepClone(),
-            ["configuration"] = configuration.DeepClone(),
+            ["configuration"] = new JsonObject { ["jobType"] = "QUERY", ["query"] = new JsonObject() },
             ["status"] = status,
-            ["statistics"] = statistics,
+            ["statistics"] = new JsonObject { ["creationTime"] = "1700000000000", ["startTime"] = "1700000000000" },
         };
+    }
+
+    // the job's state in this answer - running while it has answers left to give as running
+    private string State(string jobId)
+    {
+        var outcome = _jobs[jobId].Outcome;
+        var answered = _answers.AddOrUpdate(jobId, 1, (_, count) => count + 1);
+        return answered <= outcome.AnswersWhileRunning ? "RUNNING" : outcome.State;
     }
 
     private static (HttpStatusCode, JsonNode?) NotFound(string what) =>
@@ -272,9 +234,6 @@ public sealed class BigQueryStub : IAsyncDisposable
 
     private static async Task<StubRequest> ReadAsync(HttpListenerRequest request)
     {
-        var path = request.Url!.AbsolutePath;
-        var query = request.Url.Query;
-
         JsonNode? body = null;
         if (request.HasEntityBody)
         {
@@ -289,7 +248,7 @@ public sealed class BigQueryStub : IAsyncDisposable
             body = text.Length == 0 ? null : JsonNode.Parse(text);
         }
 
-        return new StubRequest(request.HttpMethod, path, query, body);
+        return new StubRequest(request.HttpMethod, request.Url!.AbsolutePath, request.Url.Query, body);
     }
 
     private static int FreePort()

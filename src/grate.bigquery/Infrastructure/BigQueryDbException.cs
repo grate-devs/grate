@@ -15,11 +15,12 @@ public sealed class BigQueryDbException : DbException
     /// </summary>
     public static readonly IReadOnlyList<string> TransientReasons = ["rateLimitExceeded", "backendError"];
 
-    public BigQueryDbException(GoogleApiException exception)
+    public BigQueryDbException(GoogleApiException exception, string? jobId = null)
         : base(exception?.Error?.Message ?? exception?.Message, exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
+        JobId = jobId;
         HttpStatusCode = exception.HttpStatusCode;
         var first = exception.Error?.Errors?.FirstOrDefault();
         Reason = first?.Reason;
@@ -28,6 +29,21 @@ public sealed class BigQueryDbException : DbException
             .Select(x => $"{x.Reason}: {x.Message}")
             .ToArray() ?? [];
     }
+
+    /// <summary>
+    /// A job whose outcome grate does not know - it stopped waiting for the job, or could not read it.
+    /// </summary>
+    public BigQueryDbException(string message, string jobId, Exception? cause)
+        : base(message, cause)
+    {
+        JobId = jobId;
+        Errors = [];
+    }
+
+    /// <summary>
+    /// The BigQuery job, when there is one - to find it in BigQuery.
+    /// </summary>
+    public string? JobId { get; }
 
     public HttpStatusCode HttpStatusCode { get; }
 

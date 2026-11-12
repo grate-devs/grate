@@ -1,4 +1,6 @@
 ﻿using System.Data.Common;
+using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Security.Claims;
 using Google;
@@ -27,10 +29,19 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     private const string NotVersioning = "0.0.0.0";
 
     /// <summary>
-    /// How many times a job is tried while BigQuery says its failure will pass - a table takes 5 metadata changes per
-    /// 10 seconds, and DML on grate's tables counts.
+    /// How many times grate sends a request, or reads a job, while its failure is one that passes: the request failed
+    /// on its way, or BigQuery refused it for now (<c>rateLimitExceeded</c>, <c>backendError</c>).
     /// </summary>
     private const int MaxAttempts = 5;
+
+    // how long BigQuery holds a jobs.query request for the query to finish - Google's own default
+    private static readonly TimeSpan QueryRequestWait = TimeSpan.FromSeconds(10);
+
+    // how long one wait for a job lasts when the command timeout is 0 - grate then waits again, without limit
+    private static readonly TimeSpan WaitWithoutLimit = TimeSpan.FromMinutes(5);
+
+    // the client needs a limit for a read, and a read of grate's tables never takes a day
+    private static readonly TimeSpan ReadWithoutLimit = TimeSpan.FromDays(1);
 
     private ILogger _logger = logger;
     private SharedClient? _client;
@@ -181,7 +192,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         var rows = await QueryAsync($"SELECT COALESCE(MAX(id), 0) + 1 AS id FROM {VersionTable}");
         var versionId = (long)rows.Single()["id"];
 
-        await QueryAsync(
+        await ExecuteAsync(
             $"""
             INSERT INTO {VersionTable} (id, repository_path, version, entry_date, modified_date, entered_by, status)
             VALUES (@id, CAST(@repository_path AS STRING), @version, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @entered_by, @status)
@@ -208,7 +219,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             connectionType.ToString(), transactionHandling, sql);
 
         // admin scripts may run before the dataset exists, so they get no default dataset
-        await QueryAsync(sql, connectionType == ConnectionType.Admin);
+        await ExecuteAsync(sql, connectionType == ConnectionType.Admin);
     }
 
     public async Task<string?> GetCurrentHash(string scriptName)
@@ -303,7 +314,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
 
     public async Task ChangeVersionStatus(string status, long versionId)
     {
-        await QueryAsync(
+        await ExecuteAsync(
             $"""
             UPDATE {VersionTable}
             SET status = @status
@@ -315,7 +326,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
 
     public async Task DeleteVersionRecord(long versionId)
     {
-        await QueryAsync(
+        await ExecuteAsync(
             $"""
             DELETE FROM {VersionTable}
             WHERE id = @version_id
@@ -430,41 +441,102 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     {
         if (Bootstrapping)
         {
-            _deferredWrites.Add(async () => await QueryAsync(sql, parameters));
+            _deferredWrites.Add(async () => await ExecuteAsync(sql, parameters));
             return;
         }
 
-        await QueryAsync(sql, parameters);
+        await ExecuteAsync(sql, parameters);
     }
 
-    private Task<BigQueryResults> QueryAsync(string sql, params BigQueryParameter[] parameters) =>
-        QueryAsync(sql, false, parameters);
-
-    private async Task<BigQueryResults> QueryAsync(string sql, bool admin, params BigQueryParameter[] parameters)
+    /// <summary>
+    /// Reads grate's own tables. A read changes nothing, so a read that fails on its way is simply run again.
+    /// </summary>
+    private async Task<BigQueryResults> QueryAsync(string sql, params BigQueryParameter[] parameters)
     {
         var options = new QueryOptions
         {
-            DefaultDataset = admin ? null : Client.GetDatasetReference(DatasetId),
+            DefaultDataset = Client.GetDatasetReference(DatasetId),
             UseQueryCache = false,
         };
+        var resultsOptions = new GetQueryResultsOptions { Timeout = Limit(admin: false) ?? ReadWithoutLimit };
 
-        var timeout = admin ? _config?.AdminCommandTimeout : _config?.CommandTimeout;
-        var resultsOptions = new GetQueryResultsOptions
+        try
         {
-            Timeout = timeout > 0 ? TimeSpan.FromSeconds(timeout.Value) : null,
+            return await ReadAsync(() => Client.ExecuteQueryAsync(sql, parameters, options, resultsOptions));
+        }
+        catch (GoogleApiException ex)
+        {
+            throw new BigQueryDbException(ex);
+        }
+    }
+
+    private Task ExecuteAsync(string sql, params BigQueryParameter[] parameters) =>
+        ExecuteAsync(sql, false, parameters);
+
+    /// <summary>
+    /// Runs a script, or a statement whose rows grate does not read - so a query that has finished when BigQuery
+    /// answers needs no more requests.
+    /// </summary>
+    private async Task ExecuteAsync(string sql, bool admin, params BigQueryParameter[] parameters)
+    {
+        var limit = Limit(admin);
+        var waited = Stopwatch.StartNew();
+
+        var (job, finished) = await SubmitAsync(sql, admin, parameters, limit);
+        if (!finished)
+        {
+            await WaitAsync(job, limit, waited);
+        }
+    }
+
+    // 0 is no limit, as with grate's other providers
+    private TimeSpan? Limit(bool admin)
+    {
+        var timeout = admin ? _config?.AdminCommandTimeout : _config?.CommandTimeout;
+        return timeout > 0 ? TimeSpan.FromSeconds(timeout.Value) : null;
+    }
+
+    /// <summary>
+    /// Starts the query with <c>jobs.query</c>, under a request id of grate's own. A request that fails on its way, or
+    /// that BigQuery refuses for now, is sent again with the same id: BigQuery runs a request id once, so the query
+    /// never runs twice. A query BigQuery ran and that failed is not run again - a script's statements before the
+    /// failure have run.
+    /// </summary>
+    private async Task<(JobReference Job, bool Finished)> SubmitAsync(
+        string sql, bool admin, BigQueryParameter[] parameters, TimeSpan? limit)
+    {
+        var request = new QueryRequest
+        {
+            Query = sql,
+            UseLegacySql = false,
+            UseQueryCache = false,
+            DefaultDataset = admin ? null : Client.GetDatasetReference(DatasetId),
+            Location = Settings.Location,
+            ParameterMode = parameters.Length == 0 ? null : "named",
+            QueryParameters = parameters.Length == 0 ? null : parameters.Select(ToQueryParameter).ToList(),
+            RequestId = Guid.NewGuid().ToString(),
+
+            // a job, so that grate can wait for it, cancel it and name it
+            JobCreationMode = "JOB_CREATION_REQUIRED",
+
+            // how long BigQuery holds the request for the query to finish - grate then waits on the job
+            TimeoutMs = (long)(limit < QueryRequestWait ? limit.Value : QueryRequestWait).TotalMilliseconds,
         };
 
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                return await Client.ExecuteQueryAsync(sql, parameters, options, resultsOptions);
+                var response = await Client.Service.Jobs.Query(request, Settings.ProjectId).ExecuteAsync();
+
+                // errors in a finished answer are read from the job, as when it had not finished
+                return (response.JobReference, response.JobComplete == true && !(response.Errors?.Count > 0));
             }
-            catch (GoogleApiException ex) when (attempt < MaxAttempts && new BigQueryDbException(ex).IsTransient)
+            catch (Exception ex) when (attempt < MaxAttempts && IsRetriable(ex))
             {
-                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
-                _logger.LogWarning("BigQuery job failed, and will be tried again: attempt {Attempt}, in {Delay}: {Error}",
-                    attempt, delay, ex.Message);
+                var delay = Backoff(attempt);
+                _logger.LogWarning("BigQuery request {RequestId} failed, and will be sent again: attempt {Attempt}, in {Delay}: {Error}",
+                    request.RequestId, attempt, delay, ex.Message);
                 await Task.Delay(delay);
             }
             catch (GoogleApiException ex)
@@ -473,6 +545,151 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             }
         }
     }
+
+    /// <summary>
+    /// Waits for the job to finish, up to the command timeout. A failure to read the job is not taken as the job's
+    /// failure - BigQuery's record of the job says which it was.
+    /// </summary>
+    private async Task WaitAsync(JobReference job, TimeSpan? limit, Stopwatch waited)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var remaining = limit - waited.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                throw await OutcomeUnknownAsync(job, $"did not finish within {limit!.Value.TotalSeconds} seconds", null);
+            }
+
+            try
+            {
+                await Client.GetQueryResultsAsync(job, new GetQueryResultsOptions { Timeout = remaining ?? WaitWithoutLimit });
+                return;
+            }
+            catch (TimeoutException ex)
+            {
+                if (limit is not null)
+                {
+                    throw await OutcomeUnknownAsync(job, $"did not finish within {limit.Value.TotalSeconds} seconds", ex);
+                }
+
+                // no limit - wait again
+            }
+            catch (Exception ex) when (ex is GoogleApiException or HttpRequestException)
+            {
+                BigQueryJob current;
+                try
+                {
+                    current = await ReadAsync(() => Client.GetJobAsync(job));
+                }
+                catch (Exception readFailure) when (readFailure is GoogleApiException or HttpRequestException)
+                {
+                    throw await OutcomeUnknownAsync(job, "could not be read", readFailure);
+                }
+
+                if (current.State == JobState.Done && current.Status.ErrorResult is not null)
+                {
+                    throw Failure(current);
+                }
+
+                if (attempt >= MaxAttempts)
+                {
+                    throw await OutcomeUnknownAsync(job, "could not be read", ex);
+                }
+
+                await Task.Delay(Backoff(attempt));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asks BigQuery to cancel a job grate stops waiting for, and describes it. Cancelling is best effort: the job can
+    /// still finish, so its outcome is unknown.
+    /// </summary>
+    private async Task<BigQueryDbException> OutcomeUnknownAsync(JobReference job, string what, Exception? cause)
+    {
+        try
+        {
+            await Client.CancelJobAsync(job);
+        }
+        catch (Exception ex) when (ex is GoogleApiException or HttpRequestException)
+        {
+            _logger.LogWarning("Could not cancel BigQuery job {JobId}: {Error}", job.JobId, ex.Message);
+        }
+
+        return new BigQueryDbException(
+            $"BigQuery job {job.JobId} {what}. grate asked BigQuery to cancel it, but the job may still finish: check job " +
+            $"{job.JobId} in BigQuery before you run grate again.",
+            job.JobId,
+            cause);
+    }
+
+    // reading changes nothing, so a read that fails on its way is safe to try again
+    private static async Task<T> ReadAsync<T>(Func<Task<T>> read)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await read();
+            }
+            catch (Exception ex) when (attempt < MaxAttempts && IsRetriable(ex))
+            {
+                await Task.Delay(Backoff(attempt));
+            }
+        }
+    }
+
+    private static BigQueryDbException Failure(BigQueryJob job)
+    {
+        try
+        {
+            job.ThrowOnAnyError();
+        }
+        catch (GoogleApiException ex)
+        {
+            return new BigQueryDbException(ex, job.Reference.JobId);
+        }
+
+        throw new InvalidOperationException($"BigQuery job {job.Reference.JobId} failed, but reports no errors");
+    }
+
+    // a request that failed on its way, or that BigQuery refused for now
+    private static bool IsRetriable(Exception exception) => exception switch
+    {
+        HttpRequestException => true,
+        GoogleApiException ex => (int)ex.HttpStatusCode >= 500
+            || ex.HttpStatusCode == HttpStatusCode.TooManyRequests
+            || new BigQueryDbException(ex).IsTransient,
+        _ => false,
+    };
+
+    private static TimeSpan Backoff(int attempt) => TimeSpan.FromSeconds(Math.Pow(2, attempt));
+
+    // the client turns its own parameters into the REST API's internally, and grate uses only these three types
+    private static QueryParameter ToQueryParameter(BigQueryParameter parameter) => new()
+    {
+        Name = parameter.Name,
+        ParameterType = new QueryParameterType
+        {
+            Type = parameter.Type switch
+            {
+                BigQueryDbType.Int64 => "INT64",
+                BigQueryDbType.String => "STRING",
+                BigQueryDbType.Bool => "BOOL",
+                _ => throw new NotSupportedException($"grate passes no {parameter.Type} parameters to BigQuery"),
+            },
+        },
+        ParameterValue = new QueryParameterValue
+        {
+            Value = parameter.Value switch
+            {
+                null => null,
+                bool value => value ? "true" : "false",
+                IFormattable value => value.ToString(null, CultureInfo.InvariantCulture),
+                var value => value.ToString(),
+            },
+        },
+    };
 
     private sealed class NoConnection : IDisposable
     {

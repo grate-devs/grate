@@ -14,6 +14,7 @@ public class BigQueryScriptFailed(MigrationsFolder folder, string file, string? 
             ? new Dictionary<string, object?>
             {
                 { nameof(BigQueryDbException.Message), ex.Message },
+                { nameof(BigQueryDbException.JobId), ex.JobId },
                 { nameof(BigQueryDbException.HttpStatusCode), (int)ex.HttpStatusCode },
                 { nameof(BigQueryDbException.Reason), ex.Reason },
                 { nameof(BigQueryDbException.Location), ex.Location },
