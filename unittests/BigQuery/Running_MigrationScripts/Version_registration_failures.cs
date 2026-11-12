@@ -31,18 +31,21 @@ public class Version_registration_failures(BigQueryGrateTestContext testContext,
             await migrator.Migrate();
         }
 
-        // the next version insert fails, as it would without the right to write the table
+        // the next version registration fails, as it would without the right to read or write the version table
         using (var conn = Context.External.CreateDbConnection(db))
         {
-            await conn.ExecuteAsync($"DROP TABLE {Context.Syntax.TableWithSchema("grate", "Version")}");
+            await conn.ExecuteAsync($"DROP TABLE `{db}`.{Context.Syntax.TableWithSchema("grate", "Version")}");
         }
 
         WriteSql(parent, knownFolders[Up]!.Path, "2_second.sql", "CREATE TABLE second_table (id INT64);");
 
+        Exception exception;
         await using (var migrator = Context.Migrator.WithConfiguration(config))
         {
-            await Assert.ThrowsAnyAsync<Exception>(() => migrator.Migrate());
+            exception = await Assert.ThrowsAnyAsync<Exception>(() => migrator.Migrate());
         }
+
+        Assert.Contains("grate_Version", exception.Message);
 
         string[] tables;
         using (var conn = Context.External.CreateDbConnection(db))

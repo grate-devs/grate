@@ -21,7 +21,9 @@ public sealed class Cloned_databases : IAsyncDisposable
         var clone = (BigQueryDatabase)original.Clone();
         await clone.InitializeConnections(StubDatabase.Configuration(target, project, location));
 
+        // a script carries its own location, but a read of grate's tables takes the client's
         await clone.RunSql("SELECT 1", ConnectionType.Default, TransactionHandling.Default);
+        await clone.HasRun("1_first.sql", TransactionHandling.Default);
         await clone.DropDatabase();
         await clone.DisposeAsync();
 
@@ -31,6 +33,8 @@ public sealed class Cloned_databases : IAsyncDisposable
         var cloneJob = Assert.Single(target.Queries, x => x.Sql == "SELECT 1");
         Assert.Equal(project, cloneJob.Project);
         Assert.Equal(location, cloneJob.Location);
+        var cloneRead = Assert.Single(target.Queries, x => x.Sql!.Contains("script_name"));
+        Assert.Equal((project, location), (cloneRead.Project, cloneRead.Location));
         var drop = Assert.Single(target.Requests, x => x.Method == "DELETE");
         Assert.Equal((project, StubDatabase.Dataset), (drop.Project, drop.Dataset));
         var originalJob = Assert.Single(_first.Queries, x => x.Sql == "SELECT 2");

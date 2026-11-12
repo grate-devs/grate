@@ -54,10 +54,12 @@ dataset at a time.
 * **Rate limits.** A table takes 5 metadata changes per 10 seconds. DDL counts toward that limit; DML, such as grate's
   writes to its own tables, does not - it has [limits of its own](https://docs.cloud.google.com/bigquery/docs/troubleshoot-quotas).
   Prefer one `ALTER TABLE` per table per script, listing every new column.
-* **A failed script is not run again.** grate sends each script with a request id of its own. A request that fails on
-  its way, or that BigQuery refuses for now (`rateLimitExceeded`, `backendError`), is sent again with a back-off, under
-  the same id - BigQuery runs a request id once, so the script never runs twice. A script that BigQuery ran and that
-  failed is not run again, as the statements before the failure have run: fix the cause, and run grate again.
+* **A failed script is not run again.** grate starts each script with a request id of its own, which each job also
+  carries as the label `grate_request_id`. When no answer arrives, or BigQuery turns the request away (HTTP 429),
+  grate sends the request again with a back-off, under the same id, which BigQuery takes as the same request. When
+  BigQuery answers with an error, grate does not send the script again, as the statements before the failure may have
+  run: fix the cause, and run grate again. If BigQuery fails while it answers (HTTP 5xx), or no answer ever arrives,
+  grate cannot tell whether the script ran: it fails, naming the request id, so find the job in BigQuery first.
 * **Timeouts.** `--commandtimeout` (and `--admincommandtimeout` for the admin scripts) limits how long grate waits for a
   job; 0 waits without a limit. When the time is up, grate asks BigQuery to cancel the job and fails, naming the job.
   Cancelling is best effort, so the job may still finish: check it in BigQuery before you run grate again.

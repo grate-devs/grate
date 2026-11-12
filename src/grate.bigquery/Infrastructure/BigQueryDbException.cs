@@ -31,9 +31,10 @@ public sealed class BigQueryDbException : DbException
     }
 
     /// <summary>
-    /// A job whose outcome grate does not know - it stopped waiting for the job, or could not read it.
+    /// A query whose outcome grate does not know - it stopped waiting for the job, could not read it, or got no answer
+    /// it could use to the request that started it.
     /// </summary>
-    public BigQueryDbException(string message, string jobId, Exception? cause)
+    public BigQueryDbException(string message, string? jobId, Exception? cause)
         : base(message, cause)
     {
         JobId = jobId;

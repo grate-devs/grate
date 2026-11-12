@@ -12,13 +12,27 @@ public sealed class Job_identity : IAsyncDisposable
     [Fact]
     public async Task A_query_whose_answer_was_lost_runs_once()
     {
-        // BigQuery starts the query, but its answer is lost on the way back
+        // BigQuery starts the query, but its answer is lost on the way back - Google's client sends a request that got
+        // HTTP 503 again by itself
         _bigQuery.LoseAnswerTo = request => request.IsQuery && _bigQuery.Queries.Count == 1;
         await using var database = await StubDatabase.Initialize(_bigQuery);
 
         await database.RunSql("INSERT INTO t (id) VALUES (1)", ConnectionType.Default, TransactionHandling.Default);
 
         Assert.Equal(2, _bigQuery.Queries.Count);
+        Assert.Single(_bigQuery.CreatedJobIds);
+    }
+
+    [Fact]
+    public async Task A_query_BigQuery_turned_away_is_sent_again_as_itself()
+    {
+        _bigQuery.TurnAway = request => request.IsQuery && _bigQuery.Queries.Count == 1;
+        await using var database = await StubDatabase.Initialize(_bigQuery);
+
+        await database.RunSql("INSERT INTO t (id) VALUES (1)", ConnectionType.Default, TransactionHandling.Default);
+
+        Assert.Equal(2, _bigQuery.Queries.Count);
+        Assert.Single(_bigQuery.Queries.Select(x => x.RequestId).Distinct());
         Assert.Single(_bigQuery.CreatedJobIds);
     }
 
@@ -37,6 +51,7 @@ public sealed class Job_identity : IAsyncDisposable
             database.RunSql("UPDATE t SET x = 1 WHERE TRUE", ConnectionType.Default, TransactionHandling.Default));
 
         Assert.Equal("rateLimitExceeded", exception.Reason);
+        Assert.Single(_bigQuery.Queries);
         var jobId = Assert.Single(_bigQuery.CreatedJobIds);
 
         // BigQuery's answer to a query that failed names no job

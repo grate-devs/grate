@@ -42,12 +42,14 @@ public sealed record StubRequest(string Method, string Path, string Query, JsonN
 }
 
 /// <summary>
-/// How a job the <see cref="BigQueryStub"/> creates ends, and how many of the stub's answers about it - to the query,
-/// to a read of its results, to a read of the job - still find it running.
+/// How a job the <see cref="BigQueryStub"/> creates ends, the one row it returns if any, and how many of the stub's
+/// answers about it - to the query, to a read of its results, to a read of the job - still find it running.
 /// </summary>
-public sealed record StubJob(string State, string? ErrorReason = null, int AnswersWhileRunning = 0)
+public sealed record StubJob(string State, string? ErrorReason = null, int AnswersWhileRunning = 0, (string Column, string Value)? Row = null)
 {
     public static StubJob Succeeds { get; } = new("DONE");
+
+    public static StubJob Returns(string column, string value) => new("DONE", Row: (column, value));
 
     public static StubJob Running { get; } = new("RUNNING");
 

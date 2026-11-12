@@ -29,10 +29,13 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     private const string NotVersioning = "0.0.0.0";
 
     /// <summary>
-    /// How many times grate sends a request, or reads a job, while its failure is one that passes: the request failed
-    /// on its way, or BigQuery refused it for now (<c>rateLimitExceeded</c>, <c>backendError</c>).
+    /// How many times grate sends a request that got no answer, or that BigQuery turned away, and how many times it
+    /// tries a read that failed in a way that passes.
     /// </summary>
     private const int MaxAttempts = 5;
+
+    // the label that carries grate's request id on each job
+    private const string RequestIdLabel = "grate_request_id";
 
     // how long BigQuery holds a jobs.query request for the query to finish - Google's own default
     private static readonly TimeSpan QueryRequestWait = TimeSpan.FromSeconds(10);
@@ -497,14 +500,16 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     }
 
     /// <summary>
-    /// Starts the query with <c>jobs.query</c>, under a request id of grate's own. A request that fails on its way, or
-    /// that BigQuery refuses for now, is sent again with the same id: BigQuery runs a request id once, so the query
-    /// never runs twice. A query BigQuery ran and that failed is not run again - a script's statements before the
-    /// failure have run.
+    /// Starts the query with <c>jobs.query</c>, under a request id of grate's own. When no answer arrives, or BigQuery
+    /// turns the request away before it runs it (HTTP 429), the request is sent again with the same id: BigQuery takes
+    /// a repeat of a request it is running, or has run, as that request. Any other error is BigQuery's answer and is
+    /// not sent again - the query may have failed after a script's earlier statements ran, and BigQuery does not say
+    /// that it takes the repeat of a failed request as that request.
     /// </summary>
     private async Task<(JobReference Job, bool Finished)> SubmitAsync(
         string sql, bool admin, BigQueryParameter[] parameters, TimeSpan? limit)
     {
+        var requestId = Guid.NewGuid().ToString();
         var request = new QueryRequest
         {
             Query = sql,
@@ -514,7 +519,10 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             Location = Settings.Location,
             ParameterMode = parameters.Length == 0 ? null : "named",
             QueryParameters = parameters.Length == 0 ? null : parameters.Select(ToQueryParameter).ToList(),
-            RequestId = Guid.NewGuid().ToString(),
+            RequestId = requestId,
+
+            // the request id on the job too, to find a job whose answer never arrived
+            Labels = new Dictionary<string, string> { [RequestIdLabel] = requestId },
 
             // a job, so that grate can wait for it, cancel it and name it
             JobCreationMode = "JOB_CREATION_REQUIRED",
@@ -532,16 +540,25 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
                 // errors in a finished answer are read from the job, as when it had not finished
                 return (response.JobReference, response.JobComplete == true && !(response.Errors?.Count > 0));
             }
-            catch (Exception ex) when (attempt < MaxAttempts && IsRetriable(ex))
+            catch (Exception ex) when (attempt < MaxAttempts && IsUnanswered(ex))
             {
                 var delay = Backoff(attempt);
-                _logger.LogWarning("BigQuery request {RequestId} failed, and will be sent again: attempt {Attempt}, in {Delay}: {Error}",
-                    request.RequestId, attempt, delay, ex.Message);
+                _logger.LogWarning("BigQuery request {RequestId} got no answer, and will be sent again: attempt {Attempt}, in {Delay}: {Error}",
+                    requestId, attempt, delay, ex.Message);
                 await Task.Delay(delay);
+            }
+            catch (GoogleApiException ex) when ((int)ex.HttpStatusCode >= 500)
+            {
+                // BigQuery failed while it answered: the query may never have started, or may have run
+                throw RequestOutcomeUnknown(requestId, ex);
             }
             catch (GoogleApiException ex)
             {
                 throw new BigQueryDbException(ex);
+            }
+            catch (Exception ex) when (IsUnanswered(ex))
+            {
+                throw RequestOutcomeUnknown(requestId, ex);
             }
         }
     }
@@ -552,7 +569,8 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     /// </summary>
     private async Task WaitAsync(JobReference job, TimeSpan? limit, Stopwatch waited)
     {
-        for (var attempt = 1; ; attempt++)
+        var failedReads = 0;
+        while (true)
         {
             var remaining = limit - waited.Elapsed;
             if (remaining <= TimeSpan.Zero)
@@ -574,29 +592,36 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
 
                 // no limit - wait again
             }
-            catch (Exception ex) when (ex is GoogleApiException or HttpRequestException)
+            catch (Exception ex) when (ex is GoogleApiException || IsUnanswered(ex))
             {
                 BigQueryJob current;
                 try
                 {
                     current = await ReadAsync(() => Client.GetJobAsync(job));
                 }
-                catch (Exception readFailure) when (readFailure is GoogleApiException or HttpRequestException)
+                catch (Exception readFailure) when (readFailure is GoogleApiException || IsUnanswered(readFailure))
                 {
                     throw await OutcomeUnknownAsync(job, "could not be read", readFailure);
                 }
 
-                if (current.State == JobState.Done && current.Status.ErrorResult is not null)
+                if (current.State == JobState.Done)
                 {
-                    throw Failure(current);
+                    if (current.Status.ErrorResult is not null)
+                    {
+                        throw Failure(current);
+                    }
+
+                    // it finished, and grate does not read its rows
+                    return;
                 }
 
-                if (attempt >= MaxAttempts)
+                failedReads++;
+                if (failedReads >= MaxAttempts)
                 {
                     throw await OutcomeUnknownAsync(job, "could not be read", ex);
                 }
 
-                await Task.Delay(Backoff(attempt));
+                await Task.Delay(Backoff(failedReads));
             }
         }
     }
@@ -611,7 +636,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         {
             await Client.CancelJobAsync(job);
         }
-        catch (Exception ex) when (ex is GoogleApiException or HttpRequestException)
+        catch (Exception ex) when (ex is GoogleApiException || IsUnanswered(ex))
         {
             _logger.LogWarning("Could not cancel BigQuery job {JobId}: {Error}", job.JobId, ex.Message);
         }
@@ -622,6 +647,16 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             job.JobId,
             cause);
     }
+
+    /// <summary>
+    /// A request whose answer grate cannot use: the query may never have started, or may have run, or may still run.
+    /// </summary>
+    private static BigQueryDbException RequestOutcomeUnknown(string requestId, Exception cause) =>
+        new(
+            $"BigQuery request {requestId} got no answer grate can use, so the query may have run or may still run: " +
+            $"find its job by the label {RequestIdLabel}:{requestId} in BigQuery before you run grate again.",
+            null,
+            cause);
 
     // reading changes nothing, so a read that fails on its way is safe to try again
     private static async Task<T> ReadAsync<T>(Func<Task<T>> read)
@@ -643,7 +678,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     {
         try
         {
-            job.ThrowOnAnyError();
+            job.ThrowOnFatalError();
         }
         catch (GoogleApiException ex)
         {
@@ -653,13 +688,22 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         throw new InvalidOperationException($"BigQuery job {job.Reference.JobId} failed, but reports no errors");
     }
 
-    // a request that failed on its way, or that BigQuery refused for now
+    // a read that failed on its way, or that BigQuery refused for now - a read is safe to send again
     private static bool IsRetriable(Exception exception) => exception switch
     {
-        HttpRequestException => true,
         GoogleApiException ex => (int)ex.HttpStatusCode >= 500
             || ex.HttpStatusCode == HttpStatusCode.TooManyRequests
             || new BigQueryDbException(ex).IsTransient,
+        _ => IsUnanswered(exception),
+    };
+
+    // no answer arrived (the connection failed, or the HTTP client gave up), or BigQuery turned the request away
+    // before it ran it
+    private static bool IsUnanswered(Exception exception) => exception switch
+    {
+        HttpRequestException => true,
+        TaskCanceledException => true,
+        GoogleApiException ex => ex.HttpStatusCode == HttpStatusCode.TooManyRequests,
         _ => false,
     };
 

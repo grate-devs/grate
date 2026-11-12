@@ -46,6 +46,11 @@ public sealed class BigQueryStub : IAsyncDisposable
     /// </summary>
     public Func<StubRequest, bool> LoseAnswerTo { get; set; } = _ => false;
 
+    /// <summary>
+    /// Requests the stub turns away before it carries them out, with HTTP 429.
+    /// </summary>
+    public Func<StubRequest, bool> TurnAway { get; set; } = _ => false;
+
     public IReadOnlyList<StubRequest> Requests => _requests.ToArray();
 
     public IReadOnlyList<StubRequest> Queries => Requests.Where(x => x.IsQuery).ToArray();
@@ -85,7 +90,9 @@ public sealed class BigQueryStub : IAsyncDisposable
         var request = await ReadAsync(context.Request);
         _requests.Enqueue(request);
 
-        var (status, body) = await AnswerAsync(request);
+        var (status, body) = TurnAway(request)
+            ? Error(HttpStatusCode.TooManyRequests, "rateLimitExceeded", "Too many requests")
+            : await AnswerAsync(request);
         if (LoseAnswerTo(request))
         {
             (status, body) = Error(HttpStatusCode.ServiceUnavailable, "backendError", "The answer was lost");
@@ -169,20 +176,31 @@ public sealed class BigQueryStub : IAsyncDisposable
 
         if (outcome.ErrorReason is { } reason)
         {
-            return Error(HttpStatusCode.BadRequest, reason, $"The job failed: {reason}");
+            // as BigQuery answers a query that failed
+            var status = reason switch
+            {
+                "accessDenied" or "rateLimitExceeded" => HttpStatusCode.Forbidden,
+                "notFound" => HttpStatusCode.NotFound,
+                _ => HttpStatusCode.BadRequest,
+            };
+            return Error(status, reason, $"The job failed: {reason}");
         }
 
+        var (column, value) = outcome.Row ?? ("value", "");
+        var rows = outcome.Row is null
+            ? new JsonArray()
+            : new JsonArray(new JsonObject { ["f"] = new JsonArray(new JsonObject { ["v"] = value }) });
         return (HttpStatusCode.OK, new JsonObject
         {
             ["kind"] = kind,
             ["jobReference"] = reference.DeepClone(),
             ["jobComplete"] = true,
-            ["totalRows"] = "0",
+            ["totalRows"] = rows.Count.ToString(),
             ["schema"] = new JsonObject
             {
-                ["fields"] = new JsonArray(new JsonObject { ["name"] = "value", ["type"] = "INTEGER", ["mode"] = "NULLABLE" }),
+                ["fields"] = new JsonArray(new JsonObject { ["name"] = column, ["type"] = "INTEGER", ["mode"] = "NULLABLE" }),
             },
-            ["rows"] = new JsonArray(),
+            ["rows"] = rows,
         });
     }
 
