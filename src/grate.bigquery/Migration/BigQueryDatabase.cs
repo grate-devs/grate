@@ -167,31 +167,28 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
 
     public async Task<long> VersionTheDatabase(string newVersion)
     {
-        long versionId;
-
-        try
+        if (await IsInitialBootstrap())
         {
-            // the next id is one above the highest - only one migration runs against a database at a time
-            var rows = await QueryAsync($"SELECT COALESCE(MAX(id), 0) + 1 AS id FROM {VersionTable}");
-            versionId = (long)rows.Single()["id"];
+            // the bootstrap scripts create grate's tables, so the first bootstrap versions itself before its version
+            // table exists - its deferred history belongs to the version the next internal migration inserts
+            _logger.LogDebug("No version table in {DatabaseName} yet - using version id 1", DatabaseName);
+            return 1;
+        }
 
-            await QueryAsync(
-                $"""
-                INSERT INTO {VersionTable} (id, repository_path, version, entry_date, modified_date, entered_by, status)
-                VALUES (@id, CAST(@repository_path AS STRING), @version, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @entered_by, @status)
-                """,
-                new BigQueryParameter("id", BigQueryDbType.Int64, versionId),
-                new BigQueryParameter("repository_path", BigQueryDbType.String, _config?.RepositoryPath),
-                new BigQueryParameter("version", BigQueryDbType.String, newVersion),
-                new BigQueryParameter("entered_by", BigQueryDbType.String, UserName),
-                new BigQueryParameter("status", BigQueryDbType.String, MigrationStatus.InProgress));
-        }
-        catch (BigQueryDbException ex)
-        {
-            // the bootstrap versions itself before its version table exists, as with grate's other providers
-            _logger.LogDebug(ex, "Could not find the version table in {DatabaseName} - using version id 1", DatabaseName);
-            versionId = 1;
-        }
+        // the next id is one above the highest - only one migration runs against a database at a time
+        var rows = await QueryAsync($"SELECT COALESCE(MAX(id), 0) + 1 AS id FROM {VersionTable}");
+        var versionId = (long)rows.Single()["id"];
+
+        await QueryAsync(
+            $"""
+            INSERT INTO {VersionTable} (id, repository_path, version, entry_date, modified_date, entered_by, status)
+            VALUES (@id, CAST(@repository_path AS STRING), @version, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @entered_by, @status)
+            """,
+            new BigQueryParameter("id", BigQueryDbType.Int64, versionId),
+            new BigQueryParameter("repository_path", BigQueryDbType.String, _config?.RepositoryPath),
+            new BigQueryParameter("version", BigQueryDbType.String, newVersion),
+            new BigQueryParameter("entered_by", BigQueryDbType.String, UserName),
+            new BigQueryParameter("status", BigQueryDbType.String, MigrationStatus.InProgress));
 
         _logger.LogInformation(" Versioning {DbName} database with version {Version}.", DatabaseName, newVersion);
 
@@ -385,6 +382,9 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     /// they exist.
     /// </summary>
     private bool Bootstrapping => _config?.Environment == GrateEnvironment.InternalBootstrap;
+
+    // as AnsiSqlDatabase.IsInitialBootstrap - grate's first bootstrap runs before its version table exists
+    private async Task<bool> IsInitialBootstrap() => Bootstrapping && !await VersionTableExists();
 
     // as grate's other providers record who ran a migration
     private static string UserName => ClaimsPrincipal.Current?.Identity?.Name ?? Environment.UserName;
