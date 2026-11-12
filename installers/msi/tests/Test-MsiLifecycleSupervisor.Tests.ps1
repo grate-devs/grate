@@ -180,6 +180,28 @@ try {
         if ($process.ExitCode -ne $ExpectedExitCode -or $observation.TimedOut -ne $ExpectedTimeout) {
             throw "$Mode supervisor returned the wrong exit/timeout outcome."
         }
+        if ($ExpectedTimeout) {
+            # ExitCode is read through the supervisor's owned native handle only
+            # after termination. Test cleanup must not supply a missing kill.
+            if ($null -eq $observation.ExitCode -or $observation.ExitCode -ne 1) {
+                throw "$Mode timed-out worker did not retain its terminated exit code."
+            }
+            $workerId = 0
+            if (![int]::TryParse([string]$observation.ProcessId, [ref]$workerId) -or $workerId -le 0) {
+                throw "$Mode timed-out worker did not retain its creation PID."
+            }
+            $timedOutWorker = $null
+            try {
+                $timedOutWorker = Get-Process -Id $workerId -ErrorAction SilentlyContinue
+                if ($null -ne $timedOutWorker -and !$timedOutWorker.HasExited) {
+                    throw "$Mode timed-out worker was still alive before test cleanup."
+                }
+            } finally {
+                if ($null -ne $timedOutWorker) {
+                    $timedOutWorker.Dispose()
+                }
+            }
+        }
         if ($Mode -eq 'NativeFailure' -and $observation.ExitCode -ne 37) {
             throw 'Native failure exit code was not retained.'
         }
