@@ -51,9 +51,16 @@ dataset at a time.
   stored as written, though, so qualify the tables a view reads: `{% raw %}{{DatabaseName}}{% endraw %}.my_table`.
   Scripts in `dropDatabase`, `createDatabase` and `alterDatabase` are the exception: they can run before the dataset
   exists, so they have no default dataset, and every table in them needs its dataset.
-* **Rate limits.** A table takes 5 metadata changes (DDL, and DML on grate's tables) per 10 seconds. grate tries a job
-  again, with a back-off, when BigQuery answers `rateLimitExceeded` or `backendError`, but prefer one `ALTER TABLE` per
-  table per script, listing every new column.
+* **Rate limits.** A table takes 5 metadata changes per 10 seconds. DDL counts toward that limit; DML, such as grate's
+  writes to its own tables, does not - it has [limits of its own](https://docs.cloud.google.com/bigquery/docs/troubleshoot-quotas).
+  Prefer one `ALTER TABLE` per table per script, listing every new column.
+* **A failed script is not run again.** grate sends each script with a request id of its own. A request that fails on
+  its way, or that BigQuery refuses for now (`rateLimitExceeded`, `backendError`), is sent again with a back-off, under
+  the same id - BigQuery runs a request id once, so the script never runs twice. A script that BigQuery ran and that
+  failed is not run again, as the statements before the failure have run: fix the cause, and run grate again.
+* **Timeouts.** `--commandtimeout` (and `--admincommandtimeout` for the admin scripts) limits how long grate waits for a
+  job; 0 waits without a limit. When the time is up, grate asks BigQuery to cancel the job and fails, naming the job.
+  Cancelling is best effort, so the job may still finish: check it in BigQuery before you run grate again.
 * **Not supported:** `--restore`, and the database user and permission scripts that some other databases use.
 
 ## Trying it locally
