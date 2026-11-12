@@ -96,6 +96,9 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
+        # Only the ordinary SQL Server test host owns these pool lifetimes.
+        GRATE_SQLSERVER_SCOPED_POOLING: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
         # The 35-minute budget can expire during the fourth sequential Oracle TFM.
         # Keep diagnostics alive beyond the test deadline, within the 45-minute job cap.
         TEST_TIMEOUT: ${{ matrix.category == 'Oracle' && '40m' || '20m' }}
@@ -130,6 +133,8 @@ jobs:
       env:
         LogLevel: Warning
         TZ: UTC
+        GRATE_SQLSERVER_SCOPED_POOLING: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
+        GRATE_REPRODUCIBLE_TABLE_CASINGS: ${{ matrix.category == 'SqlServer' && 'true' || 'false' }}
 
     - name: Upload Unit Test Results
       if: always()
