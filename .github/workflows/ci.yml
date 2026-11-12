@@ -1,114 +1,100 @@
-name: Oracle ARM64 MSI live checkpoints
+name: MSI regression evidence controls
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  replay:
-    name: Oracle ARM64 phase replay
-    runs-on: windows-11-arm
-    timeout-minutes: 20
-    env:
-      STANDALONE_VERSION: '0.0.1'
+  controls:
+    name: MSI controls ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: X64
+          - runner: windows-11-arm
+            arch: Arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
-        with:
-          global-json-file: global.json
       - name: Verify native architecture
         shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
         run: |
-          if ([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString() -ne 'Arm64') {
-            throw 'MSI replay must execute natively on ARM64.'
+          if ([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString() -cne $env:EXPECTED_ARCH) {
+            throw 'MSI controls must run on their native architecture.'
           }
-      - name: Build and verify the Oracle CLI
-        shell: pwsh
-        run: ./scripts/verify-packages.ps1 -Kind Standalone -Distribution Oracle -RuntimeIdentifier win-arm64 -StandaloneVersion $env:STANDALONE_VERSION -OutputDirectory "${{ runner.temp }}/grate-cli" -RunSmokeTest
-      - name: Build and verify the actual MSI
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $identity = ./installers/msi/helpers/Get-InstallerIdentity.ps1 -Version $env:STANDALONE_VERSION -Distribution Oracle -Architecture arm64
-          "MSI_PACKAGE_ID=$($identity.PackageId)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          ./installers/msi/Create-Installer.ps1 -grateExe "${{ runner.temp }}/grate-cli/published/grate.exe" -Version $env:STANDALONE_VERSION -Distribution Oracle -arch arm64
-          ./installers/msi/tests/Test-InstallerMetadata.Tests.ps1 -MsiPath "installers/msi/tmp/$($identity.PackageId)-$env:STANDALONE_VERSION.msi" -ExpectedVersion $env:STANDALONE_VERSION -Distribution Oracle -ExpectedArchitecture arm64
-      - name: Launch detached unchanged lifecycle diagnostic
-        id: launch
+      - name: Run native component controls
         timeout-minutes: 2
         shell: pwsh
-        run: |
-          $parameters = @{
-            MsiPath = "./installers/msi/tmp/$env:MSI_PACKAGE_ID-$env:STANDALONE_VERSION.msi"
-            PublishedExecutable = "${{ runner.temp }}/grate-cli/published/grate.exe"
-            Architecture = 'arm64'
-            Distribution = 'Oracle'
-            OutputDirectory = "${{ runner.temp }}/grate-msi-lifecycle"
-          }
-          ./installers/msi/tests/support/Start-MsiDiagnosticReplayDetached.ps1 -Parameters $parameters -DeadlineSeconds 450
-      - name: Capture checkpoint one while replay may be active
-        if: always()
+        run: ./installers/msi/tests/support/Test-MsiLifecycleNativeProcess.Tests.ps1 -OutputDirectory "${{ runner.temp }}/msi-native-controls"
+      - name: Run all eight supervisor cases
         timeout-minutes: 2
         shell: pwsh
-        run: |
-          if (Test-Path -LiteralPath "${{ runner.temp }}/grate-msi-lifecycle-detached/launch.json") {
-            Start-Sleep -Seconds 45
-          }
-          ./installers/msi/tests/support/Copy-MsiReplayCheckpoint.ps1 -LifecycleDirectory "${{ runner.temp }}/grate-msi-lifecycle" -OutputDirectory "${{ runner.temp }}/msi-checkpoint-1"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: always()
+        run: ./installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1
+      - name: Reject missing worker termination before cleanup
         timeout-minutes: 2
-        with:
-          name: oracle-arm64-msi-checkpoint-1
-          path: ${{ runner.temp }}/msi-checkpoint-1/**
-          retention-days: 3
-      - name: Capture checkpoint two while replay may be active
-        if: always()
-        timeout-minutes: 2
-        shell: pwsh
-        run: |
-          if (Test-Path -LiteralPath "${{ runner.temp }}/grate-msi-lifecycle-detached/launch.json") {
-            Start-Sleep -Seconds 45
-          }
-          ./installers/msi/tests/support/Copy-MsiReplayCheckpoint.ps1 -LifecycleDirectory "${{ runner.temp }}/grate-msi-lifecycle" -OutputDirectory "${{ runner.temp }}/msi-checkpoint-2"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: always()
-        timeout-minutes: 2
-        with:
-          name: oracle-arm64-msi-checkpoint-2
-          path: ${{ runner.temp }}/msi-checkpoint-2/**
-          retention-days: 3
-      - name: Require atomic full replay completion
-        if: ${{ always() && steps.launch.outcome == 'success' }}
-        timeout-minutes: 9
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $directory = "${{ runner.temp }}/grate-msi-lifecycle-detached"
-          $launch = Get-Content -LiteralPath "$directory/launch.json" -Raw | ConvertFrom-Json
-          $limit = ([DateTime]$launch.StartedUtc).ToUniversalTime().AddSeconds($launch.DeadlineSeconds + 30)
-          $completionPath = "$directory/entry-completion.json"
-          while (!(Test-Path -LiteralPath $completionPath)) {
-            if ([DateTime]::UtcNow -ge $limit) {
-              throw 'Atomic MSI replay completion was not published within its deadline; partial phase checkpoints remain diagnostic only.'
-            }
-            Start-Sleep -Seconds 1
+          $PSNativeCommandUseErrorActionPreference = $false
+          $PSStyle.OutputRendering = 'PlainText'
+          $directory = Join-Path $env:RUNNER_TEMP 'msi-missed-kill-control'
+          $support = Join-Path $directory 'tests/support'
+          New-Item -ItemType Directory -Path $support -Force | Out-Null
+          Copy-Item -LiteralPath './installers/msi/InstallerLifecycle.Diagnostics.ps1' -Destination $directory
+          foreach ($name in @('MsiLifecycle.NativeProcess.cs', 'MsiLifecycle.Worker.ps1')) {
+            Copy-Item -LiteralPath "./installers/msi/tests/support/$name" -Destination $support
           }
-          $completion = Get-Content -LiteralPath $completionPath -Raw | ConvertFrom-Json
-          if (!$completion.Succeeded -or !$completion.ReplayReturned -or !$completion.CompletedUtc) {
-            throw 'Detached MSI replay failed or returned without complete lifecycle evidence.'
+          $source = Get-Content -LiteralPath './installers/msi/tests/support/Invoke-MsiLifecycle.ps1' -Raw
+          $needle = '        $process.Kill()'
+          if ([regex]::Matches($source, [regex]::Escape($needle)).Count -ne 1) {
+            throw 'Expected exactly one owned worker termination to mutate.'
           }
-          Write-Host 'Unchanged MSI lifecycle completed; atomic replay completion verified.'
-      - name: Capture final phase state
-        if: always()
-        timeout-minutes: 2
-        shell: pwsh
-        run: ./installers/msi/tests/support/Copy-MsiReplayCheckpoint.ps1 -LifecycleDirectory "${{ runner.temp }}/grate-msi-lifecycle" -OutputDirectory "${{ runner.temp }}/msi-checkpoint-final"
+          $mutant = Join-Path $support 'Invoke-MsiLifecycle.ps1'
+          $source.Replace($needle, '        # Deliberately omit termination in this controlled mutant.') |
+            Set-Content -LiteralPath $mutant
+          $runner = Join-Path $directory 'run-mutant.ps1'
+          @'
+          param([string]$TestPath, [string]$SupervisorPath, [string]$FailurePath)
+          $ErrorActionPreference = 'Stop'
+          try {
+              & $TestPath -SupervisorPath $SupervisorPath -Cases WorkerHang
+              exit 0
+          } catch {
+              $_.Exception.Message | Set-Content -LiteralPath $FailurePath
+              exit 1
+          }
+          '@ | Set-Content -LiteralPath $runner
+          $failure = Join-Path $directory 'assertion.txt'
+          $arguments = @(
+            '-NoLogo', '-NoProfile', '-NonInteractive', '-File',
+            $runner, '-TestPath', (Resolve-Path './installers/msi/tests/Test-MsiLifecycleSupervisor.Tests.ps1').Path,
+            '-SupervisorPath', $mutant, '-FailurePath', $failure
+          )
+          $output = & (Join-Path $PSHOME 'pwsh.exe') @arguments 2>&1
+          $exitCode = $LASTEXITCODE
+          $output | Set-Content -LiteralPath (Join-Path $directory 'mutant-output.log')
+          if ($exitCode -eq 0) {
+            throw 'The missed-termination mutant was incorrectly accepted.'
+          }
+          # Reject the mutant only at the intended pre-cleanup assertion.
+          if (!(Test-Path -LiteralPath $failure) -or
+              (Get-Content -LiteralPath $failure -Raw).Trim() -cne 'WorkerHang timed-out worker did not retain its terminated exit code.') {
+            throw 'The mutant failed without the intended worker-termination assertion.'
+          }
+          @{ ExitCode = $exitCode; ExpectedRejection = $true } |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'result.json')
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
-        timeout-minutes: 2
         with:
-          name: oracle-arm64-msi-checkpoint-final
-          path: ${{ runner.temp }}/msi-checkpoint-final/**
+          name: msi-regression-controls-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/msi-native-controls/**
+            ${{ runner.temp }}/lifecycle/supervisor contract evidence/**
+            ${{ runner.temp }}/msi-missed-kill-control/**
           retention-days: 3
