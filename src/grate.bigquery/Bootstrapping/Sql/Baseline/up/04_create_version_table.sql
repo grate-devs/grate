@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS {{SchemaName}}_{{VersionTable}} (
+CREATE TABLE IF NOT EXISTS `{{SchemaName}}_{{VersionTable}}` (
     id INT64,
     repository_path STRING,
     version STRING,

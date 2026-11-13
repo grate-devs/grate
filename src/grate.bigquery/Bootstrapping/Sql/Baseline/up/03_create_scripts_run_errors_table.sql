@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS {{SchemaName}}_{{ScriptsRunErrorsTable}} (
+CREATE TABLE IF NOT EXISTS `{{SchemaName}}_{{ScriptsRunErrorsTable}}` (
     id INT64,
     repository_path STRING,
     version STRING,
