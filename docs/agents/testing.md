@@ -200,10 +200,15 @@ matrix entries and successful artifact publication establish no runtime coverage
 
 `ci.yml` additionally requires twelve All/slim CLI lanes, including
 `CommandLine.SqlServerCaseSensitive` for SQL Server's case-sensitive database
-contract. `scripts/ci/Invoke-DistributionTests.ps1` publishes the selected
-self-contained binary and installs its exact local NuGet tool, verifies provider
-dependencies (all four tool TFMs), then runs the complete matching CommandLine
-suite against both forms on net11.0. The existing library matrix still exercises
+contract. `scripts/ci/Prepare-DistributionTests.ps1` prepares all six self-contained
+profiles, their four-TFM tool packages and the six normal JIT test payloads once.
+Each CLI lane downloads only its selected profile and suite from the same run.
+`scripts/ci/Invoke-DistributionTests.ps1` validates the prepared source, runtime,
+profile, suite and file identities, installs the exact tool from a fresh local
+feed/cache, verifies provider dependencies (all four tool TFMs), then runs the
+complete matching CommandLine suite against both forms on net11.0. Its default
+local mode still builds fresh artifacts before running the suites. The existing
+library matrix still exercises
 the provider suites on all supported frameworks. CLI overrides retain their
 explicit skips for inaccessible in-process exception details; see the reports
 for exact execution and skip counts.

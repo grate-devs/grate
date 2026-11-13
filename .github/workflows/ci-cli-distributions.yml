@@ -40,12 +40,22 @@ jobs:
             9.0.x
             10.0.x
             11.0.100
+      - name: Download selected distribution payload
+        uses: actions/download-artifact@v8
+        with:
+          name: cli-profile-${{ matrix.distribution }}-linux-x64
+          path: ${{ runner.temp }}/prepared-distribution
+      - name: Download selected test payload
+        uses: actions/download-artifact@v8
+        with:
+          name: cli-tests-${{ matrix.database }}-linux-x64
+          path: ${{ runner.temp }}/prepared-tests
       - name: Test published CLI and installed tool against database
         shell: pwsh
         env:
           LogLevel: Warning
           TZ: UTC
-        run: ./scripts/ci/Invoke-DistributionTests.ps1 -Distribution '${{ matrix.distribution }}' -Database '${{ matrix.database }}' -OutputDirectory '${{ runner.temp }}/distribution-tests'
+        run: ./scripts/ci/Invoke-DistributionTests.ps1 -Distribution '${{ matrix.distribution }}' -Database '${{ matrix.database }}' -OutputDirectory '${{ runner.temp }}/distribution-tests' -PreparedDistributionDirectory '${{ runner.temp }}/prepared-distribution' -PreparedTestsDirectory '${{ runner.temp }}/prepared-tests'
       - name: Upload distribution test results
         if: always()
         uses: actions/upload-artifact@v7

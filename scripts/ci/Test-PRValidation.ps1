@@ -6,7 +6,7 @@ $script:passed = 0
 function New-Fixture {
     # A contract fixture, not a call to the production inventory. Matrix names
     # match the checks GitHub emits, including Windows provider filter arguments.
-    $names = @('Build', 'NuGet libraries and installed tool', 'PR validation policy')
+    $names = @('Build', 'NuGet libraries and installed tool', 'PR validation policy', 'Prepare CLI artifacts')
     foreach ($category in @('Basic_tests', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Sqlite', 'Oracle')) {
         $names += "Run tests (ubuntu-latest, $category)"
     }
@@ -38,9 +38,9 @@ function New-Fixture {
         }
         $names += "CLI database All / $database", "CLI database $slim / $database"
     }
-    if ($names.Count -ne 94) { throw 'Fixture must contain 94 required jobs.' }
+    if ($names.Count -ne 95) { throw 'Fixture must contain 95 required jobs.' }
     $needs = @{}
-    foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
+    foreach ($group in @('build-code', 'test', 'cli-distribution-build', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
         $needs[$group] = @{ result = 'success' }
     }
     $jobs = @($names | ForEach-Object { @{ name = $_; status = 'completed'; conclusion = 'success'; run_id = 123; run_attempt = 1 } })
@@ -48,13 +48,28 @@ function New-Fixture {
         $stepNames = @()
         if ($job.name -ceq 'Build') { $stepNames = @('Restore dependencies', 'Build') }
         if ($job.name -ceq 'PR validation policy') { $stepNames = @('Check build-independent contracts') }
+        if ($job.name -ceq 'Prepare CLI artifacts') {
+            $stepNames = @('Prepare standalone, tool and test payloads')
+            foreach ($profile in @('All', 'SQLite', 'SQLServer', 'MariaDB', 'PostgreSQL', 'Oracle')) {
+                $stepNames += "Upload profile $profile"
+            }
+            foreach ($database in @('Sqlite', 'SqlServer', 'SqlServerCaseSensitive', 'PostgreSQL', 'MariaDB', 'Oracle')) {
+                $stepNames += "Upload tests $database"
+            }
+        }
         if ($job.name -ceq 'NuGet libraries and installed tool') {
             $stepNames = @('Check standalone verification command contract', 'Verify packages across supported frameworks')
         }
         if ($job.name.StartsWith('Run tests (ubuntu-latest, ')) { $stepNames = @('Test on Linux') }
         if ($job.name.StartsWith('Run tests (windows-latest, ')) { $stepNames = @('Test on Windows') }
         if ($job.name.StartsWith('CLI ')) { $stepNames = @('Verify self-contained runtime and execution') }
-        if ($job.name.StartsWith('CLI database ')) { $stepNames = @('Test published CLI and installed tool against database') }
+        if ($job.name.StartsWith('CLI database ')) {
+            $stepNames = @(
+                'Download selected distribution payload'
+                'Download selected test payload'
+                'Test published CLI and installed tool against database'
+            )
+        }
         if ($job.name -cmatch '^CLI (?:SQLite |SQLServer |MariaDB |PostgreSQL |Oracle )?win-(?:x64|arm64)$') {
             $stepNames += @('Check per-user MSI authoring regressions', 'Build MSI from verified Windows binary',
                 'Check verified Windows MSI metadata', 'Verify installed MSI, major upgrade and uninstall')
@@ -94,6 +109,10 @@ function ConvertTo-ApiJobFixture {
             }
             '^NuGet libraries and installed tool$' {
                 'Packages'
+                break
+            }
+            '^Prepare CLI artifacts$' {
+                'CLI distribution build'
                 break
             }
             '^Run tests \((ubuntu|windows)-latest, Basic_tests\)$' {
@@ -163,7 +182,7 @@ $fixture.jobs += @{ name = 'Create test report'; status = 'completed'; conclusio
 $fixture.jobs += @{ name = 'Analyze Code Security'; status = 'completed'; conclusion = 'failure'; run_id = 123; run_attempt = 1 }
 Invoke-Gate $fixture
 $script:passed++
-$fixture.jobs[3].conclusion = 'failure'
+($fixture.jobs | Where-Object name -CEQ 'Run tests (ubuntu-latest, Basic_tests)').conclusion = 'failure'
 Assert-Rejected 'green report with red test' { Invoke-Gate $fixture } 'Required job.*Run tests.*failure'
 
 foreach ($conclusion in @('failure', 'cancelled', 'skipped', 'timed_out', 'neutral', 'action_required', 'unknown', $null)) {
@@ -190,7 +209,7 @@ $fixture = New-Fixture
 $fixture.jobs += $fixture.jobs[0].Clone()
 Assert-Rejected 'duplicate required job' { Invoke-Gate $fixture } 'Duplicate required job'
 
-foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
+foreach ($group in @('build-code', 'test', 'cli-distribution-build', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
     foreach ($result in @('failure', 'cancelled', 'skipped', 'unknown', $null)) {
         $fixture = New-Fixture
         $fixture.needs[$group].result = $result
