@@ -1,0 +1,77 @@
+name: Release · NativeAOT database verification
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: NativeAOT database ${{ matrix.distribution }} / ${{ matrix.database }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.database == 'Oracle' && 50 || 40 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distribution: All, database: Sqlite }
+          - { distribution: SQLite, database: Sqlite }
+          - { distribution: All, database: SqlServer }
+          - { distribution: SQLServer, database: SqlServer }
+          - { distribution: All, database: SqlServerCaseSensitive }
+          - { distribution: SQLServer, database: SqlServerCaseSensitive }
+          - { distribution: All, database: PostgreSQL }
+          - { distribution: PostgreSQL, database: PostgreSQL }
+          - { distribution: All, database: MariaDB }
+          - { distribution: MariaDB, database: MariaDB }
+          - { distribution: All, database: Oracle }
+          - { distribution: Oracle, database: Oracle }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Select distribution identity
+        id: distribution
+        shell: pwsh
+        run: |
+          . ./scripts/release/distribution_profiles.ps1
+          $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+          "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+      - name: Download this run's release candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: release-${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-${{ inputs.version }}.zip
+          path: ${{ runner.temp }}/nativeaot-archive
+      - name: Test the archived NativeAOT CLI against its database
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          LogLevel: Warning
+          TZ: UTC
+        run: |
+          $parameters = @{
+            Distribution = '${{ matrix.distribution }}'
+            Database = '${{ matrix.database }}'
+            RuntimeIdentifier = 'linux-x64'
+            OutputDirectory = '${{ runner.temp }}/nativeaot-tests'
+            NativeAot = $true
+            NativeAotArchive = '${{ runner.temp }}/nativeaot-archive/${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-' + $env:PACKAGE_VERSION + '.zip'
+          }
+          ./scripts/ci/Invoke-DistributionTests.ps1 @parameters
+      - name: Retain NativeAOT database test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nativeaot-results-${{ matrix.distribution }}-${{ matrix.database }}
+          path: ${{ runner.temp }}/nativeaot-tests/results/
+          if-no-files-found: warn
+          retention-days: 3

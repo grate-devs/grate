@@ -61,11 +61,10 @@ public record MariaDbDatabase : AnsiSqlDatabase
 SELECT GROUP_CONCAT(CONCAT('KILL ',id,';') SEPARATOR ' ')
 FROM information_schema.processlist WHERE DB = '{DatabaseName}'";
 
-        var killStatements = await ExecuteScalarAsync<object>(AdminConnection, sql);
-        if (killStatements != null && !DBNull.Value.Equals(killStatements))
+        var killStatements = await ExecuteStringScalarAsync(AdminConnection, sql);
+        if (killStatements != null)
         {
-            string killSql = killStatements.ToString() ?? ""; // Just to keep warnings happy
-            await ExecuteNonQuery(AdminConnection, killSql, null);
+            await ExecuteNonQuery(AdminConnection, killStatements, null);
         }
 
         var databaseExists = await DatabaseExists();

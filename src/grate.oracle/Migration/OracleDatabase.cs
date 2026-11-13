@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Dapper;
 using grate.Configuration;
@@ -29,7 +30,10 @@ public record OracleDatabase : AnsiSqlDatabase
     public static string Type => "oracle";
     public static ISyntax Syntax { get; } = new OracleSyntax();
 
-    protected override DbConnection GetSqlConnection(string? connectionString) => new OracleConnection(connectionString);
+    // The provider's setter reflects on this property, so NativeAOT must retain its metadata.
+    [DynamicDependency(nameof(OracleCommand.InitialLONGFetchSize), typeof(OracleCommand))]
+    protected override DbConnection GetSqlConnection(string? connectionString) =>
+        new OracleConnection(connectionString) { BindByName = true };
 
     protected override string ExistsSql(string tableSchema, string fullTableName) =>
         $@"
@@ -110,15 +114,13 @@ RETURNING id into :id
 ";
         var repositoryPath = Config?.RepositoryPath;
 
-        var parameters = new
-        {
-            repositoryPath,
-            newVersion,
-            entryDate = DateTime.UtcNow,
-            modifiedDate = DateTime.UtcNow,
-            enteredBy = GetUserName()
-        };
-        var dynParams = new DynamicParameters(parameters);
+        // Templates require Dapper's runtime code generation, even with Dapper.AOT.
+        var dynParams = new DynamicParameters();
+        dynParams.Add("repositoryPath", repositoryPath);
+        dynParams.Add("newVersion", newVersion);
+        dynParams.Add("entryDate", DateTime.UtcNow);
+        dynParams.Add("modifiedDate", DateTime.UtcNow);
+        dynParams.Add("enteredBy", GetUserName());
         if (includeStatus)
         {
             dynParams.Add("status", MigrationStatus.InProgress);
