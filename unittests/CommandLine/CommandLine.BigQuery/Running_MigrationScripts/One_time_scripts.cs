@@ -49,8 +49,6 @@ public class One_time_scripts(BigQueryGrateTestContext testContext, ITestOutputH
 
         Assert.Single(scripts);
         Assert.Equal(Context.Sql.SelectVersion, scripts.First());
-        
-        //await Context.DropDatabase(db);
     }
 
 }
