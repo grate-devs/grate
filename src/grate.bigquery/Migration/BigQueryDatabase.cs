@@ -40,6 +40,9 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     // how long BigQuery holds a jobs.query request for the query to finish - Google's own default
     private static readonly TimeSpan QueryRequestWait = TimeSpan.FromSeconds(10);
 
+    // the least of the command timeout a request sent again must have left, for BigQuery to have time to run it
+    private static readonly TimeSpan MinimumRequestWait = TimeSpan.FromSeconds(1);
+
     // how long one wait for a job lasts when the command timeout is 0 - grate then waits again, without limit
     private static readonly TimeSpan WaitWithoutLimit = TimeSpan.FromMinutes(5);
 
@@ -485,7 +488,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
         var limit = Limit(admin);
         var waited = Stopwatch.StartNew();
 
-        var (job, finished) = await SubmitAsync(sql, admin, parameters, limit);
+        var (job, finished) = await SubmitAsync(sql, admin, parameters, limit, waited);
         if (!finished)
         {
             await WaitAsync(job, limit, waited);
@@ -504,10 +507,11 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     /// turns the request away before it runs it (HTTP 429), the request is sent again with the same id: BigQuery takes
     /// a repeat of a request it is running, or has run, as that request. Any other error is BigQuery's answer and is
     /// not sent again - the query may have failed after a script's earlier statements ran, and BigQuery does not say
-    /// that it takes the repeat of a failed request as that request.
+    /// that it takes the repeat of a failed request as that request. Nothing is sent again without time left on the
+    /// command timeout, but a query BigQuery reports as finished without errors is finished, however late the answer.
     /// </summary>
     private async Task<(JobReference Job, bool Finished)> SubmitAsync(
-        string sql, bool admin, BigQueryParameter[] parameters, TimeSpan? limit)
+        string sql, bool admin, BigQueryParameter[] parameters, TimeSpan? limit, Stopwatch waited)
     {
         var requestId = Guid.NewGuid().ToString();
         var request = new QueryRequest
@@ -528,7 +532,7 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             JobCreationMode = "JOB_CREATION_REQUIRED",
 
             // how long BigQuery holds the request for the query to finish - grate then waits on the job
-            TimeoutMs = (long)(limit < QueryRequestWait ? limit.Value : QueryRequestWait).TotalMilliseconds,
+            TimeoutMs = RequestWait(limit, waited),
         };
 
         for (var attempt = 1; ; attempt++)
@@ -543,9 +547,16 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
             catch (Exception ex) when (attempt < MaxAttempts && IsUnanswered(ex))
             {
                 var delay = Backoff(attempt);
+                if (delay + MinimumRequestWait > limit - waited.Elapsed)
+                {
+                    // sent again, the request would have too little of the command timeout left
+                    throw RequestOutcomeUnknown(requestId, ex, "no answer grate can use within the command timeout");
+                }
+
                 _logger.LogWarning("BigQuery request {RequestId} got no answer, and will be sent again: attempt {Attempt}, in {Delay}: {Error}",
                     requestId, attempt, delay, ex.Message);
                 await Task.Delay(delay);
+                request.TimeoutMs = RequestWait(limit, waited);
             }
             catch (GoogleApiException ex) when ((int)ex.HttpStatusCode >= 500)
             {
@@ -651,9 +662,10 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     /// <summary>
     /// A request whose answer grate cannot use: the query may never have started, or may have run, or may still run.
     /// </summary>
-    private static BigQueryDbException RequestOutcomeUnknown(string requestId, Exception cause) =>
+    private static BigQueryDbException RequestOutcomeUnknown(
+        string requestId, Exception cause, string answer = "no answer grate can use") =>
         new(
-            $"BigQuery request {requestId} got no answer grate can use, so the query may have run or may still run: " +
+            $"BigQuery request {requestId} got {answer}, so the query may have run or may still run: " +
             $"find its job by the label {RequestIdLabel}:{requestId} in BigQuery before you run grate again.",
             null,
             cause);
@@ -708,6 +720,14 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
     };
 
     private static TimeSpan Backoff(int attempt) => TimeSpan.FromSeconds(Math.Pow(2, attempt));
+
+    // how long BigQuery may hold a jobs.query request - never past the command timeout
+    private static long RequestWait(TimeSpan? limit, Stopwatch waited)
+    {
+        var remaining = limit - waited.Elapsed;
+        var wait = remaining < QueryRequestWait ? remaining.Value : QueryRequestWait;
+        return Math.Max(1, (long)wait.TotalMilliseconds);
+    }
 
     // the client turns its own parameters into the REST API's internally, and grate uses only these three types
     private static QueryParameter ToQueryParameter(BigQueryParameter parameter) => new()

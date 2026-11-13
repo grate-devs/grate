@@ -62,7 +62,9 @@ dataset at a time.
   grate cannot tell whether the script ran: it fails, naming the request id, so find the job in BigQuery first.
 * **Timeouts.** `--commandtimeout` (and `--admincommandtimeout` for the admin scripts) limits how long grate waits for a
   job; 0 waits without a limit. When the time is up, grate asks BigQuery to cancel the job and fails, naming the job.
-  Cancelling is best effort, so the job may still finish: check it in BigQuery before you run grate again.
+  Cancelling is best effort, so the job may still finish: check it in BigQuery before you run grate again. Nor does
+  grate send a script's request again when too little of the time is left: it fails, naming the request id. A script
+  that BigQuery reports as finished without errors has run, even when its answer arrives after the time is up.
 * **Not supported:** `--restore`, and the database user and permission scripts that some other databases use.
 
 ## Trying it locally
