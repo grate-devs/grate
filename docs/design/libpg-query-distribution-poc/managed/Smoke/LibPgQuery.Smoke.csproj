@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <IsPackable>false</IsPackable>
+    <IsPackable Condition="'$(PackAsTool)' == 'true'">true</IsPackable>
+    <PackageId>Grate.Poc.LibPgQuery.SmokeTool</PackageId>
+    <Version>18.1.0-poc.1</Version>
+    <PackageReadmeFile />
+    <ToolCommandName>pg-query-native-smoke</ToolCommandName>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishSingleFile Condition="'$(SelfContained)' == 'true'">true</PublishSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TrimMode>partial</TrimMode>
+    <PublishTrimmed Condition="'$(SelfContained)' == 'true' and '$(RuntimeIdentifier)' != '' and !$(RuntimeIdentifier.StartsWith('win-'))">true</PublishTrimmed>
+    <PublishTrimmed Condition="$(RuntimeIdentifier.StartsWith('win-'))">false</PublishTrimmed>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Grate.Poc.LibPgQuery.Native" Version="18.1.0-poc.1" />
+  </ItemGroup>
+</Project>

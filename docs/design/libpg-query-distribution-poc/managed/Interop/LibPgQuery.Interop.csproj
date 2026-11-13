@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <PackageId>Grate.Poc.LibPgQuery.Native</PackageId>
+    <Version>18.1.0-poc.1</Version>
+    <Description>Local experiment for libpg_query native asset distribution.</Description>
+    <PackageReadmeFile />
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <IncludeSymbols>false</IncludeSymbols>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(NativeAssetsRoot)' != ''">
+    <None Include="$(NativeAssetsRoot)/runtimes/**/*"
+          Pack="true" PackagePath="runtimes/%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="$(NativeAssetsRoot)/licenses/**/*"
+          Pack="true" PackagePath="licenses/%(RecursiveDir)" />
+    <None Include="$(NativeAssetsRoot)/licenses/**/*"
+          Pack="true" PackagePath="contentFiles/any/any/licenses/%(RecursiveDir)"
+          PackageCopyToOutput="true" PackageFlatten="false" />
+  </ItemGroup>
+  <Target Name="RequireNativeAssetsForPack" BeforeTargets="GenerateNuspec">
+    <Error Condition="'$(NativeAssetsRoot)' == ''" Text="Set NativeAssetsRoot to the external staging directory containing runtimes/&lt;rid&gt;/native assets." />
+    <ItemGroup>
+      <NativeAsset Include="$(NativeAssetsRoot)/runtimes/*/native/*" />
+      <RequiredNotice Include="$(NativeAssetsRoot)/licenses/libpg_query-LICENSE" />
+      <RequiredNotice Include="$(NativeAssetsRoot)/licenses/PostgreSQL-COPYRIGHT" />
+      <RequiredNotice Include="$(NativeAssetsRoot)/licenses/upb-LICENSE" />
+      <RequiredNotice Include="$(NativeAssetsRoot)/licenses/utf8_range-LICENSE" />
+      <RequiredNotice Include="$(NativeAssetsRoot)/licenses/xxhash-LICENSE" />
+    </ItemGroup>
+    <Error Condition="'@(NativeAsset)' == ''" Text="NativeAssetsRoot contains no native assets." />
+    <Error Condition="!Exists('%(RequiredNotice.Identity)')" Text="Required native third-party notice is missing: %(RequiredNotice.Identity)" />
+  </Target>
+</Project>
