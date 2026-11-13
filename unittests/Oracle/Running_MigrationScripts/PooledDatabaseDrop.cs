@@ -59,7 +59,9 @@ public sealed class PooledDatabaseDrop(OracleGrateTestContext context, ITestOutp
                 throw;
             }
 
-            await using (var connection = new OracleConnection(resultConnectionString))
+            // Observe history without creating a separate test-host target pool;
+            // the migration inputs and their cleanup pool key remain unchanged.
+            await using (var connection = new OracleConnection(ExplicitPooling(resultConnectionString, false)))
             {
                 var scripts = (await connection.QueryAsync<string>(
                     $"SELECT text_of_script FROM {Context.Syntax.TableWithSchema("grate", "ScriptsRun")}")).ToArray();
