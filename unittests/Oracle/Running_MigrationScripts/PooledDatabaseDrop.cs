@@ -32,6 +32,7 @@ public sealed class PooledDatabaseDrop(OracleGrateTestContext context, ITestOutp
             .Build();
         await using var admin = new OracleConnection(ExplicitPooling(Context.External.AdminConnectionString, false));
         await admin.OpenAsync(TestContext.Current.CancellationToken);
+        Exception? primaryFailure = null;
         try
         {
             await admin.ExecuteAsync(Context.Syntax.CreateDatabase(otherUser,
@@ -71,21 +72,51 @@ public sealed class PooledDatabaseDrop(OracleGrateTestContext context, ITestOutp
             Assert.Equal(otherSession, await Session(otherConnectionString));
             Assert.Equal(adminSession, await Session(adminPool));
         }
+        catch (Exception exception)
+        {
+            primaryFailure = exception;
+            throw;
+        }
         finally
         {
-            using (var connection = new OracleConnection(adminPool))
+            var cleanupFailures = new List<Exception>();
+            try
             {
+                using var connection = new OracleConnection(adminPool);
                 OracleConnection.ClearPool(connection);
+            }
+            catch (Exception exception)
+            {
+                cleanupFailures.Add(exception);
             }
             foreach (var item in new[] { (database, resultConnectionString), (otherUser, otherConnectionString) })
             {
-                using var connection = new OracleConnection(item.Item2);
-                OracleConnection.ClearPool(connection);
-                if (await admin.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM all_users WHERE username = :name",
-                        new { name = item.Item1 }) != 0)
+                var role = item.Item1 == database ? "target" : "other";
+                TestOutput.WriteLine($"CleanupStarted:Role={role}");
+                try
                 {
-                    await admin.ExecuteAsync(Context.Syntax.DropDatabase(item.Item1));
+                    using var connection = new OracleConnection(item.Item2);
+                    OracleConnection.ClearPool(connection);
+                    if (await admin.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM all_users WHERE username = :name",
+                            new { name = item.Item1 }) != 0)
+                    {
+                        await admin.ExecuteAsync(Context.Syntax.DropDatabase(item.Item1));
+                    }
+                    TestOutput.WriteLine($"CleanupCompleted:Role={role}");
                 }
+                catch (Exception exception)
+                {
+                    cleanupFailures.Add(exception);
+                }
+            }
+            foreach (var exception in cleanupFailures)
+            {
+                var number = exception is OracleException oracle ? oracle.Number : (int?)null;
+                TestOutput.WriteLine($"CleanupFailure:Type={exception.GetType().Name};OracleNumber={number}");
+            }
+            if (primaryFailure is null && cleanupFailures.Count != 0)
+            {
+                throw new AggregateException("Oracle DROP test cleanup failed.", cleanupFailures);
             }
         }
     }
