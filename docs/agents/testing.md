@@ -165,8 +165,12 @@ the Alpine/musl [Dockerfile](../../installers/docker/Dockerfile).
 
 The Linux Oracle provider lane enables `GRATE_ORACLE_SCOPED_POOLING=true`.
 It clears test-host pools before and after each case and releases the selected
-user's idle pool before fixture cleanup drops that user. The dedicated production
-DROP test keeps its original unpooled input. Imported CLI/Docker suites keep their
+user's idle pool before fixture cleanup drops that user. Production Oracle DROP
+closes the probed target connection and releases that exact pool before the
+existing target-user disconnect/drop SQL, without clearing other users' pools.
+Its regression uses explicit pooled and unpooled strings, checks recreated script
+history, and retains an unrelated user's active connection and idle admin pool.
+The test is also imported by CLI/Docker suites; their other tests retain their
 existing pooling policy. The shared `GRATE_REPRODUCIBLE_TABLE_CASINGS=true` flag
 selects 27 distinct, reproducible casing combinations in the Linux Oracle lane,
 as it does in the SQL Server lanes described above. Windows Oracle enables

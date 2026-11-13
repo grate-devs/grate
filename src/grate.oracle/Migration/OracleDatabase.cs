@@ -31,6 +31,24 @@ public record OracleDatabase : AnsiSqlDatabase
 
     protected override DbConnection GetSqlConnection(string? connectionString) => new OracleConnection(connectionString);
 
+    public override async Task DropDatabase()
+    {
+        if (await DatabaseExists())
+        {
+            var connection = (OracleConnection)Connection;
+            var databaseName = DatabaseName;
+            await CloseConnection();
+            // The existence probe borrows from this exact pool. Release its idle
+            // sessions before DROP USER, including sessions marked for disconnect.
+            if (new OracleConnectionStringBuilder(connection.ConnectionString).Pooling)
+            {
+                OracleConnection.ClearPool(connection);
+            }
+            await OpenAdminConnection();
+            await ExecuteNonQuery(AdminConnection, Syntax.DropDatabase(databaseName), Config?.AdminCommandTimeout);
+        }
+    }
+
     protected override string ExistsSql(string tableSchema, string fullTableName) =>
         $@"
 SELECT table_name FROM user_tables
