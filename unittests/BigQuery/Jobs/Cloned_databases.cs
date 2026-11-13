@@ -1,6 +1,11 @@
-﻿using BigQuery.TestInfrastructure.Stub;
+﻿using System.Reflection;
+using BigQuery.TestInfrastructure.Stub;
+using Google.Cloud.BigQuery.V2;
+using grate.BigQuery.Infrastructure;
 using grate.BigQuery.Migration;
+using grate.Infrastructure;
 using grate.Migration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BigQuery.Jobs;
 
@@ -39,6 +44,33 @@ public sealed class Cloned_databases : IAsyncDisposable
         Assert.Equal((project, StubDatabase.Dataset), (drop.Project, drop.Dataset));
         var originalJob = Assert.Single(_first.Queries, x => x.Sql == "SELECT 2");
         Assert.Equal(("project-a", null), (originalJob.Project, originalJob.Location));
+    }
+
+    [Fact]
+    public async Task The_last_database_to_let_go_disposes_the_client_also_after_a_failed_write()
+    {
+        // grate's bootstrap writes its records once the database is disposed, and BigQuery refuses this one
+        _first.NewJob = request => request.Sql!.Contains("INSERT INTO") ? StubJob.Fails("accessDenied") : StubJob.Succeeds;
+        var database = new BigQueryDatabase(NullLogger<BigQueryDatabase>.Instance);
+        await database.InitializeConnections(
+            StubDatabase.Configuration(_first) with { Environment = GrateEnvironment.InternalBootstrap });
+        var client = ClientOf(database);
+        await database.InsertScriptRun("1_first.sql", "SELECT 1", "hash", true, 1, TransactionHandling.Default);
+
+        var exception = await Assert.ThrowsAsync<BigQueryDbException>(() => database.DisposeAsync().AsTask());
+
+        Assert.Equal("accessDenied", exception.Reason);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() =>
+            client.GetDatasetAsync(StubDatabase.Dataset, cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    // the client a database holds - nothing outside the provider can reach it
+    private static BigQueryClient ClientOf(BigQueryDatabase database)
+    {
+        var shared = typeof(BigQueryDatabase)
+            .GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(database)!;
+        return (BigQueryClient)shared.GetType().GetProperty("Client")!.GetValue(shared)!;
     }
 
     public async ValueTask DisposeAsync()

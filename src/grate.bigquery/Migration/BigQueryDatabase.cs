@@ -360,19 +360,24 @@ public class BigQueryDatabase(ILogger<BigQueryDatabase> logger) : IDatabase
 
     public async ValueTask DisposeAsync()
     {
-        // the bootstrap has created grate's tables by now, so its records of itself can be written
-        foreach (var write in _deferredWrites)
+        try
         {
-            await write();
+            // the bootstrap has created grate's tables by now, so its records of itself can be written
+            foreach (var write in _deferredWrites)
+            {
+                await write();
+            }
         }
+        finally
+        {
+            _deferredWrites.Clear();
 
-        _deferredWrites.Clear();
+            // the last of a database and its clones to be disposed disposes the client, also after a failed write
+            _client?.Release();
+            _client = null;
 
-        // the last of a database and its clones to be disposed disposes the client
-        _client?.Release();
-        _client = null;
-
-        GC.SuppressFinalize(this);
+            GC.SuppressFinalize(this);
+        }
     }
 
     public object Clone()
