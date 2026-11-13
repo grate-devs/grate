@@ -13,7 +13,7 @@ SQL scripts migration runner
 
 grate is a SQL scripts migration runner, using plain, old SQL for migrations. No meta-language, no code, no config,
 no EF migrations. It gives you full flexibility, and full control of your migrations, and lets you use
-all the fancy features of you particular database system. You are not constrained to any lowest common
+all the fancy features of your particular database system. You are not constrained to any lowest common
 feature set of all supported databases.
 
 Use it from the command line, in CI/CD, in a container, or through its .NET
@@ -22,7 +22,8 @@ libraries. Start with [getting started](GettingStarted.md) or choose an
 
 ## Supported databases
 
-SQL Server (including Azure SQL), PostgreSQL, MariaDB/MySQL, SQLite, and Oracle.
+SQL Server (including Azure SQL), PostgreSQL, MariaDB/MySQL, SQLite, Oracle, and
+Google BigQuery (see [BigQuery](BigQuery.md)).
 grate runs on Windows, Linux, and macOS.
 
 ## How scripts run

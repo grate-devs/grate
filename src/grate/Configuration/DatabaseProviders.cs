@@ -1,4 +1,7 @@
 ﻿using System.CommandLine;
+#if ALL_DATABASES
+using grate.bigquery.DependencyInjection;
+#endif
 #if ALL_DATABASES || MARIADB_ONLY
 using grate.mariadb.DependencyInjection;
 #endif
@@ -36,6 +39,9 @@ internal static class DatabaseProviders
 #endif
 #if ALL_DATABASES || SQLITE_ONLY
         DatabaseType.SQLite,
+#endif
+#if ALL_DATABASES
+        DatabaseType.BigQuery,
 #endif
     ];
 
@@ -88,6 +94,9 @@ internal static class DatabaseProviders
 #endif
 #if ALL_DATABASES || SQLITE_ONLY
             DatabaseType.SQLite => services.AddGrateWithSqlite(config),
+#endif
+#if ALL_DATABASES
+            DatabaseType.BigQuery => services.AddGrateWithBigQuery(config),
 #endif
             _ => throw new ArgumentOutOfRangeException(nameof(config),
                 config.DatabaseType,
