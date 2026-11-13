@@ -8,28 +8,19 @@ namespace Oracle.TestInfrastructure;
 
 internal static class OracleTestConnectionPools
 {
-    private static readonly AsyncLocal<bool> UnpooledScope = new();
-
     // These sources are also compiled into CommandLine/Docker assemblies, whose
     // separately launched candidates cannot share this test host's pool lifetime.
     private static bool ScopedPoolingRequested => typeof(OracleTestConnectionPools).Assembly.GetName().Name == "Oracle"
                                     && string.Equals(Environment.GetEnvironmentVariable("GRATE_ORACLE_SCOPED_POOLING"),
                                         "true", StringComparison.OrdinalIgnoreCase);
 
-    internal static bool Enabled => ScopedPoolingRequested && !UnpooledScope.Value;
-
-    internal static void UseUnpooledConnections(bool value) => UnpooledScope.Value = value;
+    internal static bool Enabled => ScopedPoolingRequested;
 
     internal static string Configure(string connectionString)
     {
         if (!ScopedPoolingRequested)
         {
             return connectionString;
-        }
-
-        if (UnpooledScope.Value)
-        {
-            return PreservePasswordKey(new OracleConnectionStringBuilder(connectionString) { Pooling = false });
         }
 
         return PreservePasswordKey(new OracleConnectionStringBuilder(connectionString)
@@ -75,13 +66,6 @@ internal static class OracleTestConnectionPools
             OracleConnection.ClearAllPools();
         }
     }
-}
-
-public sealed class UnpooledOracleTestAttribute : BeforeAfterTestAttribute
-{
-    public override void Before(MethodInfo methodUnderTest, IXunitTest test) => OracleTestConnectionPools.UseUnpooledConnections(true);
-
-    public override void After(MethodInfo methodUnderTest, IXunitTest test) => OracleTestConnectionPools.UseUnpooledConnections(false);
 }
 
 public sealed class OracleTestPoolScopeAttribute : BeforeAfterTestAttribute
