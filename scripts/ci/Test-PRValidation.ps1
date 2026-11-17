@@ -157,6 +157,11 @@ foreach ($apiName in @((ConvertTo-ApiJobFixture -Jobs (New-Fixture).jobs).name |
     }
 }
 
+$fixture = New-Fixture
+$fixture.jobs = @(ConvertTo-ApiJobFixture -Jobs $fixture.jobs)
+$fixture.jobs[0].name = 'Build / build'
+Assert-Rejected 'incorrect API job name casing' { Invoke-Gate $fixture -RawJobEvidence } "Missing required job 'Build'"
+
 # Optional reports and security analysis do not replace any required producer.
 $fixture = New-Fixture
 $fixture.jobs += @{ name = 'Create test report'; status = 'completed'; conclusion = 'success'; run_id = 123; run_attempt = 1 }
@@ -231,6 +236,20 @@ Assert-Rejected 'latest skip overrides older success' { Invoke-Gate $fixture -At
 $fixture.jobs[-1].conclusion = 'success'
 $fixture.jobs += $fixture.jobs[-1].Clone()
 Assert-Rejected 'duplicate in latest attempt' { Invoke-Gate $fixture -Attempt 2 } 'Duplicate required job'
+
+$fixture = New-Fixture
+$fixture.jobs += $fixture.jobs[0].Clone()
+$fixture.jobs += $rerunBuild
+Assert-Rejected 'duplicate in older attempt with a newer success' { Invoke-Gate $fixture -Attempt 2 } 'Duplicate required job'
+
+$fixture = New-Fixture
+$fixture.jobs = @(ConvertTo-ApiJobFixture -Jobs $fixture.jobs)
+$malformedRerun = $fixture.jobs[0].Clone()
+$malformedRerun.run_attempt = 2
+$malformedRerun.conclusion = 'failure'
+$malformedRerun.name = @('Build / Build')
+$fixture.jobs += $malformedRerun
+Assert-Rejected 'non-string name in a newer failed attempt' { Invoke-Gate $fixture -Attempt 2 -RawJobEvidence } 'invalid job name'
 
 # Every correctness step matters even if its containing job is green. These
 # cases distinguish checking producer execution from checking only job summaries.
