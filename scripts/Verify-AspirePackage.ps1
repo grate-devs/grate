@@ -6,7 +6,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $repository = Split-Path $PSScriptRoot -Parent
-$packages = @('hosting', 'azure', 'oracle', 'mysql', 'kubernetes')
+$packages = @('hosting', 'azure', 'appservice', 'oracle', 'mysql', 'kubernetes')
 $workspace = Join-Path ([IO.Path]::GetTempPath()) "grate-aspire-package-$([Guid]::NewGuid().ToString('N'))"
 $feed = Join-Path $workspace 'feed'
 $consumer = Join-Path $workspace 'consumer'
@@ -34,6 +34,7 @@ try {
   <ItemGroup>
     <PackageReference Include="grate.aspire.hosting" Version="$packageVersion" />
     <PackageReference Include="grate.aspire.azure" Version="$packageVersion" />
+    <PackageReference Include="grate.aspire.appservice" Version="$packageVersion" />
     <PackageReference Include="grate.aspire.oracle" Version="$packageVersion" />
     <PackageReference Include="grate.aspire.mysql" Version="$packageVersion" />
     <PackageReference Include="grate.aspire.kubernetes" Version="$packageVersion" />
@@ -44,6 +45,7 @@ try {
     $program = @'
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Grate.Aspire.AppService;
 using Grate.Aspire.Azure;
 using Grate.Aspire.Hosting;
 
@@ -70,6 +72,8 @@ var consumer = builder.AddContainer("consumer", "nginx", "stable")
 // Use the target class explicitly when both deployment adapters are referenced.
 var kubernetesConsumer = Grate.Aspire.Kubernetes.GrateKubernetesExtensions.WithGrateMigrationInitContainer(
     builder.AddContainer("kubernetes-consumer", "nginx", "stable"), mysqlMigration, environment: "PRODUCTION");
+var appServiceConsumer = builder.AddContainer("app-service-consumer", "nginx", "stable")
+    .WithGrateMigrationBeforeDeploy(oracleMigration, builder.AddAzureContainerAppEnvironment("migration-jobs"), environment: "PRODUCTION");
 if (migration.Resource.Name != "appdb-grate" ||
     sqlServerMigration.Resource.Name != "sqldb-grate" ||
     sqliteMigration.Resource.Name != "filedb-grate" ||
@@ -80,11 +84,13 @@ if (migration.Resource.Name != "appdb-grate" ||
     !consumer.Resource.Annotations.OfType<WaitAnnotation>().Any(wait =>
         wait.Resource == migration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0) ||
     !kubernetesConsumer.Resource.Annotations.OfType<WaitAnnotation>().Any(wait =>
-        wait.Resource == mysqlMigration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0))
+        wait.Resource == mysqlMigration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0) ||
+    !appServiceConsumer.Resource.Annotations.OfType<WaitAnnotation>().Any(wait =>
+        wait.Resource == oracleMigration.Resource && wait.WaitType == WaitType.WaitForCompletion && wait.ExitCode == 0))
 {
     throw new InvalidOperationException("The packaged API did not register one migration per provider.");
 }
-Console.WriteLine("PASS: isolated NuGet consumer registered all six databases and both deployment APIs from five packages.");
+Console.WriteLine("PASS: isolated NuGet consumer registered all six databases and three deployment APIs from six packages.");
 '@
     Set-Content -LiteralPath (Join-Path $consumer 'Program.cs') -Value $program
     Push-Location $consumer

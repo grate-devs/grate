@@ -12,6 +12,7 @@ cover PostgreSQL, SQL Server, SQLite, Oracle, MySQL and MariaDB. An optional Azu
 module packages SQL into an image and runs it as an Azure Container Apps init
 container before the application's main containers start. A separate Kubernetes
 adapter adds the same migration lifecycle to a Deployment or StatefulSet Pod.
+Azure App Service can instead gate website provisioning on a Container Apps Job.
 
 | Package in this checkout | Integration |
 | --- | --- |
@@ -20,6 +21,7 @@ adapter adds the same migration lifecycle to a Deployment or StatefulSet Pod.
 | `grate.aspire.mysql` | Native `Aspire.Hosting.MySql` database resources, including a MariaDB server using the compatible resource |
 | `grate.aspire.azure` | Azure Container Apps init-container publishing |
 | `grate.aspire.kubernetes` | Kubernetes init-container publishing through native Aspire Helm charts |
+| `grate.aspire.appservice` | Container Apps Job before Azure App Service website provisioning |
 
 The optional database adapters use the same `Grate.Aspire.Hosting` namespace.
 SQLite uses `CommunityToolkit.Aspire.Hosting.Sqlite` 13.6.1; native database and
@@ -269,6 +271,32 @@ See the [Kubernetes example](https://github.com/grate-devs/grate/blob/main/examp
 for native publication, registry configuration, Helm rendering and verification.
 The adapter targets existing Kubernetes clusters; it does not provision a cluster.
 
+## Azure App Service deployment gate
+
+Reference `grate.aspire.appservice`, select an App Service environment for the
+web app and pass a Container Apps environment for the migration job.
+
+```csharp
+using Grate.Aspire.AppService;
+
+application.WithGrateMigrationBeforeDeploy(migration, jobsEnvironment, environment: "PRODUCTION");
+```
+
+The adapter packages SQL in a derived grate image and configures a manual
+Container Apps Job. During `aspire deploy`, a pipeline step starts the job after
+provisioning and image push. Aspire waits for the returned execution to succeed
+before provisioning or updating the website. A failed execution or a timeout
+stops that step. Locally, the helper adds a successful migration completion wait.
+Supply the whole migration connection as one deferred secret, such as an
+`AddConnectionString` resource configured through secret configuration. Both
+environments need access to the database.
+
+The migration runs per deployment attempt. Serialize deployments sharing the
+same database or job. The previous app version can still be live during an
+upgrade, so the new schema must remain compatible with it. See the
+[App Service example](https://github.com/grate-devs/grate/blob/main/examples/aspire/AzureAppService/README.md)
+for setup and the offline success and SQL failure checks.
+
 ## Other deployment boundaries
 
 `PublishAsGrateMigrationImage()` in the base package can package SQL for another
@@ -280,7 +308,7 @@ annotation into rollout ordering.
 | --- | --- |
 | Azure Container Apps | Optional init-container adapter described above |
 | Kubernetes | Optional per-Pod init-container adapter described above; no separate migration Job lifecycle |
-| Azure App Service | No grate predeployment adapter. Use an explicitly executed and awaited migration job or pipeline step |
+| Azure App Service | Optional deployment gate described above, using a Container Apps Job |
 
 The Kubernetes observation uses `13.6.5-preview.1.26559.7`. See the pinned
 [Kubernetes](https://github.com/microsoft/aspire/blob/v13.6.5/src/Aspire.Hosting.Kubernetes/KubernetesResource.cs)
@@ -298,11 +326,14 @@ provider matrix and release-package inventory. Build it, run the model tests,
 then execute the examples' smoke checks sequentially. See their README files for
 commands and cleanup.
 [`Verify-AspirePackage.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspirePackage.ps1) also restores and
-executes a separate consumer of the five locally packed packages.
+executes a separate consumer of the six locally packed packages.
 [`Verify-AspirePublication.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspirePublication.ps1)
 runs the offline ACA artifact and packaged-image checks. The dedicated Aspire
 workflow covers the resource models, all six database examples, isolated package
 consumption and offline publication without publishing packages or calling Azure.
+[`Verify-AspireAppServicePublication.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspireAppServicePublication.ps1)
+checks App Service publication and exercises the gate against successful and
+failing SQL using the packaged grate image.
 [`Verify-AspireKubernetesPublication.ps1`](https://github.com/grate-devs/grate/blob/main/scripts/Verify-AspireKubernetesPublication.ps1)
 publishes and renders the native Helm chart, checking init-container configuration,
 secret isolation, image references and deployment dependencies.

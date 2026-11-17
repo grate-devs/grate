@@ -239,7 +239,7 @@ credentials and image initialization settings.
 The optional ACA and Kubernetes modules package SQL and configure init containers. Do not infer
 other deployment-target support from local resource behavior; the
 [deployment boundaries](../Aspire.md#other-deployment-boundaries) describe the
-remaining per-Pod concurrency, App Service and SQLite limitations.
+remaining concurrency and SQLite limitations.
 
 The package's runnable example belongs with grate's consumer examples. Updates need a
 small pinned compatibility matrix: Aspire/AppHost, grate image, database image,
@@ -273,7 +273,7 @@ these outcomes against disposable local resources:
 5. Script path containing spaces and launch from another working directory:
    the same scripts are selected. Check diagnostics for credential disclosure.
 
-The prototype includes resource-model tests, isolated consumption of all five
+The prototype includes resource-model tests, isolated consumption of all six
 packed packages, and repeatable database smoke checks. PostgreSQL exercises all
 the lifecycle boundaries above; other engines cover fresh setup, retained
 data/history and SQL failure, with credential failures for server databases.
@@ -342,9 +342,13 @@ applications and deployments can race. Serialize independent migrations for the
 same database or coordinate deployments externally. History does not provide a
 distributed lock, and everytime scripts may run on each invocation.
 
-There is no separate Kubernetes migration Job lifecycle or Azure App Service
-predeployment adapter. Use an explicitly executed and awaited migration job or
-delivery-pipeline step where per-Pod initialization is unsuitable. SQLite cloud publishing requires a separate durable
+Azure App Service uses a manual Container Apps Job as a deployment gate. Its
+web app can start during provisioning, so the actual website provisioning step
+depends on the migration execution. Job configuration and image push both precede
+the gate. The gate follows the returned execution ID and requires success.
+See the [App Service adapter](../Aspire.md#azure-app-service-deployment-gate).
+
+SQLite cloud publishing requires a separate durable
 storage, path and locking contract and is explicitly rejected. Across targets,
 define credentials, connectivity, migration ownership and interruption/retry
 recovery. Keep migrations in an existing delivery pipeline when that already

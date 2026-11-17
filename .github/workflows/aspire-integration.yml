@@ -8,6 +8,7 @@ on:
       - 'examples/aspire/**'
       - 'scripts/Verify-AspirePackage.ps1'
       - 'scripts/Verify-AspirePublication.ps1'
+      - 'scripts/Verify-AspireAppServicePublication.ps1'
       - 'scripts/Verify-AspireKubernetesPublication.ps1'
       - 'scripts/Verify-AspireKubernetesRuntime.ps1'
       - 'scripts/Install-KubernetesTestTools.ps1'
@@ -66,6 +67,7 @@ jobs:
           $suites = @(
             @{ Project = 'Hosting'; Assembly = 'hosting'; Minimum = 50 }
             @{ Project = 'Azure'; Assembly = 'azure'; Minimum = 20 }
+            @{ Project = 'AppService'; Assembly = 'appservice'; Minimum = 37 }
             @{ Project = 'Kubernetes'; Assembly = 'kubernetes'; Minimum = 33 }
             @{ Project = 'Oracle'; Assembly = 'oracle'; Minimum = 6 }
             @{ Project = 'MySql'; Assembly = 'mysql'; Minimum = 6 }
@@ -81,6 +83,9 @@ jobs:
       - name: Verify native ACA publication and the packaged migration image
         shell: pwsh
         run: ./scripts/Verify-AspirePublication.ps1 -NoBuild
+      - name: Verify the native App Service migration gate with real SQL
+        shell: pwsh
+        run: ./scripts/Verify-AspireAppServicePublication.ps1 -NoBuild
       - name: Install the pinned Helm client
         shell: pwsh
         run: |

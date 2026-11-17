@@ -123,6 +123,6 @@ Cancellation and failure do not guarantee rollback of previously committed SQL.
 SQLite publishing is rejected because the local shared-file adapter does not
 define durable storage, shared paths and filesystem locking for cloud replicas.
 Kubernetes init containers use the separate
-[`grate.aspire.kubernetes` adapter](../Kubernetes/README.md). There is no separate
-migration Job lifecycle or Azure App Service predeployment adapter.
-See the [integration guide](../../../docs/Aspire.md) for those boundaries.
+[`grate.aspire.kubernetes` adapter](../Kubernetes/README.md).
+For a deployment-wide gate before updating an App Service website, use the
+[`grate.aspire.appservice` adapter](../AzureAppService/README.md).
