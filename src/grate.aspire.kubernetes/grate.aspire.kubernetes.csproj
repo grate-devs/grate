@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <IsPublishable>false</IsPublishable>
+    <PackageId>grate.aspire.kubernetes</PackageId>
+    <Description>Kubernetes init-container publishing for grate Aspire migrations.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Kubernetes" />
+    <ProjectReference Include="../grate.aspire.hosting/grate.aspire.hosting.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="NuGet.md" Pack="true" PackagePath="\" />
+    <InternalsVisibleTo Include="grate.aspire.kubernetes.tests" />
+  </ItemGroup>
+</Project>

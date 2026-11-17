@@ -66,6 +66,7 @@ grate is short for migrate. And it's also pronounced the same way as _great_, so
 * [Token replacement](TokenReplacement.md)
 * [Response files](ConfigurationOptions/ResponseFiles.md)
 * [Agent skill](AgentSkill.md)
+* [Aspire migrations and deployment init containers](Aspire.md)
 
 ## Coming from RoundhousE?
 
@@ -78,7 +79,7 @@ for compatibility details and the changes to make when moving an existing projec
 Maintainers can follow the [release process](ReleaseProcess.md) to prepare,
 publish, verify, and recover a release.
 
-The [Aspire integration assessment](design/aspire-integration.md) describes a
-proposed integration path and its verification scope.
+The [Aspire integration assessment](design/aspire-integration.md) describes the
+unpublished adapters, deployment boundaries and verification scope.
 
 Head over to the [github page]({{ site.github.repository_url }}), and please see [CONTRIBUTING.md]({{ site.github.repository_url }}/blob/main/CONTRIBUTING.md)

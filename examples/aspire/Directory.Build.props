@@ -1,0 +1,4 @@
+<Project>
+  <!-- This checkout-based prototype shares the repository's strict build contract. -->
+  <Import Project="../../Directory.Build.props" />
+</Project>

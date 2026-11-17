@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>grate.aspire.mysql.example.api</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MySqlConnector" />
+  </ItemGroup>
+</Project>

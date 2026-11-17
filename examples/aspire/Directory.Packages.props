@@ -1,0 +1,4 @@
+<Project>
+  <!-- Keep the integration's Aspire and test-consumer versions in one place. -->
+  <Import Project="../../Directory.Packages.props" />
+</Project>
