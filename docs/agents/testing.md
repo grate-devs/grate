@@ -197,7 +197,9 @@ symlinks are preserved. Externally configured Oracle servers are not modified.
 [integration-tests.yml](../../.github/workflows/integration-tests.yml) actively runs
 net11 Linux x64 self-contained CLI tests against SQL Server 2017/2019/2022/2025,
 PostgreSQL 12–18, MariaDB 10.4/10.10/11/12/13 RC, SQLite, and Oracle Free/XE image
-variants. Read its exact image tags when selecting compatibility checks. These jobs
+variants. On PRs, `ci.yml` calls this workflow after its preflight. Push and manual
+integration runs perform their own preflight. Read the exact image tags when
+selecting compatibility checks. These jobs
 test both All and the matching slim CLI and propagate failures. The grate Docker-distribution step, external/cloud
 test environment, and wider OS/architecture integration jobs are disabled; commented
 matrix entries and successful artifact publication establish no runtime coverage.

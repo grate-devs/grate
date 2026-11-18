@@ -88,6 +88,12 @@ jobs:
     needs: [build-code, fast-tests, validation-policy]
     uses: ./.github/workflows/ci-cli-distributions.yml
 
+  compatibility:
+    name: Compatibility
+    if: github.event_name == 'pull_request'
+    needs: validation-policy
+    uses: ./.github/workflows/integration-tests.yml
+
   report:
     name: Test report
     needs: [fast-tests, test, cli-distributions]
@@ -115,7 +121,7 @@ jobs:
     timeout-minutes: 5
     # A skipped dependent job can look green in isolation. Only this aggregate
     # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
+    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation, compatibility]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v7
@@ -123,4 +129,4 @@ jobs:
         shell: pwsh
         env:
           CI_NEEDS_JSON: ${{ toJSON(needs) }}
-        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON
+        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON -EventName $env:GITHUB_EVENT_NAME

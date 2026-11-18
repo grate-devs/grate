@@ -7,27 +7,32 @@ on:
       - main
     paths-ignore:
       - docs/
-  pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - docs/
   workflow_dispatch:
+  workflow_call:
 
 # This workflow only builds and tests; superseded revisions need not retain
 # their large database matrix while the newest revision waits for runners.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # A reusable workflow sees the caller's github.workflow. Keep these groups
+  # separate so entering compatibility does not cancel the calling CI run.
+  group: integration-tests-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  id-token: write # This is required for requesting the JWT
   contents: read  # This is required for actions/checkout
 
   
 jobs:
   preflight:
     name: Build-independent checks
+    # The PR entry point already requires its preflight at the caller boundary.
+    # Every other entry point must run the local preflight before resolving a version.
+    if: >-
+      ${{
+        !(github.event_name == 'pull_request'
+          && github.ref == format('refs/pull/{0}/merge', github.event.pull_request.number)
+          && github.workflow_ref == format('{0}/.github/workflows/ci.yml@{1}', github.repository, github.ref))
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -41,6 +46,14 @@ jobs:
   set-version-number:
     name: Set version number
     needs: preflight
+    if: >-
+      ${{
+        !cancelled() && (needs.preflight.result == 'success'
+          || (needs.preflight.result == 'skipped'
+            && github.event_name == 'pull_request'
+            && github.ref == format('refs/pull/{0}/merge', github.event.pull_request.number)
+            && github.workflow_ref == format('{0}/.github/workflows/ci.yml@{1}', github.repository, github.ref)))
+      }}
     runs-on: ubuntu-latest
     outputs:
       nuGetVersion: ${{ steps.gitversion.outputs.majorMinorPatch }}
@@ -470,7 +483,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: "${{ matrix.variant }} CLI ${{ matrix.database.name }} XML test results"
+        name: "Compatibility ${{ matrix.variant }} CLI ${{ matrix.database.name }} results"
         path: |
           /tmp/test-results/cli/
         retention-days: 1
@@ -623,6 +636,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: test-results
+          pattern: 'Compatibility * CLI * results'
 
       - name: Setup .NET # Required to execute ReportGenerator
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)
@@ -692,7 +706,7 @@ jobs:
       - name: Upload HTML test report
         uses: actions/upload-artifact@v7
         with:
-          name: HTML test report
+          name: Compatibility HTML test report
           path: |
             test-outputs/*.html
           retention-days: 10

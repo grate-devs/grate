@@ -155,6 +155,12 @@ function Read-Workflow {
         }
         $file = $Matches[1]
         $child = Read-Workflow -Name $file -Root $Root -Raw
+        if ($Name -ceq 'ci.yml' -and $jobId -ceq 'compatibility' -and $file -ceq 'integration-tests.yml' -and
+            $child['on'].Contains('workflow_call')) {
+            # Keep this multi-job call as a boundary. The preflight policy
+            # checks the raw caller and the compatibility workflow separately.
+            continue
+        }
         if (!$child['on'].Contains('workflow_call') -or $child.jobs.Count -ne 1) {
             throw "Reusable policy phases require workflow_call and exactly one leaf job: $file"
         }

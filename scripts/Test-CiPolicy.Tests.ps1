@@ -11,7 +11,7 @@ $phases = (Read-Workflow 'ci.yml').jobs
 $workflow = Get-Content -LiteralPath "$repositoryRoot/.github/workflows/ci.yml" -Raw
 $preflightScript = Get-Content -LiteralPath "$repositoryRoot/scripts/ci/Invoke-Preflight.ps1" -Raw
 $aggregate = Join-Path $PSScriptRoot 'Assert-CiResults.ps1'
-$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distributions', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
+$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distributions', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation', 'compatibility')
 $expensiveJobs = @('analyze', 'test', 'cli-distributions', 'packages', 'standalone', 'docker')
 $analysisCondition = "`${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}"
 $aggregateCondition = "    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')"
@@ -167,7 +167,8 @@ function Assert-WorkflowPolicy {
     if (!$aggregateJob -or !$aggregateJob.Contains($expectedNeeds) -or !$aggregateJob.Contains($aggregateCondition)) {
         throw 'The CI result must always evaluate every required producer.'
     }
-    if (!$aggregateJob.Contains('CI_NEEDS_JSON: ${{ toJSON(needs) }}') -or !$aggregateJob.Contains('./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON')) {
+    if (!$aggregateJob.Contains('CI_NEEDS_JSON: ${{ toJSON(needs) }}') -or
+        !$aggregateJob.Contains('./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON -EventName $env:GITHUB_EVENT_NAME')) {
         throw 'The CI result must validate actual dependency results with the tested gate.'
     }
     if ($jobs['report'] -notmatch '(?m)^    needs: \[fast-tests, test, cli-distributions\]\r?$') {
@@ -233,7 +234,17 @@ $successfulResults = @{}
 foreach ($job in $requiredJobs) {
     $successfulResults[$job] = @{ result = 'success' }
 }
-& $aggregate -NeedsJson ($successfulResults | ConvertTo-Json -Depth 3 -Compress)
+& $aggregate -NeedsJson ($successfulResults | ConvertTo-Json -Depth 3 -Compress) -EventName pull_request
+
+$manualResults = $successfulResults.Clone()
+$manualResults.compatibility = @{ result = 'skipped' }
+& $aggregate -NeedsJson ($manualResults | ConvertTo-Json -Depth 3 -Compress) -EventName workflow_dispatch
+Assert-Rejected -Action {
+    & $aggregate -NeedsJson ($manualResults | ConvertTo-Json -Depth 3 -Compress) -EventName pull_request
+} -ExpectedMessage 'compatibility: skipped'
+Assert-Rejected -Action {
+    & $aggregate -NeedsJson ($successfulResults | ConvertTo-Json -Depth 3 -Compress) -EventName workflow_dispatch
+} -ExpectedMessage 'compatibility: success'
 
 $rejectionCount = 0
 foreach ($job in $requiredJobs) {
@@ -241,7 +252,7 @@ foreach ($job in $requiredJobs) {
         $results = $successfulResults.Clone()
         $results[$job] = @{ result = $state }
         Assert-Rejected -Action {
-            & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress)
+            & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress) -EventName pull_request
         } -ExpectedMessage "${job}:"
         $rejectionCount++
     }
@@ -249,20 +260,20 @@ foreach ($job in $requiredJobs) {
         $results = $successfulResults.Clone()
         $results[$job] = $missingResult
         Assert-Rejected -Action {
-            & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress)
+            & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress) -EventName pull_request
         } -ExpectedMessage "${job}: missing result"
         $rejectionCount++
     }
     $results = $successfulResults.Clone()
     $results.Remove($job)
     Assert-Rejected -Action {
-        & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress)
+        & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress) -EventName pull_request
     } -ExpectedMessage "${job}: missing result"
     $rejectionCount++
 }
 
-Assert-Rejected -Action { & $aggregate -NeedsJson '{}' } -ExpectedMessage 'missing result'
-Assert-Rejected -Action { & $aggregate -NeedsJson '[]' } -ExpectedMessage 'must be an object'
+Assert-Rejected -Action { & $aggregate -NeedsJson '{}' -EventName pull_request } -ExpectedMessage 'missing result'
+Assert-Rejected -Action { & $aggregate -NeedsJson '[]' -EventName pull_request } -ExpectedMessage 'must be an object'
 
 # These mutations must be rejected even if every remaining job would be green.
 $bypassedDependency = $workflow.Replace('needs: [build-code, fast-tests, validation-policy]', 'needs: [build-code]')
@@ -271,7 +282,7 @@ $bypassedPolicy = $workflow.Replace('needs: [build-code, fast-tests, validation-
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $bypassedPolicy } -ExpectedMessage 'must depend'
 $skippedAggregate = $workflow.Replace('    if: always()', '    if: success()')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $skippedAggregate } -ExpectedMessage 'must always evaluate'
-$missingProducer = $workflow.Replace('needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]', 'needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy]')
+$missingProducer = $workflow.Replace(', pr-validation, compatibility]', ', pr-validation]')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $missingProducer } -ExpectedMessage 'must always evaluate'
 $missingMonitorTests = $preflightScript.Replace('-Path .github/scripts -Filter monitor-test-containers.Tests.ps1', '-Path scripts -Filter skipped.ps1')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Preflight $missingMonitorTests } -ExpectedMessage 'Container monitor regressions must run'
