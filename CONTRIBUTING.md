@@ -170,6 +170,13 @@ This phase summary complements the `PR validation` matrix-inventory check added
 in #913. Its main-protection ruleset remains a separate proposal; workflow changes
 do not themselves configure repository branch protection.
 
+The CLI distribution build prepares the six standalone profiles, their four-TFM
+tool packages and the six normal JIT test payloads once. The twelve CLI database
+lanes then download only their selected profile and suite and execute both the
+standalone and locally installed tool. Preparation is a required producer;
+missing, stale or mismatched payloads fail validation rather than rebuilding in
+the consuming job. Other test phases keep their existing scheduling.
+
 Run scheduling/gate regressions locally with
 `pwsh -NoProfile -File scripts/Test-CiPolicy.Tests.ps1` and validate workflow syntax
 with `actionlint .github/workflows/ci.yml`. Separate integration and

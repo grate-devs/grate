@@ -41,7 +41,7 @@ jobs:
     # Keep this name stable: the proposed main ruleset consumes it.
     name: PR validation
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
-    needs: [validation-policy, build-code, test, cli-distributions, packages, standalone, docker]
+    needs: [validation-policy, build-code, test, cli-distribution-build, cli-distributions, packages, standalone, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -83,9 +83,14 @@ jobs:
     needs: [build-code, fast-tests, validation-policy]
     uses: ./.github/workflows/ci-database-tests.yml
 
+  cli-distribution-build:
+    name: CLI distribution build
+    needs: [build-code, fast-tests, validation-policy]
+    uses: ./.github/workflows/ci-cli-distribution-build.yml
+
   cli-distributions:
     name: CLI distributions
-    needs: [build-code, fast-tests, validation-policy]
+    needs: [build-code, fast-tests, validation-policy, cli-distribution-build]
     uses: ./.github/workflows/ci-cli-distributions.yml
 
   report:
@@ -115,7 +120,7 @@ jobs:
     timeout-minutes: 5
     # A skipped dependent job can look green in isolation. Only this aggregate
     # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
+    needs: [build-code, fast-tests, analyze, test, cli-distribution-build, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v7

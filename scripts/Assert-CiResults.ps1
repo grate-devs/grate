@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distributions', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
+$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distribution-build', 'cli-distributions', 'report', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
 $results = ConvertFrom-Json -InputObject $NeedsJson -AsHashtable
 if ($results -isnot [System.Collections.IDictionary]) {
     throw 'CI results must be an object containing every required job.'

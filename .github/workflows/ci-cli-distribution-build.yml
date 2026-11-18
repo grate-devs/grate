@@ -1,0 +1,125 @@
+# Prepare the candidates once; the twelve database lanes consume this run's artifacts.
+name: CI · CLI distribution build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Prepare CLI artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+            11.0.100
+      - name: Prepare standalone, tool and test payloads
+        shell: pwsh
+        run: ./scripts/ci/Prepare-DistributionTests.ps1 -RuntimeIdentifier linux-x64 -OutputDirectory '${{ runner.temp }}/distribution-artifacts'
+      - name: Upload profile All
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-profile-All-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/profiles/All/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload profile SQLite
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-profile-SQLite-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/profiles/SQLite/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload profile SQLServer
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-profile-SQLServer-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/profiles/SQLServer/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload profile MariaDB
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-profile-MariaDB-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/profiles/MariaDB/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload profile PostgreSQL
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-profile-PostgreSQL-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/profiles/PostgreSQL/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload profile Oracle
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-profile-Oracle-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/profiles/Oracle/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload tests Sqlite
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-tests-Sqlite-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/tests/Sqlite/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload tests SqlServer
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-tests-SqlServer-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/tests/SqlServer/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload tests SqlServerCaseSensitive
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-tests-SqlServerCaseSensitive-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/tests/SqlServerCaseSensitive/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload tests PostgreSQL
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-tests-PostgreSQL-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/tests/PostgreSQL/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload tests MariaDB
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-tests-MariaDB-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/tests/MariaDB/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+      - name: Upload tests Oracle
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-tests-Oracle-linux-x64
+          path: ${{ runner.temp }}/distribution-artifacts/tests/Oracle/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
