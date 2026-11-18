@@ -22,7 +22,7 @@ if ($Tier -eq 'full') {
 # evidence consumers the ability to omit historical versions.
 $pilotRefs = @(
     'refs/heads/ci/942-compatibility-pr957'
-    'refs/heads/ci/942-compatibility-pr894'
+    'refs/heads/ci/942-compatibility-pr963'
 )
 if ($EventName -cne 'workflow_dispatch' -or $Ref -cnotin $pilotRefs) {
     throw 'The reduced matrix is only available for manual measurement on the two pilot branches.'

@@ -553,7 +553,7 @@ jobs:
     if: >-
       ${{ always() && github.event_name == 'workflow_dispatch' &&
           (github.ref == 'refs/heads/ci/942-compatibility-pr957' ||
-           github.ref == 'refs/heads/ci/942-compatibility-pr894') }}
+           github.ref == 'refs/heads/ci/942-compatibility-pr963') }}
     needs: [preflight, set-version-number, build-standalone, build-tests, cli-database-integration-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 5

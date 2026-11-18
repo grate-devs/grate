@@ -59,7 +59,7 @@ if ($compatibilityStep.Count -ne 1 -or $compatibilityStep[0].Contains('if') -or
 $gate = $integration.jobs.'compatibility-result'
 $gateDependencies = 'preflight,set-version-number,build-standalone,build-tests,cli-database-integration-tests'
 if ($gate.name -cne 'Compatibility result' -or ($gate.needs -join ',') -cne $gateDependencies -or
-    ($gate.if -replace '\s+', ' ') -cne '${{ always() && github.event_name == ''workflow_dispatch'' && (github.ref == ''refs/heads/ci/942-compatibility-pr957'' || github.ref == ''refs/heads/ci/942-compatibility-pr894'') }}' -or
+    ($gate.if -replace '\s+', ' ') -cne '${{ always() && github.event_name == ''workflow_dispatch'' && (github.ref == ''refs/heads/ci/942-compatibility-pr957'' || github.ref == ''refs/heads/ci/942-compatibility-pr963'') }}' -or
     $gate.Contains('continue-on-error')) {
     throw 'Compatibility result must complete independently of the report and cover all prerequisites on both manual pilot branches.'
 }
@@ -90,7 +90,7 @@ if (($fullMatrix.name -join ',') -cne ($expectedNames -join ',')) {
 }
 $pilotRefs = @(
     'refs/heads/ci/942-compatibility-pr957'
-    'refs/heads/ci/942-compatibility-pr894'
+    'refs/heads/ci/942-compatibility-pr963'
 )
 $expectedPreview = 'SqlServer 2025,SqlServer case-sensitive 2022,PostgreSQL 18,MariaDB 12,Sqlite,Oracle Free latest'
 foreach ($pilotRef in $pilotRefs) {
@@ -138,7 +138,7 @@ foreach ($event in @('push', 'pull_request')) {
 }
 foreach ($ref in @('refs/heads/main', 'refs/heads/ci/942-compatibility-tier-preview',
         'refs/heads/ci/942-compatibility-pr957-other', 'refs/heads/ci/942-compatibility-PR957',
-        'refs/tags/ci/942-compatibility-pr894', 'refs/pull/957/merge')) {
+        'refs/tags/ci/942-compatibility-pr963', 'refs/pull/957/merge')) {
     Assert-Rejected -MessagePattern 'only available for manual measurement' -Action {
         & $matrixSelector -Tier pr-preview -EventName workflow_dispatch -Ref $ref
     }
