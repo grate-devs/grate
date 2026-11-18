@@ -44,10 +44,62 @@ if ($testStep.Count -ne 1 -or !$testStep[0].run.Contains('-Distribution ''${{ ma
     throw 'The database suite must receive its matrix distribution and database.'
 }
 $integrationJob = $integration.jobs.'cli-database-integration-tests'
-if ($integrationJob.Contains('continue-on-error') -or @($integrationJob.strategy.matrix.variant).Count -ne 2) {
+if ($integrationJob.Contains('continue-on-error') -or $integrationJob.Contains('if') -or
+    (($integrationJob.strategy.matrix.variant -join ',') -cne 'All,Slim') -or
+    $integrationJob.strategy.'fail-fast' -ne $false -or
+    $integrationJob.strategy.matrix.Contains('include') -or $integrationJob.strategy.matrix.Contains('exclude')) {
     throw 'All and slim version-matrix tests must propagate failures.'
 }
-foreach ($entry in $integrationJob.strategy.matrix.database) {
+$compatibilityStep = @($integrationJob.steps | Where-Object name -CEQ 'Docker Test CmdLine')
+if ($compatibilityStep.Count -ne 1 -or $compatibilityStep[0].Contains('if') -or
+    $compatibilityStep[0].Contains('continue-on-error') -or
+    !$compatibilityStep[0].run.Contains("'--minimum-expected-tests', '1'")) {
+    throw 'Every compatibility lane must run the CLI test suite and reject an empty test selection.'
+}
+$gate = $integration.jobs.'compatibility-result'
+$gateDependencies = 'preflight,set-version-number,build-standalone,build-tests,cli-database-integration-tests'
+if ($gate.name -cne 'Compatibility result' -or ($gate.needs -join ',') -cne $gateDependencies -or
+    ($gate.if -replace '\s+', ' ') -cne '${{ always() && github.event_name == ''workflow_dispatch'' && (github.ref == ''refs/heads/ci/942-compatibility-pr957'' || github.ref == ''refs/heads/ci/942-compatibility-pr894'') }}' -or
+    $gate.Contains('continue-on-error')) {
+    throw 'Compatibility result must complete independently of the report and cover all prerequisites on both manual pilot branches.'
+}
+$gateStep = @($gate.steps | Where-Object run -CEQ './scripts/ci/Invoke-CompatibilityValidation.ps1')
+if ($gateStep.Count -ne 1 -or $gateStep[0].Contains('if') -or $gateStep[0].Contains('continue-on-error') -or
+    $gateStep[0].env.NEEDS_JSON -cne '${{ toJSON(needs) }}' -or
+    $gateStep[0].env.COMPATIBILITY_TIER -cne '${{ inputs.compatibility-tier || ''full'' }}') {
+    throw 'Compatibility result must check all required jobs using its selected tier.'
+}
+$matrixJob = $integration.jobs.preflight
+$matrixStep = @($matrixJob.steps | Where-Object id -CEQ 'matrix')
+if ($integrationJob.strategy.matrix.database -cne '${{ fromJSON(needs.preflight.outputs.databases) }}' -or
+    $integrationJob.needs -cnotcontains 'preflight' -or
+    $matrixJob.outputs.databases -cne '${{ steps.matrix.outputs.databases }}' -or
+    $matrixStep.Count -ne 1 -or $matrixStep[0].Contains('if') -or $matrixStep[0].Contains('continue-on-error')) {
+    throw 'The compatibility matrix must come from a successful preflight plan.'
+}
+$matrixSelector = Join-Path $PSScriptRoot 'Get-CompatibilityDatabases.ps1'
+$fullMatrix = @(& $matrixSelector -Tier full)
+$expectedNames = @(
+    'SqlServer 2025', 'SqlServer 2022', 'SqlServer 2019', 'SqlServer 2017', 'SqlServer case-sensitive 2022',
+    'PostgreSQL 18', 'PostgreSQL 17', 'PostgreSQL 16', 'PostgreSQL 15', 'PostgreSQL 14', 'PostgreSQL 13', 'PostgreSQL 12',
+    'MariaDB 13', 'MariaDB 12', 'MariaDB 11', 'MariaDB 10.4', 'MariaDB 10.10', 'Sqlite',
+    'Oracle Free latest', 'Oracle XE latest', 'Oracle XE 18'
+)
+if (($fullMatrix.name -join ',') -cne ($expectedNames -join ',')) {
+    throw 'Require all 21 compatibility database configurations in the full matrix.'
+}
+$pilotRefs = @(
+    'refs/heads/ci/942-compatibility-pr957'
+    'refs/heads/ci/942-compatibility-pr894'
+)
+$expectedPreview = 'SqlServer 2025,SqlServer case-sensitive 2022,PostgreSQL 18,MariaDB 12,Sqlite,Oracle Free latest'
+foreach ($pilotRef in $pilotRefs) {
+    $preview = @(& $matrixSelector -Tier pr-preview -EventName workflow_dispatch -Ref $pilotRef)
+    if (($preview.name -join ',') -cne $expectedPreview) {
+        throw 'Each pilot must exercise six current representative configurations.'
+    }
+}
+foreach ($entry in $fullMatrix) {
     if ($entry.distribution -cne $expected[$entry.type]) {
         throw "Incorrect version-matrix distribution for $($entry.name)."
     }
@@ -74,6 +126,25 @@ function Assert-Rejected {
     }
     if (!$rejected) {
         throw 'Expected the incorrect artifact or suite mapping to be rejected.'
+    }
+}
+
+foreach ($event in @('push', 'pull_request')) {
+    foreach ($pilotRef in $pilotRefs) {
+        Assert-Rejected -MessagePattern 'only available for manual measurement' -Action {
+            & $matrixSelector -Tier pr-preview -EventName $event -Ref $pilotRef
+        }
+    }
+}
+foreach ($ref in @('refs/heads/main', 'refs/heads/ci/942-compatibility-tier-preview',
+        'refs/heads/ci/942-compatibility-pr957-other', 'refs/heads/ci/942-compatibility-PR957',
+        'refs/tags/ci/942-compatibility-pr894', 'refs/pull/957/merge')) {
+    Assert-Rejected -MessagePattern 'only available for manual measurement' -Action {
+        & $matrixSelector -Tier pr-preview -EventName workflow_dispatch -Ref $ref
+    }
+    $defaultMatrix = @(& $matrixSelector -EventName workflow_dispatch -Ref $ref)
+    if (($defaultMatrix.name -join ',') -cne ($expectedNames -join ',')) {
+        throw "Require the full compatibility matrix on '$ref'."
     }
 }
 
