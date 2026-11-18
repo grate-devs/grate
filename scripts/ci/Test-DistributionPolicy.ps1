@@ -4,7 +4,9 @@ $ErrorActionPreference = 'Stop'
 Import-Module powershell-yaml -RequiredVersion 0.4.12
 . "$PSScriptRoot/../release/workflow_test_helpers.ps1"
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$workflow = Read-Workflow 'ci.yml'
+# The scheduling policy verifies both callers. Validate the shared test leaf
+# directly to distinguish a caller selecting a schedule from a skippable test.
+$workflow = Read-Workflow 'ci-cli-distributions.yml'
 $integration = Get-Content -LiteralPath "$repository/.github/workflows/integration-tests.yml" -Raw | ConvertFrom-Yaml
 $expected = @{
     Sqlite = 'SQLite'
