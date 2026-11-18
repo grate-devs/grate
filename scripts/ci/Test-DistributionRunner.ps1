@@ -9,6 +9,11 @@ $directory = New-TestDirectory
 $pwsh = (Get-Process -Id $PID).Path
 $savedPackages = $env:NUGET_PACKAGES
 $savedExecutable = $env:GrateExecutablePath
+$savedActions = @{
+    GITHUB_SHA = $env:GITHUB_SHA
+    GITHUB_RUN_ID = $env:GITHUB_RUN_ID
+    GITHUB_RUN_ATTEMPT = $env:GITHUB_RUN_ATTEMPT
+}
 $initialLocation = (Get-Location).Path
 $fixture = @{
     Events = [Collections.Generic.List[object]]::new()
@@ -174,6 +179,11 @@ function dotnet {
             $path = "$build/bin/$project/release_net11.0"
             New-Item -ItemType Directory -Path $path -Force | Out-Null
             Set-Content -LiteralPath "$path/$project.dll" -Value 'fixture'
+            Set-Content -LiteralPath "$path/$project.deps.json" -Value '{}'
+            Set-Content -LiteralPath "$path/$project.runtimeconfig.json" -Value '{}'
+            Set-Content -LiteralPath "$path/xunit.runner.json" -Value '{}'
+            $null = New-Item -ItemType Directory -Path "$path/nested"
+            Set-Content -LiteralPath "$path/nested/provider-fixture.sql" -Value 'select 1;'
         }
         default {
             Assert-True ($arguments[0] -match '/CommandLine\.(PostgreSQL|SqlServerCaseSensitive)\.dll$')
@@ -305,6 +315,83 @@ try {
             Assert-Equal 0 @($fixture.Events | Where-Object { $_.Arguments[0] -eq 'build' }).Count
         }
     }
+    $env:GITHUB_SHA = (git -C (Join-Path $PSScriptRoot '../..') rev-parse HEAD).Trim()
+    $env:GITHUB_RUN_ID = '12345'
+    $env:GITHUB_RUN_ATTEMPT = '1'
+    $prepared = Join-Path $directory 'test payload'
+    $archive = Join-Path $directory 'grate-postgresql-linux-x64-nativeaot-prepared.zip'
+    New-FixtureNativeAotArchive -Path $archive
+    Invoke-Test 'prepare one complete JIT project and reuse its same-run payload in a later attempt' {
+        $fixture.Events.Clear()
+        $fixture.FailAt = ''
+        & "$PSScriptRoot/Prepare-NativeAotTests.ps1" -Database PostgreSQL -OutputDirectory $prepared
+        $build = @($fixture.Events | Where-Object { $_.Arguments[0] -ceq 'build' })
+        Assert-Equal 1 $build.Count
+        Assert-True ($build[0].Arguments[1].EndsWith('/CommandLine.PostgreSQL.csproj'))
+        Assert-Equal 'Release' (Get-FixtureArgument -Arguments $build[0].Arguments -Name '-c')
+        Assert-Equal 'net11.0' (Get-FixtureProperty -Arguments $build[0].Arguments -Name 'TargetFrameworks')
+        Assert-Equal 0 @($build[0].Arguments | Where-Object { $_ -match '(PublishAot|GrateDistribution|SelfContained)' }).Count
+        Assert-True (Test-Path -LiteralPath "$prepared/payload/nested/provider-fixture.sql" -PathType Leaf)
+
+        $env:GITHUB_RUN_ATTEMPT = '2'
+        $fixture.Events.Clear()
+        $output = Join-Path $directory 'prepared aot tests'
+        Register-FixtureExecutable -Path "$output/nativeaot/extracted/grate"
+        & $runner -Distribution PostgreSQL -Database PostgreSQL -OutputDirectory $output -NativeAot -NativeAotArchive $archive -PreparedTestsDirectory $prepared
+        Assert-Equal 2 $fixture.Events.Count
+        Assert-Equal 'msbuild' $fixture.Events[0].Arguments[0]
+        Assert-Equal "$prepared/payload/CommandLine.PostgreSQL.dll" $fixture.Events[1].Arguments[0]
+        Assert-Equal "$output/nativeaot/extracted/grate" $fixture.Events[1].Executable
+        Assert-True ($fixture.Events[1].Arguments -contains '--minimum-expected-tests')
+        Assert-Equal 0 @($fixture.Events[1].Arguments | Where-Object { $_.StartsWith('--filter') }).Count
+        Assert-Equal 'exact native archive payload' (Get-Content -LiteralPath "$output/nativeaot/extracted/grate" -Raw)
+    }
+    Invoke-Test 'prepared test payload cannot be silently replaced by a fresh build' {
+        $fixture.Events.Clear()
+        $output = Join-Path $directory 'missing test payload run'
+        $missing = Join-Path $directory 'missing test payload'
+        Assert-Throws { & $runner -Distribution PostgreSQL -Database PostgreSQL -OutputDirectory $output -NativeAot -NativeAotArchive $archive -PreparedTestsDirectory $missing } '*Missing prepared NativeAOT test directory*'
+        Assert-Throws { & $runner -Distribution PostgreSQL -Database PostgreSQL -OutputDirectory $output -NativeAot -NativeAotArchive $archive -PreparedTestsDirectory '' } '*requires a nonempty directory*'
+        Assert-Throws { & $runner -Distribution PostgreSQL -Database PostgreSQL -OutputDirectory $output -PreparedTestsDirectory $prepared } '*Linux x64 NativeAOT archive*'
+        Assert-Equal 1 $fixture.Events.Count
+        Assert-Equal 'msbuild' $fixture.Events[0].Arguments[0]
+        Assert-True (!(Test-Path -LiteralPath $output))
+    }
+    Invoke-Test 'prepared tests reject wrong provenance, future attempts, and altered or incomplete contents' {
+        $cases = @(
+            @{ Name = 'other checkout'; Error = '*mismatch for SourceRevision*'; Change = { param($path, $manifest) $manifest.Identity.SourceRevision = 'a' * 40 } }
+            @{ Name = 'other run'; Error = '*mismatch for RunId*'; Change = { param($path, $manifest) $manifest.Identity.RunId = '67890' } }
+            @{ Name = 'other project'; Error = '*mismatch for Project*'; Change = { param($path, $manifest) $manifest.Identity.Project = 'CommandLine.Sqlite' } }
+            @{ Name = 'other framework'; Error = '*mismatch for Framework*'; Change = { param($path, $manifest) $manifest.Identity.Framework = 'net10.0' } }
+            @{ Name = 'other RID'; Error = '*mismatch for RuntimeIdentifier*'; Change = { param($path, $manifest) $manifest.Identity.RuntimeIdentifier = 'linux-arm64' } }
+            @{ Name = 'future attempt'; Error = '*invalid or future producer attempt*'; Change = { param($path, $manifest) $manifest.Attempt = 3 } }
+            @{ Name = 'altered fixture'; Error = '*integrity mismatch*'; Change = { param($path, $manifest) Add-Content -LiteralPath "$path/payload/nested/provider-fixture.sql" -Value 'select 2;' } }
+            @{ Name = 'missing fixture'; Error = '*inventory does not match*'; Change = { param($path, $manifest) Remove-Item -LiteralPath "$path/payload/nested/provider-fixture.sql" } }
+            @{ Name = 'extra file'; Error = '*inventory does not match*'; Change = { param($path, $manifest) Set-Content -LiteralPath "$path/payload/untracked.dll" -Value 'unexpected' } }
+            @{ Name = 'extra manifest hash'; Error = '*inventory does not match*'; Change = { param($path, $manifest) $manifest.Files += @{ Path = 'untracked.dll'; Sha256 = 'A' * 64 } } }
+            @{ Name = 'duplicate hash entry'; Error = '*Invalid prepared NativeAOT test file inventory*'; Change = { param($path, $manifest) $manifest.Files += $manifest.Files[0] } }
+            @{ Name = 'extra root file'; Error = '*Expected only the prepared NativeAOT test payload*'; Change = { param($path, $manifest) Set-Content -LiteralPath "$path/untracked.dll" -Value 'unexpected' } }
+            @{ Name = 'missing test config'; Error = '*missing xunit.runner.json*'; Change = {
+                param($path, $manifest)
+                Remove-Item -LiteralPath "$path/payload/xunit.runner.json"
+                $manifest.Files = @($manifest.Files | Where-Object Path -CNE 'xunit.runner.json')
+            } }
+        )
+        foreach ($case in $cases) {
+            $fixture.Events.Clear()
+            $altered = Join-Path $directory $case.Name
+            Copy-Item -LiteralPath $prepared -Destination $altered -Recurse -Force
+            $manifestPath = Join-Path $altered 'manifest.json'
+            $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable
+            & $case.Change $altered $manifest
+            $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath
+            $output = Join-Path $directory 'invalid prepared payload run'
+            Assert-Throws { & $runner -Distribution PostgreSQL -Database PostgreSQL -OutputDirectory $output -NativeAot -NativeAotArchive $archive -PreparedTestsDirectory $altered } $case.Error
+            Assert-Equal 1 $fixture.Events.Count
+            Assert-Equal 'msbuild' $fixture.Events[0].Arguments[0]
+            Assert-True (!(Test-Path -LiteralPath $output))
+        }
+    }
     Write-Host "PASS: $script:TestCount distribution runner contract scenarios."
 } finally {
     foreach ($name in $fixture.Aliases) {
@@ -312,5 +399,8 @@ try {
     }
     $env:NUGET_PACKAGES = $savedPackages
     $env:GrateExecutablePath = $savedExecutable
+    foreach ($name in $savedActions.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $savedActions[$name])
+    }
     Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
 }

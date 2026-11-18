@@ -9,6 +9,7 @@ $expectedRoutes = @{
     'build-standalone-mac-arm64' = 'release-cli.yml'
     'build-native-aot-linux-x64' = 'release-native-aot.yml'
     'build-native-aot' = 'release-native-aot.yml'
+    'prepare-native-aot-tests' = 'release-native-aot-test-payloads.yml'
     'test-native-aot' = 'release-native-aot-tests.yml'
     'test-native-aot-compatibility' = 'release-native-aot-compatibility.yml'
     'build-msi' = 'release-msi.yml'
@@ -29,6 +30,7 @@ $expectedInputNames = @{
     'release-libraries.yml' = @('version', 'core-version')
     'release-cli.yml' = @('version', 'publish', 'runner', 'runtime-identifiers', 'native-arm-sdk')
     'release-native-aot.yml' = @('version', 'targets')
+    'release-native-aot-test-payloads.yml' = @()
     'release-native-aot-tests.yml' = @('version')
     'release-native-aot-compatibility.yml' = @('version')
     'release-msi.yml' = @('version', 'core-version')
@@ -209,7 +211,8 @@ function Assert-ReleaseCallContracts {
 
     $required = @(
         'set-version-number', 'validate-release-policy', 'build-netcore-tool', 'build-nuget-package',
-        'build-standalone', 'build-standalone-mac-arm64', 'build-native-aot-linux-x64', 'build-native-aot', 'test-native-aot',
+        'build-standalone', 'build-standalone-mac-arm64', 'build-native-aot-linux-x64', 'build-native-aot',
+        'prepare-native-aot-tests', 'test-native-aot',
         'test-native-aot-compatibility', 'build-msi', 'build-docker-image',
         'build-slim-docker-images', 'build-chocolatey', 'build-deb'
     )

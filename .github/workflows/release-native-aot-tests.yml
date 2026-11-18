@@ -51,6 +51,11 @@ jobs:
         with:
           name: release-${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-${{ inputs.version }}.zip
           path: ${{ runner.temp }}/nativeaot-archive
+      - name: Download this run's JIT test payload
+        uses: actions/download-artifact@v8
+        with:
+          name: nativeaot-jit-tests-${{ matrix.database }}
+          path: ${{ runner.temp }}/nativeaot-jit-tests
       - name: Test the archived NativeAOT CLI against its database
         shell: pwsh
         env:
@@ -65,6 +70,7 @@ jobs:
             OutputDirectory = '${{ runner.temp }}/nativeaot-tests'
             NativeAot = $true
             NativeAotArchive = '${{ runner.temp }}/nativeaot-archive/${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-' + $env:PACKAGE_VERSION + '.zip'
+            PreparedTestsDirectory = '${{ runner.temp }}/nativeaot-jit-tests'
           }
           ./scripts/ci/Invoke-DistributionTests.ps1 @parameters
       - name: Retain NativeAOT database test results

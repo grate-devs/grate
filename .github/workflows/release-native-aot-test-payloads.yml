@@ -1,0 +1,40 @@
+name: Release · NativeAOT JIT test payloads
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: Prepare CommandLine.${{ matrix.database }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [Sqlite, SqlServer, SqlServerCaseSensitive, PostgreSQL, MariaDB, Oracle]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Prepare complete JIT test payload
+        shell: pwsh
+        env:
+          NATIVE_AOT_TEST_DATABASE: ${{ matrix.database }}
+          NATIVE_AOT_TEST_PAYLOAD: ${{ runner.temp }}/nativeaot-jit-tests
+        run: ./scripts/ci/Prepare-NativeAotTests.ps1 -Database $env:NATIVE_AOT_TEST_DATABASE -OutputDirectory $env:NATIVE_AOT_TEST_PAYLOAD
+      - name: Upload same-run JIT test payload
+        uses: actions/upload-artifact@v7
+        with:
+          name: nativeaot-jit-tests-${{ matrix.database }}
+          path: ${{ runner.temp }}/nativeaot-jit-tests/
+          if-no-files-found: error
+          include-hidden-files: true
+          # Rerunning a producer replaces the payload of the same suite and run.
+          overwrite: true

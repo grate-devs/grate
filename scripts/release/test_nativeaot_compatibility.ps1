@@ -40,11 +40,16 @@ function Assert-NativeAotCompatibility {
     Assert-Policy ($selection.run.Contains("Get-GrateDistribution -Name '$profileExpression'") -and $selection.run.Contains('package-id=$($profile.PackageId)')) 'Resolve All and matching slim package identities from the selected profile.'
 
     $downloads = @($job.steps | Where-Object { $_.uses -like 'actions/download-artifact@*' })
-    Assert-Policy ($downloads.Count -eq 1) 'Download exactly the NativeAOT release candidate.'
+    Assert-Policy ($downloads.Count -eq 2) 'Download exactly the NativeAOT release candidate and selected JIT test payload.'
     $download = $downloads[0]
-    Assert-Policy ($download.with.Count -eq 2 -and !$download.if -and !$download.'continue-on-error') 'Download from this run without cross-run or cross-repository overrides.'
+    foreach ($artifact in $downloads) {
+        Assert-Policy ($artifact.with.Count -eq 2 -and !$artifact.if -and !$artifact.'continue-on-error') 'Download from this run without cross-run or cross-repository overrides.'
+    }
     Assert-Policy ($download.with.name -ceq 'release-${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-${{ inputs.version }}.zip') 'Consume the versioned NativeAOT archive from this run.'
     Assert-Policy ($download.with.path -ceq '${{ runner.temp }}/nativeaot-compatibility-archive') 'Keep the downloaded release candidate separate from fresh test output.'
+    $payload = $downloads[1]
+    Assert-Policy ($payload.with.name -ceq 'nativeaot-jit-tests-${{ matrix.database.type }}' -and
+        $payload.with.path -ceq '${{ runner.temp }}/nativeaot-jit-tests') 'Download only the prepared test payload for the selected database type.'
 
     $test = $job.steps | Where-Object name -CEQ 'Test archived NativeAOT CLI database compatibility'
     Assert-Policy (!$test.if -and !$test.'continue-on-error' -and $test.shell -ceq 'pwsh') 'Run compatibility checks with failures propagated.'
@@ -57,6 +62,7 @@ function Assert-NativeAotCompatibility {
         'OutputDirectory = ''${{ runner.temp }}/nativeaot-compatibility-tests''',
         'NativeAot = $true',
         'NativeAotArchive = ''${{ runner.temp }}/nativeaot-compatibility-archive/${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-'' + $env:PACKAGE_VERSION + ''.zip''',
+        'PreparedTestsDirectory = ''${{ runner.temp }}/nativeaot-jit-tests''',
         './scripts/ci/Invoke-DistributionTests.ps1 @parameters'
     )) {
         Assert-Policy ($test.run.Contains($line)) "Missing archived NativeAOT runner routing: $line"
@@ -71,7 +77,7 @@ function Assert-NativeAotCompatibility {
 
     $call = $Build.jobs['test-native-aot-compatibility']
     Assert-Policy ($call.uses -ceq './.github/workflows/release-native-aot-compatibility.yml' -and
-        ($call.needs -join ',') -ceq 'set-version-number,build-native-aot-linux-x64' -and !$call.if) 'Compatibility must wait for only this run''s Linux x64 NativeAOT producer and version resolution.'
+        ($call.needs -join ',') -ceq 'set-version-number,build-native-aot-linux-x64,prepare-native-aot-tests' -and !$call.if) 'Compatibility must wait for only version resolution, Linux x64 NativeAOT archives and prepared test payloads.'
     Assert-Policy ($call.with.version -ceq '${{ needs.set-version-number.outputs.semVer }}' -and !$call.if -and !$call.'continue-on-error') 'Forward the candidate version without making compatibility optional.'
     Assert-Policy ($Build.jobs['release-ready'].needs -ccontains 'test-native-aot-compatibility') 'Compatibility must gate release publication.'
 }
@@ -87,11 +93,14 @@ $mutations = @(
     @{ Change = { param($b, $c) $c.jobs.main.strategy.matrix.variant = @('All') }; Error = '*both All*' },
     @{ Change = { param($b, $c) (Get-ActionStep -Job $c.jobs.main -Action 'actions/download-artifact').with.name = 'grate-linux-x64-self-contained' }; Error = '*versioned NativeAOT archive*' },
     @{ Change = { param($b, $c) (Get-ActionStep -Job $c.jobs.main -Action 'actions/download-artifact').with['run-id'] = 123 }; Error = '*this run*' },
+    @{ Change = { param($b, $c) ($c.jobs.main.steps | Where-Object name -CEQ 'Download this run''s JIT test payload').with.name = 'nativeaot-jit-tests-SqlServer' }; Error = '*selected database type*' },
     @{ Change = { param($b, $c) ($c.jobs.main.steps | Where-Object name -CEQ 'Test archived NativeAOT CLI database compatibility').env.GrateTestConfig__DockerImage = 'postgres:18' }; Error = '*exact database image*' },
     @{ Change = { param($b, $c) $step = $c.jobs.main.steps | Where-Object name -CEQ 'Test archived NativeAOT CLI database compatibility'; $step.run = $step.run.Replace('NativeAot = $true', 'NativeAot = $false') }; Error = '*NativeAot = $true*' },
     @{ Change = { param($b, $c) $c.jobs.main.strategy['fail-fast'] = $true }; Error = '*including failures*' },
     @{ Change = { param($b, $c) $b.jobs['test-native-aot-compatibility'].with.version = 'stale-version' }; Error = '*candidate version*' },
-    @{ Change = { param($b, $c) $b.jobs['test-native-aot-compatibility'].needs += 'build-native-aot' }; Error = '*wait for only this run*' },
+    @{ Change = { param($b, $c) $step = $c.jobs.main.steps | Where-Object name -CEQ 'Test archived NativeAOT CLI database compatibility'; $step.run = $step.run.Replace('PreparedTestsDirectory', 'UnusedDirectory') }; Error = '*PreparedTestsDirectory*' },
+    @{ Change = { param($b, $c) $b.jobs['test-native-aot-compatibility'].needs += 'build-native-aot' }; Error = '*wait for only version resolution*' },
+    @{ Change = { param($b, $c) $b.jobs['test-native-aot-compatibility'].needs = @($b.jobs['test-native-aot-compatibility'].needs | Where-Object { $_ -cne 'prepare-native-aot-tests' }) }; Error = '*wait for only version resolution*' },
     @{ Change = { param($b, $c) $b.jobs['release-ready'].needs = @($b.jobs['release-ready'].needs | Where-Object { $_ -cne 'test-native-aot-compatibility' }) }; Error = '*gate release publication*' }
 )
 foreach ($mutation in $mutations) {

@@ -108,11 +108,13 @@ same requirement when running downloaded test DLLs with `dotnet test --test-modu
   migration/rerun smoke checks for All/SQLite. The release workflow also runs
   twelve provider-default CLI suites and 42 database-version compatibility
   suites against its actual Linux x64 NativeAOT ZIPs. Both suites start once the
-  six Linux x64 archives are ready. Release publication waits for both archive
-  groups across all 54 profile/RID pairs and both database suites. The version
-  matrix must match the ordinary CLI compatibility entries exactly. The test
-  runners stay normal JIT builds. These suites establish server-version
-  compatibility on Linux x64.
+  six Linux x64 archives and six CommandLine test payloads are ready. The
+  version matrix must match the ordinary CLI compatibility entries exactly.
+  Each consumer verifies the complete ordinary JIT test output from the same
+  source and run and executes the selected NativeAOT archive. Release
+  publication waits for all archive and test payload producers and both
+  database suites. These suites establish server-version compatibility on
+  Linux x64.
 - **NuGet libraries:** [build.yml](../../.github/workflows/build.yml) packs
   `grate.core` and all five provider packages. The CI package job runs
   [verify-packages.ps1](../../scripts/verify-packages.ps1), which restores all six

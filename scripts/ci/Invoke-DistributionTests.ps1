@@ -10,12 +10,14 @@ param(
     [string]$OutputDirectory,
     [string]$RuntimeIdentifier = 'linux-x64',
     [switch]$NativeAot,
-    [string]$NativeAotArchive
+    [string]$NativeAotArchive,
+    [string]$PreparedTestsDirectory
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/Distribution.Common.ps1"
+. "$PSScriptRoot/Distribution.TestPayload.ps1"
 
 function Expand-NativeAotArchive {
     param(
@@ -168,21 +170,6 @@ function Install-DistributionTool {
     }
 }
 
-function Build-DistributionTests {
-    param(
-        [string]$Database,
-        [string]$Framework,
-        [string]$OutputDirectory
-    )
-
-    # Tests retain normal JIT builds and All references; only the selected CLI changes.
-    $buildArguments = @(
-        'build', "unittests/CommandLine/CommandLine.$Database/CommandLine.$Database.csproj",
-        '-c', 'Release', "-p:TargetFrameworks=$Framework", "-p:ArtifactsPath=$OutputDirectory/test-build"
-    )
-    dotnet @buildArguments
-}
-
 function Invoke-DistributionSuites {
     param(
         [string]$Distribution,
@@ -190,12 +177,12 @@ function Invoke-DistributionSuites {
         [string]$Framework,
         [string]$RuntimeIdentifier,
         [string]$OutputDirectory,
+        [string]$TestAssembly,
         [switch]$NativeAot
     )
 
-    $testAssembly = "$OutputDirectory/test-build/bin/CommandLine.$Database/release_$Framework/CommandLine.$Database.dll"
-    if (!(Test-Path -LiteralPath $testAssembly)) {
-        throw "Missing built test assembly: $testAssembly"
+    if (!(Test-Path -LiteralPath $TestAssembly -PathType Leaf)) {
+        throw "Missing built test assembly: $TestAssembly"
     }
     $executableName = if ($RuntimeIdentifier.StartsWith('win-')) { 'grate.exe' } else { 'grate' }
     $forms = if ($NativeAot) { @('nativeaot') } else { @('standalone', 'tool') }
@@ -208,7 +195,7 @@ function Invoke-DistributionSuites {
             throw "$Distribution $form did not install its bundled skill."
         }
         $testArguments = @(
-            $testAssembly, '--minimum-expected-tests', '1', '--long-running', '60', '--timeout', '20m',
+            $TestAssembly, '--minimum-expected-tests', '1', '--long-running', '60', '--timeout', '20m',
             '--results-directory', "$OutputDirectory/results/$form", '--report-xunit-trx'
         )
         dotnet @testArguments
@@ -231,6 +218,12 @@ if ($Distribution -ne 'All' -and $Distribution -ne $databaseDistributions[$Datab
 if ($NativeAotArchive -and !$NativeAot) {
     throw '-NativeAotArchive requires -NativeAot.'
 }
+if ($PSBoundParameters.ContainsKey('PreparedTestsDirectory')) {
+    if ([string]::IsNullOrWhiteSpace($PreparedTestsDirectory) -or !$NativeAot -or !$NativeAotArchive -or $RuntimeIdentifier -cne 'linux-x64') {
+        throw '-PreparedTestsDirectory requires a nonempty directory and a Linux x64 NativeAOT archive.'
+    }
+    $PreparedTestsDirectory = [IO.Path]::GetFullPath($PreparedTestsDirectory)
+}
 if ($NativeAotArchive) {
     $NativeAotArchive = [IO.Path]::GetFullPath($NativeAotArchive)
 }
@@ -245,6 +238,10 @@ Push-Location $repository
 try {
     $frameworks = @((dotnet msbuild src/grate/grate.csproj -nologo -getProperty:TargetFrameworks).Trim() -split ';')
     $framework = $frameworks[-1]
+    if ($PreparedTestsDirectory) {
+        $run = Get-NativeAotTestRunIdentity -Database $Database -Framework $framework -RuntimeIdentifier $RuntimeIdentifier
+        $testAssembly = Read-NativeAotTestPayload -Directory $PreparedTestsDirectory -Run $run
+    }
     $version = '0.0.0-ci.' + [Guid]::NewGuid().ToString('N')
     $packageId = if ($Distribution -eq 'All') { 'grate' } else { 'grate-' + $Distribution.ToLowerInvariant() }
     if ($NativeAot) {
@@ -279,7 +276,11 @@ try {
         Build-DistributionTool @toolParameters
         Install-DistributionTool -PackageId $packageId -Version $version -Framework $framework -OutputDirectory $output
     }
-    Build-DistributionTests -Database $Database -Framework $framework -OutputDirectory $output
+    if (!$PreparedTestsDirectory) {
+        Build-DistributionTests -Database $Database -Framework $framework -OutputDirectory $output
+        $testOutput = Get-DistributionTestOutputDirectory -Database $Database -Framework $framework -OutputDirectory $output
+        $testAssembly = Join-Path $testOutput "CommandLine.$Database.dll"
+    }
 
     $suiteParameters = @{
         Distribution = $Distribution
@@ -287,6 +288,7 @@ try {
         Framework = $framework
         RuntimeIdentifier = $RuntimeIdentifier
         OutputDirectory = $output
+        TestAssembly = $testAssembly
         NativeAot = $NativeAot
     }
     Invoke-DistributionSuites @suiteParameters
