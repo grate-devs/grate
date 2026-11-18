@@ -1,5 +1,6 @@
 # Heavyweight integration tests
 name: CI · Integration tests
+run-name: Compatibility (${{ inputs.compatibility-tier || 'full' }})
 
 on:
   push:
@@ -13,6 +14,12 @@ on:
     paths-ignore:
       - docs/
   workflow_dispatch:
+    inputs:
+      compatibility-tier:
+        description: Version matrix to measure on a compatibility pilot branch
+        type: choice
+        default: full
+        options: [full, pr-preview]
 
 # This workflow only builds and tests; superseded revisions need not retain
 # their large database matrix while the newest revision waits for runners.
@@ -32,11 +39,24 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      databases: ${{ steps.matrix.outputs.databases }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/preflight
+      - name: Select compatibility matrix
+        id: matrix
+        shell: pwsh
+        env:
+          COMPATIBILITY_TIER: ${{ inputs.compatibility-tier || 'full' }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $rows = @(./scripts/ci/Get-CompatibilityDatabases.ps1 -Tier $env:COMPATIBILITY_TIER -EventName $env:GITHUB_EVENT_NAME -Ref $env:GITHUB_REF)
+          $matrix = ConvertTo-Json -InputObject $rows -Compress -Depth 5
+          "databases=$matrix" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          Write-Host "Selected $($rows.Count) database configurations for the $env:COMPATIBILITY_TIER tier."
 
   set-version-number:
     name: Set version number
@@ -295,6 +315,7 @@ jobs:
     timeout-minutes: 25
 
     needs:
+      - preflight
       - set-version-number
       - build-standalone
       - build-tests
@@ -303,92 +324,7 @@ jobs:
       fail-fast: false
       matrix:
         variant: [All, Slim]
-        database:
-          - name: "SqlServer 2025"
-            type: SqlServer
-            distribution: SQLServer
-            image: "mcr.microsoft.com/mssql/server:2025-latest"
-          - name: "SqlServer 2022"
-            type: SqlServer
-            distribution: SQLServer
-            image: "mcr.microsoft.com/mssql/server:2022-latest"
-          - name: "SqlServer 2019" 
-            type: SqlServer
-            distribution: SQLServer
-            image: "mcr.microsoft.com/mssql/server:2019-CU26-ubuntu-20.04"
-          - name: "SqlServer 2017" 
-            type: SqlServer
-            distribution: SQLServer
-            image: "mcr.microsoft.com/mssql/server:2017-latest"
-          - name: "SqlServer case-sensitive 2022"
-            type: SqlServerCaseSensitive
-            distribution: SQLServer
-            image: "mcr.microsoft.com/mssql/server:2022-latest"
-          - name: "PostgreSQL 18" 
-            type: PostgreSQL
-            distribution: PostgreSQL
-            image: "postgres:18"
-          - name: "PostgreSQL 17" 
-            type: PostgreSQL
-            distribution: PostgreSQL
-            image: "postgres:17"
-          - name: "PostgreSQL 16" 
-            type: PostgreSQL
-            distribution: PostgreSQL
-            image: "postgres:16"
-          - name: "PostgreSQL 15" 
-            type: PostgreSQL
-            distribution: PostgreSQL
-            image: "postgres:15"
-          - name: "PostgreSQL 14" 
-            type: PostgreSQL
-            distribution: PostgreSQL
-            image: "postgres:14"
-          - name: "PostgreSQL 13" 
-            type: PostgreSQL
-            distribution: PostgreSQL
-            image: "postgres:13"
-          - name: "PostgreSQL 12" 
-            type: PostgreSQL
-            distribution: PostgreSQL
-            image: "postgres:12"
-          - name: "MariaDB 13" 
-            type: MariaDB
-            distribution: MariaDB
-            image: "mariadb:13.0-rc"
-          - name: "MariaDB 12" 
-            type: MariaDB
-            distribution: MariaDB
-            image: "mariadb:12"
-          - name: "MariaDB 11" 
-            type: MariaDB
-            distribution: MariaDB
-            image: "mariadb:11"
-          - name: "MariaDB 10.4" 
-            type: MariaDB
-            distribution: MariaDB
-            image: "mariadb:10.4"
-          - name: "MariaDB 10.10" 
-            type: MariaDB
-            distribution: MariaDB
-            image: "mariadb:10.10"
-          - name: "Sqlite" 
-            type: Sqlite
-            distribution: SQLite
-            image: "irrelevant"
-          - name: "Oracle Free latest" 
-            type: Oracle
-            distribution: Oracle
-            image: "gvenzl/oracle-free:latest-faststart"
-          - name: "Oracle XE latest" 
-            type: Oracle
-            distribution: Oracle
-            image: "gvenzl/oracle-xe:latest-faststart"
-          - name: "Oracle XE 18" 
-            type: Oracle
-            distribution: Oracle
-            image: "gvenzl/oracle-xe:18-faststart"
-
+        database: ${{ fromJSON(needs.preflight.outputs.databases) }}
 
     runs-on: ubuntu-latest
     steps:
@@ -610,6 +546,31 @@ jobs:
     #   env:
     #     FAILURE: ${{ contains(steps.*.result, 'failure') }}
     #     CANCELLED: ${{ contains(steps.*.result, 'cancelled') }}
+
+  compatibility-result:
+    name: Compatibility result
+    # Measure when compatibility is known independently of report generation.
+    if: >-
+      ${{ always() && github.event_name == 'workflow_dispatch' &&
+          (github.ref == 'refs/heads/ci/942-compatibility-pr957' ||
+           github.ref == 'refs/heads/ci/942-compatibility-pr894') }}
+    needs: [preflight, set-version-number, build-standalone, build-tests, cli-database-integration-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify all selected compatibility tests passed
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          COMPATIBILITY_TIER: ${{ inputs.compatibility-tier || 'full' }}
+        run: ./scripts/ci/Invoke-CompatibilityValidation.ps1
 
   report:
     runs-on: ubuntu-latest
