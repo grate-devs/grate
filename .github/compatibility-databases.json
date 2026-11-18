@@ -1,0 +1,128 @@
+[
+  {
+    "name": "SqlServer 2025",
+    "image": "mcr.microsoft.com/mssql/server:2025-latest",
+    "type": "SqlServer",
+    "distribution": "SQLServer"
+  },
+  {
+    "name": "SqlServer 2022",
+    "image": "mcr.microsoft.com/mssql/server:2022-latest",
+    "type": "SqlServer",
+    "distribution": "SQLServer"
+  },
+  {
+    "name": "SqlServer 2019",
+    "image": "mcr.microsoft.com/mssql/server:2019-CU26-ubuntu-20.04",
+    "type": "SqlServer",
+    "distribution": "SQLServer"
+  },
+  {
+    "name": "SqlServer 2017",
+    "image": "mcr.microsoft.com/mssql/server:2017-latest",
+    "type": "SqlServer",
+    "distribution": "SQLServer"
+  },
+  {
+    "name": "SqlServer case-sensitive 2022",
+    "image": "mcr.microsoft.com/mssql/server:2022-latest",
+    "type": "SqlServerCaseSensitive",
+    "distribution": "SQLServer"
+  },
+  {
+    "name": "PostgreSQL 18",
+    "image": "postgres:18",
+    "type": "PostgreSQL",
+    "distribution": "PostgreSQL"
+  },
+  {
+    "name": "PostgreSQL 17",
+    "image": "postgres:17",
+    "type": "PostgreSQL",
+    "distribution": "PostgreSQL"
+  },
+  {
+    "name": "PostgreSQL 16",
+    "image": "postgres:16",
+    "type": "PostgreSQL",
+    "distribution": "PostgreSQL"
+  },
+  {
+    "name": "PostgreSQL 15",
+    "image": "postgres:15",
+    "type": "PostgreSQL",
+    "distribution": "PostgreSQL"
+  },
+  {
+    "name": "PostgreSQL 14",
+    "image": "postgres:14",
+    "type": "PostgreSQL",
+    "distribution": "PostgreSQL"
+  },
+  {
+    "name": "PostgreSQL 13",
+    "image": "postgres:13",
+    "type": "PostgreSQL",
+    "distribution": "PostgreSQL"
+  },
+  {
+    "name": "PostgreSQL 12",
+    "image": "postgres:12",
+    "type": "PostgreSQL",
+    "distribution": "PostgreSQL"
+  },
+  {
+    "name": "MariaDB 13",
+    "image": "mariadb:13.0-rc",
+    "type": "MariaDB",
+    "distribution": "MariaDB"
+  },
+  {
+    "name": "MariaDB 12",
+    "image": "mariadb:12",
+    "type": "MariaDB",
+    "distribution": "MariaDB"
+  },
+  {
+    "name": "MariaDB 11",
+    "image": "mariadb:11",
+    "type": "MariaDB",
+    "distribution": "MariaDB"
+  },
+  {
+    "name": "MariaDB 10.4",
+    "image": "mariadb:10.4",
+    "type": "MariaDB",
+    "distribution": "MariaDB"
+  },
+  {
+    "name": "MariaDB 10.10",
+    "image": "mariadb:10.10",
+    "type": "MariaDB",
+    "distribution": "MariaDB"
+  },
+  {
+    "name": "Sqlite",
+    "image": "irrelevant",
+    "type": "Sqlite",
+    "distribution": "SQLite"
+  },
+  {
+    "name": "Oracle Free latest",
+    "image": "gvenzl/oracle-free:latest-faststart",
+    "type": "Oracle",
+    "distribution": "Oracle"
+  },
+  {
+    "name": "Oracle XE latest",
+    "image": "gvenzl/oracle-xe:latest-faststart",
+    "type": "Oracle",
+    "distribution": "Oracle"
+  },
+  {
+    "name": "Oracle XE 18",
+    "image": "gvenzl/oracle-xe:18-faststart",
+    "type": "Oracle",
+    "distribution": "Oracle"
+  }
+]
