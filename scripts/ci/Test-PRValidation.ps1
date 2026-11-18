@@ -40,9 +40,10 @@ function New-Fixture {
     }
     if ($names.Count -ne 94) { throw 'Fixture must contain 94 required jobs.' }
     $needs = @{}
-    foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
+    foreach ($group in @('build-code', 'fast-tests-linux', 'fast-tests-windows', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
         $needs[$group] = @{ result = 'success' }
     }
+    $needs['cli-distributions-early'] = @{ result = 'skipped' }
     $jobs = @($names | ForEach-Object { @{ name = $_; status = 'completed'; conclusion = 'success'; run_id = 123; run_attempt = 1 } })
     foreach ($job in $jobs) {
         $stepNames = @()
@@ -124,13 +125,13 @@ function ConvertTo-ApiJobFixture {
     }
 }
 
-function Invoke-Gate($Fixture, [int] $Attempt = 1, [switch]$RawJobEvidence) {
+function Invoke-Gate($Fixture, [int] $Attempt = 1, [switch]$RawJobEvidence, [string] $CliScheduling = 'baseline') {
     $jobs = $Fixture.jobs
     if (!$RawJobEvidence) {
         $jobs = @(ConvertTo-ApiJobFixture -Jobs $Fixture.jobs)
     }
     & $gate -NeedsJson (ConvertTo-Json -InputObject $Fixture.needs -Depth 10 -Compress) `
-        -JobsJson (ConvertTo-Json -InputObject $jobs -Depth 10 -Compress) -RunId 123 -RunAttempt $Attempt
+        -JobsJson (ConvertTo-Json -InputObject $jobs -Depth 10 -Compress) -RunId 123 -RunAttempt $Attempt -CliScheduling $CliScheduling
 }
 
 function Assert-Rejected([string] $Name, [scriptblock] $Action, [string] $Message) {
@@ -195,8 +196,10 @@ $fixture = New-Fixture
 $fixture.jobs += $fixture.jobs[0].Clone()
 Assert-Rejected 'duplicate required job' { Invoke-Gate $fixture } 'Duplicate required job'
 
-foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')) {
-    foreach ($result in @('failure', 'cancelled', 'skipped', 'unknown', $null)) {
+$baselineNeeds = (New-Fixture).needs
+foreach ($group in $baselineNeeds.Keys) {
+    $expected = $baselineNeeds[$group].result
+    foreach ($result in @('success', 'failure', 'cancelled', 'skipped', 'unknown', $null) -cne $expected) {
         $fixture = New-Fixture
         $fixture.needs[$group].result = $result
         Assert-Rejected "dependency $group result '$result'" { Invoke-Gate $fixture } 'Required dependency'
@@ -205,6 +208,16 @@ foreach ($group in @('build-code', 'test', 'cli-distributions', 'packages', 'sta
     $fixture.needs.Remove($group)
     Assert-Rejected "missing dependency $group" { Invoke-Gate $fixture } 'Missing required dependency'
 }
+
+$fixture = New-Fixture
+$fixture.needs['cli-distributions'].result = 'skipped'
+$fixture.needs['cli-distributions-early'].result = 'success'
+$fixture.jobs += @{ name = 'CLI distributions'; status = 'completed'; conclusion = 'skipped'; run_id = 123; run_attempt = 1 }
+Invoke-Gate $fixture -CliScheduling early
+$script:passed++
+Assert-Rejected 'wrong CLI scheduling' { Invoke-Gate $fixture } 'Required dependency .*cli-distributions'
+$fixture.needs['fast-tests-windows'].result = 'failure'
+Assert-Rejected 'early CLI with failed Windows tests' { Invoke-Gate $fixture -CliScheduling early } 'Required dependency .*fast-tests-windows'
 
 $fixture = New-Fixture
 $fixture.jobs[0].run_id = 456
@@ -294,7 +307,7 @@ foreach ($job in $fixture.jobs) {
 Invoke-Gate $fixture
 $script:passed++
 
-Assert-Rejected 'non-object dependencies' { & $gate -NeedsJson '[]' -JobsJson '[]' -RunId 123 -RunAttempt 1 } 'needs object'
-Assert-Rejected 'non-array jobs' { & $gate -NeedsJson '{}' -JobsJson '{}' -RunId 123 -RunAttempt 1 } 'jobs array'
-Assert-Rejected 'malformed evidence' { & $gate -NeedsJson '{}' -JobsJson 'invalid' -RunId 123 -RunAttempt 1 } 'JSON'
+Assert-Rejected 'non-object dependencies' { & $gate -NeedsJson '[]' -JobsJson '[]' -RunId 123 -RunAttempt 1 -CliScheduling baseline } 'needs object'
+Assert-Rejected 'non-array jobs' { & $gate -NeedsJson '{}' -JobsJson '{}' -RunId 123 -RunAttempt 1 -CliScheduling baseline } 'jobs array'
+Assert-Rejected 'malformed evidence' { & $gate -NeedsJson '{}' -JobsJson 'invalid' -RunId 123 -RunAttempt 1 -CliScheduling baseline } 'JSON'
 Write-Host "PASS: $script:passed PR validation policy cases."

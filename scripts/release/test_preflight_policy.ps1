@@ -15,7 +15,7 @@ $contracts = @(
     @{
         Workflow = 'ci.yml'
         CheckJob = 'validation-policy'
-        BuildJobs = @('build-code', 'fast-tests')
+        BuildJobs = @('build-code', 'fast-tests-linux', 'fast-tests-windows')
     },
     @{
         Workflow = 'build.yml'

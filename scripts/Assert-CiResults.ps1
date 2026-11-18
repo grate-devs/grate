@@ -2,13 +2,22 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [string] $NeedsJson
+    [string] $NeedsJson,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('baseline', 'early')]
+    [string] $CliScheduling
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
+$requiredJobs = @('build-code', 'fast-tests-linux', 'fast-tests-windows', 'analyze', 'test', 'cli-distributions', 'cli-distributions-early', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
+$inactiveCliJob = if ($CliScheduling -eq 'early') {
+    'cli-distributions'
+} else {
+    'cli-distributions-early'
+}
 $results = ConvertFrom-Json -InputObject $NeedsJson -AsHashtable
 if ($results -isnot [System.Collections.IDictionary]) {
     throw 'CI results must be an object containing every required job.'
@@ -16,11 +25,12 @@ if ($results -isnot [System.Collections.IDictionary]) {
 
 $unsuccessfulJobs = @()
 foreach ($job in $requiredJobs) {
+    $expected = if ($job -ceq $inactiveCliJob) { 'skipped' } else { 'success' }
     $result = $results[$job]
     if ($result -isnot [System.Collections.IDictionary] -or !$result.Contains('result')) {
         $unsuccessfulJobs += "${job}: missing result"
-    } elseif ($result.result -cne 'success') {
-        $unsuccessfulJobs += "${job}: $($result.result)"
+    } elseif ($result.result -cne $expected) {
+        $unsuccessfulJobs += "${job}: $($result.result) (expected $expected)"
     }
 }
 

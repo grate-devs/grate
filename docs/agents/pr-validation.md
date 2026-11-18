@@ -11,16 +11,20 @@ grate. Run its script checks locally with `pwsh -File scripts/ci/Invoke-Prefligh
 
 In `CI`, the existing `PR validation policy` job runs this preflight. Build and
 Basic_tests wait for it; database, CodeQL and packaging jobs then wait for Build
-and Basic_tests. Release artifacts and integration tests perform preflight before
+and both Basic_tests jobs. CLI distribution tests normally wait for both as
+well. Manual dispatches on `ci/942-cli-scheduling-pilot` can select
+`cli-scheduling: early` to start those same CLI tests after Build and the Linux
+Basic_tests job. Release artifacts and integration tests perform preflight before
 version resolution, installation checks wait for their documentation/preflight
 job, and WinGet preparation waits before compiling native MSI actions. Each
 workflow evaluates its own first job using the same action. Failed, cancelled or
 skipped preflight prevents its build jobs from starting. The final `PR validation`
 and `CI result` checks still run to report incomplete CI.
 
-`PR validation` uses `always()` and requires all seven dependencies to succeed:
-`validation-policy`, `build-code`, `test`, `cli-distributions`, `packages`,
-`standalone` and `docker`. It also queries every page of the current run's Jobs
+`PR validation` uses `always()` and requires preflight, Build, both Basic_tests,
+database, package, standalone and Docker jobs to succeed. Both final checks also
+require the selected CLI distribution job to succeed and the other scheduling
+variant to be skipped. PR validation queries every page of the current run's Jobs
 API and requires all 94 expected jobs and their applicable mandatory producer
 steps to complete successfully. This includes every All/slim CLI and tool lane,
 native standalone target, MSI lifecycle and Alpine target.

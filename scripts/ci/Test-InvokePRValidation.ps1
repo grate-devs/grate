@@ -3,15 +3,15 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('grate-pr-validation-' + [Guid]::NewGuid().ToString('N'))
-$names = @('GITHUB_API_URL', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GH_TOKEN', 'NEEDS_JSON')
+$names = @('GITHUB_API_URL', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GH_TOKEN', 'NEEDS_JSON', 'CLI_SCHEDULING')
 $saved = @{}
 foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
 try {
     New-Item -ItemType Directory -Path $root | Out-Null
     Copy-Item "$PSScriptRoot/Invoke-PRValidation.ps1" $root
     @'
-param($NeedsJson, $JobsJson, $RunId, $RunAttempt)
-if ($NeedsJson -cne '{"fixture":true}' -or $RunId -ne '123' -or $RunAttempt -ne '2') { throw 'Caller changed the decision context.' }
+param($NeedsJson, $JobsJson, $RunId, $RunAttempt, $CliScheduling)
+if ($NeedsJson -cne '{"fixture":true}' -or $RunId -ne '123' -or $RunAttempt -ne '2' -or $CliScheduling -cne 'early') { throw 'Caller changed the decision context.' }
 $items = @($JobsJson | ConvertFrom-Json)
 if ($items.Count -ne 101) { throw 'Caller lost a page of jobs.' }
 foreach ($index in 0..99) {
@@ -26,6 +26,7 @@ $fixture.DecisionCalled = $true
     $env:GITHUB_RUN_ATTEMPT = '2'
     $env:GH_TOKEN = 'fixture-token'
     $env:NEEDS_JSON = '{"fixture":true}'
+    $env:CLI_SCHEDULING = 'early'
     $fixture = @{
         Requests = @()
         ApiFails = $false

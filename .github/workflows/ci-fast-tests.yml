@@ -3,25 +3,19 @@ name: CI · Isolated tests
 
 on:
   workflow_call:
+    inputs:
+      os:
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 jobs:
   fast-tests:
-    name: Run tests
-    runs-on: ${{ matrix.os }}
+    name: Run tests (${{ inputs.os }}, Basic_tests)
+    runs-on: ${{ inputs.os }}
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            category: Basic_tests
-            test_filter: ''
-          - os: windows-latest
-            category: Basic_tests
-            test_filter: ''
     steps:
       - uses: actions/checkout@v7
       - name: Setup .NET 11 and earlier
@@ -37,13 +31,13 @@ jobs:
         env:
           LogLevel: Warning
           TZ: UTC
-          TEST_RESULTS_DIRECTORY: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}
+          TEST_RESULTS_DIRECTORY: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/Basic_tests
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           $testArgs = @(
             'test',
-            '--project', "${{ github.workspace }}/unittests/${{ matrix.category }}/${{ matrix.category }}.csproj",
+            '--project', "${{ github.workspace }}/unittests/Basic_tests/Basic_tests.csproj",
             '--max-parallel-test-modules', '1',
             '--minimum-expected-tests', '1',
             '--stop-on-fail', 'on',
@@ -60,6 +54,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: "${{ matrix.os }} ${{ matrix.category }} XML test results"
-          path: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/${{ matrix.category }}/
+          name: "${{ inputs.os }} Basic_tests XML test results"
+          path: ${{ runner.os == 'Windows' && runner.temp || '/tmp' }}/test-results/Basic_tests/
           retention-days: 1

@@ -11,10 +11,14 @@ $phases = (Read-Workflow 'ci.yml').jobs
 $workflow = Get-Content -LiteralPath "$repositoryRoot/.github/workflows/ci.yml" -Raw
 $preflightScript = Get-Content -LiteralPath "$repositoryRoot/scripts/ci/Invoke-Preflight.ps1" -Raw
 $aggregate = Join-Path $PSScriptRoot 'Assert-CiResults.ps1'
-$requiredJobs = @('build-code', 'fast-tests', 'analyze', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
-$expensiveJobs = @('analyze', 'test', 'cli-distributions', 'packages', 'standalone', 'docker')
-$analysisCondition = "`${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}"
+$requiredJobs = @('build-code', 'fast-tests-linux', 'fast-tests-windows', 'analyze', 'test', 'cli-distributions', 'cli-distributions-early', 'packages', 'standalone', 'docker', 'validation-policy', 'pr-validation')
+$expensiveJobs = @('analyze', 'test', 'packages', 'standalone', 'docker')
+$fastPlatforms = @{ 'fast-tests-linux' = 'ubuntu-latest'; 'fast-tests-windows' = 'windows-latest' }
+$analysisCondition = "`${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests-linux.result == 'success' && needs.fast-tests-windows.result == 'success' && needs.validation-policy.result == 'success')) }}"
 $aggregateCondition = "    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')"
+$pilotContext = "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot'"
+$schedulingEnv = "CLI_SCHEDULING: `${{ $pilotContext && inputs.cli-scheduling || 'baseline' }}"
+$bothBasicTests = 'needs: [build-code, fast-tests-linux, fast-tests-windows, validation-policy]'
 
 function Assert-CiPhaseCoverage {
     param(
@@ -82,7 +86,7 @@ function Assert-CiPhaseCoverage {
             }
         }
     }
-    foreach ($id in @('build-code', 'fast-tests', 'analyze', 'test', 'packages')) {
+    foreach ($id in @('build-code', 'fast-tests-linux', 'fast-tests-windows', 'analyze', 'test', 'packages')) {
         $setup = Get-ActionStep $Phases[$id] 'actions/setup-dotnet'
         $versions = @($setup.with.'dotnet-version' -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
         if ($setup.with.'global-json-file' -cne 'global.json' -or
@@ -90,12 +94,28 @@ function Assert-CiPhaseCoverage {
             throw "Preserve the pinned SDK and earlier runtime setup in $id."
         }
     }
-    foreach ($id in @('fast-tests', 'test')) {
-        $upload = Get-ActionStep $Phases[$id] 'actions/upload-artifact'
-        if ($upload.if -cne 'always()' -or $upload.with.'retention-days' -ne 1 -or
-            $upload.with.name -cne '${{ matrix.os }} ${{ matrix.category }} XML test results') {
-            throw 'Retain both test tiers under their existing artifact names on failure.'
+    foreach ($id in $fastPlatforms.Keys) {
+        $platform = $fastPlatforms[$id]
+        $job = $Phases[$id]
+        if ($job.'runs-on' -cne $platform -or $job.name -cne "Run tests ($platform, Basic_tests)" -or
+            $job.ContainsKey('strategy')) {
+            throw 'Linux and Windows isolated tests must run once after preflight.'
         }
+        $testStep = $job.steps | Where-Object { $_['name'] -ceq 'Test on ${{ runner.os }}' }
+        if (!$testStep -or $testStep.ContainsKey('if') -or $testStep.ContainsKey('continue-on-error') -or
+            !$testStep.run.Contains('/unittests/Basic_tests/Basic_tests.csproj')) {
+            throw 'Both isolated lanes must execute the unfiltered Basic_tests project.'
+        }
+        $upload = Get-ActionStep $job 'actions/upload-artifact'
+        if ($upload.if -cne 'always()' -or $upload.with.'retention-days' -ne 1 -or
+            $upload.with.name -cne "$platform Basic_tests XML test results") {
+            throw 'Retain isolated tests under their existing artifact names on failure.'
+        }
+    }
+    $upload = Get-ActionStep $Phases.test 'actions/upload-artifact'
+    if ($upload.if -cne 'always()' -or $upload.with.'retention-days' -ne 1 -or
+        $upload.with.name -cne '${{ matrix.os }} ${{ matrix.category }} XML test results') {
+        throw 'Retain provider tests under their existing artifact names on failure.'
     }
     $distributionReports = $Phases['cli-distributions'].steps | Where-Object { $_['name'] -ceq 'Upload distribution test results' }
     if ($distributionReports.if -cne 'always()' -or $distributionReports.with.'retention-days' -ne 3 -or
@@ -137,7 +157,7 @@ function Assert-WorkflowPolicy {
     }
 
     foreach ($job in $expensiveJobs) {
-        if (!$jobs.ContainsKey($job) -or $jobs[$job] -notmatch '(?m)^    needs: \[build-code, fast-tests, validation-policy\]\r?$') {
+        if (!$jobs.ContainsKey($job) -or !$jobs[$job].Contains("    $bothBasicTests")) {
             throw "Expensive job $job must depend on Build, validation policy and both isolated test lanes."
         }
         if ($job -eq 'analyze') {
@@ -150,7 +170,7 @@ function Assert-WorkflowPolicy {
         }
     }
 
-    foreach ($job in @('build-code', 'fast-tests')) {
+    foreach ($job in @('build-code', 'fast-tests-linux', 'fast-tests-windows')) {
         if ($jobs[$job] -notmatch '(?m)^    needs: validation-policy\r?$') {
             throw "$job must depend on build-independent checks."
         }
@@ -162,33 +182,46 @@ function Assert-WorkflowPolicy {
         throw 'The first job must run the shared build-independent checks.'
     }
 
+    $earlyCondition = "$pilotContext && inputs.cli-scheduling == 'early'"
+    if (!$jobs['cli-distributions'].Contains("    $bothBasicTests") -or
+        !$jobs['cli-distributions'].Contains("    if: `${{ !($earlyCondition) }}") -or
+        !$jobs['cli-distributions-early'].Contains('    needs: [build-code, fast-tests-linux, validation-policy]') -or
+        !$jobs['cli-distributions-early'].Contains("    if: `${{ $earlyCondition }}") -or
+        $jobs['cli-distributions'] -match '(?m)^    continue-on-error:' -or
+        $jobs['cli-distributions-early'] -match '(?m)^    continue-on-error:') {
+        throw 'Only pilot dispatches may start CLI tests before Windows succeeds.'
+    }
+
     $aggregateJob = $jobs['ci-result']
     $expectedNeeds = '    needs: [' + ($requiredJobs -join ', ') + ']'
     if (!$aggregateJob -or !$aggregateJob.Contains($expectedNeeds) -or !$aggregateJob.Contains($aggregateCondition)) {
         throw 'The CI result must always evaluate every required producer.'
     }
-    if (!$aggregateJob.Contains('CI_NEEDS_JSON: ${{ toJSON(needs) }}') -or !$aggregateJob.Contains('./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON')) {
+    if (!$aggregateJob.Contains('CI_NEEDS_JSON: ${{ toJSON(needs) }}') -or !$aggregateJob.Contains($schedulingEnv) -or
+        !$aggregateJob.Contains('./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON -CliScheduling $env:CLI_SCHEDULING')) {
         throw 'The CI result must validate actual dependency results with the tested gate.'
     }
-    if ($jobs['report'] -notmatch '(?m)^    needs: \[fast-tests, test, cli-distributions\]\r?$' -or
+    if ($jobs['report'] -notmatch '(?m)^    needs: \[fast-tests-linux, fast-tests-windows, test, cli-distributions, cli-distributions-early\]\r?$' -or
             !$jobs['report'].Contains($aggregateCondition)) {
         throw 'The test report must collect both test tiers even when tests fail.'
     }
-    $fastLanes = @($Phases['fast-tests'].strategy.matrix.include)
-    if (@($Phases['test'].strategy.matrix.include | Where-Object category -CEQ 'Basic_tests').Count -ne 0 -or
-        $fastLanes.Count -ne 2 -or @($fastLanes | Where-Object category -CEQ 'Basic_tests').Count -ne 2 -or
-        (@($fastLanes.os | Sort-Object) -join ',') -cne 'ubuntu-latest,windows-latest') {
+    if (@($Phases['test'].strategy.matrix.include | Where-Object category -CEQ 'Basic_tests').Count -ne 0) {
         throw 'Linux and Windows isolated tests must run once after preflight.'
     }
-    if (!$Preflight.Contains('-Path .github/scripts -Filter monitor-test-containers.Tests.ps1') -or $jobs['fast-tests'].Contains('monitor-test-containers.Tests.ps1') -or $jobs['test'].Contains('monitor-test-containers.Tests.ps1')) {
+    if (!$Preflight.Contains('-Path .github/scripts -Filter monitor-test-containers.Tests.ps1') -or
+        $jobs['fast-tests-linux'].Contains('monitor-test-containers.Tests.ps1') -or
+        $jobs['fast-tests-windows'].Contains('monitor-test-containers.Tests.ps1') -or
+        $jobs['test'].Contains('monitor-test-containers.Tests.ps1')) {
         throw 'Container monitor regressions must run before compiling test projects.'
     }
     $callers = @{
         'build-code' = @('ci-build.yml', 'Build')
-        'fast-tests' = @('ci-fast-tests.yml', 'Isolated tests')
+        'fast-tests-linux' = @('ci-fast-tests.yml', 'Isolated tests')
+        'fast-tests-windows' = @('ci-fast-tests.yml', 'Isolated tests')
         'analyze' = @('ci-security-analysis.yml', 'Security analysis')
         'test' = @('ci-database-tests.yml', 'Database tests')
         'cli-distributions' = @('ci-cli-distributions.yml', 'CLI distributions')
+        'cli-distributions-early' = @('ci-cli-distributions.yml', 'CLI distributions')
         'packages' = @('ci-packages.yml', 'Packages')
         'standalone' = @('ci-standalone.yml', 'Standalone CLI')
         'docker' = @('ci-docker.yml', 'Docker')
@@ -202,8 +235,11 @@ function Assert-WorkflowPolicy {
             throw "Reusable CI phase $id must preserve its exact caller identity and required leaf execution."
         }
     }
-    if (!$jobs['pr-validation'].Contains('    name: PR validation')) {
-        throw 'The required PR validation check name must remain stable.'
+    $validation = $jobs['pr-validation']
+    if (!$validation.Contains('    name: PR validation') -or
+        !$validation.Contains('    needs: [validation-policy, build-code, fast-tests-linux, fast-tests-windows, test, cli-distributions, cli-distributions-early, packages, standalone, docker]') -or
+        !$validation.Contains($schedulingEnv) -or !$validation.Contains('NEEDS_JSON: ${{ toJSON(needs) }}')) {
+        throw 'PR validation must keep its check name and cover every required producer under the chosen scheduling.'
     }
     Assert-CiPhaseCoverage -Phases $Phases
 }
@@ -234,53 +270,66 @@ $successfulResults = @{}
 foreach ($job in $requiredJobs) {
     $successfulResults[$job] = @{ result = 'success' }
 }
-& $aggregate -NeedsJson ($successfulResults | ConvertTo-Json -Depth 3 -Compress)
+$successfulResults['cli-distributions-early'] = @{ result = 'skipped' }
+& $aggregate -NeedsJson ($successfulResults | ConvertTo-Json -Depth 3 -Compress) -CliScheduling baseline
 
 $failedReport = $successfulResults.Clone()
 $failedReport['report'] = @{ result = 'failure' }
-& $aggregate -NeedsJson ($failedReport | ConvertTo-Json -Depth 3 -Compress)
+& $aggregate -NeedsJson ($failedReport | ConvertTo-Json -Depth 3 -Compress) -CliScheduling baseline
 
 $greenReportRedTests = $successfulResults.Clone()
 $greenReportRedTests['report'] = @{ result = 'success' }
 $greenReportRedTests['test'] = @{ result = 'failure' }
 Assert-Rejected -Action {
-    & $aggregate -NeedsJson ($greenReportRedTests | ConvertTo-Json -Depth 3 -Compress)
+    & $aggregate -NeedsJson ($greenReportRedTests | ConvertTo-Json -Depth 3 -Compress) -CliScheduling baseline
 } -ExpectedMessage 'test: failure'
 
 $rejectionCount = 0
-foreach ($job in $requiredJobs) {
-    foreach ($state in @('failure', 'cancelled', 'skipped', 'unknown', '')) {
-        $results = $successfulResults.Clone()
-        $results[$job] = @{ result = $state }
-        Assert-Rejected -Action {
-            & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress)
-        } -ExpectedMessage "${job}:"
-        $rejectionCount++
+foreach ($mode in @('baseline', 'early')) {
+    $expectedResults = $successfulResults.Clone()
+    if ($mode -ceq 'early') {
+        $expectedResults['cli-distributions'] = @{ result = 'skipped' }
+        $expectedResults['cli-distributions-early'] = @{ result = 'success' }
     }
-    foreach ($missingResult in @($null, @{})) {
-        $results = $successfulResults.Clone()
-        $results[$job] = $missingResult
+    & $aggregate -NeedsJson ($expectedResults | ConvertTo-Json -Depth 3 -Compress) -CliScheduling $mode
+    foreach ($job in $requiredJobs) {
+        foreach ($state in @('success', 'failure', 'cancelled', 'skipped', 'unknown', '') -cne $expectedResults[$job].result) {
+            $results = $expectedResults.Clone()
+            $results[$job] = @{ result = $state }
+            Assert-Rejected -Action {
+                & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress) -CliScheduling $mode
+            } -ExpectedMessage "${job}:"
+            $rejectionCount++
+        }
+        foreach ($missingResult in @($null, @{})) {
+            $results = $expectedResults.Clone()
+            $results[$job] = $missingResult
+            Assert-Rejected -Action {
+                & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress) -CliScheduling $mode
+            } -ExpectedMessage "${job}: missing result"
+            $rejectionCount++
+        }
+        $results = $expectedResults.Clone()
+        $results.Remove($job)
         Assert-Rejected -Action {
-            & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress)
+            & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress) -CliScheduling $mode
         } -ExpectedMessage "${job}: missing result"
         $rejectionCount++
     }
-    $results = $successfulResults.Clone()
-    $results.Remove($job)
-    Assert-Rejected -Action {
-        & $aggregate -NeedsJson ($results | ConvertTo-Json -Depth 3 -Compress)
-    } -ExpectedMessage "${job}: missing result"
-    $rejectionCount++
 }
 
-Assert-Rejected -Action { & $aggregate -NeedsJson '{}' } -ExpectedMessage 'missing result'
-Assert-Rejected -Action { & $aggregate -NeedsJson '[]' } -ExpectedMessage 'must be an object'
+Assert-Rejected -Action { & $aggregate -NeedsJson '{}' -CliScheduling baseline } -ExpectedMessage 'missing result'
+Assert-Rejected -Action { & $aggregate -NeedsJson '[]' -CliScheduling baseline } -ExpectedMessage 'must be an object'
 
 # These mutations must be rejected even if every remaining job would be green.
-$bypassedDependency = $workflow.Replace('needs: [build-code, fast-tests, validation-policy]', 'needs: [build-code]')
+$bypassedDependency = $workflow.Replace($bothBasicTests, 'needs: [build-code]')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $bypassedDependency } -ExpectedMessage 'must depend'
-$bypassedPolicy = $workflow.Replace('needs: [build-code, fast-tests, validation-policy]', 'needs: [build-code, fast-tests]')
+$bypassedPolicy = $workflow.Replace($bothBasicTests, 'needs: [build-code, fast-tests-linux, fast-tests-windows]')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $bypassedPolicy } -ExpectedMessage 'must depend'
+$unscopedPilot = $workflow.Replace(" && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot'", '')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $unscopedPilot } -ExpectedMessage 'Only pilot dispatches'
+$ungatedEarlyCli = $workflow.Replace('needs: [build-code, fast-tests-linux, validation-policy]', 'needs: [build-code, validation-policy]')
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $ungatedEarlyCli } -ExpectedMessage 'Only pilot dispatches'
 $skippedAggregate = $workflow.Replace('    if: always()', '    if: success()')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $skippedAggregate } -ExpectedMessage 'must always evaluate'
 $aggregateNeeds = 'needs: [' + ($requiredJobs -join ', ') + ']'
@@ -299,9 +348,9 @@ $renamedCaller = $workflow.Replace('    name: Standalone CLI', '    name: Other 
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $renamedCaller } -ExpectedMessage 'exact caller identity'
 $wrongWorkflow = $workflow.Replace('uses: ./.github/workflows/ci-standalone.yml', 'uses: ./.github/workflows/ci-packages.yml')
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $wrongWorkflow } -ExpectedMessage 'exact caller identity'
-$missingFastLane = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
-$missingFastLane['fast-tests'].strategy.matrix.include = @($missingFastLane['fast-tests'].strategy.matrix.include[0])
-Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $missingFastLane } -ExpectedMessage 'isolated tests must run once'
+$wrongFastLane = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+$wrongFastLane['fast-tests-windows']['runs-on'] = 'ubuntu-latest'
+Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $wrongFastLane } -ExpectedMessage 'isolated tests must run once'
 $optionalLeaf = $phases | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
 $optionalLeaf.standalone['continue-on-error'] = $true
 Assert-Rejected -Action { Assert-WorkflowPolicy -Workflow $workflow -Phases $optionalLeaf } -ExpectedMessage 'required leaf execution'

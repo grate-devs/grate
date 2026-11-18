@@ -111,7 +111,7 @@ function Assert-StagedCiJobs {
         [string] $Workflow
     )
 
-    $producers = @('build-code', 'fast-tests', 'test', 'packages', 'standalone', 'docker')
+    $producers = @('build-code', 'fast-tests-linux', 'fast-tests-windows', 'test', 'packages', 'standalone', 'docker')
     foreach ($producer in $producers) {
         $job = Get-WorkflowJob $Workflow $producer
         Assert-Policy ($job -notmatch '(?m)^    if:|continue-on-error:') "Preserve the staged success-only gate for $producer."
@@ -146,23 +146,28 @@ function Get-CodeqlCondition {
     $expression = $condition.Replace('!cancelled()', '(-not $IsCancelled)')
     $expression = $expression.Replace('github.event_name', '$EventName')
     $expression = $expression.Replace('needs.build-code.result', '$BuildResult')
-    $expression = $expression.Replace('needs.fast-tests.result', '$FastResult')
+    $expression = $expression.Replace('needs.fast-tests-linux.result', '$LinuxResult')
+    $expression = $expression.Replace('needs.fast-tests-windows.result', '$WindowsResult')
     $expression = $expression.Replace('needs.validation-policy.result', '$PolicyResult')
     $expression = $expression.Replace('&&', '-and').Replace('||', '-or').Replace('==', '-eq')
-    $parameters = 'param($EventName, $BuildResult, $FastResult, $PolicyResult, $IsCancelled) '
+    $parameters = 'param($EventName, $BuildResult, $LinuxResult, $WindowsResult, $PolicyResult, $IsCancelled) '
     return [scriptblock]::Create($parameters + $expression)
 }
 
 function Get-PrerequisiteCases {
     $states = @('success', 'failure', 'cancelled', 'skipped', $null)
     foreach ($build in $states) {
-        foreach ($fastTests in $states) {
-            foreach ($policy in $states) {
-                [pscustomobject] @{
-                    Build = $build
-                    FastTests = $fastTests
-                    Policy = $policy
-                    AllSucceeded = $build -eq 'success' -and $fastTests -eq 'success' -and $policy -eq 'success'
+        foreach ($linuxTests in $states) {
+            foreach ($windowsTests in $states) {
+                foreach ($policy in $states) {
+                    [pscustomobject] @{
+                        Build = $build
+                        LinuxTests = $linuxTests
+                        WindowsTests = $windowsTests
+                        Policy = $policy
+                        AllSucceeded = $build -eq 'success' -and $linuxTests -eq 'success' -and
+                            $windowsTests -eq 'success' -and $policy -eq 'success'
+                    }
                 }
             }
         }
@@ -183,8 +188,8 @@ function Assert-CodeqlScheduling {
                 $isBaseline = $eventName -in @('push', 'schedule')
                 $isValidatedPr = $eventName -in @('pull_request', 'workflow_dispatch') -and $case.AllSucceeded
                 $expected = !$isCancelled -and ($isBaseline -or $isValidatedPr)
-                $actual = [bool] (& $evaluate $eventName $case.Build $case.FastTests $case.Policy $isCancelled)
-                $context = "$eventName/$($case.Build)/$($case.FastTests)/$($case.Policy)/cancelled=$isCancelled"
+                $actual = [bool] (& $evaluate $eventName $case.Build $case.LinuxTests $case.WindowsTests $case.Policy $isCancelled)
+                $context = "$eventName/$($case.Build)/$($case.LinuxTests)/$($case.WindowsTests)/$($case.Policy)/cancelled=$isCancelled"
                 Assert-Policy ($actual -eq $expected) "Incorrect CodeQL scheduling: $context."
                 $caseCount++
             }

@@ -4,14 +4,20 @@ param(
     [Parameter(Mandatory)][string] $NeedsJson,
     [Parameter(Mandatory)][string] $JobsJson,
     [Parameter(Mandatory)][ValidateRange(1, [long]::MaxValue)][long] $RunId,
-    [Parameter(Mandatory)][ValidateRange(1, [int]::MaxValue)][int] $RunAttempt
+    [Parameter(Mandatory)][ValidateRange(1, [int]::MaxValue)][int] $RunAttempt,
+    [Parameter(Mandatory)][ValidateSet('baseline', 'early')][string] $CliScheduling
 )
 
 $ErrorActionPreference = 'Stop'
 
 # This inventory is deliberately independent of the workflow's matrix. Removing a
 # lane from YAML must not silently redefine the work required for a green check.
-$requiredGroups = @('build-code', 'test', 'cli-distributions', 'packages', 'standalone', 'docker', 'validation-policy')
+$requiredGroups = @('build-code', 'fast-tests-linux', 'fast-tests-windows', 'test', 'cli-distributions', 'cli-distributions-early', 'packages', 'standalone', 'docker', 'validation-policy')
+$inactiveCliGroup = if ($CliScheduling -eq 'early') {
+    'cli-distributions'
+} else {
+    'cli-distributions-early'
+}
 $requiredJobs = @(
     'Build'
     'NuGet libraries and installed tool'
@@ -109,10 +115,11 @@ if ($jobs -isnot [array]) { throw 'Expected a jobs array.' }
 
 $problems = [System.Collections.Generic.List[string]]::new()
 foreach ($group in $requiredGroups) {
+    $expected = if ($group -ceq $inactiveCliGroup) { 'skipped' } else { 'success' }
     if (!$needs.Contains($group)) {
         $problems.Add("Missing required dependency '$group'.")
-    } elseif ($needs[$group] -isnot [System.Collections.IDictionary] -or $needs[$group].result -cne 'success') {
-        $problems.Add("Required dependency '$group' did not succeed.")
+    } elseif ($needs[$group] -isnot [System.Collections.IDictionary] -or $needs[$group].result -cne $expected) {
+        $problems.Add("Required dependency '$group' did not have expected result '$expected'.")
     }
 }
 
@@ -220,4 +227,4 @@ foreach ($name in $requiredJobs) {
 if ($problems.Count -gt 0) {
     throw "PR validation failed:`n$($problems -join "`n")"
 }
-Write-Host "PASS: all $($requiredGroups.Count) dependencies and $($requiredJobs.Count) required jobs succeeded for run $RunId, attempt $RunAttempt."
+Write-Host "PASS: all $($requiredGroups.Count - 1) active dependencies and $($requiredJobs.Count) required jobs succeeded for run $RunId, attempt $RunAttempt ($CliScheduling CLI scheduling)."

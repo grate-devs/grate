@@ -1,5 +1,6 @@
 # Build, security analysis, and the full database/runtime test matrix for PRs.
 name: CI · Build and tests
+run-name: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot' && inputs.cli-scheduling || '' }}
 
 on:
   # Feature branches are validated through PRs; main also needs a CodeQL baseline.
@@ -14,6 +15,12 @@ on:
     - cron: '23 5 * * 1'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      cli-scheduling:
+        description: CLI scheduling to measure on the pilot branch
+        type: choice
+        default: baseline
+        options: [baseline, early]
 
 permissions:
   contents: read
@@ -41,7 +48,7 @@ jobs:
     # Keep this name stable: the proposed main ruleset consumes it.
     name: PR validation
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
-    needs: [validation-policy, build-code, test, cli-distributions, packages, standalone, docker]
+    needs: [validation-policy, build-code, fast-tests-linux, fast-tests-windows, test, cli-distributions, cli-distributions-early, packages, standalone, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -56,6 +63,7 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
         NEEDS_JSON: ${{ toJSON(needs) }}
+        CLI_SCHEDULING: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot' && inputs.cli-scheduling || 'baseline' }}
       run: ./scripts/ci/Invoke-PRValidation.ps1
 
   build-code:
@@ -63,15 +71,24 @@ jobs:
     needs: validation-policy
     uses: ./.github/workflows/ci-build.yml
 
-  fast-tests:
+  fast-tests-linux:
     name: Isolated tests
     needs: validation-policy
     uses: ./.github/workflows/ci-fast-tests.yml
+    with:
+      os: ubuntu-latest
+
+  fast-tests-windows:
+    name: Isolated tests
+    needs: validation-policy
+    uses: ./.github/workflows/ci-fast-tests.yml
+    with:
+      os: windows-latest
 
   analyze:
     name: Security analysis
-    needs: [build-code, fast-tests, validation-policy]
-    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests.result == 'success' && needs.validation-policy.result == 'success')) }}
+    needs: [build-code, fast-tests-linux, fast-tests-windows, validation-policy]
+    if: ${{ !cancelled() && (github.event_name == 'push' || github.event_name == 'schedule' || ((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.build-code.result == 'success' && needs.fast-tests-linux.result == 'success' && needs.fast-tests-windows.result == 'success' && needs.validation-policy.result == 'success')) }}
     permissions:
       actions: read
       contents: read
@@ -80,34 +97,41 @@ jobs:
 
   test:
     name: Database tests
-    needs: [build-code, fast-tests, validation-policy]
+    needs: [build-code, fast-tests-linux, fast-tests-windows, validation-policy]
     uses: ./.github/workflows/ci-database-tests.yml
 
   cli-distributions:
     name: CLI distributions
-    needs: [build-code, fast-tests, validation-policy]
+    needs: [build-code, fast-tests-linux, fast-tests-windows, validation-policy]
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot' && inputs.cli-scheduling == 'early') }}
+    uses: ./.github/workflows/ci-cli-distributions.yml
+
+  cli-distributions-early:
+    name: CLI distributions
+    needs: [build-code, fast-tests-linux, validation-policy]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot' && inputs.cli-scheduling == 'early' }}
     uses: ./.github/workflows/ci-cli-distributions.yml
 
   report:
     # Diagnostic artifact. The test producers gate CI independently.
     name: Test report
-    needs: [fast-tests, test, cli-distributions]
+    needs: [fast-tests-linux, fast-tests-windows, test, cli-distributions, cli-distributions-early]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/ci-report.yml
 
   packages:
     name: Packages
-    needs: [build-code, fast-tests, validation-policy]
+    needs: [build-code, fast-tests-linux, fast-tests-windows, validation-policy]
     uses: ./.github/workflows/ci-packages.yml
 
   standalone:
     name: Standalone CLI
-    needs: [build-code, fast-tests, validation-policy]
+    needs: [build-code, fast-tests-linux, fast-tests-windows, validation-policy]
     uses: ./.github/workflows/ci-standalone.yml
 
   docker:
     name: Docker
-    needs: [build-code, fast-tests, validation-policy]
+    needs: [build-code, fast-tests-linux, fast-tests-windows, validation-policy]
     uses: ./.github/workflows/ci-docker.yml
 
   ci-result:
@@ -116,7 +140,7 @@ jobs:
     timeout-minutes: 5
     # A skipped dependent job can look green in isolation. Only this aggregate
     # evaluates the required phases, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, cli-distributions, packages, standalone, docker, validation-policy, pr-validation]
+    needs: [build-code, fast-tests-linux, fast-tests-windows, analyze, test, cli-distributions, cli-distributions-early, packages, standalone, docker, validation-policy, pr-validation]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v7
@@ -124,4 +148,5 @@ jobs:
         shell: pwsh
         env:
           CI_NEEDS_JSON: ${{ toJSON(needs) }}
-        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON
+          CLI_SCHEDULING: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot' && inputs.cli-scheduling || 'baseline' }}
+        run: ./scripts/Assert-CiResults.ps1 -NeedsJson $env:CI_NEEDS_JSON -CliScheduling $env:CLI_SCHEDULING

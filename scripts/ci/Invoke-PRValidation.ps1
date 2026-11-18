@@ -3,7 +3,7 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-foreach ($name in @('GITHUB_API_URL', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GH_TOKEN', 'NEEDS_JSON')) {
+foreach ($name in @('GITHUB_API_URL', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GH_TOKEN', 'NEEDS_JSON', 'CLI_SCHEDULING')) {
     if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
         throw "Required environment variable $name is missing."
     }
@@ -28,4 +28,4 @@ do {
 
 & "$PSScriptRoot/Assert-PRValidation.ps1" -NeedsJson $env:NEEDS_JSON `
     -JobsJson (ConvertTo-Json -InputObject $jobs -Depth 20 -Compress) `
-    -RunId $env:GITHUB_RUN_ID -RunAttempt $env:GITHUB_RUN_ATTEMPT
+    -RunId $env:GITHUB_RUN_ID -RunAttempt $env:GITHUB_RUN_ATTEMPT -CliScheduling $env:CLI_SCHEDULING
