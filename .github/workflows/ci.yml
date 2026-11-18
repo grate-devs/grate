@@ -28,7 +28,8 @@ permissions:
 # Replace obsolete test runs without letting a manual branch run cancel a PR's
 # merge-ref validation. Publishing on main is handled by build.yml separately.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # Keep a stalled measurement from holding the other pilot schedule's group.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/942-cli-scheduling-pilot' && format('-{0}', inputs.cli-scheduling || 'baseline') || '' }}
   cancel-in-progress: true
 
 jobs:
