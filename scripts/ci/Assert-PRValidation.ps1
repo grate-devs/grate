@@ -119,6 +119,9 @@ foreach ($group in $requiredGroups) {
 # The caller retrieves every page with filter=all. A partial rerun preserves
 # successful jobs from earlier attempts of this same immutable workflow run.
 # Select the latest attempt per name, never an older success over a newer failure.
+# Use the same case-sensitive invariant comparison as PowerShell's -ceq.
+$jobsByName = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new(
+    [StringComparer]::InvariantCulture)
 foreach ($job in $jobs) {
     if ($job -isnot [System.Collections.IDictionary] -or [string]$job.run_id -cne [string]$RunId) {
         throw 'Job evidence belongs to a different or missing run ID.'
@@ -126,21 +129,32 @@ foreach ($job in $jobs) {
     if ([string]$job.run_attempt -cnotmatch '^[1-9][0-9]*$' -or [long]$job.run_attempt -gt $RunAttempt) {
         throw 'Job evidence has a missing, invalid or future run attempt.'
     }
+    if ($job.name -isnot [string]) {
+        throw 'Job evidence has a missing or invalid job name.'
+    }
+    if (!$jobsByName.ContainsKey($job.name)) {
+        $jobsByName[$job.name] = [System.Collections.Generic.List[object]]::new()
+    }
+    $jobsByName[$job.name].Add($job)
 }
 
 foreach ($name in $requiredJobs) {
     $apiName = Get-RequiredApiJobName -Name $name
-    $matches = @($jobs | Where-Object { $_.name -ceq $apiName })
-    if ($matches.Count -eq 0) {
+    $matchingJobs = $null
+    if (!$jobsByName.TryGetValue($apiName, [ref]$matchingJobs)) {
         $problems.Add("Missing required job '$name'.")
         continue
     }
-    $duplicateAttempts = @($matches | Group-Object run_attempt | Where-Object Count -gt 1)
-    if ($duplicateAttempts.Count -gt 0) {
-        $problems.Add("Duplicate required job '$name' in the same attempt.")
-        continue
+
+    $latest = $matchingJobs[0]
+    if ($matchingJobs.Count -gt 1) {
+        $duplicateAttempts = @($matchingJobs | Group-Object run_attempt | Where-Object Count -gt 1)
+        if ($duplicateAttempts.Count -gt 0) {
+            $problems.Add("Duplicate required job '$name' in the same attempt.")
+            continue
+        }
+        $latest = $matchingJobs | Sort-Object { [long]$_.run_attempt } -Descending | Select-Object -First 1
     }
-    $latest = $matches | Sort-Object { [long]$_.run_attempt } -Descending | Select-Object -First 1
     if ($latest.status -cne 'completed' -or $latest.conclusion -cne 'success') {
         $problems.Add("Required job '$name' is '$($latest.status)/$($latest.conclusion)' in attempt $($latest.run_attempt).")
     }
