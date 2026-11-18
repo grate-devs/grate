@@ -27,7 +27,9 @@ native standalone target, MSI lifecycle and Alpine target.
 Missing, duplicate, failed, cancelled, unexpectedly skipped, timed-out, neutral,
 unknown and pending required results fail validation. Reusable workflow jobs are
 matched by their exact caller/leaf check names.
-`Create test report` is diagnostic; successful HTML never overrides failed tests.
+`Create test report` runs as a separate diagnostic job after the test producers,
+including on test failure. `PR validation` and `CI result` can finish while that
+job is queued or running. The report still has its own status and HTML artifact.
 
 For partial reruns, the newest attempt per job is used. Earlier successes from
 the same immutable run can be reused. API failure or missing context fails closed.
