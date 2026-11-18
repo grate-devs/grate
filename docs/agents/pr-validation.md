@@ -4,19 +4,21 @@
 Every category runs the full existing build, test and packaging matrix. There
 is no documentation classifier or permitted skip.
 
-Each PR build workflow starts with the shared `.github/actions/preflight` action.
+PR build workflows use the shared `.github/actions/preflight` action.
 It checks CI scheduling, the aggregate policy, container-monitor contracts,
 release/Docker/Debian automation and the generated documentation before compiling
 grate. Run its script checks locally with `pwsh -File scripts/ci/Invoke-Preflight.ps1`.
 
 In `CI`, the existing `PR validation policy` job runs this preflight. Build and
 Basic_tests wait for it; database, CodeQL and packaging jobs then wait for Build
-and Basic_tests. Release artifacts and integration tests perform preflight before
-version resolution, installation checks wait for their documentation/preflight
-job, and WinGet preparation waits before compiling native MSI actions. Each
-workflow evaluates its own first job using the same action. Failed, cancelled or
-skipped preflight prevents its build jobs from starting. The final `PR validation`
-and `CI result` checks still run to report incomplete CI.
+and Basic_tests. Compatibility starts after that same PR preflight and runs the
+full version matrix in the same run. The version job skips its local preflight
+step only for that PR caller. Direct integration runs from a push to main or a
+manual dispatch run the step before resolving a version. Release
+artifact, installation and WinGet workflows also run their own preflight. Failed,
+cancelled or unexpectedly skipped preflight prevents its build jobs from
+starting. The final `PR validation` and `CI result` checks still run to report
+incomplete CI.
 
 `PR validation` uses `always()` and requires all seven dependencies to succeed:
 `validation-policy`, `build-code`, `test`, `cli-distributions`, `packages`,
@@ -34,12 +36,14 @@ the same immutable run can be reused. API failure or missing context fails close
 Workflow cancellation may cancel the aggregate; a cancelled required check blocks
 merging. CodeQL and dependency-security checks remain separate controls.
 
-This aggregate covers the required producers in `ci.yml`. The separate
-heavyweight `Integration tests` workflow runs All and slim CommandLine suites
-against its database-version matrix and propagates native test failures. Its
-legacy Docker lane remains disabled and advisory. Path-specific
-skill, installer and release-contract workflows retain their separate checks;
-they are not silently promoted into required workflows by this proposal.
+The `PR validation` inventory covers the ordinary producers in `ci.yml`.
+`CI result` also requires Compatibility to succeed on a PR. Manually dispatched
+`ci.yml` runs expect Compatibility to be skipped. Dispatch `integration-tests.yml`
+separately to run the All and slim CommandLine suites against the full
+database-version matrix. Compatibility XML and HTML artifacts have their own
+names, so coverage reports stay separate in the shared PR run. The legacy Docker
+lane remains disabled and advisory. Path-specific skill, installer and
+release-contract workflows retain their separate checks.
 
 ## Permissions and maintenance
 

@@ -2,7 +2,7 @@
 
 The event entry points keep dependency order, release eligibility and aggregate
 results visible. Same-revision reusable workflows contain the implementation of
-each phase. Each child has one leaf job, with its own matrix where applicable;
+each phase. Build and release phases have one leaf job, with a matrix where applicable;
 inputs carry version/context explicitly and outputs expose values such as the
 built Docker digest.
 
@@ -18,6 +18,7 @@ verification phases, and the existing `PR validation` / `CI result` gates.
 | [ci-security-analysis.yml](ci-security-analysis.yml) | CodeQL analysis, including the main/scheduled baseline |
 | [ci-database-tests.yml](ci-database-tests.yml) | Provider/runtime suites |
 | [ci-cli-distributions.yml](ci-cli-distributions.yml) | Matching All/slim CLI and installed-tool suites |
+| [integration-tests.yml](integration-tests.yml) | Full All/slim compatibility matrix, after CI's preflight on PRs |
 | [ci-packages.yml](ci-packages.yml) | NuGet consumer/package verification |
 | [ci-standalone.yml](ci-standalone.yml) | Native profile/RID checks and MSI/Debian lifecycle tests |
 | [ci-docker.yml](ci-docker.yml) | Native Alpine profile/architecture checks |
@@ -28,6 +29,8 @@ step through the Actions API. Reusable jobs add caller prefixes to displayed job
 names; the validator recognizes only the explicitly mapped caller/leaf paths.
 Missing, duplicate, failed, cancelled or unexpectedly skipped producers remain
 failures. A successful report is not a substitute for a successful test phase.
+On PRs, `CI result` also requires the Compatibility phase to succeed. Direct
+integration runs on main pushes or manual dispatch run their own preflight.
 
 ## Release
 
