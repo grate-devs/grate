@@ -7,45 +7,39 @@ on:
       version:
         type: string
         required: true
+      targets:
+        description: JSON array of RID, runner and Alpine selections
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 jobs:
   main:
-    name: NativeAOT ${{ matrix.distribution }} / ${{ matrix.rid }}
-    runs-on: ${{ matrix.os }}
+    name: NativeAOT ${{ matrix.distribution }} / ${{ matrix.target.rid }}
+    runs-on: ${{ matrix.target.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
-        rid: [win-x64, win-x86, win-arm64, linux-x64, linux-arm64, linux-musl-x64, linux-musl-arm64, osx-x64, osx-arm64]
-        include:
-          - { rid: win-x64, os: windows-latest, alpine: false }
-          - { rid: win-x86, os: windows-latest, alpine: false }
-          - { rid: win-arm64, os: windows-11-arm, alpine: false }
-          - { rid: linux-x64, os: ubuntu-24.04, alpine: false }
-          - { rid: linux-arm64, os: ubuntu-24.04-arm, alpine: false }
-          - { rid: linux-musl-x64, os: ubuntu-latest, alpine: true }
-          - { rid: linux-musl-arm64, os: ubuntu-24.04-arm, alpine: true }
-          - { rid: osx-x64, os: macos-15-intel, alpine: false }
-          - { rid: osx-arm64, os: macos-15, alpine: false }
+        target: ${{ fromJSON(inputs.targets) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        if: matrix.rid != 'osx-arm64'
+        if: matrix.target.rid != 'osx-arm64'
         with:
           global-json-file: global.json
       - uses: ./.github/actions/setup-dotnet-macos-arm64
-        if: matrix.rid == 'osx-arm64'
+        if: matrix.target.rid == 'osx-arm64'
         with:
           global-json-file: global.json
       - name: Install native Linux compiler prerequisites
-        if: runner.os == 'Linux' && !matrix.alpine
+        if: runner.os == 'Linux' && !matrix.target.alpine
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -55,11 +49,12 @@ jobs:
         shell: pwsh
         env:
           PACKAGE_VERSION: ${{ inputs.version }}
-          ALPINE: ${{ matrix.alpine }}
+          ALPINE: ${{ matrix.target.alpine }}
+          NATIVE_AOT_RUNTIME_IDENTIFIER: ${{ matrix.target.rid }}
         run: |
           $parameters = @{
             Distribution = '${{ matrix.distribution }}'
-            RuntimeIdentifier = '${{ matrix.rid }}'
+            RuntimeIdentifier = $env:NATIVE_AOT_RUNTIME_IDENTIFIER
             Version = $env:PACKAGE_VERSION
             OutputDirectory = '${{ runner.temp }}/nativeaot'
           }
@@ -80,14 +75,14 @@ jobs:
       - name: Upload verified NativeAOT release archive
         uses: actions/upload-artifact@v7
         with:
-          name: release-${{ steps.distribution.outputs.package-id }}-${{ matrix.rid }}-nativeaot-${{ inputs.version }}.zip
+          name: release-${{ steps.distribution.outputs.package-id }}-${{ matrix.target.rid }}-nativeaot-${{ inputs.version }}.zip
           path: ${{ runner.temp }}/nativeaot/*-nativeaot-${{ inputs.version }}.zip
           if-no-files-found: error
       - name: Retain NativeAOT compiler and payload evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: nativeaot-evidence-${{ matrix.distribution }}-${{ matrix.rid }}
+          name: nativeaot-evidence-${{ matrix.distribution }}-${{ matrix.target.rid }}
           path: |
             ${{ runner.temp }}/nativeaot/*.log
             ${{ runner.temp }}/nativeaot/*.json

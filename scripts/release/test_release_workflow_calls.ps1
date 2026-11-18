@@ -7,6 +7,7 @@ $expectedRoutes = @{
     'build-nuget-package' = 'release-libraries.yml'
     'build-standalone' = 'release-cli.yml'
     'build-standalone-mac-arm64' = 'release-cli.yml'
+    'build-native-aot-linux-x64' = 'release-native-aot.yml'
     'build-native-aot' = 'release-native-aot.yml'
     'test-native-aot' = 'release-native-aot-tests.yml'
     'test-native-aot-compatibility' = 'release-native-aot-compatibility.yml'
@@ -27,7 +28,7 @@ $expectedInputNames = @{
     'release-tools.yml' = @('version')
     'release-libraries.yml' = @('version', 'core-version')
     'release-cli.yml' = @('version', 'publish', 'runner', 'runtime-identifiers', 'native-arm-sdk')
-    'release-native-aot.yml' = @('version')
+    'release-native-aot.yml' = @('version', 'targets')
     'release-native-aot-tests.yml' = @('version')
     'release-native-aot-compatibility.yml' = @('version')
     'release-msi.yml' = @('version', 'core-version')
@@ -111,6 +112,11 @@ function Assert-ReleaseCallContracts {
             } else {
                 '["win-x64","win-x86","win-arm64","linux-musl-x64","linux-musl-arm64","linux-x64","linux-arm64","osx-x64"]'
             }
+        }
+        if ($file -ceq 'release-native-aot.yml') {
+            # NativeAOT policy checks the exact caller partition and hosts.
+            Assert-Policy ($call.with.targets -is [string] -and $call.with.targets.TrimStart().StartsWith('[')) "Pass an explicit JSON target array in $jobId."
+            $inputs.targets = $call.with.targets
         }
         Assert-ExactMapping -Actual $call.with -Expected $inputs -Context "$jobId inputs"
         $definitions = if ($child.on.workflow_call.inputs) {
@@ -203,7 +209,8 @@ function Assert-ReleaseCallContracts {
 
     $required = @(
         'set-version-number', 'validate-release-policy', 'build-netcore-tool', 'build-nuget-package',
-        'build-standalone', 'build-standalone-mac-arm64', 'build-native-aot', 'test-native-aot', 'test-native-aot-compatibility', 'build-msi', 'build-docker-image',
+        'build-standalone', 'build-standalone-mac-arm64', 'build-native-aot-linux-x64', 'build-native-aot', 'test-native-aot',
+        'test-native-aot-compatibility', 'build-msi', 'build-docker-image',
         'build-slim-docker-images', 'build-chocolatey', 'build-deb'
     )
     $ready = $Workflow.jobs['release-ready']

@@ -70,7 +70,8 @@ function Assert-NativeAotCompatibility {
     Assert-Policy ($upload.with.path -ceq '${{ runner.temp }}/nativeaot-compatibility-tests/results/') 'Upload results from the actual archive test invocation.'
 
     $call = $Build.jobs['test-native-aot-compatibility']
-    Assert-Policy ($call.uses -ceq './.github/workflows/release-native-aot-compatibility.yml' -and ($call.needs -join ',') -ceq 'set-version-number,build-native-aot') 'Compatibility must wait for this run''s versioned NativeAOT producer.'
+    Assert-Policy ($call.uses -ceq './.github/workflows/release-native-aot-compatibility.yml' -and
+        ($call.needs -join ',') -ceq 'set-version-number,build-native-aot-linux-x64' -and !$call.if) 'Compatibility must wait for only this run''s Linux x64 NativeAOT producer and version resolution.'
     Assert-Policy ($call.with.version -ceq '${{ needs.set-version-number.outputs.semVer }}' -and !$call.if -and !$call.'continue-on-error') 'Forward the candidate version without making compatibility optional.'
     Assert-Policy ($Build.jobs['release-ready'].needs -ccontains 'test-native-aot-compatibility') 'Compatibility must gate release publication.'
 }
@@ -90,6 +91,7 @@ $mutations = @(
     @{ Change = { param($b, $c) $step = $c.jobs.main.steps | Where-Object name -CEQ 'Test archived NativeAOT CLI database compatibility'; $step.run = $step.run.Replace('NativeAot = $true', 'NativeAot = $false') }; Error = '*NativeAot = $true*' },
     @{ Change = { param($b, $c) $c.jobs.main.strategy['fail-fast'] = $true }; Error = '*including failures*' },
     @{ Change = { param($b, $c) $b.jobs['test-native-aot-compatibility'].with.version = 'stale-version' }; Error = '*candidate version*' },
+    @{ Change = { param($b, $c) $b.jobs['test-native-aot-compatibility'].needs += 'build-native-aot' }; Error = '*wait for only this run*' },
     @{ Change = { param($b, $c) $b.jobs['release-ready'].needs = @($b.jobs['release-ready'].needs | Where-Object { $_ -cne 'test-native-aot-compatibility' }) }; Error = '*gate release publication*' }
 )
 foreach ($mutation in $mutations) {
