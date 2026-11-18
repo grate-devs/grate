@@ -89,6 +89,7 @@ jobs:
     uses: ./.github/workflows/ci-cli-distributions.yml
 
   report:
+    # Diagnostic artifact. The test producers gate CI independently.
     name: Test report
     needs: [fast-tests, test, cli-distributions]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
@@ -114,12 +115,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # A skipped dependent job can look green in isolation. Only this aggregate
-    # represents complete CI, including early failures and cancellations.
-    needs: [build-code, fast-tests, analyze, test, cli-distributions, report, packages, standalone, docker, validation-policy, pr-validation]
+    # evaluates the required phases, including early failures and cancellations.
+    needs: [build-code, fast-tests, analyze, test, cli-distributions, packages, standalone, docker, validation-policy, pr-validation]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v7
-      - name: Require successful results from every CI phase
+      - name: Require successful results from every required CI phase
         shell: pwsh
         env:
           CI_NEEDS_JSON: ${{ toJSON(needs) }}
