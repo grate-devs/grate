@@ -83,21 +83,27 @@ function Assert-CompatibilityPreflight {
         Assert-Policy ($Integration.jobs[$job].Contains('if') -and $Integration.jobs[$job].if -eq $false) 'External integration jobs must remain disabled.'
     }
 
-    $localPreflight = $Integration.jobs.preflight
     $version = $Integration.jobs.'set-version-number'
+    Assert-Policy (!$Integration.jobs.Contains('preflight') -and !$version.needs -and
+        !$version.if -and !$version.'continue-on-error') 'Compatibility version selection cannot inherit a skipped preflight job.'
+
+    $checkout = $version.steps[0]
+    $localPreflight = $version.steps[1]
     $sharedPrEntry = @(
         "github.event_name == 'pull_request'"
         "github.ref == format('refs/pull/{0}/merge', github.event.pull_request.number)"
         "github.workflow_ref == format('{0}/.github/workflows/ci.yml@{1}', github.repository, github.ref)"
     ) -join ' && '
     $preflightCondition = ('${{ !(' + $sharedPrEntry + ') }}')
-    $versionCondition = ('${{ !cancelled() && (needs.preflight.result == ''success'' || ' +
-        '(needs.preflight.result == ''skipped'' && ' + $sharedPrEntry + ')) }}')
+    Assert-Policy ($checkout.uses -cmatch '^actions/checkout@[0-9a-f]{40}$' -and
+        $checkout.with.'fetch-depth' -eq 0 -and $checkout.with.'persist-credentials' -eq $false -and
+        !$checkout.if -and !$checkout.'continue-on-error') 'Compatibility must check out the revision and history before running local preflight.'
     Assert-Policy (($localPreflight.if -replace '\s+', ' ') -ceq $preflightCondition -and
-        !$localPreflight.needs -and !$localPreflight.'continue-on-error' -and
-        $localPreflight.steps.uses -ccontains './.github/actions/preflight') 'Skip local preflight only for the shared PR entry.'
-    Assert-Policy ($version.needs -ceq 'preflight' -and !$version.'continue-on-error' -and
-        ($version.if -replace '\s+', ' ') -ceq $versionCondition) 'Version selection requires successful local preflight or an intentional skip by the exact shared PR caller.'
+        $localPreflight.uses -ceq './.github/actions/preflight' -and
+        $localPreflight.'timeout-minutes' -eq 10 -and !$localPreflight.'continue-on-error') 'Skip the local preflight step only for the shared PR entry.'
+    foreach ($step in $version.steps | Select-Object -Skip 2) {
+        Assert-Policy (!$step.if -and !$step.'continue-on-error') 'Version selection cannot bypass a failed local preflight.'
+    }
     foreach ($job in @('build-standalone', 'build-tests')) {
         Assert-PreflightDependency -Job $Integration.jobs[$job] -CheckJob 'set-version-number'
     }
@@ -132,13 +138,24 @@ catch {
     }
 }
 $brokenIntegration = $integration | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
-$brokenIntegration.jobs.'set-version-number'.if = '${{ !cancelled() }}'
+$brokenIntegration.jobs.'set-version-number'.needs = 'preflight'
 try {
     Assert-CompatibilityPreflight -Ci $ci -Integration $brokenIntegration
-    throw 'Failed or accidentally skipped preflight could start version selection.'
+    throw 'The version job accepted a potentially skipped ancestor.'
 }
 catch {
-    if ($_.Exception.Message -cne 'Version selection requires successful local preflight or an intentional skip by the exact shared PR caller.') {
+    if ($_.Exception.Message -cne 'Compatibility version selection cannot inherit a skipped preflight job.') {
+        throw
+    }
+}
+$brokenIntegration = $integration | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
+$brokenIntegration.jobs.'set-version-number'.steps[1].'continue-on-error' = $true
+try {
+    Assert-CompatibilityPreflight -Ci $ci -Integration $brokenIntegration
+    throw 'A failed local preflight could start version selection.'
+}
+catch {
+    if ($_.Exception.Message -cne 'Skip the local preflight step only for the shared PR entry.') {
         throw
     }
 }

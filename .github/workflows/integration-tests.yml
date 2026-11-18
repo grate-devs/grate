@@ -23,37 +23,8 @@ permissions:
 
   
 jobs:
-  preflight:
-    name: Build-independent checks
-    # The PR entry point already requires its preflight at the caller boundary.
-    # Every other entry point must run the local preflight before resolving a version.
-    if: >-
-      ${{
-        !(github.event_name == 'pull_request'
-          && github.ref == format('refs/pull/{0}/merge', github.event.pull_request.number)
-          && github.workflow_ref == format('{0}/.github/workflows/ci.yml@{1}', github.repository, github.ref))
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/preflight
-
   set-version-number:
     name: Set version number
-    needs: preflight
-    if: >-
-      ${{
-        !cancelled() && (needs.preflight.result == 'success'
-          || (needs.preflight.result == 'skipped'
-            && github.event_name == 'pull_request'
-            && github.ref == format('refs/pull/{0}/merge', github.event.pull_request.number)
-            && github.workflow_ref == format('{0}/.github/workflows/ci.yml@{1}', github.repository, github.ref)))
-      }}
     runs-on: ubuntu-latest
     outputs:
       nuGetVersion: ${{ steps.gitversion.outputs.majorMinorPatch }}
@@ -63,9 +34,22 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: 0
+        persist-credentials: false
+
+    - name: Build-independent checks
+      # A skipped preflight job propagates through dependent jobs. Skip only
+      # this step when the PR caller has already completed its own preflight.
+      if: >-
+        ${{
+          !(github.event_name == 'pull_request'
+            && github.ref == format('refs/pull/{0}/merge', github.event.pull_request.number)
+            && github.workflow_ref == format('{0}/.github/workflows/ci.yml@{1}', github.repository, github.ref))
+        }}
+      timeout-minutes: 10
+      uses: ./.github/actions/preflight
 
     - name: Setup .NET 11 and .NET 10
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1; public-feed redirect sanitization (#830)

@@ -12,8 +12,9 @@ grate. Run its script checks locally with `pwsh -File scripts/ci/Invoke-Prefligh
 In `CI`, the existing `PR validation policy` job runs this preflight. Build and
 Basic_tests wait for it; database, CodeQL and packaging jobs then wait for Build
 and Basic_tests. Compatibility starts after that same PR preflight and runs the
-full version matrix in the same run. Direct integration runs from a push to main
-or manual dispatch perform their own preflight before version resolution. Release
+full version matrix in the same run. The version job skips its local preflight
+step only for that PR caller. Direct integration runs from a push to main or a
+manual dispatch run the step before resolving a version. Release
 artifact, installation and WinGet workflows also run their own preflight. Failed,
 cancelled or unexpectedly skipped preflight prevents its build jobs from
 starting. The final `PR validation` and `CI result` checks still run to report
