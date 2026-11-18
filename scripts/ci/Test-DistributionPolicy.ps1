@@ -47,7 +47,32 @@ $integrationJob = $integration.jobs.'cli-database-integration-tests'
 if ($integrationJob.Contains('continue-on-error') -or @($integrationJob.strategy.matrix.variant).Count -ne 2) {
     throw 'All and slim version-matrix tests must propagate failures.'
 }
-foreach ($entry in $integrationJob.strategy.matrix.database) {
+$matrixJob = $integration.jobs.preflight
+$matrixStep = @($matrixJob.steps | Where-Object id -CEQ 'matrix')
+if ($integrationJob.strategy.matrix.database -cne '${{ fromJSON(needs.preflight.outputs.databases) }}' -or
+    $integrationJob.needs -cnotcontains 'preflight' -or
+    $matrixJob.outputs.databases -cne '${{ steps.matrix.outputs.databases }}' -or
+    $matrixStep.Count -ne 1 -or $matrixStep[0].Contains('if') -or $matrixStep[0].Contains('continue-on-error')) {
+    throw 'The compatibility matrix must come from a successful preflight plan.'
+}
+$matrixSelector = Join-Path $PSScriptRoot 'Get-CompatibilityDatabases.ps1'
+$fullMatrix = @(& $matrixSelector -Tier full)
+$expectedNames = @(
+    'SqlServer 2025', 'SqlServer 2022', 'SqlServer 2019', 'SqlServer 2017', 'SqlServer case-sensitive 2022',
+    'PostgreSQL 18', 'PostgreSQL 17', 'PostgreSQL 16', 'PostgreSQL 15', 'PostgreSQL 14', 'PostgreSQL 13', 'PostgreSQL 12',
+    'MariaDB 13', 'MariaDB 12', 'MariaDB 11', 'MariaDB 10.4', 'MariaDB 10.10', 'Sqlite',
+    'Oracle Free latest', 'Oracle XE latest', 'Oracle XE 18'
+)
+if (($fullMatrix.name -join ',') -cne ($expectedNames -join ',')) {
+    throw 'Require all 21 compatibility database configurations in the full matrix.'
+}
+$previewRef = 'refs/heads/ci/942-compatibility-tier-preview'
+$preview = @(& $matrixSelector -Tier pr-preview -EventName workflow_dispatch -Ref $previewRef)
+$expectedPreview = 'SqlServer 2025,SqlServer case-sensitive 2022,PostgreSQL 18,MariaDB 12,Sqlite,Oracle Free latest'
+if (($preview.name -join ',') -cne $expectedPreview) {
+    throw 'The preview must exercise six current representative configurations.'
+}
+foreach ($entry in $fullMatrix) {
     if ($entry.distribution -cne $expected[$entry.type]) {
         throw "Incorrect version-matrix distribution for $($entry.name)."
     }
@@ -75,6 +100,13 @@ function Assert-Rejected {
     if (!$rejected) {
         throw 'Expected the incorrect artifact or suite mapping to be rejected.'
     }
+}
+
+Assert-Rejected -MessagePattern 'only available for manual measurement' -Action {
+    & $matrixSelector -Tier pr-preview -EventName pull_request -Ref $previewRef
+}
+Assert-Rejected -MessagePattern 'only available for manual measurement' -Action {
+    & $matrixSelector -Tier pr-preview -EventName workflow_dispatch -Ref 'refs/heads/main'
 }
 
 # Independent package fixtures distinguish missing selected clients and leaked
