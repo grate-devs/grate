@@ -1,0 +1,73 @@
+name: NuGet cache timing preview
+on:
+  push:
+    branches: [ci/942-nuget-cache-preview]
+
+permissions:
+  contents: read
+
+env:
+  CACHE_KEY: 942-nuget-preview-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+jobs:
+  prime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Isolate NuGet caches
+        run: |
+          echo "NUGET_PACKAGES=$RUNNER_TEMP/grate-nuget-packages" >> "$GITHUB_ENV"
+          echo "NUGET_HTTP_CACHE_PATH=$RUNNER_TEMP/grate-nuget-http-cache" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Prime NuGet packages
+        run: dotnet restore -r linux-x64 grate.slnx
+      - name: Save NuGet package cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ env.CACHE_KEY }}
+
+  compare:
+    name: Restore (${{ matrix.mode }})
+    needs: prime
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [cold, cached]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Isolate NuGet caches
+        run: |
+          echo "NUGET_PACKAGES=$RUNNER_TEMP/grate-nuget-packages" >> "$GITHUB_ENV"
+          echo "NUGET_HTTP_CACHE_PATH=$RUNNER_TEMP/grate-nuget-http-cache" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Fetch NuGet package cache
+        if: matrix.mode == 'cached'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ env.CACHE_KEY }}
+          fail-on-cache-miss: true
+      - name: Restore dependencies
+        run: dotnet restore -r linux-x64 grate.slnx
+      - name: Verify the restored CLI builds
+        run: dotnet build --no-restore --no-self-contained -r linux-x64 src/grate/grate.csproj -c release
