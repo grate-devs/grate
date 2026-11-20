@@ -22,7 +22,7 @@ try {
             Assert-Equal 1 ([regex]::Matches($primary, [regex]::Escape($asset))).Count "Primary asset: $asset"
         }
         foreach ($title in @(
-            'ZIP (54 release files)', 'MSI (12 release files)', 'Debian (12 release files)',
+            'ZIP (54 release files)', 'NativeAOT ZIP (54 release files)', 'MSI (12 release files)', 'Debian (12 release files)',
             'NuGet tools (6 package identities)', 'Docker (6 images, 12 platform variants)',
             'WinGet (6 candidate identities, 30 installer selections)', 'Chocolatey (6 package candidates)',
             'Homebrew casks (6 recipes, 12 architecture selections)', 'Homebrew source formulas (6 candidates)',

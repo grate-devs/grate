@@ -3,11 +3,18 @@
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <IsPublishable>false</IsPublishable>
+    <InterceptorsNamespaces Condition="'$(PublishAot)' == 'true'">$(InterceptorsNamespaces);Dapper.AOT</InterceptorsNamespaces>
   </PropertyGroup>
   
   <ItemGroup>
+    <PackageReference Include="Dapper.AOT" Condition="'$(PublishAot)' == 'true'" PrivateAssets="contentfiles;analyzers;build;buildtransitive" />
     <PackageReference Include="Oracle.ManagedDataAccess.Core" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
+  <!-- Only NativeAOT source builds opt in; ordinary NuGet packages use Dapper. -->
+  <ItemGroup Condition="'$(PublishAot)' != 'true'">
+    <Compile Remove="DapperAot.cs" />
   </ItemGroup>
   
   <ItemGroup>

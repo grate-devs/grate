@@ -5,6 +5,7 @@
     <RootNamespace>grate</RootNamespace>
     <SourceRevisionId>build$([System.DateTime]::UtcNow.ToString("O"))</SourceRevisionId>
     <IsPublishable>false</IsPublishable>
+    <InterceptorsNamespaces Condition="'$(PublishAot)' == 'true'">$(InterceptorsNamespaces);Dapper.AOT</InterceptorsNamespaces>
   </PropertyGroup>
   
   <ItemGroup>
@@ -42,6 +43,12 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting"  />
     <PackageReference Include="Dapper" />
+    <PackageReference Include="Dapper.AOT" Condition="'$(PublishAot)' == 'true'" PrivateAssets="contentfiles;analyzers;build;buildtransitive" />
+  </ItemGroup>
+
+  <!-- Only NativeAOT source builds opt in; ordinary NuGet packages use Dapper. -->
+  <ItemGroup Condition="'$(PublishAot)' != 'true'">
+    <Compile Remove="DapperAot.cs" />
   </ItemGroup>
 
   <ItemGroup>

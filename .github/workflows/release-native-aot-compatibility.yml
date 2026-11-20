@@ -1,0 +1,152 @@
+name: Release · NativeAOT database compatibility
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: NativeAOT compatibility ${{ matrix.variant }} / ${{ matrix.database.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.database.type == 'Oracle' && 50 || 40 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [All, Slim]
+        # Keep the complete active CLI database/image matrix in integration-tests.yml.
+        database:
+          - name: "SqlServer 2025"
+            type: SqlServer
+            distribution: SQLServer
+            image: "mcr.microsoft.com/mssql/server:2025-latest"
+          - name: "SqlServer 2022"
+            type: SqlServer
+            distribution: SQLServer
+            image: "mcr.microsoft.com/mssql/server:2022-latest"
+          - name: "SqlServer 2019"
+            type: SqlServer
+            distribution: SQLServer
+            image: "mcr.microsoft.com/mssql/server:2019-CU26-ubuntu-20.04"
+          - name: "SqlServer 2017"
+            type: SqlServer
+            distribution: SQLServer
+            image: "mcr.microsoft.com/mssql/server:2017-latest"
+          - name: "SqlServer case-sensitive 2022"
+            type: SqlServerCaseSensitive
+            distribution: SQLServer
+            image: "mcr.microsoft.com/mssql/server:2022-latest"
+          - name: "PostgreSQL 18"
+            type: PostgreSQL
+            distribution: PostgreSQL
+            image: "postgres:18"
+          - name: "PostgreSQL 17"
+            type: PostgreSQL
+            distribution: PostgreSQL
+            image: "postgres:17"
+          - name: "PostgreSQL 16"
+            type: PostgreSQL
+            distribution: PostgreSQL
+            image: "postgres:16"
+          - name: "PostgreSQL 15"
+            type: PostgreSQL
+            distribution: PostgreSQL
+            image: "postgres:15"
+          - name: "PostgreSQL 14"
+            type: PostgreSQL
+            distribution: PostgreSQL
+            image: "postgres:14"
+          - name: "PostgreSQL 13"
+            type: PostgreSQL
+            distribution: PostgreSQL
+            image: "postgres:13"
+          - name: "PostgreSQL 12"
+            type: PostgreSQL
+            distribution: PostgreSQL
+            image: "postgres:12"
+          - name: "MariaDB 13"
+            type: MariaDB
+            distribution: MariaDB
+            image: "mariadb:13.0-rc"
+          - name: "MariaDB 12"
+            type: MariaDB
+            distribution: MariaDB
+            image: "mariadb:12"
+          - name: "MariaDB 11"
+            type: MariaDB
+            distribution: MariaDB
+            image: "mariadb:11"
+          - name: "MariaDB 10.4"
+            type: MariaDB
+            distribution: MariaDB
+            image: "mariadb:10.4"
+          - name: "MariaDB 10.10"
+            type: MariaDB
+            distribution: MariaDB
+            image: "mariadb:10.10"
+          - name: "Sqlite"
+            type: Sqlite
+            distribution: SQLite
+            image: "irrelevant"
+          - name: "Oracle Free latest"
+            type: Oracle
+            distribution: Oracle
+            image: "gvenzl/oracle-free:latest-faststart"
+          - name: "Oracle XE latest"
+            type: Oracle
+            distribution: Oracle
+            image: "gvenzl/oracle-xe:latest-faststart"
+          - name: "Oracle XE 18"
+            type: Oracle
+            distribution: Oracle
+            image: "gvenzl/oracle-xe:18-faststart"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Select distribution identity
+        id: distribution
+        shell: pwsh
+        run: |
+          . ./scripts/release/distribution_profiles.ps1
+          $profile = Get-GrateDistribution -Name '${{ matrix.variant == 'All' && 'All' || matrix.database.distribution }}'
+          "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+      - name: Download this run's release candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: release-${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-${{ inputs.version }}.zip
+          path: ${{ runner.temp }}/nativeaot-compatibility-archive
+      - name: Test archived NativeAOT CLI database compatibility
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          LogLevel: Warning
+          TZ: UTC
+          GrateTestConfig__DockerImage: ${{ matrix.database.image }}
+        run: |
+          $parameters = @{
+            Distribution = '${{ matrix.variant == 'All' && 'All' || matrix.database.distribution }}'
+            Database = '${{ matrix.database.type }}'
+            RuntimeIdentifier = 'linux-x64'
+            OutputDirectory = '${{ runner.temp }}/nativeaot-compatibility-tests'
+            NativeAot = $true
+            NativeAotArchive = '${{ runner.temp }}/nativeaot-compatibility-archive/${{ steps.distribution.outputs.package-id }}-linux-x64-nativeaot-' + $env:PACKAGE_VERSION + '.zip'
+          }
+          ./scripts/ci/Invoke-DistributionTests.ps1 @parameters
+      - name: Retain NativeAOT compatibility test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nativeaot-compatibility-results-${{ matrix.variant }}-${{ matrix.database.name }}
+          path: ${{ runner.temp }}/nativeaot-compatibility-tests/results/
+          if-no-files-found: warn
+          retention-days: 3

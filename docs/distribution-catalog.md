@@ -86,6 +86,67 @@ Self-contained CLI archives for Windows, Linux glibc/musl and macOS. Each archiv
 | Oracle | `osx-x64` | `grate-oracle-osx-x64-self-contained-<version>.zip` | [workflow runs][release-runs] |
 | Oracle | `osx-arm64` | `grate-oracle-osx-arm64-self-contained-<version>.zip` | [workflow runs][release-runs] |
 
+## NativeAOT ZIP (54 release files)
+
+Optional fully trimmed, ahead-of-time compiled CLI archives on the same platforms. Extract the complete archive, including native database libraries. Package-manager channels continue to use the ordinary builds.
+
+| Profile | Platform / framework | Package / artifact | Build results |
+| --- | --- | --- | --- |
+| All | `win-x64` | `grate-win-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `win-x86` | `grate-win-x86-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `win-arm64` | `grate-win-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `linux-musl-x64` | `grate-linux-musl-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `linux-musl-arm64` | `grate-linux-musl-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `linux-x64` | `grate-linux-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `linux-arm64` | `grate-linux-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `osx-x64` | `grate-osx-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| All | `osx-arm64` | `grate-osx-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `win-x64` | `grate-sqlite-win-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `win-x86` | `grate-sqlite-win-x86-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `win-arm64` | `grate-sqlite-win-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `linux-musl-x64` | `grate-sqlite-linux-musl-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `linux-musl-arm64` | `grate-sqlite-linux-musl-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `linux-x64` | `grate-sqlite-linux-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `linux-arm64` | `grate-sqlite-linux-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `osx-x64` | `grate-sqlite-osx-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLite | `osx-arm64` | `grate-sqlite-osx-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `win-x64` | `grate-sqlserver-win-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `win-x86` | `grate-sqlserver-win-x86-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `win-arm64` | `grate-sqlserver-win-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `linux-musl-x64` | `grate-sqlserver-linux-musl-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `linux-musl-arm64` | `grate-sqlserver-linux-musl-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `linux-x64` | `grate-sqlserver-linux-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `linux-arm64` | `grate-sqlserver-linux-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `osx-x64` | `grate-sqlserver-osx-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| SQLServer | `osx-arm64` | `grate-sqlserver-osx-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `win-x64` | `grate-mariadb-win-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `win-x86` | `grate-mariadb-win-x86-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `win-arm64` | `grate-mariadb-win-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `linux-musl-x64` | `grate-mariadb-linux-musl-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `linux-musl-arm64` | `grate-mariadb-linux-musl-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `linux-x64` | `grate-mariadb-linux-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `linux-arm64` | `grate-mariadb-linux-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `osx-x64` | `grate-mariadb-osx-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| MariaDB | `osx-arm64` | `grate-mariadb-osx-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `win-x64` | `grate-postgresql-win-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `win-x86` | `grate-postgresql-win-x86-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `win-arm64` | `grate-postgresql-win-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `linux-musl-x64` | `grate-postgresql-linux-musl-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `linux-musl-arm64` | `grate-postgresql-linux-musl-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `linux-x64` | `grate-postgresql-linux-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `linux-arm64` | `grate-postgresql-linux-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `osx-x64` | `grate-postgresql-osx-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| PostgreSQL | `osx-arm64` | `grate-postgresql-osx-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `win-x64` | `grate-oracle-win-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `win-x86` | `grate-oracle-win-x86-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `win-arm64` | `grate-oracle-win-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `linux-musl-x64` | `grate-oracle-linux-musl-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `linux-musl-arm64` | `grate-oracle-linux-musl-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `linux-x64` | `grate-oracle-linux-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `linux-arm64` | `grate-oracle-linux-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `osx-x64` | `grate-oracle-osx-x64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+| Oracle | `osx-arm64` | `grate-oracle-osx-arm64-nativeaot-<version>.zip` | [workflow runs][release-runs] |
+
 ## MSI (12 release files)
 
 Per-user Windows installers with a separate upgrade family per profile/architecture, wrapping the matching self-contained executable.
@@ -253,6 +314,6 @@ These library APIs remain alongside the CLI distributions; they are not extra Al
 | grate.postgresql | `net8.0, net9.0, net10.0, net11.0` | `grate.postgresql.<version>.nupkg + grate.postgresql.<version>.snupkg` | [workflow runs][release-runs] |
 | grate.oracle | `net8.0, net9.0, net10.0, net11.0` | `grate.oracle.<version>.nupkg + grate.oracle.<version>.snupkg` | [workflow runs][release-runs] |
 
-The primary release inventory is 54 ZIPs + 12 MSIs + 12 Debian packages = 78 payloads, plus `checksums.sha256` and `release-manifest.json` (80 uploaded files). GitHub source archives, registries, package-manager recipes and retained test reports have separate counts.
+The primary release inventory is 108 ZIPs + 12 MSIs + 12 Debian packages = 132 payloads, plus `checksums.sha256` and `release-manifest.json` (134 uploaded files). GitHub source archives, registries, package-manager recipes and retained test reports have separate counts.
 
 [release-runs]: https://github.com/grate-devs/grate/actions/workflows/build.yml?query=branch%3Amain

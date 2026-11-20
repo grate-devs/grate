@@ -85,12 +85,16 @@ Shared preflight runs the generator with `-Check` and rejects stale content. Edi
 
 '@)
 
-foreach ($format in @('ZIP', 'MSI', 'Debian')) {
-    $extension = @{ ZIP = '.zip'; MSI = '.msi'; Debian = '.deb' }[$format]
+foreach ($format in @('ZIP', 'NativeAOT ZIP', 'MSI', 'Debian')) {
+    $extension = @{ ZIP = '.zip'; 'NativeAOT ZIP' = '.zip'; MSI = '.msi'; Debian = '.deb' }[$format]
     $rows = @(foreach ($distribution in $distributions) {
         foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension $extension) {
+            if ($extension -eq '.zip' -and $asset.Contains('-nativeaot-') -ne ($format -eq 'NativeAOT ZIP')) {
+                continue
+            }
             $platform = switch ($format) {
                 ZIP { $asset.Substring($distribution.PackageId.Length + 1).Split('-self-contained-')[0] }
+                'NativeAOT ZIP' { $asset.Substring($distribution.PackageId.Length + 1).Split('-nativeaot-')[0] }
                 MSI { $asset.Substring($distribution.PackageId.Length + 5).Split('-<version>')[0] }
                 Debian { 'linux-' + ($asset -split '_')[-1].Replace('.deb', '') }
             }
@@ -99,6 +103,7 @@ foreach ($format in @('ZIP', 'MSI', 'Debian')) {
     })
     $description = switch ($format) {
         ZIP { 'Self-contained CLI archives for Windows, Linux glibc/musl and macOS. Each archive bundles the .NET runtime.' }
+        'NativeAOT ZIP' { 'Optional fully trimmed, ahead-of-time compiled CLI archives on the same platforms. Extract the complete archive, including native database libraries. Package-manager channels continue to use the ordinary builds.' }
         MSI { 'Per-user Windows installers with a separate upgrade family per profile/architecture, wrapping the matching self-contained executable.' }
         Debian { 'Linux packages wrapping the matching self-contained executable. Debian metadata normalizes prerelease ordering; release filenames retain SemVer.' }
     }
@@ -130,7 +135,7 @@ $rows = @(foreach ($distribution in $distributions) {
         $architecture = $asset.Substring($distribution.PackageId.Length + 5).Split('-<version>')[0]
         New-CatalogRow -Distribution $distribution.Name -Platform "$architecture MSI" -Artifact "$identifier → $asset"
     }
-    foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension '.zip' | Where-Object { $_.Contains('-win-') }) {
+    foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension '.zip' | Where-Object { $_.Contains('-win-') -and $_.Contains('-self-contained-') }) {
         $architecture = $asset.Substring($distribution.PackageId.Length + 1).Split('-self-contained-')[0]
         New-CatalogRow -Distribution $distribution.Name -Platform "$architecture portable ZIP" -Artifact "$identifier → $asset"
     }
@@ -143,7 +148,7 @@ $rows = @(foreach ($distribution in $distributions) {
 Add-CatalogTable -Title "Chocolatey ($($rows.Count) package candidates)" -Description 'These Windows x64 packages embed the matching self-contained executable. The build retains candidates without submitting them to the Chocolatey feed.' -Rows $rows
 
 $rows = @(foreach ($distribution in $distributions) {
-    foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension '.zip' | Where-Object { $_.Contains('-osx-') }) {
+    foreach ($asset in Get-ProfileAssets -Distribution $distribution -Extension '.zip' | Where-Object { $_.Contains('-osx-') -and $_.Contains('-self-contained-') }) {
         $architecture = $asset.Substring($distribution.PackageId.Length + 1).Split('-self-contained-')[0]
         New-CatalogRow -Distribution $distribution.Name -Platform $architecture -Artifact "erikbra/cask/$($distribution.PackageId) → $asset"
     }

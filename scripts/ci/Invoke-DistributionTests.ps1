@@ -8,12 +8,51 @@ param(
     [string]$Database,
     [Parameter(Mandatory)]
     [string]$OutputDirectory,
-    [string]$RuntimeIdentifier = 'linux-x64'
+    [string]$RuntimeIdentifier = 'linux-x64',
+    [switch]$NativeAot,
+    [string]$NativeAotArchive
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/Distribution.Common.ps1"
+
+function Expand-NativeAotArchive {
+    param(
+        [string]$ArchivePath,
+        [string]$Distribution,
+        [string]$RuntimeIdentifier,
+        [string]$OutputDirectory
+    )
+
+    $packageId = if ($Distribution -eq 'All') { 'grate' } else { 'grate-' + $Distribution.ToLowerInvariant() }
+    $archiveName = [IO.Path]::GetFileName($ArchivePath)
+    if (!$archiveName.StartsWith("$packageId-$RuntimeIdentifier-nativeaot-", [StringComparison]::Ordinal) -or
+        !$archiveName.EndsWith('.zip', [StringComparison]::Ordinal)) {
+        throw 'The NativeAOT archive name must match the selected distribution and runtime.'
+    }
+    # The framework extractor rejects entries outside the destination directory.
+    [IO.Compression.ZipFile]::ExtractToDirectory($ArchivePath, $OutputDirectory)
+    if (!$IsWindows) {
+        $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
+        try {
+            foreach ($entry in $archive.Entries) {
+                if (!$entry.FullName.EndsWith('/')) {
+                    $mode = ($entry.ExternalAttributes -shr 16) -band 0x1ff
+                    [IO.File]::SetUnixFileMode("$OutputDirectory/$($entry.FullName)", [IO.UnixFileMode]$mode)
+                }
+            }
+        } finally {
+            $archive.Dispose()
+        }
+        if ((([int][IO.File]::GetUnixFileMode("$OutputDirectory/grate")) -band 0x49) -eq 0) {
+            throw 'The NativeAOT ZIP executable has no Unix execute bits.'
+        }
+    }
+    if (Test-Path -LiteralPath "$OutputDirectory/grate.dll") {
+        throw 'The NativeAOT archive contains a managed CLI assembly.'
+    }
+}
 
 function Publish-DistributionCli {
     param(
@@ -136,7 +175,7 @@ function Build-DistributionTests {
         [string]$OutputDirectory
     )
 
-    # Tests retain normal All references; only the explicitly selected executable is slim.
+    # Tests retain normal JIT builds and All references; only the selected CLI changes.
     $buildArguments = @(
         'build', "unittests/CommandLine/CommandLine.$Database/CommandLine.$Database.csproj",
         '-c', 'Release', "-p:TargetFrameworks=$Framework", "-p:ArtifactsPath=$OutputDirectory/test-build"
@@ -150,7 +189,8 @@ function Invoke-DistributionSuites {
         [string]$Database,
         [string]$Framework,
         [string]$RuntimeIdentifier,
-        [string]$OutputDirectory
+        [string]$OutputDirectory,
+        [switch]$NativeAot
     )
 
     $testAssembly = "$OutputDirectory/test-build/bin/CommandLine.$Database/release_$Framework/CommandLine.$Database.dll"
@@ -158,8 +198,10 @@ function Invoke-DistributionSuites {
         throw "Missing built test assembly: $testAssembly"
     }
     $executableName = if ($RuntimeIdentifier.StartsWith('win-')) { 'grate.exe' } else { 'grate' }
-    foreach ($form in @('standalone', 'tool')) {
-        $env:GrateExecutablePath = "$OutputDirectory/$form/$executableName"
+    $forms = if ($NativeAot) { @('nativeaot') } else { @('standalone', 'tool') }
+    foreach ($form in $forms) {
+        $executableDirectory = if ($NativeAot) { "$OutputDirectory/nativeaot/extracted" } else { "$OutputDirectory/$form" }
+        $env:GrateExecutablePath = "$executableDirectory/$executableName"
         Assert-DistributionExecutable -Executable $env:GrateExecutablePath -Distribution $Distribution
         & $env:GrateExecutablePath skills install --local --path "$OutputDirectory/skills-$form"
         if (!(Test-Path -LiteralPath "$OutputDirectory/skills-$form/.agents/skills/use-grate/SKILL.md")) {
@@ -171,7 +213,8 @@ function Invoke-DistributionSuites {
         )
         dotnet @testArguments
     }
-    Write-Host "PASS: $Distribution standalone and installed tool passed CommandLine.$Database on $Framework."
+    $description = if ($NativeAot) { 'NativeAOT archive' } else { 'standalone and installed tool' }
+    Write-Host "PASS: $Distribution $description passed CommandLine.$Database on $Framework."
 }
 
 $databaseDistributions = @{
@@ -184,6 +227,12 @@ $databaseDistributions = @{
 }
 if ($Distribution -ne 'All' -and $Distribution -ne $databaseDistributions[$Database]) {
     throw "The $Database suite cannot validate a $Distribution distribution."
+}
+if ($NativeAotArchive -and !$NativeAot) {
+    throw '-NativeAotArchive requires -NativeAot.'
+}
+if ($NativeAotArchive) {
+    $NativeAotArchive = [IO.Path]::GetFullPath($NativeAotArchive)
 }
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $output = [IO.Path]::GetFullPath($OutputDirectory)
@@ -198,24 +247,38 @@ try {
     $framework = $frameworks[-1]
     $version = '0.0.0-ci.' + [Guid]::NewGuid().ToString('N')
     $packageId = if ($Distribution -eq 'All') { 'grate' } else { 'grate-' + $Distribution.ToLowerInvariant() }
-    $publishParameters = @{
-        Distribution = $Distribution
-        Framework = $framework
-        RuntimeIdentifier = $RuntimeIdentifier
-        Version = $version
-        OutputDirectory = $output
-    }
-    Publish-DistributionCli @publishParameters
+    if ($NativeAot) {
+        if ($NativeAotArchive) {
+            Expand-NativeAotArchive -ArchivePath $NativeAotArchive -Distribution $Distribution -RuntimeIdentifier $RuntimeIdentifier -OutputDirectory "$output/nativeaot/extracted"
+        } else {
+            $publishParameters = @{
+                Distribution = $Distribution
+                RuntimeIdentifier = $RuntimeIdentifier
+                Version = $version
+                OutputDirectory = "$output/nativeaot"
+            }
+            & "$PSScriptRoot/../release/Publish-NativeAot.ps1" @publishParameters
+        }
+    } else {
+        $publishParameters = @{
+            Distribution = $Distribution
+            Framework = $framework
+            RuntimeIdentifier = $RuntimeIdentifier
+            Version = $version
+            OutputDirectory = $output
+        }
+        Publish-DistributionCli @publishParameters
 
-    $toolParameters = @{
-        Distribution = $Distribution
-        Frameworks = $frameworks
-        Version = $version
-        PackageId = $packageId
-        OutputDirectory = $output
+        $toolParameters = @{
+            Distribution = $Distribution
+            Frameworks = $frameworks
+            Version = $version
+            PackageId = $packageId
+            OutputDirectory = $output
+        }
+        Build-DistributionTool @toolParameters
+        Install-DistributionTool -PackageId $packageId -Version $version -Framework $framework -OutputDirectory $output
     }
-    Build-DistributionTool @toolParameters
-    Install-DistributionTool -PackageId $packageId -Version $version -Framework $framework -OutputDirectory $output
     Build-DistributionTests -Database $Database -Framework $framework -OutputDirectory $output
 
     $suiteParameters = @{
@@ -224,6 +287,7 @@ try {
         Framework = $framework
         RuntimeIdentifier = $RuntimeIdentifier
         OutputDirectory = $output
+        NativeAot = $NativeAot
     }
     Invoke-DistributionSuites @suiteParameters
 } finally {

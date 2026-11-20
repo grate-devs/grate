@@ -1,0 +1,96 @@
+# Additional ZIPs only; ordinary CLI archives and package channels keep their producers.
+name: Release · NativeAOT CLI
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: NativeAOT ${{ matrix.distribution }} / ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [All, SQLite, SQLServer, MariaDB, PostgreSQL, Oracle]
+        rid: [win-x64, win-x86, win-arm64, linux-x64, linux-arm64, linux-musl-x64, linux-musl-arm64, osx-x64, osx-arm64]
+        include:
+          - { rid: win-x64, os: windows-latest, alpine: false }
+          - { rid: win-x86, os: windows-latest, alpine: false }
+          - { rid: win-arm64, os: windows-11-arm, alpine: false }
+          - { rid: linux-x64, os: ubuntu-24.04, alpine: false }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, alpine: false }
+          - { rid: linux-musl-x64, os: ubuntu-latest, alpine: true }
+          - { rid: linux-musl-arm64, os: ubuntu-24.04-arm, alpine: true }
+          - { rid: osx-x64, os: macos-15-intel, alpine: false }
+          - { rid: osx-arm64, os: macos-15, alpine: false }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        if: matrix.rid != 'osx-arm64'
+        with:
+          global-json-file: global.json
+      - uses: ./.github/actions/setup-dotnet-macos-arm64
+        if: matrix.rid == 'osx-arm64'
+        with:
+          global-json-file: global.json
+      - name: Install native Linux compiler prerequisites
+        if: runner.os == 'Linux' && !matrix.alpine
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang zlib1g-dev
+      - name: Publish, archive and execute NativeAOT CLI
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          ALPINE: ${{ matrix.alpine }}
+        run: |
+          $parameters = @{
+            Distribution = '${{ matrix.distribution }}'
+            RuntimeIdentifier = '${{ matrix.rid }}'
+            Version = $env:PACKAGE_VERSION
+            OutputDirectory = '${{ runner.temp }}/nativeaot'
+          }
+          if ($env:ALPINE -eq 'true') {
+            $PSNativeCommandUseErrorActionPreference = $true
+            $imageId = '${{ runner.temp }}/nativeaot-image.txt'
+            docker build --file scripts/release/NativeAot.Alpine.Dockerfile --iidfile $imageId .
+            $parameters.ContainerImage = (Get-Content -LiteralPath $imageId -Raw).Trim()
+          }
+          ./scripts/release/Publish-NativeAot.ps1 @parameters
+      - name: Select distribution identity
+        id: distribution
+        shell: pwsh
+        run: |
+          . ./scripts/release/distribution_profiles.ps1
+          $profile = Get-GrateDistribution -Name '${{ matrix.distribution }}'
+          "package-id=$($profile.PackageId)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+      - name: Upload verified NativeAOT release archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ steps.distribution.outputs.package-id }}-${{ matrix.rid }}-nativeaot-${{ inputs.version }}.zip
+          path: ${{ runner.temp }}/nativeaot/*-nativeaot-${{ inputs.version }}.zip
+          if-no-files-found: error
+      - name: Retain NativeAOT compiler and payload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nativeaot-evidence-${{ matrix.distribution }}-${{ matrix.rid }}
+          path: |
+            ${{ runner.temp }}/nativeaot/*.log
+            ${{ runner.temp }}/nativeaot/*.json
+            ${{ runner.temp }}/nativeaot/*.txt
+          if-no-files-found: warn
+          retention-days: 3

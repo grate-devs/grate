@@ -61,7 +61,7 @@ jobs:
         {
           echo "## Release contract ready"
           echo
-          echo "All NuGet packages, standalone archives, MSI installers, Debian packages, and the Docker build completed for \`$VERSION\`."
+          echo "All NuGet packages, ordinary and NativeAOT CLI archives, NativeAOT database checks, MSI installers, Debian packages, and the Docker build completed for \`$VERSION\`."
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Validate release assets and generate manifest
