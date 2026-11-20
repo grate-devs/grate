@@ -66,13 +66,13 @@ jobs:
         dotnet-version: 10.0.x
     - name: Install GitVersion
       if: ${{ github.event_name != 'release' && inputs.release_tag == '' }}
-      uses: gittools/actions/gitversion/setup@v4.7.0
+      uses: gittools/actions/gitversion/setup@v4.7.1
       with:
         versionSpec: '6.x'
     - name: Determine version
       if: ${{ github.event_name != 'release' && inputs.release_tag == '' }}
       id: gitversion
-      uses: gittools/actions/gitversion/execute@v4.7.0
+      uses: gittools/actions/gitversion/execute@v4.7.1
     - name: Resolve and validate release context
       id: release-context
       env:
