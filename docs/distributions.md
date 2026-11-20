@@ -3,6 +3,7 @@
 Choose `All`, `SQLite`, `SQLServer`, `MariaDB`, `PostgreSQL` or `Oracle` with
 the MSBuild property `GrateDistribution`. Every variant exposes the command
 `grate`. Omitting the property keeps the existing all-in-one distribution.
+Google BigQuery is only in the all-in-one distribution.
 
 | Profile | NuGet tool ID | Default database |
 | --- | --- | --- |

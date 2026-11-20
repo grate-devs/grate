@@ -10,7 +10,7 @@ deploy the same changes from your laptop, your tests, or your CI/CD pipeline.
 Use your database's SQL dialect and features without a migration DSL or an ORM.
 
 Supports **SQL Server (including Azure SQL), PostgreSQL, MariaDB/MySQL, SQLite,
-and Oracle**, on Windows, Linux, and macOS.
+Oracle, and Google BigQuery**, on Windows, Linux, and macOS.
 
 [Documentation](https://grate-devs.github.io/grate/) ·
 [Installation](docs/GettingGrate.md) ·

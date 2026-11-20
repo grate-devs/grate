@@ -359,6 +359,7 @@ public class Basic_CommandLineParsing
     [InlineData("--dbt=sqlite", DatabaseType.SQLite)]
     [InlineData("--dbt=oracle", DatabaseType.Oracle)]
     [InlineData("--dbt=mariadb", DatabaseType.MariaDB)]
+    [InlineData("--dbt=bigquery", DatabaseType.BigQuery)]
     [InlineData("--databasetype=mariadb", DatabaseType.MariaDB)]
     [InlineData("--databasetype=MariaDB", DatabaseType.MariaDB)]
     public async Task TestDatabaseType(string args, DatabaseType expected)

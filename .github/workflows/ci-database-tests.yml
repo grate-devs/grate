@@ -37,6 +37,9 @@ jobs:
           - os: ubuntu-latest
             category: Oracle
             test_filter: ''
+          - os: ubuntu-latest
+            category: BigQuery
+            test_filter: ''
           - os: windows-latest
             category: Sqlite
             test_filter: ''

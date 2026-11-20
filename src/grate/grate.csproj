@@ -121,6 +121,7 @@
   </ItemGroup>
   
   <ItemGroup>
+    <ProjectReference Include="..\grate.bigquery\grate.bigquery.csproj" Condition="'$(GrateDistribution)' == 'All'" />
     <ProjectReference Include="..\grate.mariadb\grate.mariadb.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'MariaDB'" />
     <ProjectReference Include="..\grate.oracle\grate.oracle.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'Oracle'" />
     <ProjectReference Include="..\grate.postgresql\grate.postgresql.csproj" Condition="'$(GrateDistribution)' == 'All' or '$(GrateDistribution)' == 'PostgreSQL'" />

@@ -13,6 +13,7 @@
     <File Path="NuGet.Config" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/grate.bigquery/grate.bigquery.csproj" />
     <Project Path="src/grate.core/grate.core.csproj" />
     <Project Path="src/grate.mariadb/grate.mariadb.csproj" />
     <Project Path="src/grate.oracle/grate.oracle.csproj" />
@@ -23,6 +24,7 @@
   </Folder>
   <Folder Name="/Unit tests/">
     <Project Path="unittests/Basic_tests/Basic_tests.csproj" />
+    <Project Path="unittests/BigQuery/BigQuery.csproj" />
     <Project Path="unittests/MariaDB/MariaDB.csproj" />
     <Project Path="unittests/Oracle/Oracle.csproj" />
     <Project Path="unittests/PostgreSQL/PostgreSQL.csproj" />
@@ -33,6 +35,7 @@
   </Folder>
   <Folder Name="/Unit tests/Command line tests/">
     <File Path="unittests/CommandLine/IncludeTests.targets" />
+    <Project Path="unittests/CommandLine/CommandLine.BigQuery/CommandLine.BigQuery.csproj" />
     <Project Path="unittests/CommandLine/CommandLine.Common/CommandLine.Common.csproj" />
     <Project Path="unittests/CommandLine/CommandLine.MariaDB/CommandLine.MariaDB.csproj" />
     <Project Path="unittests/CommandLine/CommandLine.Oracle/CommandLine.Oracle.csproj" />
@@ -42,6 +45,7 @@
     <Project Path="unittests/CommandLine/CommandLine.SqlServerCaseSensitive/CommandLine.SqlServerCaseSensitive.csproj" />
   </Folder>
   <Folder Name="/Unit tests/Docker tests/">
+    <Project Path="unittests/Docker/Docker.BigQuery/Docker.BigQuery.csproj" />
     <Project Path="unittests/Docker/Docker.Common/Docker.Common.csproj" />
     <Project Path="unittests/Docker/Docker.MariaDB/Docker.MariaDB.csproj" />
     <Project Path="unittests/Docker/Docker.Oracle/Docker.Oracle.csproj" />

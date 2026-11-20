@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Cloud.BigQuery.V2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\grate.core\grate.core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="NuGet.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Bootstrapping\Sql\**\*.sql" />
+    <None Remove="Bootstrapping\Sql\**\.sql**" />
+  </ItemGroup>
+
+</Project>

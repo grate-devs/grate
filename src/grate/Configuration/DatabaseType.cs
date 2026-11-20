@@ -7,6 +7,7 @@ public enum DatabaseType
     Oracle,
     PostgreSQL,
     MariaDB,
-    SQLite
+    SQLite,
+    BigQuery
 }
 

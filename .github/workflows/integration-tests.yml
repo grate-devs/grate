@@ -388,6 +388,18 @@ jobs:
             type: Oracle
             distribution: Oracle
             image: "gvenzl/oracle-xe:18-faststart"
+          - name: "BigQuery emulator"
+            type: BigQuery
+            distribution: All
+            image: "ghcr.io/goccy/bigquery-emulator:0.8.1"
+        exclude:
+          # BigQuery is only in the all-in-one CLI, so it has no slim CLI to test
+          - variant: Slim
+            database:
+              name: "BigQuery emulator"
+              type: BigQuery
+              distribution: All
+              image: "ghcr.io/goccy/bigquery-emulator:0.8.1"
 
 
     runs-on: ubuntu-latest
