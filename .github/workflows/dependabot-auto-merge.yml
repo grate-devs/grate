@@ -1,11 +1,6 @@
 name: CI · Dependabot auto-merge
 
 on:
-  # The required revision check belongs to the PR commit. Only the target
-  # event, whose workflow comes from the trusted base, can request a merge.
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review, auto_merge_disabled]
   pull_request_target:
     branches: [main]
     types: [opened, reopened, synchronize, ready_for_review]
@@ -14,12 +9,11 @@ permissions: {}
 
 jobs:
   metadata:
-    name: ${{ github.event_name == 'pull_request' && 'Dependabot auto-merge revision' || 'Inspect Dependabot update' }}
+    name: Inspect Dependabot update
     if: >-
       github.event.pull_request.user.login == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      ((github.event_name == 'pull_request' && github.event.pull_request.auto_merge != null) ||
-       (github.event_name == 'pull_request_target' && !github.event.pull_request.draft))
+      !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -27,40 +21,21 @@ jobs:
       pull-requests: read
     outputs:
       eligible: ${{ steps.classify.outputs.eligible }}
-      ecosystem: ${{ steps.metadata.outputs.package-ecosystem }}
+      ecosystem: ${{ steps.classify.outputs.ecosystem }}
     steps:
       - name: Check out trusted policy
         uses: &checkout actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: &trusted-base
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
-          sparse-checkout: scripts/ci
-      - name: Read verified Dependabot metadata
-        id: metadata
-        if: github.event.pull_request.commits == 1
-        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
-      - name: Check signed update types for this revision
+          sparse-checkout: |
+            scripts/ci
+            .github/actions/dependabot-update
+      - name: Classify the verified head
         id: classify
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
-          DEPENDENCIES: ${{ steps.metadata.outputs.updated-dependencies-json }}
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $eligible = $false
-          if ($env:DEPENDENCIES) {
-              $commit = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA" | ConvertFrom-Json
-              $dependencies = ConvertFrom-Json -InputObject $env:DEPENDENCIES -NoEnumerate
-              $eligible = ./scripts/ci/Confirm-DependabotUpdate.ps1 -UpdateType $env:UPDATE_TYPE -Dependencies $dependencies -Commit $commit -ExpectedHead $env:HEAD_SHA
-          }
-          if (!$eligible -and $env:GITHUB_EVENT_NAME -ceq 'pull_request') {
-              throw 'This revision is ineligible. Disable the pending auto-merge request before manual review.'
-          }
-          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "eligible=$($eligible.ToString().ToLowerInvariant())"
+        uses: ./.github/actions/dependabot-update
       - name: Check repository settings and active rules
-        if: github.event_name == 'pull_request_target' && steps.classify.outputs.eligible == 'true'
+        if: steps.classify.outputs.eligible == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

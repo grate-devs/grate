@@ -1,0 +1,38 @@
+name: CI · Dependabot revision
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, auto_merge_disabled]
+
+permissions: {}
+
+jobs:
+  revision:
+    # This static name is a required status even when GitHub skips the job.
+    name: Dependabot auto-merge revision
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.auto_merge != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out trusted policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci
+            .github/actions/dependabot-update
+      - name: Classify the verified head
+        id: classify
+        uses: ./.github/actions/dependabot-update
+      - name: Block a pending auto-merge on an ineligible revision
+        if: steps.classify.outputs.eligible != 'true'
+        shell: pwsh
+        run: throw 'This revision is ineligible. Disable the pending auto-merge request before manual review.'

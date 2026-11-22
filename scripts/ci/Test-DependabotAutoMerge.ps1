@@ -243,3 +243,22 @@ finally {
     Remove-Item -LiteralPath $eventFile
 }
 Write-Host 'Native auto-merge API fixture passed for eligible, stale, multi-commit, fork and access-denied PRs.'
+
+# GitHub can display an unevaluated expression as the name of a skipped job.
+# The ruleset needs the literal context even on PRs with no auto-merge request.
+Import-Module powershell-yaml -RequiredVersion 0.4.12 -ErrorAction Stop
+$workflowDirectory = Join-Path $PSScriptRoot '../../.github/workflows'
+$revisionJobs = @(foreach ($file in Get-ChildItem -LiteralPath $workflowDirectory -Filter '*dependabot*.yml') {
+    $workflow = Get-Content -Raw -LiteralPath $file | ConvertFrom-Yaml
+    foreach ($job in $workflow.jobs.Values) {
+        if ($job.name -ceq 'Dependabot auto-merge revision') {
+            if (!$workflow['on'].Contains('pull_request') -or $workflow['on'].Contains('pull_request_target')) {
+                throw 'The required revision check must belong to the PR workflow.'
+            }
+            $job.name
+        }
+    }
+})
+if ($revisionJobs.Count -ne 1) {
+    throw 'Expected exactly one literal Dependabot auto-merge revision job name.'
+}

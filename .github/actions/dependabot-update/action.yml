@@ -1,0 +1,33 @@
+name: Classify Dependabot update
+description: Corroborate update types against the signed event-head commit.
+outputs:
+  eligible:
+    description: Whether the verified revision contains only patch or minor updates.
+    value: ${{ steps.classify.outputs.eligible }}
+  ecosystem:
+    description: The package ecosystem reported by Dependabot.
+    value: ${{ steps.metadata.outputs.package-ecosystem }}
+runs:
+  using: composite
+  steps:
+    - name: Read verified Dependabot metadata
+      id: metadata
+      if: github.event.pull_request.commits == 1
+      uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+    - name: Check signed update types for this revision
+      id: classify
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        DEPENDENCIES: ${{ steps.metadata.outputs.updated-dependencies-json }}
+      run: |
+        $PSNativeCommandUseErrorActionPreference = $true
+        $eligible = $false
+        if ($env:DEPENDENCIES) {
+            $commit = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA" | ConvertFrom-Json
+            $dependencies = ConvertFrom-Json -InputObject $env:DEPENDENCIES -NoEnumerate
+            $eligible = ./scripts/ci/Confirm-DependabotUpdate.ps1 -UpdateType $env:UPDATE_TYPE -Dependencies $dependencies -Commit $commit -ExpectedHead $env:HEAD_SHA
+        }
+        Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "eligible=$($eligible.ToString().ToLowerInvariant())"
