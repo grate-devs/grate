@@ -1,0 +1,92 @@
+name: CI · Dependabot auto-merge
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions: {}
+
+jobs:
+  metadata:
+    name: Inspect Dependabot update
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      eligible: ${{ steps.classify.outputs.eligible }}
+      ecosystem: ${{ steps.classify.outputs.ecosystem }}
+    steps:
+      - name: Check out trusted policy
+        uses: &checkout actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: &trusted-base
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci
+            .github/actions/dependabot-update
+      - name: Classify the verified head
+        id: classify
+        uses: ./.github/actions/dependabot-update
+      - name: Check repository settings and active rules
+        if: steps.classify.outputs.eligible == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/ci/Assert-DependabotAutoMergeRules.ps1 -Repository $env:GITHUB_REPOSITORY
+
+  enable:
+    name: Enable squash auto-merge
+    needs: metadata
+    if: >-
+      github.event_name == 'pull_request_target' && needs.metadata.outputs.eligible == 'true' &&
+      !(needs.metadata.outputs.ecosystem == 'github_actions' && vars.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: *checkout
+        with: *trusted-base
+      - name: Request auto-merge for the verified head
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/ci/Enable-DependabotAutoMerge.ps1
+
+  enable-workflow-update:
+    name: Enable squash auto-merge for a workflow update
+    needs: metadata
+    if: >-
+      github.event_name == 'pull_request_target' && needs.metadata.outputs.eligible == 'true' &&
+      needs.metadata.outputs.ecosystem == 'github_actions' && vars.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    environment: dependabot-auto-merge
+    steps:
+      - uses: *checkout
+        with: *trusted-base
+      - name: Create a short-lived token for this repository
+        id: app
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+      - name: Request auto-merge for the verified head
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: ./scripts/ci/Enable-DependabotAutoMerge.ps1
