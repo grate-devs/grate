@@ -29,6 +29,9 @@ names; the validator recognizes only the explicitly mapped caller/leaf paths.
 Missing, duplicate, failed, cancelled or unexpectedly skipped producers remain
 failures. A successful report is not a substitute for a successful test phase.
 
+See [Dependabot auto-merge](../../docs/agents/pr-validation.md#dependabot-auto-merge)
+for required checks, token permissions and manual activation on `main`.
+
 ## Release
 
 [`build.yml`](build.yml) resolves the event's version/source, calls producers,

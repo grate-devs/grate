@@ -69,8 +69,9 @@ proposal**, not applied repository settings. It proposes:
 
 - PRs with no required approvals, stale approval dismissal and resolved review
   threads.
-- Required `PR validation`, `Security analysis / Analyze Code Security`, `Dependency Review` and
-  `NuGet dependency audit` from GitHub Actions (app ID 15368), on up-to-date PRs.
+- Required `PR validation`, `CI result`, `Security analysis / Analyze Code Security`,
+  `Dependency Review`, `NuGet dependency audit` and `Dependabot auto-merge revision`
+  from GitHub Actions (app ID 15368), on up-to-date PRs.
 - Native CodeQL protection rejecting high/critical security alerts, no additional
   non-security threshold. Green analysis alone does not enforce alert severity.
   Dependency Review and NuGet audit also use high/critical.
@@ -103,3 +104,82 @@ and separate verification.
 
 See GitHub's [required-check troubleshooting](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)
 and [`jobs.<job_id>.needs`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds).
+
+## Dependabot auto-merge
+
+Dependabot checks GitHub Actions and NuGet daily. The auto-merge workflow can
+request a squash merge of a single verified Dependabot commit from this repository
+to `main`. Every dependency in the commit must be a patch or minor update.
+A group containing a major or an unclassified dependency goes to manual review.
+The workflow neither reviews PRs nor grants a ruleset exception.
+
+### Configure main before enabling auto-merge
+
+1. Follow the activation sequence above. Configure an **active** PR ruleset on
+   `main`, keep required reviews and conversation resolution as agreed by
+   maintainers, and allow squash. Keep GitHub Actions and the optional merge App
+   off all applicable bypass lists. These rules affect every PR to `main`.
+2. Require up-to-date branches and select **GitHub Actions** (app ID `15368`)
+   as the expected source for each check below. Keep the native CodeQL rule
+   blocking high and critical security alerts. The disabled proposal includes
+   these checks for a maintainer to review before activation.
+
+   | Required check | What it protects |
+   | --- | --- |
+   | `PR validation` | Build, database tests and distribution matrix, including missing or cancelled producers |
+   | `CI result` | Final result across the CI phases, including isolated tests and security analysis |
+   | `Security analysis / Analyze Code Security` | Execution of the CodeQL analysis |
+   | `Dependency Review` | Vulnerability review of the PR's dependency changes |
+   | `NuGet dependency audit` | Audit of resolved direct and transitive packages |
+   | `Dependabot auto-merge revision` | Reclassification on a changed Dependabot PR that already has an auto-merge request |
+
+3. Inspect the effective server-side rules with
+   `gh api --paginate repos/grate-devs/grate/rules/branches/main`. The workflow
+   uses this metadata-readable endpoint so its token needs no administration
+   permission. Classic protection alone, evaluation-mode rules and an active
+   merge queue leave this workflow ineligible. A queue controls its own merge
+   method and would need CI support for `merge_group`.
+4. Enable **Allow squash merging** and **Allow auto-merge** in the repository's
+   pull request settings. The workflow requests native auto-merge for the
+   specific head SHA. GitHub waits for required checks, reviews and any other
+   merge requirements. With a strict ruleset a busy base can require a Dependabot
+   rebase and fresh CI.
+
+The write job runs trusted code from the base revision. Keep the normal Actions
+workflow permissions read-only. The job requests its own short-lived token
+permissions. Leave automatic PR approval disabled. If GitHub restricts the
+token or refuses the request, the PR stays available for manual review.
+
+For GitHub Actions updates that modify workflow files, GitHub can require
+`Workflows: write` on the merging identity. See the
+[GitHub CLI example of this rejection](https://github.com/cli/cli/issues/11493).
+To support these updates, install a dedicated GitHub App on this repository
+with Contents, Pull requests and Workflows write permissions. Create the
+`dependabot-auto-merge` environment, restrict deployment branches to the
+selected branch `main`, and store `DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY` **only**
+as an environment secret. Set the repository variable
+`DEPENDABOT_AUTOMERGE_APP_CLIENT_ID` last. The trusted GitHub Actions update
+job then mints a short-lived installation token for this repository. NuGet
+continues to use the built-in token. Keep the App off ruleset bypass lists.
+[GitHub's environment branch rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags)
+
+### Verify the rollout
+
+- On a fresh bot patch or minor update, confirm the merge box shows squash
+  auto-merge waiting for the required jobs and any outstanding review. Check
+  that missing or failing CI blocks merging even when dependency review passes.
+- On a bot major, an unclassified group, a fork and a human-authored PR,
+  confirm the workflow leaves auto-merge off. A configuration change alone
+  does not enroll open PRs. A subsequent eligible PR event reruns the policy.
+- If a previously enrolled PR changes, check the revision job on the new head.
+  An ineligible head with an outstanding request must be blocked. Disable
+  auto-merge on that PR to continue with manual review. Protect edits to CI
+  and its policy scripts through the repository's review process.
+- Verify the first authorized squash in GitHub, including the resulting
+  `push` workflows on `main`. The identity that performs the merge matters for
+  follow-on Actions events. To suspend the rollout, disable the workflow,
+  inspect open PRs and turn off their outstanding auto-merge requests before
+  relaxing branch protections.
+
+Run the policy and API fixtures with
+`pwsh -NoProfile -File scripts/ci/Test-DependabotAutoMerge.ps1`.
