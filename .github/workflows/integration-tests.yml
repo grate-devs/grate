@@ -60,12 +60,12 @@ jobs:
         global-json-file: global.json
         dotnet-version: 10.0.x
     - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v4.7.0
+      uses: gittools/actions/gitversion/setup@v5.0.0
       with:
         versionSpec: '6.x'
     - name: Determine Version
       id: gitversion
-      uses: gittools/actions/gitversion/execute@v4.7.0
+      uses: gittools/actions/gitversion/execute@v5.0.0
       
   build-standalone:
     name: Build ${{ matrix.distribution }} cli
